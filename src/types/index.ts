@@ -1,0 +1,238 @@
+export interface Branch {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface StoreSettings {
+  isTaxEnabled: boolean;
+  taxRate: number; // e.g. 11 for 11%
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  type: 'IN' | 'OUT' | 'ADJUST';
+  qty: number; // positive number, type dictates direction
+  reason: string;
+  date: string; // ISO String
+  branchId?: string;
+  userId: string;
+}
+
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  points: number;
+  debtAmount: number;
+  createdAt: string;
+  branchId?: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  address: string;
+  debtAmount: number;
+  createdAt: string;
+  branchId?: string;
+}
+
+export interface Promo {
+  id: string;
+  name: string;
+  type: 'PERCENTAGE' | 'FIXED';
+  value: number; // e.g. 10 for 10%, or 5000 for Rp 5000
+  minPurchase: number; // minimum total amount to apply
+  isActive: boolean;
+  createdAt: string;
+  branchId?: string;
+}
+
+export interface Attendance {
+  id: string;
+  userId: string;
+  userName: string;
+  date: string; // YYYY-MM-DD
+  clockIn: string; // ISO String
+  clockOut?: string; // ISO String
+  status: 'PRESENT' | 'LATE';
+  branchId?: string;
+}
+
+export interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  costPrice: number; // For Shariah margin calculation
+  stock: number;
+  minStock: number;
+  unit: string;
+  barcode?: string;
+  isHalal: boolean;
+  wholesalePrice?: number;
+  wholesaleMinQty?: number;
+  branchId?: string; // Optional for backward compatibility, but should be required eventually
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+export interface Transaction {
+  id: string;
+  invoiceNo: string;
+  timestamp: string;
+  cashierName: string;
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    costPrice: number;
+  }[];
+  totalAmount: number;
+  paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
+  amountPaid: number;
+  changeAmount: number;
+  zakatContribution: number; // 2.5% on pure profit if applicable
+  marginContribution: number; // total revenue - costPrice
+  customerId?: string;
+  customerName?: string;
+  promoId?: string;
+  discountAmount?: number;
+  branchId?: string;
+  // Phase 2 Enterprise additions
+  isVoided?: boolean;
+  voidReason?: string;
+  taxAmount?: number;
+  splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string;
+  category: 'POS' | 'INVENTORY' | 'FINANCE' | 'SYSTEM' | 'ZAKAT';
+  details: string;
+  ipAddress: string;
+}
+
+export interface ZakatCalculation {
+  id: string;
+  timestamp: string;
+  goldPricePerGram: number;
+  nisabValue: number; // 85 grams of gold
+  liquidAssets: number; // CASH + Bank Shariah balance
+  inventoryValue: number; // Cost Price of total inventory
+  receivables: number;
+  liabilities: number;
+  netWealth: number;
+  isZakatRequired: boolean;
+  zakatDue: number;
+  notes?: string;
+}
+
+export interface ZakatDistribution {
+  id: string;
+  timestamp: string;
+  amount: number;
+  recipient: string; // Fakir, Miskin, Amil, Muallaf, Riqab, Gharimin, Fisabilillah, Ibnu Sabil
+  esgCategory: 'ENVIRONMENTAL' | 'SOCIAL' | 'GOVERNANCE';
+  description: string;
+}
+
+export type UserRole = 'CASHIER' | 'ADMIN' | 'OWNER';
+
+export interface CurrentUser {
+  name: string;
+  username: string;
+  role: UserRole;
+  password?: string; // Optional for active credentials modification
+  branchId?: string;
+}
+
+export interface Expense {
+  id: string;
+  date: string; // Format: YYYY-MM-DD or YYYY-MM-DDTHH:mm
+  category: 'GAJI' | 'LISTRIK_AIR_WIFI' | 'SEWA_LAPAK' | 'OPERASIONAL' | 'LAINNYA';
+  amount: number;
+  description: string;
+  createdBy: string;
+  branchId?: string;
+}
+
+export interface ClosingRecord {
+  id: string;
+  date: string; // YYYY-MM-DD or YYYY-MM
+  type: 'DAILY' | 'MONTHLY';
+  revenue: number;
+  expensesTotal: number;
+  netProfit: number;
+  zakatContribution: number;
+  isBalanced: boolean;
+  notes: string;
+  createdBy: string;
+  timestamp: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  username: string;
+  password?: string;
+  role: UserRole;
+  createdAt: string;
+  isActive: boolean;
+  isApproved: boolean; // false = pending persetujuan Admin/Owner
+  approvedBy?: string;
+  approvedAt?: string;
+  phone?: string;
+  branchId?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  date: string;
+  supplier: string;
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    expectedPrice: number;
+  }[];
+  totalAmount: number;
+  status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  createdBy: string;
+  notes?: string;
+  branchId?: string;
+  invoiceSupplier?: string; // Untuk menyimpan referensi/URL invoice dari supplier
+}
+
+export type JournalSourceType = 'AUTO_TRANSAKSI' | 'AUTO_BEBAN' | 'AUTO_PO' | 'MANUAL';
+
+export interface JournalEntry {
+  id: string;
+  date: string;
+  account: string;
+  description: string;
+  debit: number;
+  credit: number;
+  referenceId?: string; // e.g. transaction id or expense id
+  referenceType?: JournalSourceType; // source classification
+  createdBy?: string;
+  branchId?: string;
+}
+

@@ -1,0 +1,6 @@
+{
+  "name": "SmartPOS Shariah",
+  "description": "Digital POS and Shariah Accounting system designed for Indonesian retail stores with interactive zakat calculators and audit logging",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
