@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Shield, UserCog, Trash2, Edit, Check, X, ShieldAlert, Clock, CheckCircle, UserX, Users, Store } from 'lucide-react';
+import { Shield, UserCog, Trash2, Edit, Check, X, ShieldAlert, Clock, CheckCircle, UserX, Users, Store, RefreshCw } from 'lucide-react';
 import { UserRole } from '../types';
 
 type Tab = 'ACTIVE' | 'PENDING';
 
 export default function AdminManagementPage() {
-  const { users, currentUser, updateUser, deleteUser, approveUser, rejectUser, branches } = useAppStore();
+  const { users, currentUser, updateUser, deleteUser, approveUser, rejectUser, branches, initializeStore, isLoading } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>('ACTIVE');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('CASHIER');
@@ -59,14 +59,24 @@ export default function AdminManagementPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex items-center space-x-3 mb-2">
-        <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">
-          <UserCog className="w-6 h-6" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+        <div className="flex items-center space-x-3">
+          <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">
+            <UserCog className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Manajemen Admin & Pengguna</h1>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">Kelola akses, role, dan persetujuan akun pengguna sistem.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Manajemen Admin & Pengguna</h1>
-          <p className="text-xs font-semibold text-slate-500 mt-0.5">Kelola akses, role, dan persetujuan akun pengguna sistem.</p>
-        </div>
+        <button
+          onClick={() => initializeStore()}
+          disabled={isLoading}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-all border border-slate-200 shadow-sm disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'Menyinkronkan...' : 'Refresh Data'}
+        </button>
       </div>
 
       {/* Info Box Aturan Role */}
