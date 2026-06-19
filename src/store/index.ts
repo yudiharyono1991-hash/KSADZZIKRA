@@ -116,14 +116,14 @@ interface AppState {
 }
 
 const DEFAULT_PRODUCTS: Product[] = [
-  { id: 'prod_1', sku: 'BRS-001', name: 'Beras Premium Cianjur 5kg', category: 'Sembako', price: 78000, costPrice: 68000, stock: 45, minStock: 10, unit: 'Pack', isHalal: true, barcode: '8991234560012' },
-  { id: 'prod_2', sku: 'MNG-002', name: 'Minyak Goreng SunCo 2L', category: 'Sembako', price: 34500, costPrice: 29000, stock: 32, minStock: 8, unit: 'Botol', isHalal: true, barcode: '8991234560029' },
-  { id: 'prod_3', sku: 'GLA-003', name: 'Gula Pasir Gulaku 1kg', category: 'Sembako', price: 17500, costPrice: 15000, stock: 40, minStock: 12, unit: 'Pack', isHalal: true, barcode: '8991234560036' },
-  { id: 'prod_4', sku: 'TLR-004', name: 'Telur Ayam Negeri 1kg', category: 'Sembako', price: 28000, costPrice: 24000, stock: 15, minStock: 15, unit: 'Kg', isHalal: true, barcode: '8991234560043' },
-  { id: 'prod_5', sku: 'BND-005', name: 'Ikan Bandeng Segar (Tanpa Duri)', category: 'Fresh Food', price: 42000, costPrice: 35000, stock: 8, minStock: 5, unit: 'Pack', isHalal: true, barcode: '8991234560050' },
-  { id: 'prod_6', sku: 'KPP-006', name: 'Kopi Kapal Api 380g', category: 'Minuman', price: 24900, costPrice: 21500, stock: 24, minStock: 6, unit: 'Pack', isHalal: true, barcode: '8991234560067' },
-  { id: 'prod_7', sku: 'TEH-007', name: 'Teh Celup Sariwangi isi 50', category: 'Minuman', price: 11000, costPrice: 9000, stock: 40, minStock: 8, unit: 'Kotak', isHalal: true, barcode: '8991234560074' },
-  { id: 'prod_8', sku: 'SBN-008', name: 'Sabun Lifebuoy Cair Refill 450ml', category: 'Kebutuhan Rumah', price: 23500, costPrice: 19500, stock: 18, minStock: 5, unit: 'Pouch', isHalal: true, barcode: '8991234560081' }
+  { id: 'prod_1', sku: 'BRS-001', name: 'Beras Premium Cianjur 5kg', category: 'Sembako', price: 78000, costPrice: 68000, stock: 45, minStock: 10, unit: 'Pack', isHalal: true, barcode: '8991234560012', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_2', sku: 'MNG-002', name: 'Minyak Goreng SunCo 2L', category: 'Sembako', price: 34500, costPrice: 29000, stock: 32, minStock: 8, unit: 'Botol', isHalal: true, barcode: '8991234560029', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_3', sku: 'GLA-003', name: 'Gula Pasir Gulaku 1kg', category: 'Sembako', price: 17500, costPrice: 15000, stock: 40, minStock: 12, unit: 'Pack', isHalal: true, barcode: '8991234560036', image: 'https://images.unsplash.com/photo-1581428982868-e410dd147a90?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_4', sku: 'TLR-004', name: 'Telur Ayam Negeri 1kg', category: 'Sembako', price: 28000, costPrice: 24000, stock: 15, minStock: 15, unit: 'Kg', isHalal: true, barcode: '8991234560043', image: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_5', sku: 'BND-005', name: 'Ikan Bandeng Segar (Tanpa Duri)', category: 'Fresh Food', price: 42000, costPrice: 35000, stock: 8, minStock: 5, unit: 'Pack', isHalal: true, barcode: '8991234560050', image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_6', sku: 'KPP-006', name: 'Kopi Kapal Api 380g', category: 'Minuman', price: 24900, costPrice: 21500, stock: 24, minStock: 6, unit: 'Pack', isHalal: true, barcode: '8991234560067', image: 'https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_7', sku: 'TEH-007', name: 'Teh Celup Sariwangi isi 50', category: 'Minuman', price: 11000, costPrice: 9000, stock: 40, minStock: 8, unit: 'Kotak', isHalal: true, barcode: '8991234560074', image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8c0a1?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_8', sku: 'SBN-008', name: 'Sabun Lifebuoy Cair Refill 450ml', category: 'Kebutuhan Rumah', price: 23500, costPrice: 19500, stock: 18, minStock: 5, unit: 'Pouch', isHalal: true, barcode: '8991234560081', image: 'https://images.unsplash.com/photo-1584824486516-0555a07fc511?auto=format&fit=crop&q=80&w=300' }
 ];
 
 const DEFAULT_TRANSACTIONS: Transaction[] = [
@@ -366,7 +366,13 @@ const getSavedAttendances = (): Attendance[] => {
 const getSavedSettings = (): StoreSettings => {
   const saved = localStorage.getItem('ba_settings');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
-  return { isTaxEnabled: false, taxRate: 11 };
+  return { 
+    isTaxEnabled: false, 
+    taxRate: 11,
+    ownerBankName: 'BSI (Bank Syariah Indonesia)',
+    ownerBankAccount: '7182938495',
+    qrisEnabled: true
+  };
 };
 
 const getSavedStockMovements = (): StockMovement[] => {
@@ -1013,6 +1019,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updated });
     localStorage.setItem('ba_users', JSON.stringify(updated));
     get().addLog('USER_REGISTER', 'SYSTEM', `Pendaftaran akun baru (PENDING): ${newUser.name} (@${newUser.username}) — menunggu persetujuan Admin.`);
+    
+    if (isSupabaseConfigured) {
+      supabaseService.saveUser(newUser);
+    }
     return true;
   },
 
@@ -1028,6 +1038,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     localStorage.setItem('ba_users', JSON.stringify(updated));
     const approvedUser = updated.find(u => u.id === id);
     get().addLog('USER_APPROVE', 'SYSTEM', `Akun disetujui: ${approvedUser?.name} (@${approvedUser?.username}) oleh ${approverName}`);
+    
+    if (isSupabaseConfigured && approvedUser) {
+      supabaseService.saveUser(approvedUser);
+    }
   },
 
   rejectUser: (id) => {
@@ -1037,6 +1051,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updated });
     localStorage.setItem('ba_users', JSON.stringify(updated));
     get().addLog('USER_REJECT', 'SYSTEM', `Pendaftaran ditolak: ${rejected?.name} (@${rejected?.username})`);
+    
+    if (isSupabaseConfigured) {
+      supabaseService.deleteUser(id);
+    }
   },
 
   updateUser: (id, updates) => {
@@ -1048,7 +1066,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     const modifiedUser = updated.find(u => u.id === id);
     if (currentUser && modifiedUser && currentUser.username === modifiedUser.username) {
-      set({ currentUser: { name: modifiedUser.name, username: modifiedUser.username, role: modifiedUser.role } });
+      set({ currentUser: { name: modifiedUser.name, username: modifiedUser.username, role: modifiedUser.role, branchId: modifiedUser.branchId } });
+    }
+    
+    if (isSupabaseConfigured && modifiedUser) {
+      supabaseService.saveUser(modifiedUser);
     }
   },
 
@@ -1058,6 +1080,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updated });
     localStorage.setItem('ba_users', JSON.stringify(updated));
     get().addLog('USER_DELETE', 'SYSTEM', `Penghapusan akun ID: ${id}`);
+    
+    if (isSupabaseConfigured) {
+      supabaseService.deleteUser(id);
+    }
   },
 
   addPurchaseOrder: (poData) => {
@@ -1275,6 +1301,11 @@ export const useAppStore = create<AppState>((set, get) => ({
                 isHalal: p.is_halal
               }));
               set({ products: productsMap });
+            }
+          }),
+          supabaseService.getUsers().then(remoteUsers => {
+            if (remoteUsers && remoteUsers.length > 0) {
+              set({ users: remoteUsers });
             }
           }),
           supabaseService.getTransactions().then(remoteTxs => {

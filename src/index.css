@@ -4,18 +4,32 @@
   body * {
     visibility: hidden;
   }
-  #printable-receipt, #printable-receipt * {
+  .printable-area, .printable-area * {
     visibility: visible;
   }
-  #printable-receipt {
+  .printable-area {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     margin: 0;
-    padding: 10px;
+    padding: 0;
     box-shadow: none;
     border: none;
+    background-color: white;
+    color: black;
+  }
+  .printable-thermal {
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 5mm !important;
+    font-size: 11px;
+  }
+  .printable-a4 {
+    width: 210mm !important;
+    padding: 15mm !important;
+    margin: 0 auto !important;
+    font-size: 12px;
   }
   /* Hide non-printable elements inside receipt if any */
   .no-print {

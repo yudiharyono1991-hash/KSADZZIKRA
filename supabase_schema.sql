@@ -141,3 +141,27 @@ CREATE POLICY "Allow public write access for zakat_distributions" ON public.zaka
 -- ========================================================================
 -- Selesai! Jalankan skrip ini semua di editor SQL Supabase Anda.
 -- ========================================================================
+
+
+-- 6. TABEL: ba_users (Data Pengguna)
+CREATE TABLE IF NOT EXISTS public.ba_users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'CASHIER',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    is_active BOOLEAN DEFAULT true,
+    is_approved BOOLEAN DEFAULT false,
+    approved_by TEXT,
+    approved_at TIMESTAMPTZ,
+    phone TEXT,
+    branch_id TEXT
+);
+
+ALTER TABLE public.ba_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access for ba_users" ON public.ba_users;
+DROP POLICY IF EXISTS "Allow public write access for ba_users" ON public.ba_users;
+CREATE POLICY "Allow public read access for ba_users" ON public.ba_users FOR SELECT USING (true);
+CREATE POLICY "Allow public write access for ba_users" ON public.ba_users FOR ALL USING (true) WITH CHECK (true);
+

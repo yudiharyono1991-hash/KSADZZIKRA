@@ -18,7 +18,7 @@ export default defineConfig(() => {
           description: 'Aplikasi Kasir Pintar Syariah Terintegrasi',
           theme_color: '#064e3b',
           background_color: '#f8fafc',
-          display: 'standalone',
+          display: 'fullscreen',
           icons: [
             {
               src: 'pwa-icon.svg',

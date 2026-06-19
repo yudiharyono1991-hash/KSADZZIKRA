@@ -358,5 +358,83 @@ export const supabaseService = {
       logSync(`Failed to save zakat distribution: ${err.message}`, true);
       return false;
     }
+  },
+
+  // Users API
+  async getUsers(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('ba_users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      
+      // Map DB snake_case to app camelCase
+      return data.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        username: u.username,
+        password: u.password,
+        role: u.role,
+        createdAt: u.created_at,
+        isActive: u.is_active,
+        isApproved: u.is_approved,
+        approvedBy: u.approved_by,
+        approvedAt: u.approved_at,
+        phone: u.phone,
+        branchId: u.branch_id
+      }));
+    } catch (err: any) {
+      logSync(`Failed to fetch users: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async saveUser(user: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload: any = {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        password: user.password,
+        role: user.role,
+        created_at: user.createdAt,
+        is_active: user.isActive,
+        is_approved: user.isApproved,
+        approved_by: user.approvedBy,
+        approved_at: user.approvedAt,
+        phone: user.phone,
+        branch_id: user.branchId
+      };
+
+      const { error } = await supabase
+        .from('ba_users')
+        .upsert(payload);
+
+      if (error) throw error;
+      logSync(`Saved user ${user.username} successfully.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save user ${user.username}: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async deleteUser(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase
+        .from('ba_users')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      logSync(`Deleted user with ID ${id}.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete user ${id}: ${err.message}`, true);
+      return false;
+    }
   }
 };

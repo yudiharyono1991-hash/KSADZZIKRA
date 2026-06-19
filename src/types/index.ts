@@ -10,6 +10,9 @@ export interface Branch {
 export interface StoreSettings {
   isTaxEnabled: boolean;
   taxRate: number; // e.g. 11 for 11%
+  ownerBankAccount?: string;
+  ownerBankName?: string;
+  qrisEnabled?: boolean;
 }
 
 export interface StockMovement {
@@ -82,6 +85,7 @@ export interface Product {
   wholesalePrice?: number;
   wholesaleMinQty?: number;
   branchId?: string; // Optional for backward compatibility, but should be required eventually
+  image?: string; // Product photo URL
 }
 
 export interface CartItem {

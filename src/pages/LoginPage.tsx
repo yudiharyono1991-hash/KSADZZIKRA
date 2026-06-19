@@ -1,33 +1,67 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Store, User, Lock, AlertCircle, Sparkles, Eye, EyeOff, UserPlus, ArrowLeft } from 'lucide-react';
+import { Store, User, Lock, AlertCircle, Sparkles, Eye, EyeOff, UserPlus, ArrowLeft, Phone, Mail } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, registerUser, branches } = useAppStore();
+  
+  const getPasswordStrength = (pass: string) => {
+    let strength = 0;
+    if (pass.length >= 8) strength++;
+    if (/[A-Z]/.test(pass)) strength++;
+    if (/[a-z]/.test(pass)) strength++;
+    if (/[0-9]/.test(pass)) strength++;
+    if (/[^A-Za-z0-9]/.test(pass)) strength++;
+    return strength;
+  };
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [name, setName] = useState('');
+  const [salutation, setSalutation] = useState('Bpk');
   const [username, setUsername] = useState(''); // No pre-fill
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState(''); // No pre-fill
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const pwdStrength = getPasswordStrength(password);
+  let strengthLabel = '';
+  let strengthColor = '';
+  let strengthText = '';
+  if (password.length > 0) {
+    if (pwdStrength <= 2) {
+      strengthLabel = 'Lemah';
+      strengthColor = 'bg-red-500';
+      strengthText = 'Gunakan kombinasi huruf besar, kecil, angka & simbol (Min. 8 karakter)';
+    } else if (pwdStrength === 3 || pwdStrength === 4) {
+      strengthLabel = 'Sedang';
+      strengthColor = 'bg-amber-500';
+      strengthText = 'Tambahkan kombinasi simbol atau angka untuk lebih aman';
+    } else {
+      strengthLabel = 'Kuat';
+      strengthColor = 'bg-emerald-500';
+      strengthText = 'Kata sandi Anda sudah sangat kuat';
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
     
-    if (!username || !password || (isRegisterMode && !name)) {
+    if (!username || !password || (isRegisterMode && (!name || !phone))) {
       setErrorMsg('Harap lengkapi semua kolom.');
       return;
     }
 
     if (isRegisterMode) {
+      const fullName = `${salutation} ${name}`;
       const success = registerUser({
-        name,
+        name: fullName,
         username,
         password,
+        phone,
         role: 'CASHIER', // Default, Admin/Owner yang approve
         branchId: selectedBranchId || undefined
       });
@@ -43,6 +77,19 @@ export default function LoginPage() {
       const result = login(username, password);
       if (result === 'SUCCESS') {
         // Login berhasil, store akan update currentUser dan App.tsx akan re-render
+        // Reset hash route berdasarkan role agar tidak tersangkut di halaman user sebelumnya
+        const currentUser = useAppStore.getState().currentUser;
+        if (currentUser) {
+          if (currentUser.role === 'OWNER') {
+            window.location.hash = '#/trend';
+          } else if (currentUser.role === 'ADMIN') {
+            window.location.hash = '#/laporan-penjualan';
+          } else {
+            window.location.hash = '#/kasir';
+          }
+        } else {
+          window.location.hash = '#/';
+        }
       } else if (result === 'PENDING') {
         setErrorMsg('⏳ Akun Anda masih menunggu persetujuan Admin/Owner. Silakan hubungi pengelola toko.');
       } else {
@@ -58,6 +105,7 @@ export default function LoginPage() {
     setName('');
     setUsername('');
     setPassword('');
+    setPhone('');
   };
 
   return (
@@ -82,7 +130,7 @@ export default function LoginPage() {
           <p className="text-xs font-bold text-amber-500 uppercase tracking-widest">Selamat Datang di</p>
           <h2 className="text-xl font-extrabold text-emerald-950 tracking-wide">Berkah Amanah Mart</h2>
           <p className="text-[10px] text-gray-500 max-w-xs font-medium leading-relaxed">
-            Toko Sembako UMKM Syariah - Sistem POS & Keuangan Terintegrasi
+            Sistem POS & Akuntansi Terintegrasi untuk UMKM Toko Sembako
           </p>
         </div>
 
@@ -90,7 +138,7 @@ export default function LoginPage() {
         <div className="mb-6 p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-start space-x-2 text-[10px] text-emerald-850">
           <Sparkles className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
           <p className="leading-snug">
-            Sistem terintegrasi dengan <b>Akad Jual Beli Murabahah</b> bebas Riba, Gharar, dan Maysir.
+            Dirancang dengan akad sesuai prinsip syariah, mewujudkan perniagaan yang bersih dari Riba, Gharar, maupun Maysir.
           </p>
         </div>
 
@@ -114,37 +162,69 @@ export default function LoginPage() {
           {isRegisterMode && (
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nama Lengkap</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <User className="w-4 h-4 text-slate-400" />
-                </span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Masukkan nama lengkap..."
-                  className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-600 transition-all text-gray-800"
-                />
+              <div className="flex space-x-2">
+                <select
+                  value={salutation}
+                  onChange={(e) => setSalutation(e.target.value)}
+                  className="w-24 bg-slate-50 border border-gray-200 rounded-xl py-3 px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all text-gray-800"
+                >
+                  <option value="Bpk">Bpk</option>
+                  <option value="Ibu">Ibu</option>
+                  <option value="Sdr">Sdr</option>
+                  <option value="Sdri">Sdri</option>
+                </select>
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <User className="w-4 h-4 text-slate-400" />
+                  </span>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Masukkan nama..."
+                    className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-600 transition-all text-gray-800"
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {/* Username Field */}
+          {/* Username/Email Field */}
           <div className="space-y-1">
-            <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Username Operator</label>
+            <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">
+              {isRegisterMode ? 'Email' : 'Email atau No Handphone'}
+            </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <User className="w-4 h-4 text-slate-400" />
+                {isRegisterMode ? <Mail className="w-4 h-4 text-slate-400" /> : <User className="w-4 h-4 text-slate-400" />}
               </span>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Masukkan username..."
+                placeholder={isRegisterMode ? "Masukkan email..." : "Masukkan email atau no hp..."}
                 className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-600 transition-all text-gray-800"
               />
             </div>
           </div>
+
+          {isRegisterMode && (
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">No Handphone</label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Phone className="w-4 h-4 text-slate-400" />
+                </span>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Masukkan nomor handphone..."
+                  className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-600 transition-all text-gray-800"
+                />
+              </div>
+            </div>
+          )}
 
           {isRegisterMode && (
             <div className="space-y-1">
@@ -184,11 +264,29 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-emerald-600 transition-colors"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {isRegisterMode && password.length > 0 && (
+              <div className="pt-1.5 space-y-1.5">
+                <div className="flex gap-1 h-1 w-full rounded-full overflow-hidden bg-gray-100">
+                  <div className={`h-full ${pwdStrength >= 1 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
+                  <div className={`h-full ${pwdStrength >= 2 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
+                  <div className={`h-full ${pwdStrength >= 3 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
+                  <div className={`h-full ${pwdStrength >= 4 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
+                  <div className={`h-full ${pwdStrength >= 5 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
+                </div>
+                <div className="flex items-start gap-1.5 text-[9px] text-gray-500 font-medium">
+                  <AlertCircle className={`w-3 h-3 ${pwdStrength <= 2 ? 'text-red-500' : pwdStrength <= 4 ? 'text-amber-500' : 'text-emerald-500'} flex-shrink-0 mt-0.5`} />
+                  <span className="leading-tight">
+                    Kekuatan: <span className={`font-bold uppercase tracking-wider mr-1 ${pwdStrength <= 2 ? 'text-red-600' : pwdStrength <= 4 ? 'text-amber-600' : 'text-emerald-600'}`}>{strengthLabel}</span> 
+                    - {strengthText}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Action Button */}
@@ -200,7 +298,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center space-y-2">
           <button
             type="button"
             onClick={toggleMode}
@@ -212,6 +310,12 @@ export default function LoginPage() {
               'Belum punya akun? Daftar sekarang'
             )}
           </button>
+          
+          {!isRegisterMode && (
+            <p className="text-[10px] text-gray-500 font-medium">
+              Lupa password? <a href="#" onClick={(e) => { e.preventDefault(); alert("Silakan hubungi Admin atau Owner untuk mereset password Anda."); }} className="text-emerald-600 hover:text-emerald-700 font-bold underline decoration-emerald-600/30 underline-offset-2">Hubungi Admin</a>
+            </p>
+          )}
         </div>
 
         {/* Quran Verse Footer Block inside card */}

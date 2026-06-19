@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { ShoppingBag, Plus, Search, CheckCircle, ShieldAlert, Send, FileText, Check } from 'lucide-react';
+import { ShoppingBag, Plus, Search, CheckCircle, ShieldAlert, Send, FileText, Check, Printer } from 'lucide-react';
 
 export default function PurchaseOrderPage() {
-  const { purchaseOrders, addPurchaseOrder, updatePurchaseOrder, suppliers, currentUser } = useAppStore();
+  const { purchaseOrders, addPurchaseOrder, updatePurchaseOrder, suppliers, currentUser, addLog, users } = useAppStore();
   const [isAdding, setIsAdding] = useState(false);
   
   const [poNumber, setPoNumber] = useState('');
@@ -15,6 +15,7 @@ export default function PurchaseOrderPage() {
 
   const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
   const [invoiceInput, setInvoiceInput] = useState('');
+  const [printPo, setPrintPo] = useState<any>(null);
 
   // Prevent accessing if not admin or owner
   if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
@@ -92,6 +93,14 @@ export default function PurchaseOrderPage() {
     });
     setReceivingPoId(null);
     setInvoiceInput('');
+  };
+
+  const handlePrintPO = (po: any) => {
+    setPrintPo(po);
+    addLog('PRINT_REPORT', 'SYSTEM', `Mencetak Purchase Order: ${po.poNumber}`);
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   return (
@@ -217,6 +226,13 @@ export default function PurchaseOrderPage() {
                       >
                         <Send className="w-4 h-4" />
                       </button>
+                      <button 
+                        onClick={() => handlePrintPO(po)}
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors inline-block"
+                        title="Cetak PO (Kertas)"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
                       {po.status === 'ORDERED' && (
                         <button 
                           onClick={() => setReceivingPoId(po.id)}
@@ -270,6 +286,109 @@ export default function PurchaseOrderPage() {
           </div>
         </div>
       )}
+
+      {/* Printable Area - 2 Rangkap PO */}
+      {printPo && (() => {
+        const creatorUser = users.find(u => u.name === printPo.createdBy);
+        const creatorRole = creatorUser?.role || 'BA Mart';
+
+        return (
+          <div className="printable-area printable-a4">
+            {/* Rangkap 1 - Asli */}
+          <div className="border-2 border-gray-800 p-6 rounded-lg mb-8">
+            <div className="flex justify-between items-start border-b-2 border-gray-800 pb-4 mb-4">
+              <div>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">Berkah Amanah Mart</h1>
+                <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Asli (Untuk Supplier)</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xl font-bold text-gray-900">{printPo.poNumber}</p>
+                <p className="text-xs text-gray-600">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
+              <div>
+                <p className="font-bold text-gray-500 text-xs uppercase">Kepada Yth:</p>
+                <p className="font-bold text-lg text-gray-900">{printPo.supplier}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-gray-500 text-xs uppercase">Estimasi Total Harga:</p>
+                <p className="font-black text-xl text-gray-900">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="font-bold text-gray-500 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-gray-800 whitespace-pre-wrap min-h-[100px]">
+                {printPo.notes || '-'}
+              </div>
+            </div>
+
+            <div className="flex justify-between mt-12 text-sm">
+              <div className="text-center w-40">
+                <p className="mb-12 font-semibold">Dibuat Oleh,</p>
+                <p className="border-b border-gray-800 pb-1 font-bold">{printPo.createdBy}</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">{creatorRole}</p>
+              </div>
+              <div className="text-center w-40">
+                <p className="mb-12 font-semibold">Disetujui/Diterima Oleh,</p>
+                <p className="border-b border-gray-800 pb-1 text-transparent select-none">__________</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">Pihak Supplier</p>
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-dashed border-gray-400 my-8 no-print" />
+
+          {/* Rangkap 2 - Arsip */}
+          <div className="border border-gray-400 p-6 rounded-lg">
+            <div className="flex justify-between items-start border-b border-gray-400 pb-4 mb-4">
+              <div>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">Berkah Amanah Mart</h1>
+                <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Copy (Arsip Toko)</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xl font-bold text-gray-900">{printPo.poNumber}</p>
+                <p className="text-xs text-gray-600">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
+              <div>
+                <p className="font-bold text-gray-500 text-xs uppercase">Kepada Yth:</p>
+                <p className="font-bold text-lg text-gray-900">{printPo.supplier}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-gray-500 text-xs uppercase">Estimasi Total Harga:</p>
+                <p className="font-black text-xl text-gray-900">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="font-bold text-gray-500 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-gray-800 whitespace-pre-wrap min-h-[100px]">
+                {printPo.notes || '-'}
+              </div>
+            </div>
+
+            <div className="flex justify-between mt-12 text-sm">
+              <div className="text-center w-40">
+                <p className="mb-12 font-semibold">Dibuat Oleh,</p>
+                <p className="border-b border-gray-800 pb-1 font-bold">{printPo.createdBy}</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">{creatorRole}</p>
+              </div>
+            </div>
+            
+            <div className="mt-8 text-right text-[9px] text-gray-400">
+              Dicetak pada: {new Date().toLocaleString('id-ID')} oleh {currentUser?.name || 'Sistem'}
+            </div>
+          </div>
+        </div>
+        );
+      })}
     </div>
   );
 }

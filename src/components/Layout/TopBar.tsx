@@ -9,16 +9,20 @@ import {
   Database,
   User,
   ShieldAlert,
-  Menu
+  Menu,
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
 
 interface TopBarProps {
   onToggleSidebar?: () => void;
+  onToggleDesktopSidebar?: () => void;
 }
 
-export default function TopBar({ onToggleSidebar }: TopBarProps) {
-  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId } = useAppStore();
+export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopBarProps) {
+  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout } = useAppStore();
   const [time, setTime] = useState(new Date());
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -38,17 +42,32 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
   // Check how many items low stock
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
 
+  // Determine branch name for current user
+  const userBranchName = currentUser?.branchId 
+    ? branches.find(b => b.id === currentUser?.branchId)?.name || 'Cabang Tidak Dikenal'
+    : 'Pusat';
+
   return (
     <header id="app-topbar" className="h-16 bg-white border-b border-gray-200/80 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none">
       
       {/* Brand Context */}
       <div className="flex items-center space-x-1.5 md:space-x-2 text-gray-500 font-semibold text-xs">
+        {/* Mobile Hamburger */}
         {onToggleSidebar && (
           <button 
             onClick={onToggleSidebar}
             className="p-1.5 -ml-1 mr-1 bg-slate-100 hover:bg-slate-200 text-gray-700 rounded-lg md:hidden transition-colors"
-            id="hamburger-menu"
-            aria-label="Buka Menu"
+            aria-label="Buka Menu Mobile"
+          >
+            <Menu className="w-5 h-5 text-emerald-800" />
+          </button>
+        )}
+        {/* Desktop Hamburger */}
+        {onToggleDesktopSidebar && (
+          <button 
+            onClick={onToggleDesktopSidebar}
+            className="p-1.5 -ml-1 mr-1 bg-slate-100 hover:bg-slate-200 text-gray-700 rounded-lg hidden md:block transition-colors"
+            aria-label="Buka/Tutup Menu Desktop"
           >
             <Menu className="w-5 h-5 text-emerald-800" />
           </button>
@@ -98,12 +117,52 @@ export default function TopBar({ onToggleSidebar }: TopBarProps) {
 
         {/* User Identity Display */}
         {currentUser && (
-          <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 p-1.5 px-3 rounded-xl">
-            <User className="w-3.5 h-3.5 text-emerald-800" />
-            <div className="text-left leading-tight">
-              <p className="text-[10px] font-extrabold text-gray-800 font-sans tracking-wide uppercase">{currentUser.name}</p>
-              <p className="text-[8px] text-gray-400 font-mono italic">{currentUser.username}</p>
-            </div>
+          <div className="relative">
+            <button 
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center space-x-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 p-1.5 px-3 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+            >
+              <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-emerald-800" />
+              </div>
+              <div className="text-left leading-tight hidden sm:block">
+                <p className="text-[10px] font-extrabold text-gray-800 font-sans tracking-wide uppercase">{currentUser.name}</p>
+                <p className="text-[8px] text-gray-500 font-mono italic">
+                  {currentUser.role} • {userBranchName}
+                </p>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isUserMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setIsUserMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="px-4 py-3 border-b border-gray-50 bg-slate-50/50">
+                    <p className="text-xs font-bold text-gray-800 truncate">{currentUser.name}</p>
+                    <p className="text-[10px] text-gray-500 truncate">{currentUser.username}</p>
+                    <div className="mt-2 flex items-center space-x-1 text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-1 rounded">
+                      <Building className="w-3 h-3" />
+                      <span>{userBranchName}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      logout();
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors font-medium cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Keluar</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

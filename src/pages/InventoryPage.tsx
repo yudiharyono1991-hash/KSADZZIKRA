@@ -29,12 +29,14 @@ export default function InventoryPage() {
   const [category, setCategory] = useState('Sembako');
   const [price, setPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
+  const [marginPct, setMarginPct] = useState('');
   const [stock, setStock] = useState('');
   const [minStock, setMinStock] = useState('');
   const [unit, setUnit] = useState('Pcs');
   const [barcode, setBarcode] = useState('');
   const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number | ''>('');
+  const [image, setImage] = useState('');
 
   const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
 
@@ -60,12 +62,14 @@ export default function InventoryPage() {
     setCategory('Sembako');
     setPrice('');
     setCostPrice('');
+    setMarginPct('');
     setStock('');
     setMinStock('10');
     setUnit('Pcs');
     setBarcode('');
     setWholesalePrice('');
     setWholesaleMinQty('');
+    setImage('');
     setIsModalOpen(true);
   };
 
@@ -76,13 +80,48 @@ export default function InventoryPage() {
     setCategory(p.category);
     setPrice(p.price.toString());
     setCostPrice(p.costPrice.toString());
+    const m = p.costPrice > 0 ? ((p.price - p.costPrice) / p.costPrice * 100).toFixed(1) : '0';
+    setMarginPct(m);
     setStock(p.stock.toString());
     setMinStock(p.minStock.toString());
     setUnit(p.unit);
     setBarcode(p.barcode || '');
     setWholesalePrice(p.wholesalePrice || '');
     setWholesaleMinQty(p.wholesaleMinQty || '');
+    setImage(p.image || '');
     setIsModalOpen(true);
+  };
+
+  const handleCostPriceChange = (val: string) => {
+    setCostPrice(val);
+    const cp = Number(val);
+    const m = Number(marginPct);
+    if (cp > 0 && m > 0) {
+      const sp = cp + (cp * m / 100);
+      setPrice(Math.round(sp).toString());
+    }
+  };
+
+  const handleMarginChange = (val: string) => {
+    setMarginPct(val);
+    const cp = Number(costPrice);
+    const m = Number(val);
+    if (cp > 0 && m >= 0) {
+      const sp = cp + (cp * m / 100);
+      setPrice(Math.round(sp).toString());
+    }
+  };
+
+  const handlePriceChange = (val: string) => {
+    setPrice(val);
+    const cp = Number(costPrice);
+    const sp = Number(val);
+    if (cp > 0 && sp >= cp) {
+      const m = ((sp - cp) / cp * 100).toFixed(1);
+      setMarginPct(m);
+    } else {
+      setMarginPct('0');
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -108,7 +147,8 @@ export default function InventoryPage() {
       barcode: barcode || undefined,
       wholesalePrice: wholesalePrice ? Number(wholesalePrice) : undefined,
       wholesaleMinQty: wholesaleMinQty ? Number(wholesaleMinQty) : undefined,
-      isHalal: true
+      isHalal: true,
+      image: image || undefined
     };
 
     if (editingProduct) {
@@ -448,9 +488,9 @@ export default function InventoryPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Harga Modal (Harga Beli rill)</label>
+                          <label className="text-xs font-bold text-gray-600">Harga Modal (Beli)</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-400 font-bold">Rp</span>
                             <input
@@ -460,9 +500,26 @@ export default function InventoryPage() {
                                 isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : ''
                               }`}
                               value={costPrice}
-                              onChange={(e) => setCostPrice(e.target.value)}
+                              onChange={(e) => handleCostPriceChange(e.target.value)}
                               required
                             />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-emerald-600">Margin Profit (%)</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              disabled={isPriceEditLockedForAdmin}
+                              className={`w-full border border-emerald-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${
+                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50 focus:ring-2 focus:ring-emerald-500/20'
+                              } outline-none`}
+                              value={marginPct}
+                              onChange={(e) => handleMarginChange(e.target.value)}
+                              placeholder="Misal: 10"
+                            />
+                            <span className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-emerald-600 font-bold">%</span>
                           </div>
                         </div>
 
@@ -474,10 +531,10 @@ export default function InventoryPage() {
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
                               className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50/20'
-                              }`}
+                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50/20 focus:ring-2 focus:ring-emerald-500/20'
+                              } outline-none`}
                               value={price}
-                              onChange={(e) => setPrice(e.target.value)}
+                              onChange={(e) => handlePriceChange(e.target.value)}
                               required
                             />
                           </div>
@@ -527,6 +584,17 @@ export default function InventoryPage() {
                     placeholder="Masukkan Barcode..."
                     value={barcode}
                     onChange={(e) => setBarcode(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600">URL Gambar/Foto Produk (Opsional)</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                    placeholder="Misal: https://images.unsplash.com/..."
+                    value={image}
+                    onChange={(e) => setImage(e.target.value)}
                   />
                 </div>
               </div>

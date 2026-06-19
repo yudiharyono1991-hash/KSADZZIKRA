@@ -6,11 +6,12 @@ import {
   Calendar, 
   Download,
   Package,
-  TrendingUp
+  TrendingUp,
+  Printer
 } from 'lucide-react';
 
 export default function SalesReportPage() {
-  const { transactions, activeBranchId } = useAppStore();
+  const { transactions, activeBranchId, currentUser, addLog } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   
   // Date filters defaulting to current month
@@ -87,12 +88,17 @@ export default function SalesReportPage() {
 
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Nama Produk,Qty Terjual,Omset Penjualan,Estimasi Profit,Zakat Terkumpul\n";
+    csvContent += "Nama Produk,Qty Terjual,Harga Pokok (Avg),Harga Jual (Avg),Margin (%),Omset Penjualan,Estimasi Profit,Zakat Terkumpul\n";
     
     aggregatedData.forEach(item => {
+      // Hitung rata-rata
+      const avgCost = (item.omset - item.profit) / item.qty;
+      const avgSell = item.omset / item.qty;
+      const marginPct = avgCost > 0 ? (((avgSell - avgCost) / avgCost) * 100).toFixed(1) : '0';
+
       // Escape commas in names
       const name = `"${item.productName.replace(/"/g, '""')}"`;
-      csvContent += `${name},${item.qty},${item.omset},${item.profit},${item.zakat}\n`;
+      csvContent += `${name},${item.qty},${Math.round(avgCost)},${Math.round(avgSell)},${marginPct}%,${item.omset},${item.profit},${item.zakat}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -102,6 +108,11 @@ export default function SalesReportPage() {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  };
+
+  const handlePrintReport = () => {
+    addLog('PRINT_REPORT', 'SYSTEM', `Mencetak Laporan Penjualan periode ${startDate} sd ${endDate}`);
+    window.print();
   };
 
   return (
@@ -147,13 +158,22 @@ export default function SalesReportPage() {
             />
           </div>
 
-          <button 
-            onClick={handleExportCSV}
-            className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-colors w-full md:w-auto"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
+          <div className="flex gap-2 w-full md:w-auto">
+            <button 
+              onClick={handleExportCSV}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>CSV</span>
+            </button>
+            <button 
+              onClick={handlePrintReport}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Cetak Kertas</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -187,10 +207,13 @@ export default function SalesReportPage() {
             <thead className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-200">
               <tr>
                 <th className="py-3.5 px-5">Nama Barang</th>
-                <th className="py-3.5 px-5 text-center">Qty Terjual</th>
-                <th className="py-3.5 px-5 text-right">Omset Penjualan</th>
-                <th className="py-3.5 px-5 text-right">Estimasi Profit</th>
-                <th className="py-3.5 px-5 text-right">Zakat Barang</th>
+                <th className="py-3.5 px-3 text-center">Qty</th>
+                <th className="py-3.5 px-3 text-right">Harga Pokok</th>
+                <th className="py-3.5 px-3 text-right">Harga Jual</th>
+                <th className="py-3.5 px-3 text-center">Margin</th>
+                <th className="py-3.5 px-4 text-right">Omset</th>
+                <th className="py-3.5 px-4 text-right">Profit</th>
+                <th className="py-3.5 px-4 text-right">Zakat</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
@@ -201,26 +224,144 @@ export default function SalesReportPage() {
                   </td>
                 </tr>
               ) : (
-                aggregatedData.map((item) => (
-                  <tr key={item.productId} className="hover:bg-slate-50/50">
-                    <td className="py-3 px-5 font-bold text-gray-900">{item.productName}</td>
-                    <td className="py-3 px-5 text-center text-emerald-700 font-bold bg-emerald-50/30">
-                      {item.qty}
-                    </td>
-                    <td className="py-3 px-5 text-right font-mono font-semibold text-gray-800">
-                      Rp {item.omset.toLocaleString('id-ID')}
-                    </td>
-                    <td className="py-3 px-5 text-right font-mono text-blue-700 font-semibold">
-                      Rp {item.profit.toLocaleString('id-ID')}
-                    </td>
-                    <td className="py-3 px-5 text-right font-mono font-semibold text-amber-600">
-                      Rp {item.zakat.toLocaleString('id-ID')}
-                    </td>
-                  </tr>
-                ))
+                aggregatedData.map((item) => {
+                  const avgCost = (item.omset - item.profit) / item.qty;
+                  const avgSell = item.omset / item.qty;
+                  const marginPct = avgCost > 0 ? (((avgSell - avgCost) / avgCost) * 100).toFixed(1) : '0';
+
+                  return (
+                    <tr key={item.productId} className="hover:bg-slate-50/50">
+                      <td className="py-3 px-5 font-bold text-gray-900">{item.productName} <span className="text-[9px] font-normal text-emerald-600 block">(Akad Murabahah)</span></td>
+                      <td className="py-3 px-3 text-center text-emerald-700 font-bold bg-emerald-50/30">
+                        {item.qty}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-gray-500">
+                        Rp {Math.round(avgCost).toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-gray-700 font-semibold">
+                        Rp {Math.round(avgSell).toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-3 px-3 text-center font-mono text-blue-600">
+                        {marginPct}%
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-800">
+                        Rp {item.omset.toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-blue-700 font-bold">
+                        Rp {item.profit.toLocaleString('id-ID')}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-amber-600">
+                        Rp {item.zakat.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
+            {aggregatedData.length > 0 && (
+              <tfoot className="bg-slate-50 font-bold text-gray-800 border-t-2 border-gray-200">
+                <tr>
+                  <td className="py-3 px-5 text-right uppercase text-[10px] tracking-widest">Grand Total:</td>
+                  <td className="py-3 px-3 text-center text-emerald-700">{grandTotal.qty}</td>
+                  <td className="py-3 px-3"></td>
+                  <td className="py-3 px-3"></td>
+                  <td className="py-3 px-3"></td>
+                  <td className="py-3 px-4 text-right">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
+                  <td className="py-3 px-4 text-right text-blue-700">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
+                  <td className="py-3 px-4 text-right text-amber-600">Rp {grandTotal.zakat.toLocaleString('id-ID')}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
+        </div>
+      </div>
+
+      {/* Printable Area - A4 Report */}
+      <div className="printable-area printable-a4 space-y-6">
+        <div className="text-center border-b-2 border-gray-800 pb-4">
+          <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">Berkah Amanah Mart</h1>
+          <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN PENJUALAN DAN KEUANGAN (MURABAHAH)</p>
+          <p className="text-xs text-gray-500 mt-1">Periode: {startDate} s/d {endDate}</p>
+        </div>
+        
+        <div className="flex justify-between items-end text-xs font-semibold text-gray-700">
+          <div>
+            <p>Cabang: {activeBranchId || 'Semua Cabang'}</p>
+            <p>Dicetak Oleh: {currentUser?.name || 'Sistem'}</p>
+          </div>
+          <div>
+            <p>Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4 py-4 border-y border-gray-200">
+          <div>
+            <p className="text-xs text-gray-500 uppercase font-bold">Total Barang</p>
+            <p className="text-lg font-black">{grandTotal.qty} Item</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase font-bold">Total Omset</p>
+            <p className="text-lg font-black">Rp {grandTotal.omset.toLocaleString('id-ID')}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase font-bold">Total Margin (Profit)</p>
+            <p className="text-lg font-black">Rp {grandTotal.profit.toLocaleString('id-ID')}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase font-bold">Zakat Disalurkan (2.5%)</p>
+            <p className="text-lg font-black">Rp {grandTotal.zakat.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+
+        <table className="w-full text-left text-xs border-collapse">
+          <thead className="bg-gray-100 uppercase font-bold text-gray-800 border-b-2 border-gray-300">
+            <tr>
+              <th className="py-2 px-2 border border-gray-300">No</th>
+              <th className="py-2 px-2 border border-gray-300">Nama Barang</th>
+              <th className="py-2 px-2 border border-gray-300 text-center">Qty</th>
+              <th className="py-2 px-2 border border-gray-300 text-right">Harga Pokok (Avg)</th>
+              <th className="py-2 px-2 border border-gray-300 text-right">Harga Jual (Avg)</th>
+              <th className="py-2 px-2 border border-gray-300 text-right">Omset</th>
+              <th className="py-2 px-2 border border-gray-300 text-right">Profit</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {aggregatedData.map((item, index) => {
+              const avgCost = (item.omset - item.profit) / item.qty;
+              const avgSell = item.omset / item.qty;
+              return (
+                <tr key={item.productId}>
+                  <td className="py-1.5 px-2 border border-gray-200">{index + 1}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 font-semibold">{item.productName} <span className="text-[9px] font-normal text-gray-500">(Akad Murabahah)</span></td>
+                  <td className="py-1.5 px-2 border border-gray-200 text-center">{item.qty}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {Math.round(avgCost).toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {Math.round(avgSell).toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {item.omset.toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 text-right font-bold">Rp {item.profit.toLocaleString('id-ID')}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {aggregatedData.length > 0 && (
+            <tfoot className="bg-gray-100 font-bold border-t-2 border-gray-300">
+              <tr>
+                <td colSpan={2} className="py-2 px-2 border border-gray-300 text-right uppercase text-[10px]">Grand Total:</td>
+                <td className="py-2 px-2 border border-gray-300 text-center">{grandTotal.qty}</td>
+                <td className="py-2 px-2 border border-gray-300"></td>
+                <td className="py-2 px-2 border border-gray-300"></td>
+                <td className="py-2 px-2 border border-gray-300 text-right">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
+                <td className="py-2 px-2 border border-gray-300 text-right">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+        
+        <div className="mt-8 pt-8 flex justify-end">
+          <div className="text-center w-48">
+            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
+            <p className="text-xs border-b border-gray-800 pb-1">{currentUser?.name || 'Admin'}</p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">{currentUser?.role || 'SYSTEM'}</p>
+          </div>
         </div>
       </div>
     </div>

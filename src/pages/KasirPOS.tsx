@@ -13,7 +13,8 @@ import {
   CreditCard,
   Building,
   Check,
-  AlertCircle
+  AlertCircle,
+  Package
 } from 'lucide-react';
 
 export default function KasirPOS() {
@@ -36,10 +37,8 @@ export default function KasirPOS() {
   
   // Checkout Modal State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON' | 'SPLIT'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'>('CASH');
   const [amountPaidInput, setAmountPaidInput] = useState('');
-  const [splitCashAmount, setSplitCashAmount] = useState('');
-  const [splitTransferAmount, setSplitTransferAmount] = useState('');
   const [receiptTx, setReceiptTx] = useState<any>(null); // To show transaction receipt after checkout
   const [customerPhone, setCustomerPhone] = useState('');
   
@@ -86,26 +85,10 @@ export default function KasirPOS() {
 
   const handleCheckoutSubmit = () => {
     let finalPaymentMethod: any = paymentMethod;
-    let finalAmountPaid = paymentMethod === 'CASH' ? Number(amountPaidInput) : (paymentMethod === 'KASBON' ? 0 : cartTotal);
+    let finalAmountPaid = paymentMethod === 'CASH' ? Number(amountPaidInput) : cartTotal;
     let splitParams = undefined;
 
-    if (paymentMethod === 'KASBON' && !selectedCustomerId) {
-      alert("Pilih pelanggan terlebih dahulu untuk transaksi KASBON (Piutang).");
-      return;
-    }
-
-    if (paymentMethod === 'SPLIT') {
-      finalPaymentMethod = 'CASH'; // base method for TS
-      finalAmountPaid = Number(splitCashAmount) + Number(splitTransferAmount);
-      splitParams = [
-        { method: 'CASH', amount: Number(splitCashAmount) },
-        { method: 'TRANSFER_BSI', amount: Number(splitTransferAmount) }
-      ];
-      if (finalAmountPaid < cartTotal) {
-        alert("Total nominal Split Payment kurang dari tagihan belanja.");
-        return;
-      }
-    } else if (paymentMethod !== 'KASBON' && finalAmountPaid < cartTotal) {
+    if (finalAmountPaid < cartTotal) {
       alert("Jumlah uang dibayarkan kurang dari total belanja.");
       return;
     }
@@ -173,9 +156,9 @@ export default function KasirPOS() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-120px)]">
+    <div className="flex flex-col md:grid md:grid-cols-12 gap-4 md:gap-6 h-auto md:h-[calc(100vh-120px)]">
       {/* Product Catalog Grid - Left */}
-      <div className="md:col-span-7 lg:col-span-8 flex flex-col h-full space-y-4">
+      <div className="md:col-span-7 lg:col-span-8 flex flex-col h-[55vh] md:h-full space-y-4">
         {/* Search & Filter Header */}
         <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="relative flex-1">
@@ -225,25 +208,38 @@ export default function KasirPOS() {
                 return (
                   <div 
                     key={p.id}
-                    className={`bg-white rounded-xl border p-3 flex flex-col justify-between transition-all relative ${
+                    className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
                       isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-emerald-300'
                     }`}
                   >
                     {/* Halal Badge */}
-                    <div className="absolute top-2.5 right-2.5">
-                      <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-emerald-100 uppercase tracking-widest">
+                    <div className="absolute top-2.5 right-2.5 z-10">
+                      <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-emerald-100 uppercase tracking-widest shadow-sm backdrop-blur-md">
                         Halal
                       </span>
                     </div>
 
-                    {/* Stock Alert Warning line */}
-                    <div className="mb-2">
-                      <span className="text-[10px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
-                      <h3 className="font-bold text-sm text-gray-800 line-clamp-2 h-10 mt-1">{p.name}</h3>
-                      <p className="text-xs text-gray-400 italic mt-1">{p.category}</p>
+                    {/* Product Image */}
+                    <div className="w-full h-32 bg-slate-100 flex-shrink-0 relative">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                          <Package className="w-8 h-8 mb-1" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">No Photo</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-2">
+                    {/* Card Content */}
+                    <div className="p-3 flex flex-col flex-1 justify-between">
+                      <div className="mb-2">
+                        <span className="text-[10px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
+                        <h3 className="font-bold text-sm text-gray-800 line-clamp-2 mt-1 leading-snug h-10">{p.name}</h3>
+                        <p className="text-[10px] text-gray-400 font-semibold uppercase mt-1">{p.category}</p>
+                      </div>
+
+                      <div className="mt-auto pt-2 border-t border-gray-50">
                       <div className="flex justify-between items-center mb-3">
                         <span className="font-bold text-gray-800 text-sm">
                           Rp {p.price.toLocaleString('id-ID')}
@@ -281,6 +277,7 @@ export default function KasirPOS() {
                           )}
                         </button>
                       )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -291,7 +288,7 @@ export default function KasirPOS() {
       </div>
 
       {/* Shopping Cart Section - Right */}
-      <div className="md:col-span-5 lg:col-span-4 bg-white rounded-xl border border-gray-200 shadow-xs flex flex-col h-full overflow-hidden">
+      <div className="md:col-span-5 lg:col-span-4 bg-white rounded-xl border border-gray-200 shadow-xs flex flex-col h-[70vh] md:h-full overflow-hidden mt-4 md:mt-0">
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -477,7 +474,7 @@ export default function KasirPOS() {
               {/* Payment Method selectors */}
               <div className="space-y-2">
                 <p className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-1">Metode Pembayaran Syariah</p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <button
                     onClick={() => { setPaymentMethod('CASH'); setAmountPaidInput(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
@@ -491,12 +488,13 @@ export default function KasirPOS() {
                   </button>
 
                   <button
+                    disabled={settings.qrisEnabled === false}
                     onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setAmountPaidInput(cartTotal.toString()); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'QRIS_SHARIAH'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    }`}
+                    } ${settings.qrisEnabled === false ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
                   >
                     <QrCode className="w-5 h-5 text-emerald-700" />
                     <span className="text-[9px] font-bold">QRIS</span>
@@ -512,33 +510,6 @@ export default function KasirPOS() {
                   >
                     <CreditCard className="w-5 h-5 text-emerald-700" />
                     <span className="text-[9px] font-bold">Transfer</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => { setPaymentMethod('KASBON'); setAmountPaidInput('0'); }}
-                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
-                      paymentMethod === 'KASBON'
-                        ? 'border-amber-600 bg-amber-50 text-amber-800'
-                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    }`}
-                  >
-                    <Building className="w-5 h-5 text-amber-700" />
-                    <span className="text-[9px] font-bold">Kasbon</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setPaymentMethod('SPLIT'); setSplitCashAmount(''); setSplitTransferAmount(''); }}
-                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
-                      paymentMethod === 'SPLIT'
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-800'
-                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    }`}
-                  >
-                    <div className="flex -space-x-1">
-                      <Coins className="w-4 h-4 text-emerald-700" />
-                      <CreditCard className="w-4 h-4 text-indigo-700" />
-                    </div>
-                    <span className="text-[9px] font-bold">Split</span>
                   </button>
                 </div>
               </div>
@@ -568,43 +539,12 @@ export default function KasirPOS() {
                     ))}
                   </div>
                 </div>
-              ) : paymentMethod === 'SPLIT' ? (
-                <div className="space-y-3 bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-600 uppercase">Uang Tunai Cash</label>
-                    <input
-                      type="number"
-                      value={splitCashAmount}
-                      onChange={(e) => setSplitCashAmount(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      placeholder="Rp..."
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-600 uppercase">Transfer BSI</label>
-                    <input
-                      type="number"
-                      value={splitTransferAmount}
-                      onChange={(e) => setSplitTransferAmount(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg py-1.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      placeholder="Rp..."
-                    />
-                  </div>
-                  <div className="flex justify-between items-center text-xs pt-1 border-t border-indigo-100">
-                    <span className="font-bold text-indigo-900">Total Nominal:</span>
-                    <span className={`font-bold ${Number(splitCashAmount) + Number(splitTransferAmount) < cartTotal ? 'text-red-500' : 'text-emerald-600'}`}>
-                      Rp {(Number(splitCashAmount) + Number(splitTransferAmount)).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                </div>
               ) : (
                 <div className="bg-slate-50 rounded-lg p-3 border border-gray-100 text-xs text-slate-500 leading-relaxed">
                   {paymentMethod === 'QRIS_SHARIAH' ? (
-                    <p>Sistem akan menampilkan barcode QRIS statis Berkah Amanah. Transaksi tercatat aman tanpa riba (bunga tambahan).</p>
-                  ) : paymentMethod === 'TRANSFER_BSI' ? (
-                    <p>Konfirmasi transfer Bank Syariah Indonesia No. Rekening <b>7823908234 (BA Mart)</b>.</p>
+                    <p>Sistem akan menampilkan barcode QRIS statis Toko. Transaksi tercatat aman tanpa riba (bunga tambahan).</p>
                   ) : (
-                    <p className="text-amber-700 font-bold">Piutang (KASBON) dicatat otomatis untuk {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name : 'Pelanggan'}. Pastikan identitas jelas.</p>
+                    <p>Konfirmasi transfer tujuan: <b>{settings.ownerBankName || 'BSI'}</b> No. Rek: <b>{settings.ownerBankAccount || '-'}</b>.</p>
                   )}
                 </div>
               )}
@@ -657,7 +597,7 @@ export default function KasirPOS() {
             </div>
 
             {/* Simulated Thermic strip content */}
-            <div id="printable-receipt" className="p-6 space-y-4 text-xs font-mono text-gray-700 border-b border-dashed border-gray-200 max-h-96 overflow-y-auto">
+            <div className="printable-area printable-thermal p-6 space-y-4 text-xs font-mono text-gray-700 border-b border-dashed border-gray-200 max-h-96 overflow-y-auto">
               <div className="text-center space-y-0.5 border-b border-gray-100 pb-3">
                 <p className="font-bold text-gray-800 text-sm">Toko Berkah Amanah Mart</p>
                 <p className="text-slate-400">Toko Berkah Amanah Mart, Indonesia</p>
