@@ -25,7 +25,7 @@ export default function StrukturOrganisasiPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight">Struktur Organisasi</h1>
-            <p className="text-xs font-semibold text-slate-500 mt-1">Bagan hierarki dan alur pelaporan BA SmartPOS Shariah</p>
+            <p className="text-xs font-semibold text-slate-500 mt-1">Bagan hierarki dan alur pelaporan KSA Mart</p>
           </div>
         </div>
       </div>

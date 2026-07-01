@@ -183,7 +183,7 @@ export default function ArtikelIslamiPage() {
               
               <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <p className="text-sm text-slate-500 italic text-center sm:text-left">
-                  Materi ini disediakan khusus untuk edukasi pengguna SmartPOS Shariah.
+                  Materi ini disediakan khusus untuk edukasi pengguna KSA Mart.
                 </p>
                 <button 
                   onClick={() => setSelectedArticle(null)}

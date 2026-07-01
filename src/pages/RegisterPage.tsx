@@ -103,11 +103,11 @@ export default function RegisterPage() {
           </button>
           
           <div className="flex items-center gap-4 mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
-              <span className="font-serif italic font-black text-3xl text-white">SPS</span>
+            <div className="flex items-center justify-center">
+              <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-16 w-auto" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">SmartPOS Shariah</h1>
+              <h1 className="text-2xl font-bold tracking-tight">KSA Mart</h1>
               <p className="text-emerald-400 font-bold tracking-[0.2em] uppercase text-sm">Indonesia</p>
             </div>
           </div>
@@ -151,11 +151,11 @@ export default function RegisterPage() {
         >
           {/* Mobile Header (Visible only on mobile) */}
           <div className="lg:hidden mb-10 flex flex-col items-center text-center">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg mb-4">
-              <span className="font-serif italic font-black text-2xl text-white">SPS</span>
+            <div className="flex items-center justify-center mb-4">
+              <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-14 w-auto" />
             </div>
             <h2 className="text-2xl font-bold">Daftar Aplikasi</h2>
-            <p className="text-slate-500 mt-2">SmartPOS Shariah Indonesia</p>
+            <p className="text-slate-500 mt-2">KSA Mart</p>
           </div>
 
           {!isSubmitted ? (

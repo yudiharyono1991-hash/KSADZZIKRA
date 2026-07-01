@@ -23,10 +23,10 @@ export default function LandingPage() {
       {/* Ticker */}
       <div className={`${isDarkMode ? 'bg-slate-950 text-amber-500' : 'bg-emerald-900 text-amber-300'} py-1 overflow-hidden whitespace-nowrap transition-colors duration-500`}>
         <div className="animate-[marquee_20s_linear_infinite] flex space-x-12">
-          <span>©2026 All Rights Reserved. SmartPOS Shariah Indonesia</span>
-          <a href="https://wa.me/6282210027952?text=Assalamu'alaikum%20Sdr%20Yudi%20Haryono,%20saya%20tertarik%20untuk%20kerjasama%20aplikasi%20SmartPOS%20Shariah." target="_blank" rel="noopener noreferrer" className="hover:text-white cursor-pointer underline decoration-dotted underline-offset-4">📞 WhatsApp Pengembang: +6282210027952 (Info & Kerjasama Aplikasi)</a>
-          <span>©2026 All Rights Reserved. SmartPOS Shariah Indonesia</span>
-          <a href="https://wa.me/6282210027952?text=Assalamu'alaikum%20Sdr%20Yudi%20Haryono,%20saya%20tertarik%20untuk%20kerjasama%20aplikasi%20SmartPOS%20Shariah." target="_blank" rel="noopener noreferrer" className="hover:text-white cursor-pointer underline decoration-dotted underline-offset-4">📞 WhatsApp Pengembang: +6282210027952 (Info & Kerjasama Aplikasi)</a>
+          <span>©2026 All Rights Reserved. KSA Mart</span>
+          <a href="https://wa.me/6282210027952?text=Assalamu'alaikum%20Sdr%20Yudi%20Haryono,%20saya%20tertarik%20untuk%20kerjasama%20aplikasi%20KSA%20Mart." target="_blank" rel="noopener noreferrer" className="hover:text-white cursor-pointer underline decoration-dotted underline-offset-4">📞 WhatsApp Pengembang: +6282210027952 (Info & Kerjasama Aplikasi)</a>
+          <span>©2026 All Rights Reserved. KSA Mart</span>
+          <a href="https://wa.me/6282210027952?text=Assalamu'alaikum%20Sdr%20Yudi%20Haryono,%20saya%20tertarik%20untuk%20kerjasama%20aplikasi%20KSA%20Mart." target="_blank" rel="noopener noreferrer" className="hover:text-white cursor-pointer underline decoration-dotted underline-offset-4">📞 WhatsApp Pengembang: +6282210027952 (Info & Kerjasama Aplikasi)</a>
         </div>
       </div>
 
@@ -34,29 +34,10 @@ export default function LandingPage() {
       <header className="p-4 sm:p-6 flex justify-between items-center z-20 relative">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center shrink-0 hover:scale-105 transition-transform duration-300 relative drop-shadow-md">
-            <svg className="w-12 h-12 sm:w-14 sm:h-14" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Latar Belakang Hijau Gelap (Filosofi Kepatuhan Syariah yang Mengakar) */}
-              <circle cx="60" cy="60" r="58" fill={isDarkMode ? '#022c22' : '#065f46'} />
-              
-              {/* Sabit Emas yang Mengayomi (Filosofi Shariah sebagai Payung Bisnis) */}
-              <path d="M 2 60 A 58 58 0 0 1 60 2 A 62 62 0 0 0 2 60 Z" fill="#f59e0b" />
-              
-              {/* Kilauan Bintang (Filosofi SMART - Canggih & Inovatif secara Teknologi) */}
-              <path d="M 94 20 Q 94 30 104 30 Q 94 30 94 40 Q 94 30 84 30 Q 94 30 94 20 Z" fill="#10b981" />
-              
-              {/* Tiga Titik Emas Fondasi (Filosofi POS - Fondasi 3 Pilar Utama: Smart, POS, Shariah) */}
-              <circle cx="48" cy="94" r="3.5" fill="#f59e0b" />
-              <circle cx="60" cy="94" r="3.5" fill="#f59e0b" />
-              <circle cx="72" cy="94" r="3.5" fill="#f59e0b" />
-              
-              {/* Teks SPS (Karakter Kuat dan Dinamis di Pusat Ekosistem) */}
-              <text x="60" y="78" fontFamily="'Playfair Display', 'Times New Roman', serif" fontSize="56" fontWeight="900" fontStyle="italic" letterSpacing="-4" textAnchor="middle" fill="#ffffff">
-                SPS
-              </text>
-            </svg>
+              <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-12 sm:h-14 w-auto drop-shadow-md rounded-md" />
           </div>
           <span className={`text-xl font-bold ${isDarkMode ? 'text-emerald-400' : 'text-emerald-800'} hidden sm:block transition-colors`}>
-            SmartPOS Shariah <span className={`${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`}>INDONESIA</span>
+            KSA <span className={`${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`}>Mart</span>
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
@@ -119,9 +100,9 @@ export default function LandingPage() {
             <HeartHandshake size={16} /> Solusi Koperasi & Ritel Islami
           </div>
           <h1 className={`text-5xl md:text-7xl font-extrabold tracking-tight drop-shadow-sm flex flex-col items-center justify-center transition-colors ${isDarkMode ? 'text-emerald-400' : 'text-emerald-900'}`}>
-            <span>SmartPOS Shariah</span>
-            <span className={`text-3xl md:text-4xl mt-2 flex items-baseline gap-2 relative transition-colors ${isDarkMode ? 'text-amber-400' : 'text-amber-500'} font-black uppercase tracking-[0.3em]`}>
-              INDONESIA
+            <span>KSA</span>
+            <span className={`text-5xl md:text-7xl mt-2 flex items-baseline gap-2 relative transition-colors ${isDarkMode ? 'text-amber-400' : 'text-amber-500'} font-black uppercase tracking-tight`}>
+              Mart
             </span>
           </h1>
           <p className={`text-lg md:text-xl max-w-2xl mx-auto leading-relaxed transition-colors ${isDarkMode ? 'text-slate-300' : 'text-emerald-700'}`}>

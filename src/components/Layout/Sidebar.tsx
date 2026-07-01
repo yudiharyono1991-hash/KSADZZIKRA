@@ -301,10 +301,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                   <Store className="w-3.5 h-3.5 text-emerald-100 drop-shadow-md" />
                 </div>
                 
-                {/* BA Typographic Logo */}
-                <div className="flex items-center -space-x-[2px] z-10 drop-shadow-md mt-1.5">
-                  <span className="text-3xl font-black text-white font-sans tracking-tighter">B</span>
-                  <span className="text-3xl font-black text-amber-400 font-sans tracking-tighter">A</span>
+                {/* Logo */}
+                <div className="flex items-center justify-center z-10 drop-shadow-md mt-1.5">
+                  <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-10 w-auto object-contain" />
                 </div>
                 
                 {/* Text indicator replacing Store Icon */}
@@ -317,7 +316,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
             {!isCollapsed && (
               <div className="text-center transition-opacity duration-300 w-full px-2">
-                <h1 className="font-extrabold text-[10px] md:text-[12px] leading-tight tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">Berkah Amanah Mart SmartPOS Shariah</h1>
+                <h1 className="font-extrabold text-[10px] md:text-[12px] leading-tight tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">Koperasi Syariah KSA Mart</h1>
                 <p className="text-[9px] text-emerald-100 font-bold tracking-[0.2em] uppercase mt-1 bg-emerald-900/60 py-0.5 px-2 rounded-full border border-emerald-700/50 inline-block shadow-inner">
                   {getRoleLabel(currentUser.role)}
                 </p>

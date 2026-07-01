@@ -186,7 +186,7 @@ export default function LoginPage() {
                 <span className="text-rose-400">"Menepis Riba,</span> <span className="text-amber-400">Demi Meraih Keberkahan Laba"</span>
               </span>
               <span className="font-cursive-modern font-bold text-emerald-50 text-xs lg:text-sm xl:text-base tracking-wider leading-relaxed text-center mt-1">
-                SmartPOS Shariah Hadir Untuk Indonesia
+                KSA Mart Hadir Untuk Koperasi
               </span>
             </div>
           </div>
@@ -211,10 +211,9 @@ export default function LoginPage() {
                 <Store className="w-5 h-5 text-emerald-100 drop-shadow-md" />
               </div>
               
-              {/* BA Typographic Logo */}
-              <div className="flex items-center -space-x-1 z-10 drop-shadow-xl mt-2">
-                <span className="text-5xl font-black text-white font-sans tracking-tighter">B</span>
-                <span className="text-5xl font-black text-amber-400 font-sans tracking-tighter">A</span>
+              {/* Logo */}
+              <div className="flex items-center justify-center z-10 drop-shadow-xl mt-2">
+                <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-16 w-auto object-contain" />
               </div>
               
               {/* Text indicator replacing Store Icon */}
@@ -236,7 +235,7 @@ export default function LoginPage() {
             </h2>
             <div className="relative mt-1 flex justify-center">
               <h2 className="relative text-2xl md:text-3xl lg:text-4xl font-extrabold text-emerald-950 tracking-tight leading-none">
-                SmartPOS Shariah
+                KSA Mart
                 <span className="absolute bottom-0.5 md:bottom-1 left-full pl-1.5 md:pl-2 text-[8px] md:text-[10px] lg:text-xs font-black text-amber-500 uppercase tracking-[0.2em] leading-none whitespace-nowrap flex items-center">
                   INDONESIA <span className="text-xl md:text-2xl ml-1 -mt-1 animate-pulse">🇮🇩</span>
                 </span>
@@ -306,6 +305,7 @@ export default function LoginPage() {
           )}
 
           {/* Username/Email Field */}
+
           <div className="space-y-1">
             <label className="text-xs uppercase tracking-wider font-bold text-gray-600">
               {isRegisterMode ? 'Email' : 'Email atau No Handphone'}
@@ -463,7 +463,7 @@ export default function LoginPage() {
       </div>
         {/* Corporate Development Metadata inside relative max-w-md container */}
         <div className="absolute -bottom-16 left-0 right-0 text-center text-white/70 text-xs font-mono tracking-wider space-y-1">
-          <p className="font-semibold">BA SmartPOS Shariah — Versi 1.0 2026 IT Development</p>
+          <p className="font-semibold">KSA Mart — Versi 1.0 2026 IT Development</p>
           <p className="text-[10px]">Amanah Retail Accounting & ESG Ecosystem Integration</p>
         </div>
       </div>

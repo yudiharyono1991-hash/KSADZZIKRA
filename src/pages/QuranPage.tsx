@@ -230,7 +230,7 @@ export default function QuranPage() {
             </div>
           </div>
           <div className="text-xs font-bold text-emerald-200 hidden sm:flex items-center gap-2">
-            SmartPOS Shariah <span className="text-amber-400 tracking-[0.2em]">INDONESIA</span>
+            KSA Mart <span className="text-amber-400 tracking-[0.2em]">INDONESIA</span>
           </div>
         </div>
       </header>
