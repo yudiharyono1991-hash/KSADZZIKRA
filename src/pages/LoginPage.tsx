@@ -200,47 +200,24 @@ export default function LoginPage() {
         
         {/* Brand Modern Logo Header */}
         <div className="flex flex-col items-center text-center space-y-2 mb-6">
-          <div className="relative group cursor-default">
-            <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-emerald-300 rounded-3xl blur-xl opacity-50 group-hover:opacity-80 transition duration-500"></div>
-            <div className="relative w-24 h-24 bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-3xl border border-emerald-600/50 shadow-2xl flex items-center justify-center overflow-hidden transform group-hover:scale-105 transition duration-300">
-              {/* Geometric pattern background */}
-              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_50%_50%,_white_1px,_transparent_1px)] bg-[length:6px_6px]"></div>
-              
-              {/* Shop Roof Decoration */}
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-50">
-                <Store className="w-5 h-5 text-emerald-100 drop-shadow-md" />
-              </div>
-              
-              {/* Logo */}
-              <div className="flex items-center justify-center z-10 drop-shadow-xl mt-2">
-                <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-16 w-auto object-contain" />
-              </div>
-              
-              {/* Text indicator replacing Store Icon */}
-              <div className="absolute bottom-1.5 right-2 flex flex-col items-end opacity-95 leading-none">
-                <span className="text-[6.5px] text-emerald-100 font-black tracking-widest uppercase">Mart Syariah</span>
-                <span className="text-[5px] text-amber-400 font-bold tracking-[0.2em] mt-[1.5px]">@INDONESIA</span>
-              </div>
-            </div>
+          <div className="flex items-center justify-center z-10 drop-shadow-xl mt-2 mb-6">
+            <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-24 md:h-28 w-auto object-contain" />
           </div>
-          <div className="w-full mt-4 text-center">
+          
+          <div className="w-full text-center">
             <h1 className="text-xs md:text-sm lg:text-base font-black text-emerald-800 tracking-tight leading-snug">
               Assalamualaikum Warahmatullahi Wabarakatuh
             </h1>
           </div>
-          <p className="text-[10px] md:text-xs lg:text-sm font-bold text-amber-500 uppercase tracking-widest mt-3 mb-1">Selamat Datang di</p>
+          <p className="text-[10px] md:text-xs lg:text-sm font-bold text-amber-500 uppercase tracking-widest mt-3 mb-2">Selamat Datang di</p>
+          
           <div className="w-full flex flex-col items-center text-center">
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-emerald-950 tracking-tight leading-none">
-              Berkah Amanah Mart
+            <h2 className="relative text-2xl md:text-3xl lg:text-4xl font-extrabold text-emerald-950 tracking-tight leading-none">
+              KSA Mart
+              <span className="absolute bottom-0.5 md:bottom-1 left-full pl-1.5 md:pl-2 text-[8px] md:text-[10px] lg:text-xs font-black text-amber-500 uppercase tracking-[0.2em] leading-none whitespace-nowrap flex items-center">
+                INDONESIA <span className="text-xl md:text-2xl ml-1 -mt-1 animate-pulse">🇮🇩</span>
+              </span>
             </h2>
-            <div className="relative mt-1 flex justify-center">
-              <h2 className="relative text-2xl md:text-3xl lg:text-4xl font-extrabold text-emerald-950 tracking-tight leading-none">
-                KSA Mart
-                <span className="absolute bottom-0.5 md:bottom-1 left-full pl-1.5 md:pl-2 text-[8px] md:text-[10px] lg:text-xs font-black text-amber-500 uppercase tracking-[0.2em] leading-none whitespace-nowrap flex items-center">
-                  INDONESIA <span className="text-xl md:text-2xl ml-1 -mt-1 animate-pulse">🇮🇩</span>
-                </span>
-              </h2>
-            </div>
           </div>
           <div className="w-full mt-3 text-center">
             <p className="text-xs md:text-sm lg:text-base text-gray-500 font-medium leading-relaxed">
