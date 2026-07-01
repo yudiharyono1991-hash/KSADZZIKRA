@@ -78,14 +78,6 @@ export default function LandingPage() {
               </div>
             )}
           </div>
-
-          <button 
-            onClick={() => navigate('/login')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold shadow-md transition-all hover:-translate-y-0.5 ${isDarkMode ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
-          >
-            <LogIn size={18} />
-            <span className="hidden sm:block">Masuk</span>
-          </button>
         </div>
       </header>
 
@@ -96,25 +88,57 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-3xl text-center space-y-8"
         >
+          {/* Syariah badge */}
           <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm mb-4 transition-colors ${isDarkMode ? 'bg-amber-900/40 text-amber-400 border border-amber-700/50' : 'bg-amber-100 text-amber-800'}`}>
             <HeartHandshake size={16} /> Solusi Koperasi & Ritel Islami
           </div>
-          <h1 className={`text-5xl md:text-7xl font-extrabold tracking-tight drop-shadow-sm flex flex-col items-center justify-center transition-colors ${isDarkMode ? 'text-emerald-400' : 'text-emerald-900'}`}>
-            <span>KSA</span>
-            <span className={`text-5xl md:text-7xl mt-2 flex items-baseline gap-2 relative transition-colors ${isDarkMode ? 'text-amber-400' : 'text-amber-500'} font-black uppercase tracking-tight`}>
-              Mart
-            </span>
-          </h1>
-          <p className={`text-lg md:text-xl max-w-2xl mx-auto leading-relaxed transition-colors ${isDarkMode ? 'text-slate-300' : 'text-emerald-700'}`}>
-            Sistem Kasir Pintar Berbasis Syariah pertama yang terintegrasi dengan laporan PSAK, zakat otomatis, dan manajemen operasional koperasi Anda.
+
+          {/* Brand Identity */}
+          <div className="flex flex-col items-center gap-0">
+            {/* KSA row */}
+            <div className="flex items-center gap-3">
+              <h1 className={`text-6xl md:text-8xl font-black tracking-tight leading-none transition-colors ${isDarkMode ? 'text-emerald-400' : 'text-emerald-800'}`}>
+                KSA
+              </h1>
+            </div>
+
+            {/* Mart row with cart icon */}
+            <div className="flex items-center gap-3 -mt-2">
+              {/* Cart icon pulled from logo colours */}
+              <div className={`flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg ${isDarkMode ? 'bg-emerald-700' : 'bg-emerald-700'}`}>
+                <Store className="w-7 h-7 md:w-9 md:h-9 text-white" />
+              </div>
+              <h1 className={`font-black tracking-tight leading-none transition-colors ${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`} style={{fontSize:'clamp(3rem,10vw,5.5rem)'}}>
+                <span style={{fontSize:'0.55em'}} className="align-top font-black">M</span>
+                <span style={{fontSize:'1em'}} className="font-black">art</span>
+              </h1>
+            </div>
+
+            {/* Growth philosophy line */}
+            <div className="mt-4 flex flex-col items-center gap-1">
+              <div className={`flex items-center gap-2 text-[11px] md:text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'text-emerald-500' : 'text-emerald-700'}`}>
+                <span className="text-amber-500">▲</span>
+                Tumbuh Bersama • Berkah Bersama • Syariah Bersama
+                <span className="text-amber-500">▲</span>
+              </div>
+              <div className={`h-px w-64 md:w-96 ${isDarkMode ? 'bg-gradient-to-r from-transparent via-emerald-600 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent'}`}></div>
+              <p className={`text-[10px] md:text-xs font-medium tracking-widest uppercase ${isDarkMode ? 'text-amber-500/70' : 'text-amber-600/80'}`}>
+                Koperasi Syariah ADZ-ZIKRA · Indonesia
+              </p>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p className={`text-base md:text-lg max-w-xl mx-auto leading-relaxed transition-colors ${isDarkMode ? 'text-slate-300' : 'text-emerald-700'}`}>
+            Sistem Kasir Pintar Berbasis Syariah — terintegrasi laporan PSAK, zakat otomatis, dan manajemen operasional koperasi. <span className={`font-bold ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>Halal. Amanah. Berkah.</span>
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
             <button 
-              onClick={() => navigate('/register')}
-              className={`px-8 py-4 rounded-xl font-bold shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-emerald-500 text-white hover:bg-emerald-400 hover:shadow-emerald-500/20' : 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-emerald-900/20'}`}
+              onClick={() => navigate('/login')}
+              className={`px-8 py-4 rounded-xl font-bold shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-emerald-500 text-white hover:bg-emerald-400 hover:shadow-emerald-500/20' : 'bg-emerald-700 text-white hover:bg-emerald-800 hover:shadow-emerald-900/20'}`}
             >
-              <Store size={20} /> Daftar Aplikasi
+              <LogIn size={20} /> Masuk ke Aplikasi
             </button>
           </div>
         </motion.div>
