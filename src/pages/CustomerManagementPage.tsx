@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Users, Plus, Search, Trash2, Edit, CreditCard } from 'lucide-react';
 
 export default function CustomerManagementPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser } = useAppStore();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry } = useAppStore();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -54,6 +54,32 @@ export default function CustomerManagementPage() {
     }
 
     updateCustomer(c.id, { debtAmount: c.debtAmount - amount });
+    
+    // Add auto journal for debt payment
+    const now = new Date().toISOString();
+    addJournalEntry({
+      date: now,
+      account: 'KAS',
+      description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${c.name}`,
+      debit: amount,
+      credit: 0,
+      referenceId: c.id,
+      referenceType: 'MANUAL',
+      createdBy: currentUser?.name,
+      branchId: currentUser?.branchId
+    });
+    addJournalEntry({
+      date: now,
+      account: 'PIUTANG_DAGANG',
+      description: `[Auto] Pengurangan piutang pelanggan: ${c.name}`,
+      debit: 0,
+      credit: amount,
+      referenceId: c.id,
+      referenceType: 'MANUAL',
+      createdBy: currentUser?.name,
+      branchId: currentUser?.branchId
+    });
+
     alert(`Pelunasan berhasil diproses. Sisa piutang: Rp ${c.debtAmount - amount}`);
   };
 

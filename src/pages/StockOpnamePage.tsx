@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter } from 'lucide-react';
 
 export default function StockOpnamePage() {
-  const { products, stockMovements, adjustStock, currentUser, activeBranchId } = useAppStore();
+  const { products, stockMovements, adjustStock, currentUser, activeBranchId, addLog } = useAppStore();
   const [selectedProductId, setSelectedProductId] = useState('');
   const [adjustmentAmount, setAdjustmentAmount] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
   
   if (currentUser?.role !== 'OWNER' && currentUser?.role !== 'ADMIN') {
     return <div className="p-6 text-red-500 font-bold">Akses ditolak.</div>;
@@ -13,12 +16,27 @@ export default function StockOpnamePage() {
 
   const handleAdjust = () => {
     if (!selectedProductId || !adjustmentAmount) return;
-    adjustStock(selectedProductId, Number(adjustmentAmount));
+    const prod = products.find(p => p.id === selectedProductId);
+    const amount = Number(adjustmentAmount);
+    
+    // Variance is difference
+    const currentStock = prod?.stock || 0;
+    const newStock = currentStock + amount;
+    
+    adjustStock(selectedProductId, amount);
+    
+    addLog('STOCK_OPNAME', 'INVENTORY', `Opname: ${prod?.name}. Fisik: ${newStock}, Sistem sblm: ${currentStock}. Variance: ${amount}`);
+    
     setAdjustmentAmount('');
-    alert("Stok berhasil disesuaikan!");
+    alert("Stok berhasil disesuaikan dan dicatat di Audit Log!");
   };
 
-  const filteredProducts = products.filter(p => !activeBranchId || p.branchId === activeBranchId || !p.branchId);
+  const filteredProducts = products.filter(p => {
+    const matchBranch = !activeBranchId || p.branchId === activeBranchId || !p.branchId;
+    const matchCat = selectedCategory === 'ALL' || p.category === selectedCategory;
+    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchBranch && matchCat && matchSearch;
+  });
 
   const filteredMovements = selectedProductId 
     ? stockMovements.filter(sm => sm.productId === selectedProductId && (!activeBranchId || sm.branchId === activeBranchId || !sm.branchId))
@@ -41,39 +59,67 @@ export default function StockOpnamePage() {
         <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-3">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
-            Penyesuaian Stok (Manual)
+            Stock Opname & Variance
           </h3>
+          
+          <div className="space-y-3 pb-3 border-b border-gray-100">
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Cari SKU / nama produk..."
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="relative">
+              <Filter className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+              <select 
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="ALL">Semua Kategori</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Pilih Produk</label>
+            <label className="text-xs font-bold text-gray-600 mb-1 block">Pilih Produk untuk Opname</label>
             <select 
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
               className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="">-- Semua Produk --</option>
+              <option value="">-- Silakan Pilih Produk --</option>
               {filteredProducts.map(p => (
-                <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock})</option>
+                <option key={p.id} value={p.id}>{p.sku} - {p.name} (Sistem: {p.stock})</option>
               ))}
             </select>
           </div>
           {selectedProductId && (
             <>
+              <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 mt-2">
+                 <p className="text-xs text-amber-800 font-medium">Stok Sistem saat ini: <b>{products.find(p=>p.id === selectedProductId)?.stock}</b></p>
+                 <p className="text-[10px] text-amber-700 mt-1">Masukkan angka minus jika fisik kurang (hilang/rusak), atau positif jika fisik berlebih.</p>
+              </div>
               <div>
-                <label className="text-xs font-bold text-gray-600 mb-1 block">Jumlah Penyesuaian (+/-)</label>
+                <label className="text-xs font-bold text-gray-600 mb-1 block">Variance (+/-)</label>
                 <input 
                   type="number"
                   value={adjustmentAmount}
                   onChange={(e) => setAdjustmentAmount(e.target.value)}
-                  placeholder="-5 (jika rusak) atau +10 (jika lebih)"
-                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Misal: -2 atau +5"
+                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">Gunakan minus (-) jika stok fisik lebih sedikit dari sistem.</p>
               </div>
               <button 
                 onClick={handleAdjust}
-                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow-xs"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow-xs flex justify-center items-center gap-2"
               >
-                Sesuaikan Stok Sekarang
+                <CheckCircle className="w-4 h-4"/> Setujui Opname (Approve)
               </button>
             </>
           )}

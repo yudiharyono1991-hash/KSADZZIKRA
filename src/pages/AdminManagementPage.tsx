@@ -10,6 +10,10 @@ export default function AdminManagementPage() {
   const [activeTab, setActiveTab] = useState<Tab>('ACTIVE');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('CASHIER');
+  const [editName, setEditName] = useState<string>('');
+  const [editBranch, setEditBranch] = useState<string>('');
+  const [editUsername, setEditUsername] = useState<string>('');
+  const [editPassword, setEditPassword] = useState<string>('');
 
   // Prevent accessing if not admin or owner
   if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
@@ -25,13 +29,21 @@ export default function AdminManagementPage() {
   const activeUsers = users.filter(u => u.isApproved && u.isActive);
   const pendingUsers = users.filter(u => !u.isApproved);
 
-  const handleEditClick = (id: string, currentRole: UserRole) => {
+  const handleEditClick = (id: string, currentRole: UserRole, currentName: string, currentUsername: string, currentBranchId?: string) => {
     setEditingId(id);
     setEditRole(currentRole);
+    setEditName(currentName);
+    setEditUsername(currentUsername);
+    setEditPassword(''); // Reset password field
+    setEditBranch(currentBranchId || '');
   };
 
   const handleSaveEdit = (id: string) => {
-    updateUser(id, { role: editRole });
+    const updates: Partial<any> = { role: editRole, name: editName, username: editUsername, branchId: editBranch || undefined };
+    if (editPassword) {
+      updates.password = editPassword;
+    }
+    updateUser(id, updates);
     setEditingId(null);
   };
 
@@ -159,11 +171,53 @@ export default function AdminManagementPage() {
                 {activeUsers.map((user) => (
                   <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="p-4">
-                      <p className="font-bold text-slate-800">{user.name}</p>
+                      {editingId === user.id ? (
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        />
+                      ) : (
+                        <p className="font-bold text-slate-800">{user.name}</p>
+                      )}
                     </td>
-                    <td className="p-4 font-mono text-xs text-slate-500">@{user.username}</td>
+                    <td className="p-4 font-mono text-xs text-slate-500">
+                      {editingId === user.id ? (
+                        <div className="space-y-1.5 min-w-[140px]">
+                          <input
+                            type="text"
+                            value={editUsername}
+                            onChange={(e) => setEditUsername(e.target.value)}
+                            className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1.5 w-full focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                            placeholder="Username baru"
+                          />
+                          <input
+                            type="text"
+                            value={editPassword}
+                            onChange={(e) => setEditPassword(e.target.value)}
+                            className="bg-white border border-amber-300 text-slate-800 text-[10px] rounded-lg px-2 py-1.5 w-full focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                            placeholder="Sandi Baru (Opsional)"
+                            title="Kosongkan jika tidak ingin merubah kata sandi"
+                          />
+                        </div>
+                      ) : (
+                        `@${user.username}`
+                      )}
+                    </td>
                     <td className="p-4 text-xs font-semibold text-slate-600">
-                      {user.branchId ? (
+                      {editingId === user.id ? (
+                        <select
+                          value={editBranch}
+                          onChange={(e) => setEditBranch(e.target.value)}
+                          className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                        >
+                          <option value="">Pusat/Global</option>
+                          {branches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      ) : user.branchId ? (
                         <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 px-2 py-1 rounded w-fit">
                           <Store className="w-3 h-3" />
                           {branches.find(b => b.id === user.branchId)?.name || 'Cabang Tidak Dikenal'}
@@ -213,10 +267,10 @@ export default function AdminManagementPage() {
                         ) : (
                           <>
                             <button
-                              onClick={() => handleEditClick(user.id, user.role)}
+                              onClick={() => handleEditClick(user.id, user.role, user.name, user.username, user.branchId)}
                               className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               disabled={user.username === currentUser?.username || (currentUser?.role === 'ADMIN' && user.role === 'OWNER')}
-                              title="Ubah Role"
+                              title="Ubah Data"
                             >
                               <Edit className="w-4 h-4" />
                             </button>

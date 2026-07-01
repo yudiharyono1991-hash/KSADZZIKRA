@@ -14,7 +14,9 @@ import {
   Building,
   Check,
   AlertCircle,
-  Package
+  Package,
+  Users,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function KasirPOS() {
@@ -37,10 +39,18 @@ export default function KasirPOS() {
   
   // Checkout Modal State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON'>('CASH');
   const [amountPaidInput, setAmountPaidInput] = useState('');
   const [receiptTx, setReceiptTx] = useState<any>(null); // To show transaction receipt after checkout
   const [customerPhone, setCustomerPhone] = useState('');
+  
+  // Payment Simulation States for Presentation
+  const [isQrisSimulated, setIsQrisSimulated] = useState(false);
+  const [isTransferSimulated, setIsTransferSimulated] = useState(false);
+  const [transferSenderName, setTransferSenderName] = useState('');
+  
+  const [qrisScanMode, setQrisScanMode] = useState<'MERCHANT' | 'CUSTOMER'>('MERCHANT');
+  const [scannedCustomerToken, setScannedCustomerToken] = useState('');
   
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [selectedPromoId, setSelectedPromoId] = useState<string>('');
@@ -307,7 +317,7 @@ export default function KasirPOS() {
             <span className="bg-amber-400 text-emerald-950 font-black px-1.5 py-0.5 rounded text-[8px]">TERKUNCI</span>
           </p>
           <p className="text-gray-100/90 leading-relaxed font-medium">
-            Harga beli dan jual sembako sudah otomatis ditentukan oleh sistem berdasarkan ketetapan Owner & Admin Syariah.
+            Harga beli dan jual barang/komoditas sudah otomatis ditentukan oleh sistem berdasarkan ketetapan Owner & Admin Syariah.
           </p>
         </div>
 
@@ -443,7 +453,7 @@ export default function KasirPOS() {
                   : 'bg-emerald-700 hover:bg-emerald-800 text-white'
               }`}
             >
-              <span>Bayar Seakarang</span>
+              <span>Bayar Sekarang</span>
             </button>
           </div>
         </div>
@@ -474,9 +484,9 @@ export default function KasirPOS() {
               {/* Payment Method selectors */}
               <div className="space-y-2">
                 <p className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-1">Metode Pembayaran Syariah</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
-                    onClick={() => { setPaymentMethod('CASH'); setAmountPaidInput(''); }}
+                    onClick={() => { setPaymentMethod('CASH'); setAmountPaidInput(''); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'CASH'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
@@ -489,7 +499,7 @@ export default function KasirPOS() {
 
                   <button
                     disabled={settings.qrisEnabled === false}
-                    onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setAmountPaidInput(cartTotal.toString()); }}
+                    onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setAmountPaidInput(cartTotal.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'QRIS_SHARIAH'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
@@ -501,7 +511,7 @@ export default function KasirPOS() {
                   </button>
 
                   <button
-                    onClick={() => { setPaymentMethod('TRANSFER_BSI'); setAmountPaidInput(cartTotal.toString()); }}
+                    onClick={() => { setPaymentMethod('TRANSFER_BSI'); setAmountPaidInput(cartTotal.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'TRANSFER_BSI'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
@@ -510,6 +520,18 @@ export default function KasirPOS() {
                   >
                     <CreditCard className="w-5 h-5 text-emerald-700" />
                     <span className="text-[9px] font-bold">Transfer</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => { setPaymentMethod('KASBON'); setAmountPaidInput('0'); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
+                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
+                      paymentMethod === 'KASBON'
+                        ? 'border-rose-600 bg-rose-50 text-rose-800'
+                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
+                    }`}
+                  >
+                    <Users className="w-5 h-5 text-rose-700" />
+                    <span className="text-[9px] font-bold">Kasbon</span>
                   </button>
                 </div>
               </div>
@@ -539,12 +561,152 @@ export default function KasirPOS() {
                     ))}
                   </div>
                 </div>
+              ) : paymentMethod === 'KASBON' ? (
+                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 space-y-3 animate-in fade-in zoom-in-95">
+                  <div className="flex items-start gap-3 text-rose-800">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-bold">Peringatan Transaksi Kasbon!</p>
+                      <p className="text-xs mt-1 text-rose-700/80">Anda wajib memilih <b>Nama Pelanggan</b> di bagian atas untuk mencatat piutang ini. Total belanja akan otomatis masuk ke tagihan (hutang) pelanggan tersebut.</p>
+                    </div>
+                  </div>
+                  {!selectedCustomerId && (
+                    <div className="bg-white p-3 rounded-lg border border-rose-200 text-center text-rose-600 font-bold text-xs animate-pulse shadow-sm shadow-rose-100">
+                      ⚠️ SILAKAN PILIH PELANGGAN DULU!
+                    </div>
+                  )}
+                  {selectedCustomerId && (
+                    <div className="bg-white p-3 rounded-lg border border-emerald-200 text-center text-emerald-700 font-bold text-xs shadow-sm shadow-emerald-100 flex items-center justify-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Pelanggan Dipilih. Siap Proses!
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="bg-slate-50 rounded-lg p-3 border border-gray-100 text-xs text-slate-500 leading-relaxed">
                   {paymentMethod === 'QRIS_SHARIAH' ? (
-                    <p>Sistem akan menampilkan barcode QRIS statis Toko. Transaksi tercatat aman tanpa riba (bunga tambahan).</p>
+                    <div className="flex flex-col space-y-3">
+                      {/* Tabs for Scan Mode */}
+                      <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                        <button 
+                          onClick={() => setQrisScanMode('MERCHANT')}
+                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'MERCHANT' ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                          Pelanggan Scan QR Toko
+                        </button>
+                        <button 
+                          onClick={() => { setQrisScanMode('CUSTOMER'); setTimeout(() => document.getElementById('barcode-scanner-input')?.focus(), 100); }}
+                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'CUSTOMER' ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                          Kasir Scan QR Pelanggan
+                        </button>
+                      </div>
+
+                      {qrisScanMode === 'MERCHANT' ? (
+                        <div className="flex flex-col items-center">
+                          <p className="text-center font-medium mb-3">Arahkan pelanggan untuk scan QR Code statis toko dan tunjukkan bukti berhasil pada layar HP mereka.</p>
+                          <div className="w-40 h-40 bg-white border border-gray-200 rounded-xl flex items-center justify-center p-2 shadow-sm overflow-hidden mb-3">
+                            {settings.qrisImageUrl ? (
+                              <img src={settings.qrisImageUrl} alt="QRIS Toko" className="w-full h-full object-contain" />
+                            ) : (
+                              <div className="flex flex-col items-center justify-center text-emerald-800 opacity-60">
+                                <QrCode className="w-16 h-16 mb-2" />
+                                <span className="text-[10px] text-center">Belum ada QRIS<br/>Upload di Pengaturan</span>
+                              </div>
+                            )}
+                          </div>
+                          {!isQrisSimulated ? (
+                            <button 
+                              onClick={() => setIsQrisSimulated(true)}
+                              className="w-full py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition-colors"
+                            >
+                              Verifikasi Bukti QRIS Selesai
+                            </button>
+                          ) : (
+                            <div className="w-full py-2 bg-emerald-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                              <CheckCircle className="w-4 h-4" />
+                              <span>Pembayaran QRIS Diterima!</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col space-y-3">
+                          <p className="text-center font-medium">Arahkan Scanner (Barcode Gun) ke layar HP pelanggan (GoPay/OVO/Dana) lalu tekan tombol tembak.</p>
+                          
+                          <div className="relative">
+                            <input
+                              id="barcode-scanner-input"
+                              type="text"
+                              autoFocus
+                              value={scannedCustomerToken}
+                              onChange={(e) => setScannedCustomerToken(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && scannedCustomerToken.length > 5) {
+                                  setIsQrisSimulated(true);
+                                }
+                              }}
+                              className="w-full border-2 border-emerald-400 rounded-lg py-3 px-3 text-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/20 bg-white text-center font-mono font-bold tracking-widest placeholder:font-sans placeholder:tracking-normal placeholder:font-normal"
+                              placeholder="Klik di sini & Tembakkan Scanner..."
+                            />
+                            {!isQrisSimulated && (
+                               <div className="absolute right-3 top-4 flex space-x-1">
+                                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                                 <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                               </div>
+                            )}
+                          </div>
+
+                          {!isQrisSimulated ? (
+                            <button 
+                              onClick={() => {
+                                if (scannedCustomerToken.length > 5) setIsQrisSimulated(true);
+                                else alert("Silakan scan barcode pelanggan terlebih dahulu (minimal 6 karakter token).");
+                              }}
+                              className="w-full py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition-colors"
+                            >
+                              Tarik Dana dari Pelanggan
+                            </button>
+                          ) : (
+                            <div className="w-full py-2 bg-emerald-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                              <CheckCircle className="w-4 h-4" />
+                              <span>Dana Berhasil Ditarik!</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <p>Konfirmasi transfer tujuan: <b>{settings.ownerBankName || 'BSI'}</b> No. Rek: <b>{settings.ownerBankAccount || '-'}</b>.</p>
+                    <div className="space-y-3">
+                      <p>Pastikan dana masuk ke rekening: <b>{settings.ownerBankName || 'BSI'}</b> No. Rek: <b>{settings.ownerBankAccount || '-'}</b>.</p>
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-gray-600 uppercase">Nama Pengirim (Sesuai Mutasi Bank)</label>
+                        <input
+                          type="text"
+                          value={transferSenderName}
+                          onChange={(e) => setTransferSenderName(e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white"
+                          placeholder="Masukkan nama pengirim untuk dicatat..."
+                        />
+                      </div>
+
+                      {!isTransferSimulated ? (
+                        <button 
+                          onClick={() => {
+                            if (!transferSenderName) { alert("Masukkan nama pengirim untuk verifikasi!"); return; }
+                            setIsTransferSimulated(true);
+                          }}
+                          className="w-full py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded-lg border border-blue-300 transition-colors"
+                        >
+                          Verifikasi Dana Masuk (Mutasi)
+                        </button>
+                      ) : (
+                        <div className="w-full py-2 bg-blue-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Dana Masuk Diverifikasi!</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -566,7 +728,7 @@ export default function KasirPOS() {
             {/* Modal Actions */}
             <div className="p-4 bg-slate-50 border-t border-gray-100 grid grid-cols-2 gap-2">
               <button
-                onClick={() => setIsCheckoutOpen(false)}
+                onClick={() => { setIsCheckoutOpen(false); setIsQrisSimulated(false); setIsTransferSimulated(false); }}
                 className="py-2.5 bg-white border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-slate-50"
               >
                 Batal
@@ -575,8 +737,24 @@ export default function KasirPOS() {
                 onClick={() => {
                   handleCheckoutSubmit();
                   setIsCheckoutOpen(false);
+                  setIsQrisSimulated(false);
+                  setIsTransferSimulated(false);
                 }}
-                className="py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-xs"
+                disabled={
+                  cart.length === 0 || 
+                  (paymentMethod === 'CASH' && Number(amountPaidInput) < cartTotal) ||
+                  (paymentMethod === 'QRIS_SHARIAH' && !isQrisSimulated) ||
+                  (paymentMethod === 'TRANSFER_BSI' && !isTransferSimulated) ||
+                  (paymentMethod === 'KASBON' && !selectedCustomerId)
+                }
+                className={`py-2.5 text-xs font-bold rounded-lg shadow-xs transition-colors ${
+                  (paymentMethod === 'CASH' && Number(amountPaidInput) < cartTotal) ||
+                  (paymentMethod === 'QRIS_SHARIAH' && !isQrisSimulated) ||
+                  (paymentMethod === 'TRANSFER_BSI' && !isTransferSimulated) ||
+                  (paymentMethod === 'KASBON' && !selectedCustomerId)
+                    ? 'bg-emerald-300 text-emerald-50 cursor-not-allowed'
+                    : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                }`}
               >
                 Selesaikan Pembayaran
               </button>
@@ -588,6 +766,14 @@ export default function KasirPOS() {
       {/* Modern Shariah Print Receipt Popup card */}
       {receiptTx && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+              @page { size: 80mm auto; margin: 0; }
+              body * { visibility: hidden; }
+              .printable-thermal, .printable-thermal * { visibility: visible; }
+              .printable-thermal { position: absolute; left: 0; top: 0; width: 80mm; padding: 2mm; margin: 0; border: none; max-height: none; overflow: visible; }
+            }
+          `}} />
           <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Receipt headers */}
             <div className="p-6 text-center border-b border-gray-100 bg-emerald-50/20">
@@ -600,7 +786,7 @@ export default function KasirPOS() {
             <div className="printable-area printable-thermal p-6 space-y-4 text-xs font-mono text-gray-700 border-b border-dashed border-gray-200 max-h-96 overflow-y-auto">
               <div className="text-center space-y-0.5 border-b border-gray-100 pb-3">
                 <p className="font-bold text-gray-800 text-sm">Toko Berkah Amanah Mart</p>
-                <p className="text-slate-400">Toko Berkah Amanah Mart, Indonesia</p>
+                <p className="text-slate-400 text-[10px] uppercase">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, Indonesia</p>
                 <p className="text-slate-400">Telp: 082210027952</p>
               </div>
 

@@ -42,6 +42,7 @@ type MenuItem = {
   path: string;
   label: string;
   icon: any;
+  badge?: number;
 };
 
 type MenuGroup = {
@@ -53,9 +54,11 @@ type MenuGroup = {
 type MenuData = (MenuItem | MenuGroup)[];
 
 export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, onExpand }: SidebarProps) {
-  const { currentUser, logout } = useAppStore();
+  const { currentUser, logout, users, settings } = useAppStore();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  
+  const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
 
   // Auto-expand group if current path is inside it
   useEffect(() => {
@@ -78,6 +81,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/kasir', label: 'Kasir POS', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/kasir-shift', label: 'Tutup Shift', icon: Lock },
+          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
       },
       {
@@ -116,12 +120,24 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/staff', label: 'Kinerja & Absensi HR', icon: UserCheck },
-          { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users },
+          { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
         ]
       }
     ];
+
+    if (settings.businessType === 'KOPERASI') {
+      menuData.splice(4, 0, {
+        label: 'Koperasi Syariah',
+        icon: UsersRound,
+        items: [
+          { path: '/koperasi-anggota', label: 'Manajemen Anggota', icon: Users },
+          { path: '/koperasi-shu', label: 'Pembagian SHU', icon: Wallet },
+        ]
+      });
+    }
   } else if (currentUser.role === 'ADMIN') {
     menuData = [
       {
@@ -158,6 +174,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/kasir', label: 'Kasir POS', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/kasir-shift', label: 'Tutup Shift', icon: Lock },
+          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
       },
       {
@@ -165,12 +182,24 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/staff', label: 'Kinerja & Absensi HR', icon: UserCheck },
-          { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users },
+          { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
         ]
       }
     ];
+
+    if (settings.businessType === 'KOPERASI') {
+      menuData.splice(4, 0, {
+        label: 'Koperasi Syariah',
+        icon: UsersRound,
+        items: [
+          { path: '/koperasi-anggota', label: 'Manajemen Anggota', icon: Users },
+          { path: '/koperasi-shu', label: 'Pembagian SHU', icon: Wallet },
+        ]
+      });
+    }
   } else {
     // CASHIER
     menuData = [
@@ -181,6 +210,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/kasir', label: 'Kasir POS', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/kasir-shift', label: 'Tutup Shift', icon: Lock },
+        ]
+      },
+      {
+        label: 'Informasi Perusahaan',
+        icon: Store,
+        items: [
+          { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
         ]
       }
     ];
@@ -249,15 +285,40 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
             </button>
           )}
 
-          <div className="flex flex-col items-center space-y-2 mt-2">
-            {/* Logo mosque/shop */}
-            <div className="w-14 h-14 rounded-full bg-[#1b5e20] border-[3px] border-amber-400 flex items-center justify-center shadow-lg transform transition-transform hover:scale-105 cursor-pointer" onClick={onExpand}>
-              <Store className="w-7 h-7 text-amber-400" />
+          <div className="flex flex-col items-center space-y-3 mt-2">
+            {/* Modern App Icon Logo */}
+            <div 
+              className="relative group cursor-pointer" 
+              onClick={onExpand}
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-emerald-300 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500"></div>
+              <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-2xl border border-emerald-600/50 shadow-xl flex items-center justify-center overflow-hidden transform group-hover:scale-105 transition duration-300">
+                {/* Geometric pattern background */}
+                <div className="absolute inset-0 opacity-[0.15] bg-[radial-gradient(circle_at_50%_50%,_white_1px,_transparent_1px)] bg-[length:4px_4px]"></div>
+                
+                {/* Shop Roof Decoration */}
+                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 opacity-50">
+                  <Store className="w-3.5 h-3.5 text-emerald-100 drop-shadow-md" />
+                </div>
+                
+                {/* BA Typographic Logo */}
+                <div className="flex items-center -space-x-[2px] z-10 drop-shadow-md mt-1.5">
+                  <span className="text-3xl font-black text-white font-sans tracking-tighter">B</span>
+                  <span className="text-3xl font-black text-amber-400 font-sans tracking-tighter">A</span>
+                </div>
+                
+                {/* Text indicator replacing Store Icon */}
+                <div className="absolute bottom-1 right-1.5 flex flex-col items-end opacity-95 leading-none">
+                  <span className="text-[4.5px] text-emerald-100 font-black tracking-widest uppercase">Mart Syariah</span>
+                  <span className="text-[4px] text-amber-400 font-bold tracking-[0.2em] mt-[1px]">@INDONESIA</span>
+                </div>
+              </div>
             </div>
+
             {!isCollapsed && (
-              <div className="text-center transition-opacity duration-300">
-                <h1 className="font-extrabold text-xl tracking-tight text-white">BA Mart</h1>
-                <p className="text-[10px] text-gray-200/80 font-bold tracking-widest uppercase mt-0.5">
+              <div className="text-center transition-opacity duration-300 w-full px-2">
+                <h1 className="font-extrabold text-[10px] md:text-[12px] leading-tight tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">Berkah Amanah Mart SmartPOS Shariah</h1>
+                <p className="text-[9px] text-emerald-100 font-bold tracking-[0.2em] uppercase mt-1 bg-emerald-900/60 py-0.5 px-2 rounded-full border border-emerald-700/50 inline-block shadow-inner">
                   {getRoleLabel(currentUser.role)}
                 </p>
               </div>
@@ -319,7 +380,12 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                             }
                           >
                             <SubIcon className="w-4 h-4 flex-shrink-0 opacity-80 group-hover:scale-110 transition-transform duration-300" />
-                            <span className="truncate">{subItem.label}</span>
+                            <span className="truncate flex-1">{subItem.label}</span>
+                            {subItem.badge && subItem.badge > 0 && !isCollapsed && (
+                              <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-xs">
+                                {subItem.badge}
+                              </span>
+                            )}
                           </NavLink>
                         );
                       })}
@@ -344,7 +410,15 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                   }
                 >
                   <Icon className="w-[18px] h-[18px] flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
-                  {!isCollapsed && <span className="truncate">{menuItem.label}</span>}
+                  {!isCollapsed && <span className="truncate flex-1">{menuItem.label}</span>}
+                  {menuItem.badge && menuItem.badge > 0 && !isCollapsed && (
+                    <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-xs ml-auto">
+                      {menuItem.badge}
+                    </span>
+                  )}
+                  {menuItem.badge && menuItem.badge > 0 && isCollapsed && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-sm shadow-red-500"></span>
+                  )}
                 </NavLink>
               );
             }
@@ -354,7 +428,11 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         {/* Keluar logout trigger aligned to bottom of sidebar */}
         <div className="p-4 border-t border-[#0e441b] space-y-3">
           <button 
-            onClick={logout}
+            onClick={() => {
+              if (window.confirm("Apakah Anda yakin ingin keluar dari sistem? Pastikan semua pekerjaan sudah tersimpan.")) {
+                logout();
+              }
+            }}
             title={isCollapsed ? 'Keluar' : undefined}
             className={`w-full flex items-center space-x-3 ${isCollapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-[13px] font-semibold text-red-100 hover:bg-red-950/40 hover:text-red-300 transition-colors group`}
           >

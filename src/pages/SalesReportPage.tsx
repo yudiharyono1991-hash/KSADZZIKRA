@@ -356,11 +356,22 @@ export default function SalesReportPage() {
           )}
         </table>
         
-        <div className="mt-8 pt-8 flex justify-end">
+        <div className="mt-8 pt-8 flex justify-between items-end">
           <div className="text-center w-48">
-            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
-            <p className="text-xs border-b border-gray-800 pb-1">{currentUser?.name || 'Admin'}</p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">{currentUser?.role || 'SYSTEM'}</p>
+            <p className="text-xs font-semibold mb-12">Dibuat Oleh,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold">
+              {currentUser?.role === 'OWNER' ? 'Administrator' : (currentUser?.name || 'Admin')}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">
+              {currentUser?.role === 'OWNER' ? 'ADMIN TOKO' : currentUser?.role || 'SYSTEM'}
+            </p>
+          </div>
+
+          <div className="text-center w-56">
+            <p className="text-[11px] text-gray-600 mb-4">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-xs font-semibold mb-12">Mengetahui / Menyetujui,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold">Yudi Hariyono</p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Pemilik Toko</p>
           </div>
         </div>
       </div>

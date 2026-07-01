@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 @media print {
+  @page {
+    margin: 0;
+  }
   body * {
     visibility: hidden;
   }
@@ -11,7 +14,7 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
+    width: 100% !important;
     margin: 0;
     padding: 0;
     box-shadow: none;
@@ -20,8 +23,9 @@
     color: black;
   }
   .printable-thermal {
+    width: 80mm !important;
     max-width: 80mm !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 5mm !important;
     font-size: 11px;
   }

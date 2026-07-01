@@ -146,7 +146,7 @@ export default function KasirRiwayatPage() {
             <div id="printable-receipt" className="p-6 space-y-4 text-xs font-mono text-gray-700 border-b border-dashed border-gray-200 max-h-96 overflow-y-auto">
               <div className="text-center space-y-0.5 border-b border-gray-100 pb-3">
                 <p className="font-bold text-gray-800 text-sm">Toko Berkah Amanah Mart</p>
-                <p className="text-slate-400">Toko Berkah Amanah Mart, Indonesia</p>
+                <p className="text-slate-400 text-[10px] uppercase">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, Indonesia</p>
                 <p className="text-slate-400">Telp: 082210027952</p>
                 <p className="text-xs font-bold mt-1">(COPY / CETAK ULANG)</p>
               </div>

@@ -11,7 +11,10 @@ import {
   ShieldAlert,
   Menu,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  KeyRound,
+  X,
+  Users
 } from 'lucide-react';
 
 interface TopBarProps {
@@ -20,9 +23,25 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopBarProps) {
-  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout } = useAppStore();
+  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser } = useAppStore();
   const [time, setTime] = useState(new Date());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !newPassword) return;
+    const activeUser = users.find(u => u.username === currentUser.username);
+    if (activeUser) {
+      updateUser(activeUser.id, { password: newPassword });
+      alert('Kata sandi berhasil diperbarui!');
+    }
+    setNewPassword('');
+    setIsPasswordModalOpen(false);
+    setIsUserMenuOpen(false);
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -46,6 +65,8 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   const userBranchName = currentUser?.branchId 
     ? branches.find(b => b.id === currentUser?.branchId)?.name || 'Cabang Tidak Dikenal'
     : 'Pusat';
+
+  const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
 
   return (
     <header id="app-topbar" className="h-16 bg-white border-b border-gray-200/80 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none">
@@ -93,11 +114,20 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
       {/* Real-time stats & Profile context */}
       <div className="flex items-center space-x-5">
         
-        {/* Low Stock Warning Header */}
         {lowStockCount > 0 && (
           <div className="flex items-center space-x-1.5 bg-amber-50 text-amber-800 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-amber-150">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600 animate-bounce" />
-            <span>{lowStockCount} Stok Low</span>
+            <span className="hidden sm:inline">{lowStockCount} Stok Low</span>
+            <span className="sm:hidden">{lowStockCount} Low</span>
+          </div>
+        )}
+
+        {/* Pending Users Warning Header */}
+        {pendingUsersCount > 0 && (currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN') && (
+          <div className="flex items-center space-x-1.5 bg-red-50 text-red-800 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-red-150 cursor-pointer" onClick={() => window.location.hash = '#/admin-management'}>
+            <Users className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+            <span className="hidden sm:inline">{pendingUsersCount} Akun Pending</span>
+            <span className="sm:hidden">{pendingUsersCount} Akun</span>
           </div>
         )}
 
@@ -153,6 +183,16 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                   <button 
                     onClick={() => {
                       setIsUserMenuOpen(false);
+                      setIsPasswordModalOpen(true);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-slate-100 flex items-center space-x-2 transition-colors font-medium border-b border-gray-50 cursor-pointer"
+                  >
+                    <KeyRound className="w-4 h-4 text-emerald-600" />
+                    <span>Ubah Kata Sandi</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
                       logout();
                     }}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors font-medium cursor-pointer"
@@ -197,6 +237,52 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="bg-emerald-700 p-4 flex justify-between items-center text-white">
+              <h3 className="font-bold flex items-center gap-2">
+                <KeyRound className="w-5 h-5" />
+                Ubah Kata Sandi
+              </h3>
+              <button onClick={() => setIsPasswordModalOpen(false)} className="hover:bg-emerald-600 p-1 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handlePasswordChange} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Kata Sandi Baru</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="Masukkan sandi baru..."
+                  minLength={4}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-lg transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg transition-colors"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

@@ -203,7 +203,7 @@ export default function ZakatPage() {
 
                 {/* Inventory asset */}
                 <div className="space-y-1">
-                  <label className="text-gray-700">2. Persediaan Sembako (Harga Beli Rill/Modal)</label>
+                  <label className="text-gray-700">2. Persediaan Barang Dagang (Harga Beli Rill/Modal)</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-300">Rp</span>
                     <input

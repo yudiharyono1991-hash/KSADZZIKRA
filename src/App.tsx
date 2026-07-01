@@ -4,6 +4,7 @@ import MainLayout from './components/Layout/MainLayout';
 import LoginPage from './pages/LoginPage';
 import { useAppStore } from './store';
 import {
+  LandingPage,
   KasirPOS,
   InventoryPage,
   TrendPage,
@@ -23,11 +24,35 @@ import {
   PromoManagementPage,
   StaffManagementPage,
   SettingsPage,
-  StockOpnamePage
+  StockOpnamePage,
+  StrukturOrganisasiPage,
+  CustomerPortal,
+  OnlineOrdersPage,
+  QuranPage,
+  JadwalShalatPage,
+  ArtikelIslamiPage,
+  KoperasiAnggotaPage,
+  KoperasiSHUPage,
+  RegisterPage
 } from './pages';
 
+// Komponen pembungkus untuk route yang membutuhkan otentikasi
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { currentUser } = useAppStore();
+  
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (currentUser.role === 'PELANGGAN') {
+    return <Navigate to="/member" replace />;
+  }
+  
+  return <MainLayout>{children}</MainLayout>;
+};
+
 export default function App() {
-  const { currentUser, initializeStore, isLoading } = useAppStore();
+  const { initializeStore, isLoading } = useAppStore();
 
   useEffect(() => {
     // Attempt startup Supabase pull
@@ -43,43 +68,49 @@ export default function App() {
     );
   }
 
-  if (!currentUser) {
-    return <LoginPage />;
-  }
-
   return (
     <HashRouter>
-      <MainLayout>
-        <Routes>
-          {/* Default Base Route redirecting to KasirPOS */}
-          <Route path="/" element={<Navigate to="/kasir" replace />} />
-          
-          {/* Active Navigation Routes */}
-          <Route path="/kasir" element={<KasirPOS />} />
-          <Route path="/kasir-riwayat" element={<KasirRiwayatPage />} />
-          <Route path="/kasir-shift" element={<KasirShiftPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/trend" element={<TrendPage />} />
-          <Route path="/laporan-penjualan" element={<SalesReportPage />} />
-          <Route path="/jurnal-umum" element={<JurnalUmumPage />} />
-          <Route path="/arus-kas" element={<ArusKasPage />} />
-          <Route path="/neraca-rugi" element={<NeracaRugiPage />} />
-          <Route path="/zakat" element={<ZakatPage />} />
-          <Route path="/audit-log" element={<AuditLogPage />} />
-          <Route path="/admin-management" element={<AdminManagementPage />} />
-          <Route path="/cabang" element={<BranchManagementPage />} />
-          <Route path="/purchase-order" element={<PurchaseOrderPage />} />
-          <Route path="/customers" element={<CustomerManagementPage />} />
-          <Route path="/suppliers" element={<SupplierManagementPage />} />
-          <Route path="/promos" element={<PromoManagementPage />} />
-          <Route path="/stock-opname" element={<StockOpnamePage />} />
-          <Route path="/staff" element={<StaffManagementPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          
-          {/* Fallback Catch-all Route redirecting to home */}
-          <Route path="*" element={<Navigate to="/kasir" replace />} />
-        </Routes>
-      </MainLayout>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/member" element={<CustomerPortal />} />
+        <Route path="/quran" element={<QuranPage />} />
+        <Route path="/jadwal-shalat" element={<JadwalShalatPage />} />
+        <Route path="/artikel-islami" element={<ArtikelIslamiPage />} />
+        
+        {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
+        <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
+        <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
+        <Route path="/kasir-shift" element={<ProtectedRoute><KasirShiftPage /></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
+        <Route path="/trend" element={<ProtectedRoute><TrendPage /></ProtectedRoute>} />
+        <Route path="/laporan-penjualan" element={<ProtectedRoute><SalesReportPage /></ProtectedRoute>} />
+        <Route path="/jurnal-umum" element={<ProtectedRoute><JurnalUmumPage /></ProtectedRoute>} />
+        <Route path="/arus-kas" element={<ProtectedRoute><ArusKasPage /></ProtectedRoute>} />
+        <Route path="/neraca-rugi" element={<ProtectedRoute><NeracaRugiPage /></ProtectedRoute>} />
+        <Route path="/zakat" element={<ProtectedRoute><ZakatPage /></ProtectedRoute>} />
+        <Route path="/audit-log" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
+        <Route path="/admin-management" element={<ProtectedRoute><AdminManagementPage /></ProtectedRoute>} />
+        <Route path="/cabang" element={<ProtectedRoute><BranchManagementPage /></ProtectedRoute>} />
+        <Route path="/purchase-order" element={<ProtectedRoute><PurchaseOrderPage /></ProtectedRoute>} />
+        <Route path="/customers" element={<ProtectedRoute><CustomerManagementPage /></ProtectedRoute>} />
+        <Route path="/online-orders" element={<ProtectedRoute><OnlineOrdersPage /></ProtectedRoute>} />
+        <Route path="/suppliers" element={<ProtectedRoute><SupplierManagementPage /></ProtectedRoute>} />
+        <Route path="/promos" element={<ProtectedRoute><PromoManagementPage /></ProtectedRoute>} />
+        <Route path="/stock-opname" element={<ProtectedRoute><StockOpnamePage /></ProtectedRoute>} />
+        <Route path="/staff" element={<ProtectedRoute><StaffManagementPage /></ProtectedRoute>} />
+        <Route path="/struktur-organisasi" element={<ProtectedRoute><StrukturOrganisasiPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        
+        {/* Koperasi Syariah Routes */}
+        <Route path="/koperasi-anggota" element={<ProtectedRoute><KoperasiAnggotaPage /></ProtectedRoute>} />
+        <Route path="/koperasi-shu" element={<ProtectedRoute><KoperasiSHUPage /></ProtectedRoute>} />
+        
+        {/* Fallback Catch-all Route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </HashRouter>
   );
 }

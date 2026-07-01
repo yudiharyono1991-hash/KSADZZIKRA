@@ -1,4 +1,17 @@
+export interface Tenant {
+  id: string;
+  name: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  address: string;
+  businessType: 'KOPERASI' | 'UMUM';
+  status: 'PENDING' | 'ACTIVE' | 'SUSPENDED';
+  createdAt: string;
+}
+
 export interface Branch {
+  tenantId: string;
   id: string;
   name: string;
   address: string;
@@ -8,15 +21,22 @@ export interface Branch {
 }
 
 export interface StoreSettings {
+  tenantId: string;
   isTaxEnabled: boolean;
   taxRate: number; // e.g. 11 for 11%
   ownerBankAccount?: string;
   ownerBankName?: string;
   qrisEnabled?: boolean;
+  qrisImageUrl?: string;
+  storeName?: string;
+  storeAddress?: string;
+  storePhone?: string;
+  businessType?: 'KOPERASI' | 'UMUM';
 }
 
 export interface StockMovement {
   id: string;
+  tenantId: string;
   productId: string;
   type: 'IN' | 'OUT' | 'ADJUST';
   qty: number; // positive number, type dictates direction
@@ -29,6 +49,7 @@ export interface StockMovement {
 
 export interface Customer {
   id: string;
+  tenantId: string;
   name: string;
   phone: string;
   points: number;
@@ -39,6 +60,7 @@ export interface Customer {
 
 export interface Supplier {
   id: string;
+  tenantId: string;
   name: string;
   contactPerson: string;
   phone: string;
@@ -50,6 +72,7 @@ export interface Supplier {
 
 export interface Promo {
   id: string;
+  tenantId: string;
   name: string;
   type: 'PERCENTAGE' | 'FIXED';
   value: number; // e.g. 10 for 10%, or 5000 for Rp 5000
@@ -61,6 +84,7 @@ export interface Promo {
 
 export interface Attendance {
   id: string;
+  tenantId: string;
   userId: string;
   userName: string;
   date: string; // YYYY-MM-DD
@@ -68,10 +92,14 @@ export interface Attendance {
   clockOut?: string; // ISO String
   status: 'PRESENT' | 'LATE';
   branchId?: string;
+  photoUrl?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Product {
   id: string;
+  tenantId: string;
   sku: string;
   name: string;
   category: string;
@@ -86,6 +114,7 @@ export interface Product {
   wholesaleMinQty?: number;
   branchId?: string; // Optional for backward compatibility, but should be required eventually
   image?: string; // Product photo URL
+  expiryDate?: string; // Tanggal Kadaluarsa
 }
 
 export interface CartItem {
@@ -95,6 +124,7 @@ export interface CartItem {
 
 export interface Transaction {
   id: string;
+  tenantId: string;
   invoiceNo: string;
   timestamp: string;
   cashierName: string;
@@ -125,6 +155,7 @@ export interface Transaction {
 
 export interface AuditLog {
   id: string;
+  tenantId: string;
   timestamp: string;
   user: string;
   action: string;
@@ -135,6 +166,7 @@ export interface AuditLog {
 
 export interface ZakatCalculation {
   id: string;
+  tenantId: string;
   timestamp: string;
   goldPricePerGram: number;
   nisabValue: number; // 85 grams of gold
@@ -150,6 +182,7 @@ export interface ZakatCalculation {
 
 export interface ZakatDistribution {
   id: string;
+  tenantId: string;
   timestamp: string;
   amount: number;
   recipient: string; // Fakir, Miskin, Amil, Muallaf, Riqab, Gharimin, Fisabilillah, Ibnu Sabil
@@ -157,18 +190,20 @@ export interface ZakatDistribution {
   description: string;
 }
 
-export type UserRole = 'CASHIER' | 'ADMIN' | 'OWNER';
+export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'PELANGGAN';
 
 export interface CurrentUser {
   name: string;
   username: string;
   role: UserRole;
   password?: string; // Optional for active credentials modification
+  tenantId?: string; // Empty if SUPERADMIN
   branchId?: string;
 }
 
 export interface Expense {
   id: string;
+  tenantId: string;
   date: string; // Format: YYYY-MM-DD or YYYY-MM-DDTHH:mm
   category: 'GAJI' | 'LISTRIK_AIR_WIFI' | 'SEWA_LAPAK' | 'OPERASIONAL' | 'LAINNYA';
   amount: number;
@@ -179,6 +214,7 @@ export interface Expense {
 
 export interface ClosingRecord {
   id: string;
+  tenantId: string;
   date: string; // YYYY-MM-DD or YYYY-MM
   type: 'DAILY' | 'MONTHLY';
   revenue: number;
@@ -193,6 +229,7 @@ export interface ClosingRecord {
 
 export interface UserAccount {
   id: string;
+  tenantId: string;
   name: string;
   username: string;
   password?: string;
@@ -208,6 +245,7 @@ export interface UserAccount {
 
 export interface PurchaseOrder {
   id: string;
+  tenantId: string;
   poNumber: string;
   date: string;
   supplier: string;
@@ -229,6 +267,7 @@ export type JournalSourceType = 'AUTO_TRANSAKSI' | 'AUTO_BEBAN' | 'AUTO_PO' | 'M
 
 export interface JournalEntry {
   id: string;
+  tenantId: string;
   date: string;
   account: string;
   description: string;
@@ -238,5 +277,36 @@ export interface JournalEntry {
   referenceType?: JournalSourceType; // source classification
   createdBy?: string;
   branchId?: string;
+}
+
+export interface OnlineOrder {
+  id: string;
+  tenantId: string;
+  orderNo: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+  }[];
+  totalAmount: number;
+  status: 'PENDING' | 'PROCESSED' | 'READY' | 'COMPLETED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
+  branchId?: string;
+  notes?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  tenantId: string;
+  orderId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: string;
 }
 

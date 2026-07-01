@@ -1,26 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Settings, Percent, Save, CheckCircle, Lock, AlertCircle, Building2, Wallet } from 'lucide-react';
+import { Settings, Percent, Save, CheckCircle, Lock, AlertCircle, Building2, Wallet, Store, Copy, Link } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { settings, updateSettings, currentUser } = useAppStore();
+  const { settings, updateSettings, currentUser, users, updateUser } = useAppStore();
   const [isTaxEnabled, setIsTaxEnabled] = useState(settings.isTaxEnabled);
   const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
   const [ownerBankName, setOwnerBankName] = useState(settings.ownerBankName || 'BSI (Bank Syariah Indonesia)');
   const [ownerBankAccount, setOwnerBankAccount] = useState(settings.ownerBankAccount || '7182938495');
   const [qrisEnabled, setQrisEnabled] = useState(settings.qrisEnabled ?? true);
+  const [qrisImageUrl, setQrisImageUrl] = useState(settings.qrisImageUrl || '');
   const [showSuccess, setShowSuccess] = useState(false);
   
-  // Password state
-  const { users, updateUser } = useAppStore();
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [pwdError, setPwdError] = useState('');
-  const [pwdSuccess, setPwdSuccess] = useState('');
+  const [ownerName, setOwnerName] = useState(currentUser?.name || '');
+  const [storeName, setStoreName] = useState(settings.storeName || 'BA Mart Syariah');
+  const [storeAddress, setStoreAddress] = useState(settings.storeAddress || '');
+  const [storePhone, setStorePhone] = useState(settings.storePhone || '');
+  const [businessType, setBusinessType] = useState<'KOPERASI' | 'UMUM'>(settings.businessType || 'KOPERASI');
 
-  // Jika owner saja yang boleh akses
-  // (Pajak hanya untuk Owner/Admin, Ganti Sandi untuk Semua User)
+  const isOwner = currentUser?.role === 'OWNER';
 
   useEffect(() => {
     setIsTaxEnabled(settings.isTaxEnabled);
@@ -28,53 +26,32 @@ export default function SettingsPage() {
   }, [settings]);
 
   const handleSave = () => {
+    // PROTEKSI AKUN DEMO: Hanya Pengembang Utama yang bisa merubah pengaturan profil toko asli
+    if (currentUser?.username !== 'admin' && currentUser?.username !== 'pengembang' && currentUser?.username !== 'yudiharyono1991@gmail.com') {
+      alert("⚠️ MODE DEMO (UJI COBA) ⚠️\n\nMaaf, Anda tidak diizinkan merubah Pengaturan Toko, Pajak, dan QRIS karena ini adalah akun uji coba. Hanya Bapak Yudi Haryono (Pengembang) yang memiliki otoritas untuk merubah data Master Profil Toko.");
+      return;
+    }
+
     updateSettings({
       isTaxEnabled,
       taxRate: Number(taxRate) || 0,
       ownerBankName,
       ownerBankAccount,
-      qrisEnabled
+      qrisEnabled,
+      storeName,
+      storeAddress,
+      storePhone,
+      businessType
     });
+
+    if (isOwner && currentUser) {
+      const ownerUser = users.find(u => u.username === currentUser.username);
+      if (ownerUser && ownerUser.name !== ownerName) {
+        updateUser(ownerUser.id, { name: ownerName });
+      }
+    }
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
-  };
-
-  const handleChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPwdError('');
-    setPwdSuccess('');
-
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setPwdError('Harap isi semua kolom kata sandi.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPwdError('Kata sandi baru tidak cocok.');
-      return;
-    }
-
-    // Cari data user lengkap berdasarkan username currentUser
-    const fullUser = users.find(u => u.username === currentUser?.username);
-    
-    if (!fullUser) {
-      setPwdError('Data pengguna tidak ditemukan.');
-      return;
-    }
-
-    if (fullUser.password !== oldPassword) {
-      setPwdError('Kata sandi lama salah.');
-      return;
-    }
-
-    // Update password
-    updateUser(fullUser.id, { password: newPassword });
-    
-    setPwdSuccess('Kata sandi berhasil diubah!');
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setTimeout(() => setPwdSuccess(''), 3000);
   };
 
   return (
@@ -129,9 +106,10 @@ export default function SettingsPage() {
                     <div className="relative w-1/2">
                       <input
                         type="number"
+                        disabled={!isOwner}
                         value={taxRate}
                         onChange={(e) => setTaxRate(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg py-2 pl-3 pr-8 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold"
+                        className={`w-full border border-gray-200 rounded-lg py-2 pl-3 pr-8 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
                     </div>
@@ -151,10 +129,11 @@ export default function SettingsPage() {
                   <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nama Bank Tujuan</label>
                   <input
                     type="text"
+                    disabled={!isOwner}
                     value={ownerBankName}
                     onChange={(e) => setOwnerBankName(e.target.value)}
                     placeholder="Contoh: BSI (Bank Syariah Indonesia)"
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
                   />
                 </div>
                 
@@ -162,10 +141,11 @@ export default function SettingsPage() {
                   <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nomor Rekening</label>
                   <input
                     type="text"
+                    disabled={!isOwner}
                     value={ownerBankAccount}
                     onChange={(e) => setOwnerBankAccount(e.target.value)}
                     placeholder="Contoh: 7182938495"
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
                   />
                 </div>
 
@@ -185,80 +165,153 @@ export default function SettingsPage() {
                   </label>
                 </div>
 
-                <button 
-                  onClick={handleSave}
-                  className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  Simpan Pengaturan
-                </button>
+                {qrisEnabled && (
+                  <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Upload QRIS Statis Toko (Opsional)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setQrisImageUrl(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-gray-200 p-1 rounded-lg"
+                    />
+                    {qrisImageUrl && (
+                      <div className="mt-2 w-32 h-32 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                        <img src={qrisImageUrl} alt="QRIS" className="w-full h-full object-contain" />
+                      </div>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-1">Upload barcode QRIS toko Anda agar pelanggan bisa menscan langsung saat checkout.</p>
+                  </div>
+                )}
+
+                {isOwner ? (
+                  <button 
+                    onClick={handleSave}
+                    className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    Simpan Pengaturan
+                  </button>
+                ) : (
+                  <div className="mt-4 w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-500 font-bold py-2.5 rounded-xl border border-gray-200">
+                    <Lock className="w-4 h-4" />
+                    Hanya Owner Yang Bisa Mengubah Data
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Change Password Card */}
+        {/* Profil Toko Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-            <Lock className="w-5 h-5 text-emerald-600" />
-            <h2 className="font-bold text-gray-800">Keamanan Akun (Ganti Sandi)</h2>
+            <Store className="w-5 h-5 text-emerald-600" />
+            <h2 className="font-bold text-gray-800">Profil & Identitas Toko</h2>
           </div>
-          <div className="p-6">
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              {pwdError && (
-                <div className="p-3 bg-red-50 text-red-700 text-xs font-semibold rounded-lg border border-red-200 flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{pwdError}</span>
-                </div>
-              )}
-              {pwdSuccess && (
-                <div className="p-3 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 flex items-center space-x-2">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>{pwdSuccess}</span>
-                </div>
-              )}
+          <div className="p-6 space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nama Pemilik (Owner)</label>
+              <input
+                type="text"
+                disabled={!isOwner}
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="Misal: Bapak/Ibu Owner"
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nama Toko (Sesuai KTP/NIB)</label>
+              <input
+                type="text"
+                disabled={!isOwner}
+                value={storeName}
+                onChange={(e) => setStoreName(e.target.value)}
+                placeholder="Misal: Berkah Amanah Mart"
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nomor Telepon / WhatsApp</label>
+              <input
+                type="text"
+                disabled={!isOwner}
+                value={storePhone}
+                onChange={(e) => setStorePhone(e.target.value)}
+                placeholder="Misal: 08123456789"
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Alamat Lengkap Toko</label>
+              <textarea
+                disabled={!isOwner}
+                value={storeAddress}
+                onChange={(e) => setStoreAddress(e.target.value)}
+                placeholder="Misal: Jl. Sudirman No. 123, Jakarta"
+                rows={3}
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+              />
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Sandi Saat Ini</label>
-                <input
-                  type="password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  placeholder="Masukkan sandi lama"
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Tipe Usaha</label>
+              <select
+                disabled={!isOwner}
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value as 'KOPERASI' | 'UMUM')}
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+              >
+                <option value="KOPERASI">Toko Koperasi (Lengkap dengan SHU)</option>
+                <option value="UMUM">Toko Umum / Ritel Biasa</option>
+              </select>
+            </div>
+
+            <div className="pt-4 border-t border-gray-100">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 block mb-2">Portal Pelanggan (Online Order)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={`${window.location.origin}/#/member`}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-sm text-slate-500"
                 />
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/#/member`);
+                    alert("Tautan berhasil disalin!");
+                  }}
+                  className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shrink-0"
+                >
+                  <Copy size={16} /> Salin
+                </button>
               </div>
+              <p className="text-xs text-slate-500 mt-2">Bagikan tautan ini ke pelanggan agar mereka bisa memesan barang secara online (Sesuai PSAK Syariah).</p>
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Sandi Baru</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Masukkan sandi baru"
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Konfirmasi Sandi Baru</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Ketik ulang sandi baru"
-                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-
+            {isOwner ? (
               <button 
-                type="submit"
+                onClick={handleSave}
                 className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
               >
                 <Save className="w-4 h-4" />
-                Ganti Kata Sandi
+                Simpan Profil Toko
               </button>
-            </form>
+            ) : (
+              <div className="mt-4 w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-500 font-bold py-2.5 rounded-xl border border-gray-200">
+                <Lock className="w-4 h-4" />
+                Akses Terkunci (Khusus Owner)
+              </div>
+            )}
           </div>
         </div>
       </div>

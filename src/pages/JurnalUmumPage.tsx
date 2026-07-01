@@ -61,13 +61,13 @@ export default function JurnalUmumPage() {
               <div className="space-y-1">
                 <label className="text-[10px] uppercase font-bold text-slate-500">Akun (Perkiraan)</label>
                 <select value={account} onChange={(e) => setAccount(e.target.value)} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-                  <option value="KAS">Kas di Tangan</option>
-                  <option value="BANK_BSI">Bank Syariah Indonesia</option>
-                  <option value="PERSEDIAAN">Persediaan Barang Dagang</option>
-                  <option value="HUTANG">Hutang Usaha</option>
-                  <option value="PIUTANG">Piutang Usaha</option>
-                  <option value="MODAL">Modal Usaha</option>
-                  <option value="PENDAPATAN">Pendapatan Penjualan</option>
+                  <option value="KAS">Kas & Setara Kas</option>
+                  <option value="BANK_BSI">Bank Syariah Indonesia (BSI)</option>
+                  <option value="PERSEDIAAN_MURABAHAH">Persediaan Aset Murabahah</option>
+                  <option value="HUTANG_QARDH">Utang (Qardh)</option>
+                  <option value="PIUTANG_MURABAHAH">Piutang Murabahah (Penjualan)</option>
+                  <option value="DANA_SYIRKAH">Dana Syirkah Temporer (Mudharabah)</option>
+                  <option value="PENDAPATAN_MARGIN">Pendapatan Margin Murabahah</option>
                   <option value="BEBAN">Beban Operasional</option>
                 </select>
               </div>

@@ -11,13 +11,52 @@ import {
   Package, 
   Tag, 
   Info,
-  DollarSign
+  DollarSign,
+  Camera,
+  Upload
 } from 'lucide-react';
 
 export default function InventoryPage() {
   const { products, addProduct, updateProduct, deleteProduct, adjustStock, currentUser, activeBranchId } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+
+  // Compress image before saving to prevent localStorage overflow
+  const handleImageUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        const MAX_HEIGHT = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Use high compression JPEG to save storage space
+        setImage(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
   
   // Modals status
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,6 +73,7 @@ export default function InventoryPage() {
   const [minStock, setMinStock] = useState('');
   const [unit, setUnit] = useState('Pcs');
   const [barcode, setBarcode] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
   const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number | ''>('');
   const [image, setImage] = useState('');
@@ -67,6 +107,7 @@ export default function InventoryPage() {
     setMinStock('10');
     setUnit('Pcs');
     setBarcode('');
+    setExpiryDate('');
     setWholesalePrice('');
     setWholesaleMinQty('');
     setImage('');
@@ -86,6 +127,7 @@ export default function InventoryPage() {
     setMinStock(p.minStock.toString());
     setUnit(p.unit);
     setBarcode(p.barcode || '');
+    setExpiryDate(p.expiryDate || '');
     setWholesalePrice(p.wholesalePrice || '');
     setWholesaleMinQty(p.wholesaleMinQty || '');
     setImage(p.image || '');
@@ -145,6 +187,7 @@ export default function InventoryPage() {
       minStock: Number(minStock),
       unit,
       barcode: barcode || undefined,
+      expiryDate: expiryDate || undefined,
       wholesalePrice: wholesalePrice ? Number(wholesalePrice) : undefined,
       wholesaleMinQty: wholesaleMinQty ? Number(wholesaleMinQty) : undefined,
       isHalal: true,
@@ -259,6 +302,7 @@ export default function InventoryPage() {
                 <th className="py-2.5 px-4 text-right">Harga Modal</th>
                 <th className="py-2.5 px-4 text-right">Harga Jual</th>
                 <th className="py-2.5 px-4 text-center">Margin Untung</th>
+                <th className="py-3 px-5 text-center">Expired Date</th>
                 <th className="py-3 px-5 text-center">Sisa Stok</th>
                 <th className="py-3 px-5 text-center">Status</th>
                 <th className="py-3 px-5 text-center">Aksi</th>
@@ -302,6 +346,15 @@ export default function InventoryPage() {
                         <span className="text-emerald-700 font-semibold font-mono">
                           Rp {profitAmt.toLocaleString('id-ID')} ({marginPct}%)
                         </span>
+                      </td>
+                      <td className="py-3 px-5 text-center text-xs">
+                        {p.expiryDate ? (
+                          <span className={`${new Date(p.expiryDate) < new Date() ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                            {new Date(p.expiryDate).toLocaleDateString('id-ID')}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="py-3 px-5 text-center font-mono font-bold">
                         {p.stock} <span className="text-gray-400 font-sans text-[10px] font-normal">{p.unit}</span>
@@ -391,7 +444,7 @@ export default function InventoryPage() {
                 
                 {/* isPriceEditLockedForAdmin definition */}
                 {(() => {
-                  const isPriceEditLockedForAdmin = (currentUser?.role === 'ADMIN' && editingProduct && editingProduct.stock > editingProduct.minStock) || currentUser?.role === 'CASHIER';
+                  const isPriceEditLockedForAdmin = currentUser?.role === 'CASHIER';
                   
                   return (
                     <>
@@ -403,13 +456,9 @@ export default function InventoryPage() {
                             Pencatatan SKU ini wajib berdasar pada komoditas rill (<b>Halalan Thayyiban</b>). Menentukan margin sewajarnya untuk menjaga etika kemaslahatan konsumen.
                           </p>
                         </div>
-                        {currentUser?.role === 'CASHIER' ? (
+                        {isPriceEditLockedForAdmin && (
                           <div className="bg-red-50 text-red-800 p-2.5 rounded-lg border border-red-200/80 text-[10px] font-bold">
-                            ⚠️ AKSES HARGA TERKUNCI: Sebagai Kasir, Anda tidak diperkenankan mengubah harga jual, harga pokok (modal), atau margin keuntungan barang sembako. Silakan hubungi Owner atau Admin untuk meng-update katalog harga resmi.
-                          </div>
-                        ) : isPriceEditLockedForAdmin && (
-                          <div className="bg-red-50 text-red-800 p-2.5 rounded-lg border border-red-200/80 text-[10px] font-bold">
-                            ⚠️ AKSES HARGA TERKUNCI: Berdasarkan aturan UMKM BA Mart, akun Superadmin hanya diperkenankan mengupdate harga barang sembako jika stok tersisa menipis (sedang low kurang dari atau sama dengan batas minimum). Untuk merubah harga saat stok aman, silakan login dengan akun Owner.
+                            ⚠️ AKSES HARGA TERKUNCI: Sebagai Kasir, Anda tidak diperkenankan mengatur atau mengubah harga jual, harga pokok (modal), maupun margin keuntungan barang. Silakan hubungi Owner atau Admin untuk meng-update katalog harga resmi.
                           </div>
                         )}
                       </div>
@@ -576,26 +625,73 @@ export default function InventoryPage() {
                   );
                 })()}
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600">Scan Barcode / Kode Batang (Opsional)</label>
-                  <input
-                    type="text"
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
-                    placeholder="Masukkan Barcode..."
-                    value={barcode}
-                    onChange={(e) => setBarcode(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-600">Scan Barcode / Kode Batang</label>
+                    <input
+                      type="text"
+                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
+                      placeholder="Masukkan Barcode..."
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-red-600">Tanggal Expired (Opsional)</label>
+                    <input
+                      type="date"
+                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-600">URL Gambar/Foto Produk (Opsional)</label>
-                  <input
-                    type="text"
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
-                    placeholder="Misal: https://images.unsplash.com/..."
-                    value={image}
-                    onChange={(e) => setImage(e.target.value)}
-                  />
+                <div className="space-y-2 border border-gray-200 rounded-xl p-4 bg-white">
+                  <label className="text-xs font-bold text-gray-800 flex items-center gap-2"><Camera className="w-4 h-4 text-emerald-600"/> Foto Produk (Opsional)</label>
+                  
+                  {image && (
+                    <div className="relative w-32 h-32 border border-gray-200 rounded-xl overflow-hidden shadow-sm mx-auto mb-3">
+                      <img src={image} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        type="button" 
+                        onClick={() => setImage('')} 
+                        className="absolute top-1 right-1 bg-white/90 p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-red-100 shadow-xs"
+                        title="Hapus Foto"
+                      >
+                        <Trash2 className="w-4 h-4"/>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="cursor-pointer bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
+                      <Upload className="w-4 h-4" /> Upload Galeri
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                      }} />
+                    </label>
+                    
+                    <label className="cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700 shadow-md text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
+                      <Camera className="w-4 h-4" /> Buka Kamera
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                      }} />
+                    </label>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-[10px] text-gray-400 mb-1 font-semibold">Atau gunakan URL Gambar (Link Internet):</p>
+                    <input
+                      type="text"
+                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                      placeholder="https://images.unsplash.com/..."
+                      value={image.startsWith('data:') ? '' : image}
+                      onChange={(e) => setImage(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 

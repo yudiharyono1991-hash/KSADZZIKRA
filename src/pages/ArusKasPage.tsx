@@ -3,18 +3,36 @@ import { useAppStore } from '../store';
 import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet } from 'lucide-react';
 
 export default function ArusKasPage() {
-  const { transactions, expenses } = useAppStore();
+  const { transactions, expenses, journalEntries } = useAppStore();
 
-  // Sort all cash movements by date
-  const cashMovements = [
-    ...transactions.map(t => ({
-      id: t.id,
-      date: t.timestamp,
-      description: `Penjualan ${t.invoiceNo} (${t.paymentMethod})`,
-      type: 'IN' as const,
-      amount: t.totalAmount, // Assuming totalAmount is paid in cash or equivalents
-      method: t.paymentMethod
-    })),
+  const cashMovements: any[] = [];
+  
+  transactions.forEach(t => {
+    if (t.splitPayments && t.splitPayments.length > 0) {
+      t.splitPayments.forEach((sp: any, i: number) => {
+        cashMovements.push({
+          id: `${t.id}_${i}`,
+          date: t.timestamp,
+          description: `Pendapatan Murabahah ${t.invoiceNo} (Split: ${sp.method})`,
+          type: 'IN',
+          amount: sp.amount - (i === 0 ? t.changeAmount : 0), // Adjust change on first payment
+          method: sp.method
+        });
+      });
+    } else if (t.paymentMethod !== 'KASBON') {
+      cashMovements.push({
+        id: t.id,
+        date: t.timestamp,
+        description: `Pendapatan Murabahah ${t.invoiceNo} (${t.paymentMethod})`,
+        type: 'IN',
+        amount: t.totalAmount,
+        method: t.paymentMethod
+      });
+    }
+  });
+
+  const allMovements = [
+    ...cashMovements,
     ...expenses.map(e => ({
       id: e.id,
       date: e.date,
@@ -22,12 +40,22 @@ export default function ArusKasPage() {
       type: 'OUT' as const,
       amount: e.amount,
       method: 'CASH'
-    }))
+    })),
+    ...journalEntries
+      .filter(je => je.account === 'KAS' && je.description.includes('Pelunasan piutang'))
+      .map(je => ({
+        id: je.id,
+        date: je.date,
+        description: je.description,
+        type: 'IN' as const,
+        amount: je.debit,
+        method: 'CASH'
+      }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const totalInTunai = cashMovements.filter(m => m.type === 'IN' && m.method === 'CASH').reduce((sum, m) => sum + m.amount, 0);
-  const totalInBank = cashMovements.filter(m => m.type === 'IN' && m.method !== 'CASH').reduce((sum, m) => sum + m.amount, 0);
-  const totalOut = cashMovements.filter(m => m.type === 'OUT').reduce((sum, m) => sum + m.amount, 0);
+  const totalInTunai = allMovements.filter(m => m.type === 'IN' && m.method === 'CASH').reduce((sum, m) => sum + m.amount, 0);
+  const totalInBank = allMovements.filter(m => m.type === 'IN' && m.method !== 'CASH').reduce((sum, m) => sum + m.amount, 0);
+  const totalOut = allMovements.filter(m => m.type === 'OUT').reduce((sum, m) => sum + m.amount, 0);
   const netCash = (totalInTunai + totalInBank) - totalOut;
 
   return (
@@ -99,7 +127,7 @@ export default function ArusKasPage() {
               </tr>
             </thead>
             <tbody className="text-sm">
-              {cashMovements.map((movement) => (
+              {allMovements.map((movement) => (
                 <tr key={movement.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                   <td className="p-4 text-xs text-slate-500">
                     {new Date(movement.date).toLocaleString('id-ID')}
@@ -122,7 +150,7 @@ export default function ArusKasPage() {
               ))}
             </tbody>
           </table>
-          {cashMovements.length === 0 && (
+          {allMovements.length === 0 && (
             <div className="p-8 text-center text-slate-500 text-sm">
               Belum ada pergerakan kas.
             </div>

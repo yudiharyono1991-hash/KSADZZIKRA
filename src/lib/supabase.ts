@@ -42,22 +42,39 @@ export const supabaseService = {
   async saveProduct(product: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const payload: any = {
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        category: product.category,
+        price: Number(product.price),
+        cost_price: Number(product.costPrice),
+        stock: Number(product.stock),
+        min_stock: Number(product.minStock),
+        unit: product.unit,
+        barcode: product.barcode || null,
+        is_halal: product.isHalal,
+        image: product.image || null
+      };
+
       const { error } = await supabase
         .from('products')
-        .upsert({
-          id: product.id,
-          sku: product.sku,
-          name: product.name,
-          category: product.category,
-          price: Number(product.price),
-          cost_price: Number(product.costPrice),
-          stock: Number(product.stock),
-          min_stock: Number(product.minStock),
-          unit: product.unit,
-          barcode: product.barcode || null,
-          is_halal: product.isHalal
-        });
-      if (error) throw error;
+        .upsert(payload);
+
+      if (error) {
+        // Fallback if 'image' column is missing in Supabase schema
+        if (error.message.includes('column') || error.message.includes('field') || error.message.includes('cache')) {
+          const saferPayload = { ...payload };
+          delete saferPayload.image;
+          const { error: retryError } = await supabase
+            .from('products')
+            .upsert(saferPayload);
+          if (retryError) throw retryError;
+          logSync(`Saved product ${product.sku} successfully (without image due to schema mismatch).`);
+          return true;
+        }
+        throw error;
+      }
       logSync(`Saved product ${product.sku} successfully.`);
       return true;
     } catch (err: any) {
