@@ -95,20 +95,19 @@ export default function LandingPage() {
 
           {/* Brand Identity */}
           <div className="flex flex-col items-center gap-0">
-            {/* KSA row */}
+            {/* KSA row - hijau gelap sesuai logo */}
             <div className="flex items-center gap-3">
-              <h1 className={`text-6xl md:text-8xl font-black tracking-tight leading-none transition-colors ${isDarkMode ? 'text-emerald-400' : 'text-emerald-800'}`}>
+              <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-none" style={{color:'#1a5c2e'}}>
                 KSA
               </h1>
             </div>
 
-            {/* Mart row with cart icon */}
+            {/* Mart row with cart icon - amber/oranye sesuai logo */}
             <div className="flex items-center gap-3 -mt-2">
-              {/* Cart icon pulled from logo colours */}
-              <div className={`flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg ${isDarkMode ? 'bg-emerald-700' : 'bg-emerald-700'}`}>
+              <div className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-xl shadow-lg" style={{backgroundColor:'#1a5c2e'}}>
                 <Store className="w-7 h-7 md:w-9 md:h-9 text-white" />
               </div>
-              <h1 className={`font-black tracking-tight leading-none transition-colors ${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`} style={{fontSize:'clamp(3rem,10vw,5.5rem)'}}>
+              <h1 className="font-black tracking-tight leading-none" style={{color:'#e8890a', fontSize:'clamp(3rem,10vw,5.5rem)'}}>
                 <span style={{fontSize:'0.55em'}} className="align-top font-black">M</span>
                 <span style={{fontSize:'1em'}} className="font-black">art</span>
               </h1>
@@ -123,7 +122,7 @@ export default function LandingPage() {
               </div>
               <div className={`h-px w-64 md:w-96 ${isDarkMode ? 'bg-gradient-to-r from-transparent via-emerald-600 to-transparent' : 'bg-gradient-to-r from-transparent via-emerald-400 to-transparent'}`}></div>
               <p className={`text-[10px] md:text-xs font-medium tracking-widest uppercase ${isDarkMode ? 'text-amber-500/70' : 'text-amber-600/80'}`}>
-                Koperasi Syariah ADZ-ZIKRA · Indonesia
+                Koperasi Syariah ADZ-ZIKRA
               </p>
             </div>
           </div>

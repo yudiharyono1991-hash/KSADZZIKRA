@@ -211,12 +211,14 @@ export default function LoginPage() {
           </div>
           <p className="text-[10px] md:text-xs lg:text-sm font-bold text-amber-500 uppercase tracking-widest mt-3 mb-2">Selamat Datang di</p>
           
-          <div className="w-full flex flex-col items-center text-center">
-            <h2 className="relative text-2xl md:text-3xl lg:text-4xl font-extrabold text-emerald-950 tracking-tight leading-none">
-              KSA Mart
-              <span className="absolute bottom-0.5 md:bottom-1 left-full pl-1.5 md:pl-2 text-[8px] md:text-[10px] lg:text-xs font-black text-amber-500 uppercase tracking-[0.2em] leading-none whitespace-nowrap flex items-center">
-                INDONESIA <span className="text-xl md:text-2xl ml-1 -mt-1 animate-pulse">🇮🇩</span>
-              </span>
+          <div className="w-full flex items-center justify-center gap-2 text-center">
+            {/* KSA - warna hijau gelap sesuai logo */}
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight leading-none" style={{color:'#1a5c2e'}}>
+              KSA
+            </h2>
+            {/* Mart - warna oranye/kuning keemasan sesuai logo */}
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight leading-none" style={{color:'#e8890a'}}>
+              Mart
             </h2>
           </div>
           <div className="w-full mt-3 text-center">
