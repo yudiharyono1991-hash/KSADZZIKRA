@@ -210,7 +210,7 @@ export default function QuranPage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans pb-12">
       {/* MAIN HEADER */}
-      <header className="bg-emerald-800 text-white shadow-md sticky top-0 z-40">
+      <header className="bg-green-800 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button 
@@ -218,7 +218,7 @@ export default function QuranPage() {
                 if (playingAudio) { playingAudio.pause(); setPlayingAudio(null); setCurrentPlayingAyat(null); }
                 selectedSurah ? setSelectedSurah(null) : navigate('/')
               }}
-              className="p-2 hover:bg-emerald-700 rounded-full transition-colors"
+              className="p-2 hover:bg-green-700 rounded-full transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -229,8 +229,8 @@ export default function QuranPage() {
               </h1>
             </div>
           </div>
-          <div className="text-xs font-bold text-emerald-200 hidden sm:flex items-center gap-2">
-            KSA Mart <span className="text-amber-400 tracking-[0.2em]">INDONESIA</span>
+          <div className="text-xs font-bold text-green-200 hidden sm:flex items-center gap-2">
+            KSA Mart <span className="text-amber-400 tracking-[0.2em]">ADZ-ZIKRA</span>
           </div>
         </div>
       </header>
@@ -255,7 +255,7 @@ export default function QuranPage() {
                       <input 
                          type="text" 
                          placeholder="Search.." 
-                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                          value={surahSearchText}
                          onChange={(e) => setSurahSearchText(e.target.value)}
                          autoFocus
@@ -266,15 +266,15 @@ export default function QuranPage() {
                          <div 
                            key={s.nomor}
                            onClick={() => { handleSelectSurah(s.nomor); setShowSurahDropdown(false); }}
-                           className={`px-4 py-3 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-50 last:border-0 ${selectedSurah.nomor === s.nomor ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}
+                           className={`px-4 py-3 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-50 last:border-0 ${selectedSurah.nomor === s.nomor ? 'bg-green-50' : 'hover:bg-slate-50'}`}
                          >
                            <div>
-                             <div className={`font-bold text-sm ${selectedSurah.nomor === s.nomor ? 'text-emerald-700' : 'text-slate-800'}`}>
+                             <div className={`font-bold text-sm ${selectedSurah.nomor === s.nomor ? 'text-green-700' : 'text-slate-800'}`}>
                                {s.namaLatin}
                              </div>
                              <div className="text-xs text-slate-500">{s.arti}</div>
                            </div>
-                           <div className={`font-arabic text-lg ${selectedSurah.nomor === s.nomor ? 'text-emerald-600' : 'text-slate-600'}`}>
+                           <div className={`font-arabic text-lg ${selectedSurah.nomor === s.nomor ? 'text-green-600' : 'text-slate-600'}`}>
                              {s.nama}
                            </div>
                          </div>
@@ -320,8 +320,8 @@ export default function QuranPage() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Bismillah Header */}
             {selectedSurah.nomor !== 9 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6 text-center border border-emerald-100 mt-2">
-                <h2 className="text-3xl md:text-4xl font-arabic text-emerald-800 leading-loose">
+              <div className="bg-white rounded-2xl shadow-sm p-6 text-center border border-green-100 mt-2">
+                <h2 className="text-3xl md:text-4xl font-arabic text-green-800 leading-loose">
                   بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيم
                 </h2>
                 <p className="text-sm text-slate-500 mt-3 font-medium">Dengan nama Allah Yang Maha Pengasih, Maha Penyayang.</p>
@@ -336,16 +336,16 @@ export default function QuranPage() {
                   <div 
                     key={ayat.nomorAyat} 
                     ref={el => ayatRefs.current[ayat.nomorAyat] = el}
-                    className={`bg-white rounded-2xl shadow-sm p-5 md:p-6 border relative group transition-all ${isPlaying ? 'border-amber-400 shadow-md ring-2 ring-amber-100' : 'border-slate-100 hover:border-emerald-200 hover:shadow-md'}`}
+                    className={`bg-white rounded-2xl shadow-sm p-5 md:p-6 border relative group transition-all ${isPlaying ? 'border-amber-400 shadow-md ring-2 ring-amber-100' : 'border-slate-100 hover:border-green-200 hover:shadow-md'}`}
                   >
                     <div className="flex justify-between items-start mb-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border shadow-sm transition-colors ${isPlaying ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border shadow-sm transition-colors ${isPlaying ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-green-100 text-green-700 border-green-200'}`}>
                         {ayat.nomorAyat}
                       </div>
                       <div className="flex-1 ml-4 flex justify-end">
                         <button 
                           onClick={() => handlePlayAudio(ayat.audio, ayat.nomorAyat, selectedSurah.ayat)}
-                          className={`transition-colors p-2 rounded-full ${isPlaying ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50'}`}
+                          className={`transition-colors p-2 rounded-full ${isPlaying ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-green-600 hover:text-green-800 hover:bg-green-50'}`}
                           title={isPlaying ? "Jeda Audio" : "Putar Audio Ayat"}
                         >
                           {isPlaying ? (
@@ -358,14 +358,14 @@ export default function QuranPage() {
                     </div>
                     
                     <div className="text-right mb-6">
-                      <p className={`text-3xl md:text-4xl font-arabic leading-[2.5] ${isPlaying ? 'text-emerald-900' : 'text-slate-900'}`} dir="rtl">
+                      <p className={`text-3xl md:text-4xl font-arabic leading-[2.5] ${isPlaying ? 'text-green-900' : 'text-slate-900'}`} dir="rtl">
                         {ayat.teksArab}
                       </p>
                     </div>
                     
                     <div className="space-y-2 border-t border-slate-50 pt-4">
                       {hoverDisplay === 'Transliterasi' || hoverDisplay === 'Terjemahan (Indonesia)' ? (
-                        <p className="text-emerald-700 text-sm font-medium italic">
+                        <p className="text-green-700 text-sm font-medium italic">
                           {ayat.teksLatin}
                         </p>
                       ) : null}
@@ -393,12 +393,12 @@ export default function QuranPage() {
                     placeholder="Cari Surah atau Terjemahan..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm transition-all"
+                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 shadow-sm transition-all"
                   />
                 </div>
                 <button 
                   onClick={() => setShowSettings(true)}
-                  className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-500 hover:text-emerald-600 hover:border-emerald-200 transition-colors"
+                  className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-500 hover:text-green-600 hover:border-green-200 transition-colors"
                   title="Pengaturan"
                 >
                   <Settings className="w-6 h-6" />
@@ -423,7 +423,7 @@ export default function QuranPage() {
                 
                 {quranSubTab === 'Surat' && (
                   loading ? (
-                    <div className="flex justify-center py-20 text-emerald-600">
+                    <div className="flex justify-center py-20 text-green-600">
                       <div className="animate-pulse flex items-center space-x-2">
                         <BookOpen className="w-6 h-6 animate-bounce" />
                         <span className="font-semibold">Memuat Surah...</span>
@@ -435,10 +435,10 @@ export default function QuranPage() {
                         <div 
                           key={surah.nomor}
                           onClick={() => handleSelectSurah(surah.nomor)}
-                          className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-emerald-200 cursor-pointer transition-all flex items-center justify-between group"
+                          className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-green-200 cursor-pointer transition-all flex items-center justify-between group"
                         >
                           <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 bg-emerald-50 text-emerald-700 rounded-lg flex items-center justify-center font-bold text-sm border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-colors rotate-45">
+                            <div className="w-10 h-10 bg-green-50 text-green-700 rounded-lg flex items-center justify-center font-bold text-sm border border-green-100 group-hover:bg-green-600 group-hover:text-white transition-colors rotate-45">
                               <span className="-rotate-45">{surah.nomor}</span>
                             </div>
                             <div>
@@ -448,7 +448,7 @@ export default function QuranPage() {
                               </p>
                             </div>
                           </div>
-                          <div className="text-xl font-arabic text-emerald-600 group-hover:text-emerald-800 transition-colors">
+                          <div className="text-xl font-arabic text-green-600 group-hover:text-green-800 transition-colors">
                             {surah.nama}
                           </div>
                         </div>
@@ -511,7 +511,7 @@ export default function QuranPage() {
                               <p className="text-xs text-slate-500 italic">{juz.eng}</p>
                             </div>
                           </div>
-                          <div className={`text-xl font-arabic transition-colors ${expandedJuz === juz.num ? 'text-blue-600' : 'text-slate-600 group-hover:text-emerald-600'}`}>
+                          <div className={`text-xl font-arabic transition-colors ${expandedJuz === juz.num ? 'text-blue-600' : 'text-slate-600 group-hover:text-green-600'}`}>
                             {juz.ar}
                           </div>
                         </div>
@@ -551,7 +551,7 @@ export default function QuranPage() {
             
             {loadingDetail && (
               <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-                <div className="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center space-x-2">
+                <div className="bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center space-x-2">
                   <BookOpen className="w-5 h-5 animate-spin" />
                   <span>Membuka Surah...</span>
                 </div>

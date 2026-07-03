@@ -5,7 +5,7 @@ import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle
 export default function StockOpnamePage() {
   const { products, stockMovements, adjustStock, currentUser, activeBranchId, addLog } = useAppStore();
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [adjustmentAmount, setAdjustmentAmount] = useState('');
+  const [physicalCount, setPhysicalCount] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
@@ -15,20 +15,25 @@ export default function StockOpnamePage() {
   }
 
   const handleAdjust = () => {
-    if (!selectedProductId || !adjustmentAmount) return;
+    if (!selectedProductId || physicalCount === '') return;
     const prod = products.find(p => p.id === selectedProductId);
-    const amount = Number(adjustmentAmount);
+    if (!prod) return;
     
-    // Variance is difference
-    const currentStock = prod?.stock || 0;
-    const newStock = currentStock + amount;
+    const physical = Number(physicalCount);
+    const currentStock = prod.stock || 0;
+    const variance = physical - currentStock;
     
-    adjustStock(selectedProductId, amount);
+    if (variance === 0) {
+      alert("Stok fisik sama dengan stok sistem. Tidak ada penyesuaian yang perlu dilakukan.");
+      return;
+    }
     
-    addLog('STOCK_OPNAME', 'INVENTORY', `Opname: ${prod?.name}. Fisik: ${newStock}, Sistem sblm: ${currentStock}. Variance: ${amount}`);
+    adjustStock(selectedProductId, variance);
     
-    setAdjustmentAmount('');
-    alert("Stok berhasil disesuaikan dan dicatat di Audit Log!");
+    addLog('STOCK_OPNAME', 'INVENTORY', `Opname: ${prod.name}. Fisik: ${physical}, Sistem sblm: ${currentStock}. Variance: ${variance > 0 ? '+' : ''}${variance}`);
+    
+    setPhysicalCount('');
+    alert(`Stok berhasil disesuaikan! Selisih ${variance > 0 ? '+' : ''}${variance} dicatat di Audit Log.`);
   };
 
   const filteredProducts = products.filter(p => {
@@ -102,19 +107,30 @@ export default function StockOpnamePage() {
           {selectedProductId && (
             <>
               <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 mt-2">
-                 <p className="text-xs text-amber-800 font-medium">Stok Sistem saat ini: <b>{products.find(p=>p.id === selectedProductId)?.stock}</b></p>
-                 <p className="text-[10px] text-amber-700 mt-1">Masukkan angka minus jika fisik kurang (hilang/rusak), atau positif jika fisik berlebih.</p>
+                 <p className="text-xs text-amber-800 font-medium">Stok Sistem saat ini: <b className="text-sm">{products.find(p=>p.id === selectedProductId)?.stock}</b></p>
+                 <p className="text-[10px] text-amber-700 mt-1">Masukkan hasil perhitungan fisik aktual di rak/gudang.</p>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-600 mb-1 block">Variance (+/-)</label>
+                <label className="text-xs font-bold text-gray-600 mb-1 block">Stok Fisik Aktual</label>
                 <input 
                   type="number"
-                  value={adjustmentAmount}
-                  onChange={(e) => setAdjustmentAmount(e.target.value)}
-                  placeholder="Misal: -2 atau +5"
+                  value={physicalCount}
+                  onChange={(e) => setPhysicalCount(e.target.value)}
+                  placeholder="Jumlah Fisik"
+                  min="0"
                   className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
                 />
               </div>
+              {physicalCount !== '' && (
+                <div className={`p-2 rounded border text-xs font-bold flex justify-between items-center ${
+                  Number(physicalCount) === products.find(p=>p.id === selectedProductId)?.stock 
+                  ? 'bg-green-50 text-green-700 border-green-100' 
+                  : 'bg-red-50 text-red-700 border-red-100'
+                }`}>
+                  <span>Selisih (Variance):</span>
+                  <span>{Number(physicalCount) - (products.find(p=>p.id === selectedProductId)?.stock || 0)}</span>
+                </div>
+              )}
               <button 
                 onClick={handleAdjust}
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow-xs flex justify-center items-center gap-2"
@@ -156,7 +172,7 @@ export default function StockOpnamePage() {
                       <td className="px-4 py-3 font-semibold text-gray-800">{prod?.name || 'Unknown'}</td>
                       <td className="px-4 py-3">
                         {m.type === 'IN' ? (
-                          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
                             <ArrowDownToLine className="w-3 h-3" /> MASUK
                           </span>
                         ) : m.type === 'OUT' ? (
@@ -169,7 +185,7 @@ export default function StockOpnamePage() {
                           </span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 font-bold ${m.type === 'IN' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      <td className={`px-4 py-3 font-bold ${m.type === 'IN' ? 'text-green-600' : 'text-amber-600'}`}>
                         {m.type === 'IN' ? '+' : '-'}{m.qty}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{m.reason}</td>

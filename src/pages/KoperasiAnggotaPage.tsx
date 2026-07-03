@@ -81,7 +81,7 @@ export default function KoperasiAnggotaPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">
+          <div className="p-3 bg-green-100 text-green-800 rounded-xl">
             <Users className="w-6 h-6" />
           </div>
           <div>
@@ -91,7 +91,7 @@ export default function KoperasiAnggotaPage() {
         </div>
         <button 
           onClick={() => { resetForm(); setIsAdding(!isAdding); }}
-          className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all"
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all"
         >
           {isAdding ? 'Batal' : <><Plus className="w-4 h-4"/> Daftar Anggota Baru</>}
         </button>
@@ -117,41 +117,41 @@ export default function KoperasiAnggotaPage() {
             <p className="text-2xl font-black text-gray-800">{members.reduce((sum, m) => sum + m.points, 0).toLocaleString('id-ID')}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center space-x-4">
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-green-100 flex items-center space-x-4">
+          <div className="p-3 bg-green-100 text-green-600 rounded-xl">
             <CreditCard className="w-6 h-6" />
           </div>
           <div>
             <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Total Simpanan</p>
-            <p className="text-2xl font-black text-emerald-700">Rp {totalSimpananSemua.toLocaleString('id-ID')}</p>
+            <p className="text-2xl font-black text-green-700">Rp {totalSimpananSemua.toLocaleString('id-ID')}</p>
           </div>
         </div>
       </div>
 
       {isAdding && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-200 mb-6 animate-in fade-in slide-in-from-top-4">
-          <h2 className="text-lg font-bold mb-4 text-emerald-800">Form Pendaftaran Anggota Koperasi</h2>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-200 mb-6 animate-in fade-in slide-in-from-top-4">
+          <h2 className="text-lg font-bold mb-4 text-green-800">Form Pendaftaran Anggota Koperasi</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-1">Nama Lengkap Sesuai KTP</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-1">Nomor WhatsApp Aktif</label>
-              <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+              <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-1">Setoran Simpanan Pokok (Rp)</label>
-              <input type="number" required value={simpananPokok} onChange={e => setSimpananPokok(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50" />
+              <input type="number" required value={simpananPokok} onChange={e => setSimpananPokok(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50" />
               <p className="text-[10px] text-gray-500 mt-1">Simpanan yang dibayarkan 1x saat mendaftar.</p>
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-1">Setoran Simpanan Wajib Awal (Rp)</label>
-              <input type="number" required value={simpananWajib} onChange={e => setSimpananWajib(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50" />
+              <input type="number" required value={simpananWajib} onChange={e => setSimpananWajib(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50" />
               <p className="text-[10px] text-gray-500 mt-1">Simpanan rutin bulanan.</p>
             </div>
             <div className="md:col-span-2 pt-2">
-              <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 transition-colors">Daftarkan Anggota & Cetak Bukti</button>
+              <button type="submit" className="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 transition-colors">Daftarkan Anggota & Cetak Bukti</button>
             </div>
           </form>
         </div>
@@ -161,7 +161,7 @@ export default function KoperasiAnggotaPage() {
         <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
           <div className="relative w-full md:w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Cari NIA atau Nama Anggota..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 text-sm outline-none shadow-sm" />
+            <input type="text" placeholder="Cari NIA atau Nama Anggota..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 text-sm outline-none shadow-sm" />
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <button className="flex-1 md:flex-none px-4 py-2 bg-white border border-gray-200 text-gray-600 font-semibold text-sm rounded-xl hover:bg-gray-50">Filter Status</button>
@@ -171,7 +171,7 @@ export default function KoperasiAnggotaPage() {
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-emerald-900 text-emerald-100 font-semibold text-xs uppercase tracking-wider">
+            <thead className="bg-green-900 text-green-100 font-semibold text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-6 py-4 rounded-tl-lg">Identitas Anggota</th>
                 <th className="px-6 py-4 text-center">Poin Belanja</th>
@@ -186,7 +186,7 @@ export default function KoperasiAnggotaPage() {
               {filtered.map(c => {
                 const totalSaldo = c.simpananPokok + c.simpananWajib + c.simpananSukarela;
                 return (
-                  <tr key={c.id} className="hover:bg-emerald-50/50 transition-colors group">
+                  <tr key={c.id} className="hover:bg-green-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="font-bold text-gray-800 text-base">{c.name}</div>
                       <div className="text-xs text-gray-500 font-medium">{c.nia} • {c.phone}</div>
@@ -199,7 +199,7 @@ export default function KoperasiAnggotaPage() {
                     <td className="px-6 py-4 text-right font-medium text-gray-600">Rp {c.simpananPokok.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4 text-right font-medium text-gray-600">Rp {c.simpananWajib.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4 text-right font-medium text-gray-600">Rp {c.simpananSukarela.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4 text-right font-bold text-emerald-700 bg-emerald-50/30">
+                    <td className="px-6 py-4 text-right font-bold text-green-700 bg-green-50/30">
                       Rp {totalSaldo.toLocaleString('id-ID')}
                     </td>
                     <td className="px-6 py-4 text-center">

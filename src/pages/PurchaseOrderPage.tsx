@@ -36,6 +36,7 @@ export default function PurchaseOrderPage() {
     const supplierContact = selectedSupplier ? selectedSupplier.phone : supplierPhone;
 
     addPurchaseOrder({
+      tenantId: currentUser.tenantId || 'tenant_default',
       poNumber,
       supplier,
       date: new Date().toISOString(),
@@ -67,7 +68,7 @@ export default function PurchaseOrderPage() {
     let formattedPhone = phone.replace(/[^0-9]/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '62' + formattedPhone.slice(1);
 
-    const textMessage = `*PURCHASE ORDER BA MART*\n` +
+    const textMessage = `*PURCHASE ORDER KSA MART*\n` +
       `No PO: ${po.poNumber}\n` +
       `Tanggal: ${new Date(po.date).toLocaleDateString('id-ID')}\n` +
       `====================\n` +
@@ -174,7 +175,7 @@ export default function PurchaseOrderPage() {
               <label className="text-[10px] uppercase font-bold text-slate-500">Catatan / Rincian Barang</label>
               <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Minyak 10 dus, Beras 50 karung..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
             </div>
-            <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors">Simpan PO</button>
+            <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors">Simpan PO</button>
           </form>
         </div>
       ) : (
@@ -200,12 +201,12 @@ export default function PurchaseOrderPage() {
                       <p className="text-[10px] text-slate-500">{new Date(po.date).toLocaleDateString('id-ID')}</p>
                     </td>
                     <td className="p-4 font-semibold text-slate-700">{po.supplier}</td>
-                    <td className="p-4 text-right font-mono font-bold text-emerald-700">
+                    <td className="p-4 text-right font-mono font-bold text-green-700">
                       {po.totalAmount.toLocaleString('id-ID')}
                     </td>
                     <td className="p-4 text-center">
                       <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${
-                        po.status === 'RECEIVED' ? 'bg-emerald-100 text-emerald-800' : 
+                        po.status === 'RECEIVED' ? 'bg-green-100 text-green-800' : 
                         po.status === 'ORDERED' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                       }`}>
                         <CheckCircle className="w-3 h-3" />
@@ -221,7 +222,7 @@ export default function PurchaseOrderPage() {
                     <td className="p-4 text-right space-x-2">
                       <button 
                         onClick={() => handleSendWA(po)}
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors inline-block"
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors inline-block"
                         title="Kirim PO via WhatsApp"
                       >
                         <Send className="w-4 h-4" />
@@ -290,7 +291,7 @@ export default function PurchaseOrderPage() {
       {/* Printable Area - 2 Rangkap PO */}
       {printPo && (() => {
         const creatorUser = users.find(u => u.name === printPo.createdBy);
-        const creatorRole = creatorUser?.role || 'BA Mart';
+        const creatorRole = creatorUser?.role || 'KSA Mart';
 
         return (
           <div className="printable-area printable-a4">
@@ -298,7 +299,7 @@ export default function PurchaseOrderPage() {
           <div className="border-2 border-gray-800 p-6 rounded-lg mb-8">
             <div className="flex justify-between items-start border-b-2 border-gray-800 pb-4 mb-4">
               <div>
-                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">Berkah Amanah Mart</h1>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
                 <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Asli (Untuk Supplier)</p>
               </div>
@@ -346,7 +347,7 @@ export default function PurchaseOrderPage() {
           <div className="border border-gray-400 p-6 rounded-lg">
             <div className="flex justify-between items-start border-b border-gray-400 pb-4 mb-4">
               <div>
-                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">Berkah Amanah Mart</h1>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
                 <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
                 <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Copy (Arsip Toko)</p>
               </div>

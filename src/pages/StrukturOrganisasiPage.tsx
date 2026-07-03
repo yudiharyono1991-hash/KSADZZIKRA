@@ -5,7 +5,7 @@ import { Users, Crown, ShieldCheck, UserCircle, ArrowDown, Store } from 'lucide-
 export default function StrukturOrganisasiPage() {
   const { users, branches } = useAppStore();
 
-  const owner = users.find(u => u.role === 'OWNER') || { name: 'Yudi Hariyono', role: 'OWNER' };
+  const owner = users.find(u => u.role === 'OWNER') || { name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.', role: 'OWNER' };
   
   // Group branches
   const getBranchUsers = (branchId: string, role: string) => {
@@ -20,7 +20,7 @@ export default function StrukturOrganisasiPage() {
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center space-x-3">
-          <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">
+          <div className="p-3 bg-green-100 text-green-800 rounded-xl">
             <Users className="w-6 h-6" />
           </div>
           <div>
@@ -39,7 +39,7 @@ export default function StrukturOrganisasiPage() {
               <Crown className="w-6 h-6 text-amber-600" />
             </div>
             <h3 className="mt-2 text-lg font-black text-slate-800">{owner.name}</h3>
-            <p className="text-sm font-bold text-amber-600 uppercase tracking-widest mt-1">Pemilik Toko</p>
+            <p className="text-sm font-bold text-amber-600 uppercase tracking-widest mt-1">Ketua Toko Koperasi KSA Mart</p>
             <p className="text-[10px] text-slate-500 mt-2 leading-tight">Menerima dan menyetujui seluruh laporan keuangan dari semua cabang.</p>
           </div>
           
@@ -76,14 +76,14 @@ export default function StrukturOrganisasiPage() {
              </div>
 
              {/* Pusat Cashiers */}
-             <div className="bg-emerald-50 border-2 border-emerald-400 p-4 rounded-xl w-full text-center shadow-sm relative z-10">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-100 p-1.5 rounded-full border border-emerald-400">
-                  <UserCircle className="w-4 h-4 text-emerald-600" />
+             <div className="bg-green-50 border-2 border-green-400 p-4 rounded-xl w-full text-center shadow-sm relative z-10">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-100 p-1.5 rounded-full border border-green-400">
+                  <UserCircle className="w-4 h-4 text-green-600" />
                 </div>
-                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-2 mt-1">Tim Kasir</p>
+                <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-2 mt-1">Tim Kasir</p>
                 <div className="grid grid-cols-2 gap-2">
                   {getPusatUsers('CASHIER').length > 0 ? getPusatUsers('CASHIER').map(cashier => (
-                    <div key={cashier.id} className="bg-white px-2 py-1.5 rounded shadow-xs border border-emerald-100">
+                    <div key={cashier.id} className="bg-white px-2 py-1.5 rounded shadow-xs border border-green-100">
                       <p className="font-bold text-xs text-slate-800">{cashier.name}</p>
                     </div>
                   )) : (
@@ -119,14 +119,14 @@ export default function StrukturOrganisasiPage() {
               </div>
 
               {/* Branch Cashiers */}
-              <div className="bg-emerald-50 border-2 border-emerald-400 p-4 rounded-xl w-full text-center shadow-sm relative z-10">
-                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-emerald-100 p-1.5 rounded-full border border-emerald-400">
-                   <UserCircle className="w-4 h-4 text-emerald-600" />
+              <div className="bg-green-50 border-2 border-green-400 p-4 rounded-xl w-full text-center shadow-sm relative z-10">
+                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-100 p-1.5 rounded-full border border-green-400">
+                   <UserCircle className="w-4 h-4 text-green-600" />
                  </div>
-                 <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-2 mt-1">Tim Kasir</p>
+                 <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-2 mt-1">Tim Kasir</p>
                  <div className="grid grid-cols-2 gap-2">
                    {getBranchUsers(branch.id, 'CASHIER').length > 0 ? getBranchUsers(branch.id, 'CASHIER').map(cashier => (
-                     <div key={cashier.id} className="bg-white px-2 py-1.5 rounded shadow-xs border border-emerald-100">
+                     <div key={cashier.id} className="bg-white px-2 py-1.5 rounded shadow-xs border border-green-100">
                        <p className="font-bold text-xs text-slate-800">{cashier.name}</p>
                      </div>
                    )) : (

@@ -63,7 +63,7 @@ export default function KoperasiSHUPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl shadow-sm">
+          <div className="p-3 bg-green-100 text-green-800 rounded-xl shadow-sm">
             <Calculator className="w-6 h-6" />
           </div>
           <div>
@@ -71,7 +71,7 @@ export default function KoperasiSHUPage() {
             <p className="text-sm text-gray-500">Sisa Hasil Usaha berdasarkan Jasa Modal dan Jasa Usaha (Poin Belanja).</p>
           </div>
         </div>
-        <button className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all">
+        <button className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all">
           <Download className="w-4 h-4"/> Export Excel / Cetak
         </button>
       </div>
@@ -79,12 +79,12 @@ export default function KoperasiSHUPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Kolom Kiri: Konfigurasi SHU */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 relative overflow-hidden">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Wallet className="w-32 h-32" />
             </div>
-            <h2 className="text-lg font-bold text-emerald-900 mb-4 flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-green-600" />
               Laba Bersih Tahunan
             </h2>
             <div className="relative">
@@ -93,7 +93,7 @@ export default function KoperasiSHUPage() {
                 type="number" 
                 value={labaBersih}
                 onChange={e => setLabaBersih(Number(e.target.value))}
-                className="w-full bg-emerald-50 border border-emerald-200 text-emerald-900 font-black text-xl rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-green-50 border border-green-200 text-green-900 font-black text-xl rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
             <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
@@ -108,9 +108,9 @@ export default function KoperasiSHUPage() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="font-semibold text-gray-700">Jasa Modal (Simpanan)</span>
-                  <span className="font-bold text-emerald-600">{porsiModal}%</span>
+                  <span className="font-bold text-green-600">{porsiModal}%</span>
                 </div>
-                <input type="range" min="0" max="100" value={porsiModal} onChange={e => setPorsiModal(Number(e.target.value))} className="w-full accent-emerald-600" />
+                <input type="range" min="0" max="100" value={porsiModal} onChange={e => setPorsiModal(Number(e.target.value))} className="w-full accent-green-600" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1">
@@ -146,9 +146,9 @@ export default function KoperasiSHUPage() {
         {/* Kolom Kanan: Distribusi SHU */}
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-              <p className="text-[10px] text-emerald-600 font-bold uppercase">Total SHU Modal</p>
-              <p className="text-lg font-black text-emerald-800">Rp {(totalShuModal / 1000000).toFixed(1)} Jt</p>
+            <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+              <p className="text-[10px] text-green-600 font-bold uppercase">Total SHU Modal</p>
+              <p className="text-lg font-black text-green-800">Rp {(totalShuModal / 1000000).toFixed(1)} Jt</p>
             </div>
             <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
               <p className="text-[10px] text-amber-600 font-bold uppercase">Total SHU Usaha</p>
@@ -165,9 +165,9 @@ export default function KoperasiSHUPage() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 bg-emerald-900 text-white flex justify-between items-center">
+            <div className="p-4 bg-green-900 text-white flex justify-between items-center">
               <h3 className="font-bold flex items-center gap-2"><Users className="w-5 h-5"/> Distribusi SHU Anggota</h3>
-              <div className="text-xs font-medium bg-emerald-800 px-3 py-1 rounded-full border border-emerald-700">
+              <div className="text-xs font-medium bg-green-800 px-3 py-1 rounded-full border border-green-700">
                 Total Anggota: {DUMMY_MEMBERS.length}
               </div>
             </div>
@@ -178,7 +178,7 @@ export default function KoperasiSHUPage() {
                     <th className="px-5 py-3">NIA / Nama</th>
                     <th className="px-5 py-3 text-right">Modal Koperasi</th>
                     <th className="px-5 py-3 text-center">Poin Usaha</th>
-                    <th className="px-5 py-3 text-right text-emerald-600 bg-emerald-50">SHU Modal</th>
+                    <th className="px-5 py-3 text-right text-green-600 bg-green-50">SHU Modal</th>
                     <th className="px-5 py-3 text-right text-amber-600 bg-amber-50">SHU Usaha</th>
                     <th className="px-5 py-3 text-right font-bold text-gray-800">Total SHU Diterima</th>
                   </tr>
@@ -199,20 +199,20 @@ export default function KoperasiSHUPage() {
                       <td className="px-5 py-4 text-center font-bold text-gray-600">
                         {m.points.toLocaleString('id-ID')}
                       </td>
-                      <td className="px-5 py-4 text-right font-medium text-emerald-700 bg-emerald-50/50">
+                      <td className="px-5 py-4 text-right font-medium text-green-700 bg-green-50/50">
                         Rp {Math.round(m.shuModal).toLocaleString('id-ID')}
                       </td>
                       <td className="px-5 py-4 text-right font-medium text-amber-700 bg-amber-50/50">
                         Rp {Math.round(m.shuUsaha).toLocaleString('id-ID')}
                       </td>
-                      <td className="px-5 py-4 text-right font-black text-emerald-800 bg-emerald-50">
+                      <td className="px-5 py-4 text-right font-black text-green-800 bg-green-50">
                         Rp {Math.round(m.totalShu).toLocaleString('id-ID')}
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-emerald-950 text-white font-bold">
+                  <tr className="bg-green-950 text-white font-bold">
                     <td colSpan={3} className="px-5 py-3 text-right text-xs tracking-wider uppercase">Grand Total SHU Anggota Dibagikan</td>
-                    <td className="px-5 py-3 text-right text-emerald-300">Rp {totalShuModal.toLocaleString('id-ID')}</td>
+                    <td className="px-5 py-3 text-right text-green-300">Rp {totalShuModal.toLocaleString('id-ID')}</td>
                     <td className="px-5 py-3 text-right text-amber-300">Rp {totalShuUsaha.toLocaleString('id-ID')}</td>
                     <td className="px-5 py-3 text-right text-white text-base">Rp {(totalShuModal + totalShuUsaha).toLocaleString('id-ID')}</td>
                   </tr>

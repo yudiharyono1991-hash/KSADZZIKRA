@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@theme {
+  /* KSA Adz-Zikra Core Green Palette */
+  --color-green-50: #f1f8f4;
+  --color-green-100: #def0e3;
+  --color-green-200: #bee1c9;
+  --color-green-300: #91caa6;
+  --color-green-400: #5fae7e;
+  --color-green-500: #3b9161;
+  --color-green-600: #2a744a;
+  --color-green-700: #235c3c;
+  --color-green-800: #135d25;
+  --color-green-900: #194029;
+  --color-green-950: #0d2317;
+
+  /* KSA Adz-Zikra Gold/Amber Palette */
+  --color-amber-50: #fff9eb;
+  --color-amber-100: #fef0c7;
+  --color-amber-200: #fde08b;
+  --color-amber-300: #fbcc4b;
+  --color-amber-400: #f5a918;
+  --color-amber-500: #e8890a;
+  --color-amber-600: #d96f00;
+  --color-amber-700: #b45104;
+  --color-amber-800: #923f0c;
+  --color-amber-900: #78340f;
+  --color-amber-950: #451a03;
+}
+
 @media print {
   @page {
     margin: 0;

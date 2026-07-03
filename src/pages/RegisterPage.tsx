@@ -86,17 +86,17 @@ export default function RegisterPage() {
     <div className={`min-h-screen flex ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} font-sans`}>
       
       {/* Left Panel - Branding (Hidden on small screens) */}
-      <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden bg-emerald-950 text-white flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden bg-green-950 text-white flex-col justify-between p-12">
         {/* Background Elements */}
         <div className="absolute top-0 left-0 w-full h-full opacity-10">
-          <div className="absolute top-10 left-10 w-96 h-96 bg-emerald-500 rounded-full mix-blend-screen filter blur-[100px]"></div>
+          <div className="absolute top-10 left-10 w-96 h-96 bg-green-500 rounded-full mix-blend-screen filter blur-[100px]"></div>
           <div className="absolute bottom-10 right-10 w-96 h-96 bg-amber-500 rounded-full mix-blend-screen filter blur-[100px]"></div>
         </div>
 
         <div className="z-10">
           <button 
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-emerald-200 hover:text-white transition-colors mb-12"
+            className="flex items-center gap-2 text-green-200 hover:text-white transition-colors mb-12"
           >
             <ArrowLeft size={20} />
             <span className="font-medium">Kembali ke Beranda</span>
@@ -108,35 +108,35 @@ export default function RegisterPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">KSA Mart</h1>
-              <p className="text-emerald-400 font-bold tracking-[0.2em] uppercase text-sm">Indonesia</p>
+              <p className="text-green-400 font-bold tracking-[0.2em] uppercase text-sm">Indonesia</p>
             </div>
           </div>
           
           <h2 className="text-4xl font-extrabold leading-tight mb-6">
             Mulai Perjalanan<br/>Bisnis Penuh Berkah.
           </h2>
-          <p className="text-emerald-100/80 text-lg max-w-md leading-relaxed">
+          <p className="text-green-100/80 text-lg max-w-md leading-relaxed">
             Sistem Kasir Pintar Berbasis Syariah pertama yang terintegrasi dengan laporan PSAK, zakat otomatis, dan ekosistem bisnis islami.
           </p>
         </div>
 
         <div className="z-10 space-y-6">
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-emerald-900/50 flex items-center justify-center shrink-0 border border-emerald-800/50">
-              <CheckCircle2 size={20} className="text-emerald-400" />
+            <div className="w-10 h-10 rounded-full bg-green-900/50 flex items-center justify-center shrink-0 border border-green-800/50">
+              <CheckCircle2 size={20} className="text-green-400" />
             </div>
             <div>
               <h4 className="font-bold">Transaksi Sesuai Syariat</h4>
-              <p className="text-sm text-emerald-200/70 mt-1">Sistem dirancang menghindari praktik ribawi dan gharar.</p>
+              <p className="text-sm text-green-200/70 mt-1">Sistem dirancang menghindari praktik ribawi dan gharar.</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-emerald-900/50 flex items-center justify-center shrink-0 border border-emerald-800/50">
-              <CheckCircle2 size={20} className="text-emerald-400" />
+            <div className="w-10 h-10 rounded-full bg-green-900/50 flex items-center justify-center shrink-0 border border-green-800/50">
+              <CheckCircle2 size={20} className="text-green-400" />
             </div>
             <div>
               <h4 className="font-bold">Akuntansi PSAK Syariah</h4>
-              <p className="text-sm text-emerald-200/70 mt-1">Laporan keuangan standar, langsung bisa dipakai R.A.T Koperasi.</p>
+              <p className="text-sm text-green-200/70 mt-1">Laporan keuangan standar, langsung bisa dipakai R.A.T Koperasi.</p>
             </div>
           </div>
         </div>
@@ -178,12 +178,12 @@ export default function RegisterPage() {
                         onClick={() => setForm({...form, tipeUsaha: type})}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col gap-2 ${
                           form.tipeUsaha === type 
-                            ? 'border-emerald-500 bg-emerald-50/50 shadow-sm shadow-emerald-100' 
+                            ? 'border-green-500 bg-green-50/50 shadow-sm shadow-green-100' 
                             : 'border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                       >
-                        <Store size={24} className={form.tipeUsaha === type ? 'text-emerald-600' : 'text-slate-400'} />
-                        <span className={`font-bold ${form.tipeUsaha === type ? 'text-emerald-900' : 'text-slate-600'}`}>{type}</span>
+                        <Store size={24} className={form.tipeUsaha === type ? 'text-green-600' : 'text-slate-400'} />
+                        <span className={`font-bold ${form.tipeUsaha === type ? 'text-green-900' : 'text-slate-600'}`}>{type}</span>
                       </button>
                     ))}
                   </div>
@@ -201,7 +201,7 @@ export default function RegisterPage() {
                         required
                         value={form.namaUsaha}
                         onChange={(e) => setForm({...form, namaUsaha: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
                         placeholder="Contoh: Koperasi Berkah" 
                       />
                     </div>
@@ -217,7 +217,7 @@ export default function RegisterPage() {
                         required
                         value={form.namaPemilik}
                         onChange={(e) => setForm({...form, namaPemilik: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
                         placeholder="Nama Lengkap" 
                       />
                     </div>
@@ -236,7 +236,7 @@ export default function RegisterPage() {
                         required
                         value={form.email}
                         onChange={(e) => setForm({...form, email: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
                         placeholder="nama@email.com" 
                       />
                     </div>
@@ -252,7 +252,7 @@ export default function RegisterPage() {
                         required
                         value={form.wa}
                         onChange={(e) => setForm({...form, wa: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
                         placeholder="081234567890" 
                       />
                     </div>
@@ -269,7 +269,7 @@ export default function RegisterPage() {
                       rows={3}
                       value={form.alamat}
                       onChange={(e) => setForm({...form, alamat: e.target.value})}
-                      className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none transition-all font-medium text-slate-900 resize-none" 
+                      className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 resize-none" 
                       placeholder="Jalan, RT/RW, Kelurahan, Kecamatan, Kota..." 
                     />
                   </div>
@@ -286,7 +286,7 @@ export default function RegisterPage() {
                         type="checkbox" 
                         checked={form.isPactAgreed}
                         onChange={(e) => setForm({...form, isPactAgreed: e.target.checked})}
-                        className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded focus:ring-2 focus:ring-emerald-500/20 checked:bg-emerald-600 checked:border-emerald-600 transition-colors"
+                        className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded focus:ring-2 focus:ring-green-500/20 checked:bg-green-600 checked:border-green-600 transition-colors"
                       />
                       <CheckCircle2 size={14} className="absolute text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
                     </div>
@@ -299,7 +299,7 @@ export default function RegisterPage() {
                 <button 
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -329,7 +329,7 @@ export default function RegisterPage() {
               animate={{ scale: 1, opacity: 1 }}
               className="text-center py-10"
             >
-              <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-600">
+              <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600">
                 <CheckCircle2 size={48} />
               </div>
               <h2 className="text-3xl font-extrabold text-slate-900 mb-4">Pendaftaran Terkirim!</h2>
@@ -366,7 +366,7 @@ export default function RegisterPage() {
                       isPactAgreed: false
                     });
                   }}
-                  className="px-6 py-3 bg-emerald-50 text-emerald-700 font-bold rounded-xl transition-colors hover:bg-emerald-100"
+                  className="px-6 py-3 bg-green-50 text-green-700 font-bold rounded-xl transition-colors hover:bg-green-100"
                 >
                   Daftarkan Usaha Lain
                 </button>

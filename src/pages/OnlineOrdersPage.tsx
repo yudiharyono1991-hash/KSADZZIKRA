@@ -60,7 +60,7 @@ export default function OnlineOrdersPage() {
                     <h4 className="font-bold text-slate-800">{order.orderNo}</h4>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                       order.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
-                      order.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
+                      order.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                       order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
                       'bg-blue-100 text-blue-800'
                     }`}>
@@ -108,7 +108,7 @@ export default function OnlineOrdersPage() {
                     )}
                     {order.status === 'READY' && (
                       <div className="flex flex-col gap-1">
-                        <button onClick={() => { if(confirm('Terima pembayaran Tunai dan Selesaikan Pesanan?')) processOnlineOrderPayment(order.id, 'CASH'); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar Cash & Selesai</button>
+                        <button onClick={() => { if(confirm('Terima pembayaran Tunai dan Selesaikan Pesanan?')) processOnlineOrderPayment(order.id, 'CASH'); }} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar Cash & Selesai</button>
                         <button onClick={() => { if(confirm('Terima pembayaran Transfer BSI dan Selesaikan Pesanan?')) processOnlineOrderPayment(order.id, 'TRANSFER_BSI'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar Transfer BSI & Selesai</button>
                       </div>
                     )}

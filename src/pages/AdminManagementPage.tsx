@@ -15,8 +15,8 @@ export default function AdminManagementPage() {
   const [editUsername, setEditUsername] = useState<string>('');
   const [editPassword, setEditPassword] = useState<string>('');
 
-  // Prevent accessing if not admin or owner
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
+  // Prevent accessing if not admin, owner, or superadmin
+  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER' && currentUser?.role !== 'SUPERADMIN') {
     return (
       <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4 py-20">
         <ShieldAlert className="w-16 h-16 text-red-400" />
@@ -64,16 +64,20 @@ export default function AdminManagementPage() {
   };
 
   // Role options based on current user role
-  const allowedRoles: UserRole[] = currentUser?.role === 'OWNER'
-    ? ['CASHIER', 'ADMIN', 'OWNER']
-    : ['CASHIER', 'ADMIN']; // Admin cannot promote to OWNER
+  let allowedRoles: UserRole[] = ['CASHIER', 'ADMIN', 'PELANGGAN'];
+  if (currentUser?.role === 'OWNER') {
+    allowedRoles.push('OWNER');
+  }
+  if (currentUser?.role === 'SUPERADMIN') {
+    allowedRoles = ['CASHIER', 'ADMIN', 'OWNER', 'PELANGGAN', 'SUPERADMIN'];
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div className="flex items-center space-x-3">
-          <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">
+          <div className="p-3 bg-green-100 text-green-800 rounded-xl">
             <UserCog className="w-6 h-6" />
           </div>
           <div>
@@ -127,13 +131,13 @@ export default function AdminManagementPage() {
           onClick={() => setActiveTab('ACTIVE')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-t-lg border-b-2 transition-colors ${
             activeTab === 'ACTIVE'
-              ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
+              ? 'border-green-600 text-green-700 bg-green-50'
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
           <Users className="w-4 h-4" />
           Pengguna Aktif
-          <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{activeUsers.length}</span>
+          <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{activeUsers.length}</span>
         </button>
         <button
           onClick={() => setActiveTab('PENDING')}
@@ -176,7 +180,7 @@ export default function AdminManagementPage() {
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          className="bg-white border border-green-300 text-slate-800 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-green-500 focus:outline-none"
                         />
                       ) : (
                         <p className="font-bold text-slate-800">{user.name}</p>
@@ -189,7 +193,7 @@ export default function AdminManagementPage() {
                             type="text"
                             value={editUsername}
                             onChange={(e) => setEditUsername(e.target.value)}
-                            className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1.5 w-full focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                            className="bg-white border border-green-300 text-slate-800 text-xs rounded-lg px-2 py-1.5 w-full focus:ring-2 focus:ring-green-500 focus:outline-none font-mono"
                             placeholder="Username baru"
                           />
                           <input
@@ -210,7 +214,7 @@ export default function AdminManagementPage() {
                         <select
                           value={editBranch}
                           onChange={(e) => setEditBranch(e.target.value)}
-                          className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          className="bg-white border border-green-300 text-slate-800 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-green-500 focus:outline-none"
                         >
                           <option value="">Pusat/Global</option>
                           {branches.map(b => (
@@ -237,7 +241,7 @@ export default function AdminManagementPage() {
                         <select
                           value={editRole}
                           onChange={(e) => setEditRole(e.target.value as UserRole)}
-                          className="bg-white border border-emerald-300 text-slate-800 text-xs rounded-lg px-2 py-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          className="bg-white border border-green-300 text-slate-800 text-xs rounded-lg px-2 py-1 focus:ring-2 focus:ring-green-500 focus:outline-none"
                         >
                           {allowedRoles.map(r => (
                             <option key={r} value={r}>{r}</option>
@@ -257,7 +261,7 @@ export default function AdminManagementPage() {
                       <div className="flex justify-center space-x-2">
                         {editingId === user.id ? (
                           <>
-                            <button onClick={() => handleSaveEdit(user.id)} className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors" title="Simpan">
+                            <button onClick={() => handleSaveEdit(user.id)} className="p-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors" title="Simpan">
                               <Check className="w-4 h-4" />
                             </button>
                             <button onClick={() => setEditingId(null)} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors" title="Batal">
@@ -302,7 +306,7 @@ export default function AdminManagementPage() {
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           {pendingUsers.length === 0 ? (
             <div className="p-12 text-center">
-              <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+              <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
               <p className="font-bold text-slate-600">Tidak ada pendaftaran yang menunggu persetujuan.</p>
               <p className="text-xs text-slate-400 mt-1">Semua akun telah diproses.</p>
             </div>
@@ -349,7 +353,7 @@ export default function AdminManagementPage() {
                         <div className="flex justify-center space-x-2">
                           <button
                             onClick={() => handleApprove(user.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                             Setujui

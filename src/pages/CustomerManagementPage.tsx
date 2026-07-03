@@ -23,7 +23,7 @@ export default function CustomerManagementPage() {
     if (editingId) {
       updateCustomer(editingId, { name, phone });
     } else {
-      addCustomer({ name, phone, points: 0, debtAmount: 0 });
+      addCustomer({ tenantId: currentUser?.tenantId || 'tenant_default', name, phone, points: 0, debtAmount: 0 });
     }
     resetForm();
   };
@@ -58,6 +58,7 @@ export default function CustomerManagementPage() {
     // Add auto journal for debt payment
     const now = new Date().toISOString();
     addJournalEntry({
+      tenantId: currentUser?.tenantId || 'tenant_default',
       date: now,
       account: 'KAS',
       description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${c.name}`,
@@ -69,6 +70,7 @@ export default function CustomerManagementPage() {
       branchId: currentUser?.branchId
     });
     addJournalEntry({
+      tenantId: currentUser?.tenantId || 'tenant_default',
       date: now,
       account: 'PIUTANG_DAGANG',
       description: `[Auto] Pengurangan piutang pelanggan: ${c.name}`,
@@ -115,7 +117,7 @@ export default function CustomerManagementPage() {
               <label className="block text-xs font-bold text-gray-600 mb-1">Nomor WhatsApp</label>
               <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
-            <button type="submit" className="w-full bg-emerald-600 text-white font-bold py-2 rounded-lg">Simpan Data</button>
+            <button type="submit" className="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Simpan Data</button>
           </form>
         </div>
       )}

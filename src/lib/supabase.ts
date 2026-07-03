@@ -44,6 +44,7 @@ export const supabaseService = {
     try {
       const payload: any = {
         id: product.id,
+        tenant_id: product.tenantId || 'tenant_default',
         sku: product.sku,
         name: product.name,
         category: product.category,
@@ -54,7 +55,16 @@ export const supabaseService = {
         unit: product.unit,
         barcode: product.barcode || null,
         is_halal: product.isHalal,
-        image: product.image || null
+        image: product.image || null,
+        wholesale_price: product.wholesalePrice || null,
+        wholesale_min_qty: product.wholesaleMinQty || null,
+        has_box_unit: product.hasBoxUnit || false,
+        box_barcode: product.boxBarcode || null,
+        pcs_per_box: product.pcsPerBox || null,
+        box_price: product.boxPrice || null,
+        box_cost_price: product.boxCostPrice || null,
+        sales_coa_code: product.salesCoaCode || null,
+        cogs_coa_code: product.cogsCoaCode || null
       };
 
       const { error } = await supabase
@@ -62,15 +72,27 @@ export const supabaseService = {
         .upsert(payload);
 
       if (error) {
-        // Fallback if 'image' column is missing in Supabase schema
-        if (error.message.includes('column') || error.message.includes('field') || error.message.includes('cache')) {
-          const saferPayload = { ...payload };
-          delete saferPayload.image;
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
+          const basicPayload = {
+            id: product.id,
+            sku: product.sku,
+            name: product.name,
+            category: product.category,
+            price: Number(product.price),
+            cost_price: Number(product.costPrice),
+            stock: Number(product.stock),
+            min_stock: Number(product.minStock),
+            unit: product.unit,
+            barcode: product.barcode || null,
+            is_halal: product.isHalal,
+            image: product.image || null
+          };
           const { error: retryError } = await supabase
             .from('products')
-            .upsert(saferPayload);
+            .upsert(basicPayload);
           if (retryError) throw retryError;
-          logSync(`Saved product ${product.sku} successfully (without image due to schema mismatch).`);
+          logSync(`Saved product ${product.sku} successfully (using basic fallback).`);
           return true;
         }
         throw error;
@@ -79,6 +101,37 @@ export const supabaseService = {
       return true;
     } catch (err: any) {
       logSync(`Failed to save product ${product.sku}: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async saveProductsBulk(products: any[]): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payloads = products.map(p => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        category: p.category,
+        price: Number(p.price),
+        cost_price: Number(p.costPrice),
+        stock: Number(p.stock),
+        min_stock: Number(p.minStock),
+        unit: p.unit,
+        barcode: p.barcode || null,
+        is_halal: p.isHalal ?? true,
+        image: p.image || null
+      }));
+
+      const { error } = await supabase
+        .from('products')
+        .upsert(payloads);
+
+      if (error) throw error;
+      logSync(`Bulk saved ${products.length} products successfully.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to bulk save products: ${err.message}`, true);
       return false;
     }
   },
@@ -128,6 +181,7 @@ export const supabaseService = {
     try {
       const payload: any = {
         id: tx.id,
+        tenant_id: tx.tenantId || 'tenant_default',
         invoice_no: tx.invoiceNo,
         timestamp: tx.timestamp,
         cashier_name: tx.cashierName,
@@ -137,7 +191,19 @@ export const supabaseService = {
         amount_paid: Number(tx.amountPaid),
         change_amount: Number(tx.changeAmount),
         zakat_contribution: Number(tx.zakatContribution),
-        margin_contribution: Number(tx.marginContribution)
+        margin_contribution: Number(tx.marginContribution),
+        customer_id: tx.customerId || null,
+        customer_name: tx.customerName || null,
+        promo_id: tx.promoId || null,
+        discount_amount: Number(tx.discountAmount || 0),
+        branch_id: tx.branchId || null,
+        is_voided: Boolean(tx.isVoided),
+        void_reason: tx.voidReason || null,
+        tax_amount: Number(tx.taxAmount || 0),
+        split_payments: tx.splitPayments || [],
+        points_earned: Number(tx.pointsEarned || 0),
+        points_redeemed: Number(tx.pointsRedeemed || 0),
+        points_discount: Number(tx.pointsDiscount || 0)
       };
 
       const { error } = await supabase
@@ -145,13 +211,24 @@ export const supabaseService = {
         .insert(payload);
 
       if (error) {
-        // If error about timestamp column
-        if (error.message.includes('column') && error.message.includes('timestamp')) {
-          const saferPayload = { ...payload };
-          delete saferPayload.timestamp; // Allow created_at to trigger automatically
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
+          const basicPayload = {
+            id: tx.id,
+            invoice_no: tx.invoiceNo,
+            timestamp: tx.timestamp,
+            cashier_name: tx.cashierName,
+            items: tx.items,
+            total_amount: Number(tx.totalAmount),
+            payment_method: tx.paymentMethod,
+            amount_paid: Number(tx.amountPaid),
+            change_amount: Number(tx.changeAmount),
+            zakat_contribution: Number(tx.zakatContribution),
+            margin_contribution: Number(tx.marginContribution)
+          };
           const { error: retryError } = await supabase
             .from('transactions')
-            .insert(saferPayload);
+            .insert(basicPayload);
           if (retryError) throw retryError;
           return true;
         }
@@ -451,6 +528,51 @@ export const supabaseService = {
       return true;
     } catch (err: any) {
       logSync(`Failed to delete user ${id}: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async saveCustomer(customer: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload: any = {
+        id: customer.id,
+        tenant_id: customer.tenantId || 'tenant_default',
+        name: customer.name,
+        phone: customer.phone || '',
+        points: Number(customer.points || 0),
+        debt_amount: Number(customer.debtAmount || 0),
+        branch_id: customer.branchId || null,
+        is_koperasi_member: Boolean(customer.isKoperasiMember)
+      };
+
+      const { error } = await supabase
+        .from('customers')
+        .upsert(payload);
+
+      if (error) {
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
+          const basicPayload = {
+            id: customer.id,
+            name: customer.name,
+            phone: customer.phone || '',
+            points: Number(customer.points || 0),
+            debt_amount: Number(customer.debtAmount || 0)
+          };
+          const { error: retryError } = await supabase
+            .from('customers')
+            .upsert(basicPayload);
+          if (retryError) throw retryError;
+          logSync(`Saved customer ${customer.name} successfully (using basic fallback).`);
+          return true;
+        }
+        throw error;
+      }
+      logSync(`Saved customer ${customer.name} successfully.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save customer ${customer.name}: ${err.message}`, true);
       return false;
     }
   }

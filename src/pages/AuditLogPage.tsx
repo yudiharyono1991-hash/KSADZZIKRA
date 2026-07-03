@@ -33,12 +33,12 @@ export default function AuditLogPage() {
       <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="font-bold text-gray-800 text-sm">Log Audit Sistem (Audit Trail)</h2>
-          <p className="text-[11px] text-gray-400 mt-0.5">Catatan akuntabilitas rill atas sirkulasi data internal toko BA Mart</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">Catatan akuntabilitas rill atas sirkulasi data internal toko KSA Mart</p>
         </div>
 
         <button
           onClick={handleDownloadLogs}
-          className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors self-start md:self-auto"
+          className="bg-green-700 hover:bg-green-800 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors self-start md:self-auto"
         >
           <Download className="w-4 h-4" />
           <span>Export Audit Log (.csv)</span>
@@ -67,7 +67,7 @@ export default function AuditLogPage() {
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold select-none whitespace-nowrap ${
                 selectedCategory === cat
-                  ? 'bg-emerald-700 text-white'
+                  ? 'bg-green-700 text-white'
                   : 'bg-slate-100 text-gray-600 hover:bg-slate-200'
               }`}
             >
@@ -106,7 +106,7 @@ export default function AuditLogPage() {
                   if (log.category === 'POS') categoryClass = 'bg-blue-50 text-blue-700 border-blue-100';
                   if (log.category === 'INVENTORY') categoryClass = 'bg-amber-50 text-amber-700 border-amber-100';
                   if (log.category === 'FINANCE') categoryClass = 'bg-indigo-50 text-indigo-700 border-indigo-100';
-                  if (log.category === 'ZAKAT') categoryClass = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+                  if (log.category === 'ZAKAT') categoryClass = 'bg-green-50 text-green-800 border-green-100';
                   if (log.category === 'SYSTEM') categoryClass = 'bg-slate-900 text-slate-200 border-slate-850';
 
                   return (

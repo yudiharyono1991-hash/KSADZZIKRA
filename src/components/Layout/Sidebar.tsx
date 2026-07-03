@@ -28,7 +28,9 @@ import {
   ChevronRight,
   Database,
   PieChart,
-  Package
+  Package,
+  HelpCircle,
+  Newspaper
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -75,12 +77,11 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
   if (currentUser.role === 'OWNER') {
     menuData = [
       {
-        label: 'Kasir & Transaksi',
+        label: 'Transaksi',
         icon: ShoppingCart,
         items: [
-          { path: '/kasir', label: 'Kasir POS', icon: ShoppingCart },
+          { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
-          { path: '/kasir-shift', label: 'Tutup Shift', icon: Lock },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
       },
@@ -93,6 +94,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/laporan-penjualan', label: 'Laporan Penjualan', icon: TrendingUp },
           { path: '/arus-kas', label: 'Laporan Arus Kas', icon: Wallet },
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
+          { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
           { path: '/zakat', label: 'Zakat & ESG', icon: Calculator },
         ]
       },
@@ -112,6 +114,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/cabang', label: 'Manajemen Cabang', icon: Store },
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
+          { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
           { path: '/promos', label: 'Manajemen Promo', icon: Tag },
         ]
       },
@@ -125,16 +128,26 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
         ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
+        ]
       }
     ];
 
     if (settings.businessType === 'KOPERASI') {
       menuData.splice(4, 0, {
-        label: 'Koperasi Syariah',
+        label: 'Manajemen KS ADZ-ZIKRA',
         icon: UsersRound,
         items: [
           { path: '/koperasi-anggota', label: 'Manajemen Anggota', icon: Users },
+          { path: '/koperasi-pembiayaan', label: 'Pembiayaan Koperasi', icon: Wallet },
           { path: '/koperasi-shu', label: 'Pembagian SHU', icon: Wallet },
+          { path: '/koperasi-keuangan', label: 'Laporan Keuangan', icon: PieChart },
+          { path: '/berita-koperasi', label: 'Berita & Info Pusat', icon: Newspaper },
         ]
       });
     }
@@ -147,6 +160,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/laporan-penjualan', label: 'Laporan Penjualan', icon: TrendingUp },
           { path: '/arus-kas', label: 'Laporan Arus Kas', icon: Wallet },
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
+          { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
         ]
       },
       {
@@ -164,16 +178,16 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         items: [
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
+          { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
           { path: '/promos', label: 'Manajemen Promo', icon: Tag },
         ]
       },
       {
-        label: 'Kasir & Transaksi',
+        label: 'Transaksi',
         icon: ShoppingCart,
         items: [
-          { path: '/kasir', label: 'Kasir POS', icon: ShoppingCart },
+          { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
-          { path: '/kasir-shift', label: 'Tutup Shift', icon: Lock },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
       },
@@ -187,6 +201,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
         ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
+        ]
       }
     ];
 
@@ -197,6 +218,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         items: [
           { path: '/koperasi-anggota', label: 'Manajemen Anggota', icon: Users },
           { path: '/koperasi-shu', label: 'Pembagian SHU', icon: Wallet },
+          { path: '/berita-koperasi', label: 'Berita & Info Pusat', icon: Newspaper },
         ]
       });
     }
@@ -204,12 +226,11 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
     // CASHIER
     menuData = [
       {
-        label: 'Kasir & Transaksi',
+        label: 'Transaksi',
         icon: ShoppingCart,
         items: [
-          { path: '/kasir', label: 'Kasir POS', icon: ShoppingCart },
+          { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
-          { path: '/kasir-shift', label: 'Tutup Shift', icon: Lock },
         ]
       },
       {
@@ -217,6 +238,14 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Store,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/berita-koperasi', label: 'Berita & Info Pusat', icon: Newspaper },
+        ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
         ]
       }
     ];
@@ -248,7 +277,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'OWNER': return 'Owner Mode';
+      case 'OWNER': return 'Ketua Toko Koperasi KSA Mart';
       case 'ADMIN': return 'Admin Mode';
       case 'CASHIER': return 'Cashier Mode';
       default: return 'User';
@@ -267,18 +296,18 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
       <aside 
         id="app-sidebar" 
-        className={`fixed md:sticky top-0 left-0 h-screen ${isCollapsed ? 'w-20' : 'w-64'} bg-[#135d25] text-white flex flex-col border-r border-[#0e441b] font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 ${
+        className={`fixed md:sticky top-0 left-0 h-screen ${isCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
         
-        {/* BA Mart Brand Header matching screenshot exactly */}
-        <div className="p-6 flex flex-col items-center border-b border-[#0e441b] relative">
+        {/* KSA Mart Brand Header matching screenshot exactly */}
+        <div className="p-6 flex flex-col items-center border-b border-green-950 relative">
           {/* Close button on mobile */}
           {onClose && (
             <button 
               onClick={onClose}
-              className="absolute top-4 right-4 p-1.5 rounded-lg bg-emerald-800/40 hover:bg-emerald-800 text-emerald-100 md:hidden transition-colors"
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-green-800/40 hover:bg-green-800 text-green-100 md:hidden transition-colors"
               aria-label="Tutup Menu"
             >
               <X className="w-5 h-5" />
@@ -291,35 +320,21 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
               className="relative group cursor-pointer" 
               onClick={onExpand}
             >
-              <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-emerald-300 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500"></div>
-              <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-800 to-emerald-950 rounded-2xl border border-emerald-600/50 shadow-xl flex items-center justify-center overflow-hidden transform group-hover:scale-105 transition duration-300">
-                {/* Geometric pattern background */}
-                <div className="absolute inset-0 opacity-[0.15] bg-[radial-gradient(circle_at_50%_50%,_white_1px,_transparent_1px)] bg-[length:4px_4px]"></div>
-                
-                {/* Shop Roof Decoration */}
-                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 opacity-50">
-                  <Store className="w-3.5 h-3.5 text-emerald-100 drop-shadow-md" />
-                </div>
-                
-                {/* Logo */}
-                <div className="flex items-center justify-center z-10 drop-shadow-md mt-1.5">
-                  <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-10 w-auto object-contain" />
-                </div>
-                
-                {/* Text indicator replacing Store Icon */}
-                <div className="absolute bottom-1 right-1.5 flex flex-col items-end opacity-95 leading-none">
-                  <span className="text-[4.5px] text-emerald-100 font-black tracking-widest uppercase">Mart Syariah</span>
-                  <span className="text-[4px] text-amber-400 font-bold tracking-[0.2em] mt-[1px]">@INDONESIA</span>
-                </div>
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-green-300 rounded-xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500"></div>
+              <div className="relative w-16 md:w-32 h-12 md:h-16 bg-white rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition duration-300 overflow-hidden">
+                {/* Clean Logo Display */}
+                <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-full h-full object-contain" />
               </div>
             </div>
 
             {!isCollapsed && (
               <div className="text-center transition-opacity duration-300 w-full px-2">
-                <h1 className="font-extrabold text-[10px] md:text-[12px] leading-tight tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">Koperasi Syariah KSA Mart</h1>
-                <p className="text-[9px] text-emerald-100 font-bold tracking-[0.2em] uppercase mt-1 bg-emerald-900/60 py-0.5 px-2 rounded-full border border-emerald-700/50 inline-block shadow-inner">
-                  {getRoleLabel(currentUser.role)}
-                </p>
+                <h1 className="font-extrabold text-[12px] md:text-[14px] leading-tight tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">KSA Mart</h1>
+                <div className="mt-1.5 flex justify-center w-full">
+                  <p className="text-[9px] text-green-100 font-bold uppercase bg-green-900/60 py-1 px-2.5 rounded-lg border border-green-700/50 shadow-inner w-full max-w-[180px] text-center leading-snug break-words">
+                    MODE: {getRoleLabel(currentUser.role)}
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -345,8 +360,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                     title={isCollapsed ? menuItem.label : undefined}
                     className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group ${
                       hasActiveChild && !isExpanded
-                        ? 'bg-[#1b5e20] text-amber-400'
-                        : 'text-gray-100 hover:bg-emerald-800/40 hover:text-white'
+                        ? 'bg-green-700 text-amber-400'
+                        : 'text-gray-100 hover:bg-green-700/40 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center space-x-3 overflow-hidden">
@@ -373,8 +388,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                             className={({ isActive }) =>
                               `flex items-center space-x-3 px-3 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 group ${
                                 isActive
-                                  ? 'bg-[#388e3c] text-amber-400 font-bold shadow-sm shadow-emerald-950/20'
-                                  : 'text-gray-300 hover:bg-emerald-800/40 hover:text-white'
+                                  ? 'bg-green-600 text-amber-400 font-bold shadow-sm shadow-green-950/20'
+                                  : 'text-gray-300 hover:bg-green-700/40 hover:text-white'
                               }`
                             }
                           >
@@ -403,8 +418,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                   className={({ isActive }) =>
                     `flex items-center space-x-3 ${isCollapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group ${
                       isActive
-                        ? 'bg-[#388e3c] text-amber-400 font-bold shadow-sm shadow-emerald-950/20'
-                        : 'text-gray-100 hover:bg-emerald-800/40 hover:text-white'
+                        ? 'bg-green-600 text-amber-400 font-bold shadow-sm shadow-green-950/20'
+                        : 'text-gray-100 hover:bg-green-700/40 hover:text-white'
                     }`
                   }
                 >
@@ -425,7 +440,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         </nav>
 
         {/* Keluar logout trigger aligned to bottom of sidebar */}
-        <div className="p-4 border-t border-[#0e441b] space-y-3">
+        <div className="p-4 border-t border-green-950 space-y-3">
           <button 
             onClick={() => {
               if (window.confirm("Apakah Anda yakin ingin keluar dari sistem? Pastikan semua pekerjaan sudah tersimpan.")) {
@@ -442,7 +457,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           {!isCollapsed && (
             <p className="text-[10px] text-gray-200/50 text-center font-bold font-sans tracking-wide">
               v1.0 © 2026 IT Development<br/>
-              BA Mart Syariah POS
+              KSA Mart Syariah POS
             </p>
           )}
         </div>

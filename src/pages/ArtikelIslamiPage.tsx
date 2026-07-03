@@ -11,8 +11,8 @@ const ARTIKEL_MOCK = [
     excerpt: "Panduan komprehensif memahami dasar-dasar akad jual beli (Al-Bai') yang sah, syarat kerelaan, serta larangan Gharar dan Maysir menurut pandangan ulama empat mazhab.",
     content: "Fikih muamalah adalah fondasi utama bagi setiap Muslim yang terjun ke dunia bisnis. Dalam perdagangan ritel modern, batas antara yang halal dan syubhat seringkali menjadi kabur karena kompleksitas sistem promosi dan distribusi.\n\n### 1. Rukun dan Syarat Jual Beli (Al-Bai')\nJual beli dalam Islam didefinisikan sebagai pertukaran harta dengan harta berdasarkan kerelaan (Tawadhu'). Rukun jual beli meliputi:\n- **'Aqidain** (Penjual dan Pembeli): Harus baligh, berakal, dan tidak dipaksa.\n- **Ma'qud 'Alaih** (Barang dan Harga): Barang harus suci, bermanfaat, dapat diserahterimakan, dan jelas wujud serta sifatnya.\n- **Sighat** (Ijab Kabul): Kesepakatan yang menunjukkan kerelaan kedua belah pihak.\n\nAllah ﷻ berfirman dalam Surat An-Nisa ayat 29:\nيَا أَيُّهَا الَّذِينَ آمَنُوا لَا تَأْكُلُوا أَمْوَالَكُم بَيْنَكُم بِالْبَاطِلِ إِلَّا أَن تَكُونَ تِجَارَةً عَن تَرَاضٍ مِّنكُمْ\n*\"Hai orang-orang yang beriman, janganlah kamu saling memakan harta sesamamu dengan jalan yang batil, kecuali dengan jalan perniagaan yang berlaku dengan suka sama-suka di antara kamu.\"*\n\n### 2. Larangan Riba, Gharar, dan Maysir\n- **Riba**: Tambahan yang disyaratkan dalam transaksi hutang piutang (Riba Duyuun) atau pertukaran barang sejenis (Riba Buyuu').\n- **Gharar**: Ketidakjelasan dalam transaksi, baik dari sisi harga, waktu penyerahan, maupun spesifikasi barang (seperti sistem mystery box yang tidak jelas nilainya).\n- **Maysir**: Unsur spekulasi atau untung-untungan (judi) yang dilarang keras, seringkali tersembunyi dalam program undian berbayar.\n\n### 3. Integritas dan Keberkahan\nRasulullah ﷺ bersabda:\n*\"Penjual dan pembeli memiliki hak khiyar (memilih) selama mereka belum berpisah. Jika keduanya jujur dan menjelaskan (kondisi barang), maka jual beli mereka diberkahi. Namun jika keduanya menyembunyikan (cacat) dan berdusta, maka dihapus keberkahan jual beli mereka.\"* (HR. Bukhari & Muslim)\n\n---\n**Referensi & Rujukan:**\n1. *Al-Fiqh Al-Islami wa Adillatuh*, Prof. Dr. Wahbah Az-Zuhaili, Jilid 5.\n2. *Fatwa DSN-MUI No. 110/DSN-MUI/IX/2017* tentang Akad Jual Beli.\n3. *Fatawa Al-Lajnah Ad-Daimah*, Bab Al-Buyuu'.",
     icon: Scale,
-    bgGradient: "from-emerald-500 to-emerald-700",
-    colorClass: "text-emerald-700"
+    bgGradient: "from-green-500 to-green-700",
+    colorClass: "text-green-700"
   },
   {
     id: 2,
@@ -28,7 +28,7 @@ const ARTIKEL_MOCK = [
   {
     id: 3,
     title: "Sistem Dropship dan Reseller: Mana yang Halal?",
-    author: "Tim Ahli Fikih BA Mart",
+    author: "KSA Mart",
     date: "2 Hari yang lalu",
     excerpt: "Membedah perbedaan mendasar antara skema dropshipping modern dan reseller tradisional dari kacamata syariat Islam.",
     content: "Model bisnis dropship semakin diminati karena minim modal. Namun, apakah menjual barang yang belum dimiliki diperbolehkan dalam Islam?\n\n### Larangan Menjual Barang yang Belum Dimiliki\nRasulullah ﷺ bersabda kepada Hakim bin Hizam:\nلَا تَبِعْ مَا لَيْسَ عِنْدَكَ\n*\"Janganlah engkau menjual sesuatu yang tidak ada padamu (tidak kau miliki).\"* (HR. Abu Daud, Tirmidzi)\n\nDalam skema dropship konvensional, dropshipper menerima uang dari pembeli untuk barang yang belum ia beli dan belum ia terima dari supplier. Ini melanggar hadits di atas karena mengandung unsur *Gharar* (ketidakpastian pengiriman barang).\n\n### Solusi Dropship Syariah\nUntuk men-syariah-kan model bisnis ini, ada 3 skema akad yang bisa digunakan:\n\n1. **Skema Samsarah (Makelar/Broker)**:\n   Dropshipper bertindak sebagai agen pemasaran bagi supplier. Ia tidak mematok harga sendiri, melainkan menjual sesuai harga supplier dan mendapatkan *Ujrah* (fee/komisi) yang disepakati di awal.\n   \n2. **Skema Salam (Pesan Buat/Beli)**:\n   Pembeli membayar lunas di awal kepada dropshipper dengan spesifikasi barang yang sangat jelas. Kemudian dropshipper memesan barang tersebut ke supplier. (Biasanya berlaku untuk barang komoditas atau custom).\n\n3. **Wakalah bil Ujrah**:\n   Pembeli mewakilkan (Wakalah) kepada dropshipper untuk mencarikan dan membelikan barang tertentu dengan memberikan upah jasa pencarian barang.\n\n### Reseller Tradisional\nReseller yang membeli stok barang terlebih dahulu (barang sudah dikuasai baik secara fisik maupun konstruktif), lalu menjualnya kembali, adalah praktik jual beli normal yang dihalalkan dan dianjurkan, karena risiko kerusakan barang sudah berpindah kepadanya (Kaidah: *Al-Kharaj bidh Dhaman*).\n\n---\n**Referensi & Rujukan:**\n1. *Al-Mu'amalat Al-Maliyah Al-Mu'ashirah*, Prof. Dr. Khalid Al-Musyaiqih.\n2. *Fatawa Asy-Syabakah Al-Islamiyah*, No. 13244 tentang Dropshipping.\n3. *Al-Ma'ayir Asy-Syar'iyyah AAOIFI*, Standar No. 10 tentang Salam.",
@@ -56,12 +56,12 @@ export default function ArtikelIslamiPage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans pb-12">
-      <header className="bg-emerald-800 text-white shadow-md sticky top-0 z-40">
+      <header className="bg-green-800 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => navigate('/')}
-              className="p-2 hover:bg-emerald-700 rounded-full transition-colors"
+              className="p-2 hover:bg-green-700 rounded-full transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -78,7 +78,7 @@ export default function ArtikelIslamiPage() {
         {/* HERO ARTICLE */}
         <div 
           onClick={() => setSelectedArticle(ARTIKEL_MOCK[0])}
-          className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col md:flex-row group cursor-pointer hover:shadow-md hover:border-emerald-200 transition-all mb-10"
+          className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col md:flex-row group cursor-pointer hover:shadow-md hover:border-green-200 transition-all mb-10"
         >
           <div className={`w-full md:w-1/2 h-64 md:h-auto relative overflow-hidden bg-gradient-to-br ${ARTIKEL_MOCK[0].bgGradient} flex items-center justify-center p-8`}>
             {(() => {
@@ -93,15 +93,15 @@ export default function ArtikelIslamiPage() {
             <div className="flex items-center space-x-2 text-sm text-slate-500 mb-3 font-medium">
               <span>{ARTIKEL_MOCK[0].author}</span>
               <span>•</span>
-              <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Baru Diperbarui</span>
+              <span className="text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded">Baru Diperbarui</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-4 leading-tight group-hover:text-emerald-700 transition-colors">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-4 leading-tight group-hover:text-green-700 transition-colors">
               {ARTIKEL_MOCK[0].title}
             </h2>
             <p className="text-slate-600 leading-relaxed mb-6">
               {ARTIKEL_MOCK[0].excerpt}
             </p>
-            <button className="flex items-center space-x-2 text-emerald-600 font-bold group-hover:text-emerald-800 transition-colors w-max">
+            <button className="flex items-center space-x-2 text-green-600 font-bold group-hover:text-green-800 transition-colors w-max">
               <span>Baca Selengkapnya</span>
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -110,7 +110,7 @@ export default function ArtikelIslamiPage() {
 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2">
-            <BookText className="w-6 h-6 text-emerald-700" />
+            <BookText className="w-6 h-6 text-green-700" />
             <h2 className="text-xl font-bold text-slate-800">Artikel Terbaru</h2>
           </div>
           <div className="text-xs text-slate-500 italic bg-white px-3 py-1.5 rounded-full border border-slate-200">
@@ -126,7 +126,7 @@ export default function ArtikelIslamiPage() {
               <div 
                 key={artikel.id} 
                 onClick={() => setSelectedArticle(artikel)}
-                className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group cursor-pointer hover:shadow-md hover:border-emerald-200 transition-all flex flex-col"
+                className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group cursor-pointer hover:shadow-md hover:border-green-200 transition-all flex flex-col"
               >
                 <div className={`h-40 relative overflow-hidden bg-gradient-to-br ${artikel.bgGradient} flex items-center justify-center`}>
                   <IconComponent className="w-16 h-16 text-white opacity-80 group-hover:scale-110 transition-transform duration-500" />

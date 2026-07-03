@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { Product } from '../types';
+import * as XLSX from 'xlsx';
 import { 
   Plus, 
   Search, 
@@ -13,11 +14,12 @@ import {
   Info,
   DollarSign,
   Camera,
-  Upload
+  Upload,
+  BookOpen
 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { products, addProduct, updateProduct, deleteProduct, adjustStock, currentUser, activeBranchId } = useAppStore();
+  const { products, addProduct, addProductsBulk, updateProduct, deleteProduct, adjustStock, currentUser, activeBranchId, coaList } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
@@ -77,6 +79,15 @@ export default function InventoryPage() {
   const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number | ''>('');
   const [image, setImage] = useState('');
+  const [salesCoaCode, setSalesCoaCode] = useState('');
+  const [cogsCoaCode, setCogsCoaCode] = useState('');
+  
+  // Box Configuration
+  const [hasBoxUnit, setHasBoxUnit] = useState(false);
+  const [boxBarcode, setBoxBarcode] = useState('');
+  const [pcsPerBox, setPcsPerBox] = useState('');
+  const [boxPrice, setBoxPrice] = useState('');
+  const [boxCostPrice, setBoxCostPrice] = useState('');
 
   const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
 
@@ -111,6 +122,13 @@ export default function InventoryPage() {
     setWholesalePrice('');
     setWholesaleMinQty('');
     setImage('');
+    setHasBoxUnit(false);
+    setBoxBarcode('');
+    setPcsPerBox('');
+    setBoxPrice('');
+    setBoxCostPrice('');
+    setSalesCoaCode('');
+    setCogsCoaCode('');
     setIsModalOpen(true);
   };
 
@@ -131,6 +149,13 @@ export default function InventoryPage() {
     setWholesalePrice(p.wholesalePrice || '');
     setWholesaleMinQty(p.wholesaleMinQty || '');
     setImage(p.image || '');
+    setHasBoxUnit(p.hasBoxUnit || false);
+    setBoxBarcode(p.boxBarcode || '');
+    setPcsPerBox(p.pcsPerBox ? p.pcsPerBox.toString() : '');
+    setBoxPrice(p.boxPrice ? p.boxPrice.toString() : '');
+    setBoxCostPrice(p.boxCostPrice ? p.boxCostPrice.toString() : '');
+    setSalesCoaCode(p.salesCoaCode || '');
+    setCogsCoaCode(p.cogsCoaCode || '');
     setIsModalOpen(true);
   };
 
@@ -178,6 +203,7 @@ export default function InventoryPage() {
     }
 
     const dataPayload = {
+      tenantId: currentUser?.tenantId || 'tenant_default',
       sku,
       name,
       category,
@@ -191,7 +217,14 @@ export default function InventoryPage() {
       wholesalePrice: wholesalePrice ? Number(wholesalePrice) : undefined,
       wholesaleMinQty: wholesaleMinQty ? Number(wholesaleMinQty) : undefined,
       isHalal: true,
-      image: image || undefined
+      image: image || undefined,
+      hasBoxUnit,
+      boxBarcode: boxBarcode || undefined,
+      pcsPerBox: hasBoxUnit && pcsPerBox ? Number(pcsPerBox) : undefined,
+      boxPrice: hasBoxUnit && boxPrice ? Number(boxPrice) : undefined,
+      boxCostPrice: hasBoxUnit && boxCostPrice ? Number(boxCostPrice) : undefined,
+      salesCoaCode: salesCoaCode || undefined,
+      cogsCoaCode: cogsCoaCode || undefined
     };
 
     if (editingProduct) {
@@ -206,6 +239,110 @@ export default function InventoryPage() {
     setIsModalOpen(false);
   };
 
+  const downloadTemplate = () => {
+    const headers = ['sku', 'name', 'category', 'price', 'costPrice', 'stock', 'minStock', 'unit', 'barcode', 'expiryDate', 'isHalal'];
+    const sampleRow = ['BRS-001', 'Beras Premium Cianjur 5kg', 'Sembako', 78000, 68000, 45, 10, 'Pack', '8991234560012', '', true];
+    
+    const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template Produk');
+    
+    XLSX.writeFile(wb, 'template_produk_ksa_mart.xlsx');
+  };
+
+  const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        if (rows.length <= 1) {
+          alert('File Excel kosong atau tidak memiliki data.');
+          return;
+        }
+
+        const newProducts: any[] = [];
+        const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+
+        const idxSku = headers.indexOf('sku');
+        const idxName = headers.indexOf('name');
+        const idxCategory = headers.indexOf('category');
+        const idxPrice = headers.indexOf('price');
+        const idxCostPrice = headers.indexOf('costprice');
+        const idxStock = headers.indexOf('stock');
+        const idxMinStock = headers.indexOf('minstock');
+        const idxUnit = headers.indexOf('unit');
+        const idxBarcode = headers.indexOf('barcode');
+        const idxExpiry = headers.indexOf('expirydate');
+        const idxHalal = headers.indexOf('ishalal');
+
+        if (idxName === -1) {
+          alert('Format kolom salah. File Excel wajib memiliki kolom "name". Kolom lainnya: sku, name, category, price, costPrice, stock, minStock, unit, barcode, expiryDate, isHalal');
+          return;
+        }
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+
+          const nameVal = idxName !== -1 ? String(row[idxName] || '').trim() : '';
+          if (!nameVal) continue; 
+
+          const skuVal = idxSku !== -1 ? String(row[idxSku] || '').trim() : '';
+          const categoryVal = idxCategory !== -1 ? String(row[idxCategory] || '').trim() : 'Sembako';
+          const priceVal = idxPrice !== -1 ? parseFloat(row[idxPrice]) || 0 : 0;
+          const costPriceVal = idxCostPrice !== -1 ? parseFloat(row[idxCostPrice]) || 0 : 0;
+          const stockVal = idxStock !== -1 ? parseFloat(row[idxStock]) || 0 : 0;
+          const minStockVal = idxMinStock !== -1 ? parseFloat(row[idxMinStock]) || 10 : 10;
+          const unitVal = idxUnit !== -1 ? String(row[idxUnit] || '').trim() : 'Pcs';
+          const barcodeVal = idxBarcode !== -1 ? String(row[idxBarcode] || '').trim() : '';
+          const expiryDateVal = idxExpiry !== -1 ? String(row[idxExpiry] || '').trim() : '';
+          
+          let isHalalVal = true;
+          if (idxHalal !== -1 && row[idxHalal] !== undefined) {
+            const hRaw = String(row[idxHalal]).toLowerCase();
+            if (hRaw.includes('false') || hRaw === '0') isHalalVal = false;
+          }
+
+          newProducts.push({
+            tenantId: currentUser?.tenantId || 'tenant_default',
+            sku: skuVal || `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+            name: nameVal,
+            category: categoryVal,
+            price: priceVal,
+            costPrice: costPriceVal,
+            stock: stockVal,
+            minStock: minStockVal,
+            unit: unitVal,
+            barcode: barcodeVal || undefined,
+            expiryDate: expiryDateVal || undefined,
+            isHalal: isHalalVal,
+            hasBoxUnit: false
+          });
+        }
+
+        if (newProducts.length > 0) {
+          addProductsBulk(newProducts);
+          alert(`✅ Berhasil mengimpor ${newProducts.length} produk dari file Excel!`);
+        } else {
+          alert('❌ Tidak ada produk valid yang berhasil diimpor.');
+        }
+      } catch (err: any) {
+        console.error(err);
+        alert(`❌ Gagal membaca file Excel: ${err.message}`);
+      }
+      e.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div className="space-y-6">
       {/* Metric Cards Grid */}
@@ -215,7 +352,7 @@ export default function InventoryPage() {
             <p className="text-gray-400 text-xs font-semibold">Total SKU Terdaftar</p>
             <h3 className="text-2xl font-black text-gray-800 mt-1">{totalSku} Item</h3>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
+          <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-700">
             <Package className="w-5 h-5" />
           </div>
         </div>
@@ -243,9 +380,9 @@ export default function InventoryPage() {
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-gray-400 text-xs font-semibold">Estimasi Modal Inventori</p>
-            <h3 className="text-xl font-extrabold text-emerald-800 mt-1">Rp {totalValue.toLocaleString('id-ID')}</h3>
+            <h3 className="text-xl font-extrabold text-green-800 mt-1">Rp {totalValue.toLocaleString('id-ID')}</h3>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+          <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-600">
             <DollarSign className="w-5 h-5" />
           </div>
         </div>
@@ -263,7 +400,7 @@ export default function InventoryPage() {
               <input
                 type="text"
                 placeholder="Cari SKU / nama produk..."
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs leading-none w-64 focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs leading-none w-64 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -271,7 +408,7 @@ export default function InventoryPage() {
             
             {/* Category selection */}
             <select
-              className="border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              className="border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
@@ -282,13 +419,33 @@ export default function InventoryPage() {
             </select>
           </div>
 
-          <button
-            onClick={handleOpenAdd}
-            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah SKU</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={downloadTemplate}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-350 font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+            >
+              <span>📥 Template Excel</span>
+            </button>
+            
+            <label className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all cursor-pointer">
+              <Upload className="w-4 h-4" />
+              <span>Import Excel</span>
+              <input 
+                type="file" 
+                accept=".xlsx, .xls" 
+                onChange={handleExcelImport} 
+                className="hidden" 
+              />
+            </label>
+
+            <button
+              onClick={handleOpenAdd}
+              className="bg-green-700 hover:bg-green-800 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah SKU</span>
+            </button>
+          </div>
         </div>
 
         {/* Master Products Listing Table */}
@@ -335,15 +492,15 @@ export default function InventoryPage() {
                         Rp {p.costPrice.toLocaleString('id-ID')}
                       </td>
                       <td className="py-2.5 px-4 text-right">
-                        <p className="font-bold text-emerald-700">Rp {p.price.toLocaleString('id-ID')}</p>
+                        <p className="font-bold text-green-700">Rp {p.price.toLocaleString('id-ID')}</p>
                         {p.wholesalePrice && p.wholesaleMinQty && (
-                          <p className="text-[10px] text-emerald-600 font-bold bg-emerald-50 inline-block px-1.5 py-0.5 rounded border border-emerald-100">
+                          <p className="text-[10px] text-green-600 font-bold bg-green-50 inline-block px-1.5 py-0.5 rounded border border-green-100">
                             Grosir: Rp {p.wholesalePrice.toLocaleString('id-ID')} (≥{p.wholesaleMinQty})
                           </p>
                         )}
                       </td>
                       <td className="py-2.5 px-4 text-center">
-                        <span className="text-emerald-700 font-semibold font-mono">
+                        <span className="text-green-700 font-semibold font-mono">
                           Rp {profitAmt.toLocaleString('id-ID')} ({marginPct}%)
                         </span>
                       </td>
@@ -370,7 +527,7 @@ export default function InventoryPage() {
                             <span>Kritis</span>
                           </span>
                         ) : (
-                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] px-2 py-0.5 rounded font-bold">
+                          <span className="bg-green-50 text-green-800 border border-green-100 text-[10px] px-2 py-0.5 rounded font-bold">
                             Sehat
                           </span>
                         )}
@@ -379,7 +536,7 @@ export default function InventoryPage() {
                         <div className="flex items-center justify-center space-x-2">
                           <button
                             onClick={() => handleOpenEdit(p)}
-                            className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 text-gray-600 transition-colors"
+                            className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600 transition-colors"
                             title="Edit SKU"
                           >
                             <Edit className="w-3.5 h-3.5" />
@@ -501,6 +658,35 @@ export default function InventoryPage() {
                         />
                       </div>
 
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-650">Akun Penjualan (Revenue)</label>
+                          <select
+                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none font-semibold text-slate-700 bg-white"
+                            value={salesCoaCode}
+                            onChange={(e) => setSalesCoaCode(e.target.value)}
+                          >
+                            <option value="">-- Hubungkan Akun Pendapatan --</option>
+                            {coaList.filter(c => c.isActive && c.category === 'REVENUE').map(c => (
+                              <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-slate-650">Akun Beban HPP (Expense)</label>
+                          <select
+                            className="w-full border border-gray-205 rounded-lg py-2 px-3 text-xs focus:outline-none font-semibold text-slate-700 bg-white"
+                            value={cogsCoaCode}
+                            onChange={(e) => setCogsCoaCode(e.target.value)}
+                          >
+                            <option value="">-- Hubungkan Akun HPP --</option>
+                            {coaList.filter(c => c.isActive && c.category === 'EXPENSE').map(c => (
+                              <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-gray-600">Satuan Unit</label>
@@ -556,19 +742,19 @@ export default function InventoryPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-emerald-600">Margin Profit (%)</label>
+                          <label className="text-xs font-bold text-green-600">Margin Profit (%)</label>
                           <div className="relative">
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-emerald-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50 focus:ring-2 focus:ring-emerald-500/20'
+                              className={`w-full border border-green-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${
+                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50 focus:ring-2 focus:ring-green-500/20'
                               } outline-none`}
                               value={marginPct}
                               onChange={(e) => handleMarginChange(e.target.value)}
                               placeholder="Misal: 10"
                             />
-                            <span className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-emerald-600 font-bold">%</span>
+                            <span className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-green-600 font-bold">%</span>
                           </div>
                         </div>
 
@@ -580,7 +766,7 @@ export default function InventoryPage() {
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
                               className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50/20 focus:ring-2 focus:ring-emerald-500/20'
+                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50/20 focus:ring-2 focus:ring-green-500/20'
                               } outline-none`}
                               value={price}
                               onChange={(e) => handlePriceChange(e.target.value)}
@@ -592,14 +778,14 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-2 gap-4 mt-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-emerald-600">Harga Grosir (Opsional)</label>
+                          <label className="text-xs font-bold text-green-600">Harga Grosir (Opsional)</label>
                           <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-emerald-400 font-bold">Rp</span>
+                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-green-400 font-bold">Rp</span>
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-emerald-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50'
+                              className={`w-full border border-green-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
+                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
                               }`}
                               value={wholesalePrice}
                               onChange={(e) => setWholesalePrice(e.target.value)}
@@ -608,12 +794,12 @@ export default function InventoryPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-emerald-600">Min. Qty Grosir</label>
+                          <label className="text-xs font-bold text-green-600">Min. Qty Grosir</label>
                           <input
                             type="number"
                             disabled={isPriceEditLockedForAdmin}
-                            className={`w-full border border-emerald-200 rounded-lg py-2 px-3 text-xs font-bold ${
-                              isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-emerald-50'
+                            className={`w-full border border-green-200 rounded-lg py-2 px-3 text-xs font-bold ${
+                              isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
                             }`}
                             value={wholesaleMinQty}
                             onChange={(e) => setWholesaleMinQty(e.target.value)}
@@ -647,8 +833,75 @@ export default function InventoryPage() {
                   </div>
                 </div>
 
+                <div className="border border-indigo-100 bg-indigo-50/30 rounded-xl p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+                      <Package className="w-5 h-5 text-indigo-600"/> 
+                      Opsi Penjualan Box/Karton
+                    </label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={hasBoxUnit}
+                        onChange={(e) => setHasBoxUnit(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+                  
+                  {hasBoxUnit && (
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-indigo-100">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600">Barcode Box</label>
+                        <input
+                          type="text"
+                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
+                          placeholder="Scan Barcode Box"
+                          value={boxBarcode}
+                          onChange={(e) => setBoxBarcode(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600">Isi per Box (Satuan {unit})</label>
+                        <input
+                          type="number"
+                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                          placeholder="Contoh: 24"
+                          value={pcsPerBox}
+                          onChange={(e) => setPcsPerBox(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600">Harga Modal (Box)</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-400 font-bold">Rp</span>
+                          <input
+                            type="number"
+                            className="w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold bg-white"
+                            value={boxCostPrice}
+                            onChange={(e) => setBoxCostPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-indigo-600">Harga Jual (Box)</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-indigo-400 font-bold">Rp</span>
+                          <input
+                            type="number"
+                            className="w-full border border-indigo-200 bg-indigo-50 rounded-lg py-2 pl-8 pr-3 text-xs font-bold"
+                            value={boxPrice}
+                            onChange={(e) => setBoxPrice(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2 border border-gray-200 rounded-xl p-4 bg-white">
-                  <label className="text-xs font-bold text-gray-800 flex items-center gap-2"><Camera className="w-4 h-4 text-emerald-600"/> Foto Produk (Opsional)</label>
+                  <label className="text-xs font-bold text-gray-800 flex items-center gap-2"><Camera className="w-4 h-4 text-green-600"/> Foto Produk (Opsional)</label>
                   
                   {image && (
                     <div className="relative w-32 h-32 border border-gray-200 rounded-xl overflow-hidden shadow-sm mx-auto mb-3">
@@ -665,7 +918,7 @@ export default function InventoryPage() {
                   )}
 
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="cursor-pointer bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
+                    <label className="cursor-pointer bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
                       <Upload className="w-4 h-4" /> Upload Galeri
                       <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -673,7 +926,7 @@ export default function InventoryPage() {
                       }} />
                     </label>
                     
-                    <label className="cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700 shadow-md text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
+                    <label className="cursor-pointer bg-green-600 text-white hover:bg-green-700 shadow-md text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
                       <Camera className="w-4 h-4" /> Buka Kamera
                       <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -686,11 +939,49 @@ export default function InventoryPage() {
                     <p className="text-[10px] text-gray-400 mb-1 font-semibold">Atau gunakan URL Gambar (Link Internet):</p>
                     <input
                       type="text"
-                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-gray-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 outline-none transition-all"
                       placeholder="https://images.unsplash.com/..."
                       value={image.startsWith('data:') ? '' : image}
                       onChange={(e) => setImage(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-4">
+                  <label className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-amber-600"/> 
+                    Pemetaan Akun (CoA)
+                  </label>
+                  <p className="text-[10px] text-amber-700 font-semibold mb-2 leading-relaxed">
+                    Pilih akun perkiraan untuk mencatat Pendapatan dan HPP otomatis saat barang terjual.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-700">Akun Pendapatan (Sales)</label>
+                      <select
+                        value={salesCoaCode}
+                        onChange={(e) => setSalesCoaCode(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-white focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="">- Default (Auto) -</option>
+                        {coaList.filter(c => c.category === 'REVENUE' && c.isActive).map(c => (
+                          <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-700">Akun Beban Pokok (COGS)</label>
+                      <select
+                        value={cogsCoaCode}
+                        onChange={(e) => setCogsCoaCode(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-white focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value="">- Default (Auto) -</option>
+                        {coaList.filter(c => c.category === 'EXPENSE' && c.isActive).map(c => (
+                          <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -706,7 +997,7 @@ export default function InventoryPage() {
                 </button>
                 <button
                   type="submit"
-                  className="py-2 px-4 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg shadow-xs"
+                  className="py-2 px-4 bg-green-700 hover:bg-green-800 text-white text-xs font-bold rounded-lg shadow-xs"
                 >
                   Simpan SKU
                 </button>

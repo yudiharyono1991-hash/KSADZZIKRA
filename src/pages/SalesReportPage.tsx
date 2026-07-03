@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useAppStore } from '../store';
+import * as XLSX from 'xlsx';
+import html2pdf from 'html2pdf.js';
 import { 
   FileText, 
   Search, 
@@ -13,6 +15,7 @@ import {
 export default function SalesReportPage() {
   const { transactions, activeBranchId, currentUser, addLog } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const reportRef = useRef<HTMLDivElement>(null);
   
   // Date filters defaulting to current month
   const today = new Date();
@@ -86,28 +89,45 @@ export default function SalesReportPage() {
     };
   }, [transactions, activeBranchId, startDate, endDate, searchQuery]);
 
-  const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Nama Produk,Qty Terjual,Harga Pokok (Avg),Harga Jual (Avg),Margin (%),Omset Penjualan,Estimasi Profit,Zakat Terkumpul\n";
+  const handleExportExcel = () => {
+    addLog('EXPORT_EXCEL', 'SYSTEM', `Export Excel Laporan Penjualan periode ${startDate} sd ${endDate}`);
     
-    aggregatedData.forEach(item => {
-      // Hitung rata-rata
+    const excelData = aggregatedData.map((item, index) => {
       const avgCost = (item.omset - item.profit) / item.qty;
       const avgSell = item.omset / item.qty;
       const marginPct = avgCost > 0 ? (((avgSell - avgCost) / avgCost) * 100).toFixed(1) : '0';
-
-      // Escape commas in names
-      const name = `"${item.productName.replace(/"/g, '""')}"`;
-      csvContent += `${name},${item.qty},${Math.round(avgCost)},${Math.round(avgSell)},${marginPct}%,${item.omset},${item.profit},${item.zakat}\n`;
+      return {
+        'No': index + 1,
+        'Nama Produk': item.productName,
+        'Qty Terjual': item.qty,
+        'Harga Pokok (Avg)': Math.round(avgCost),
+        'Harga Jual (Avg)': Math.round(avgSell),
+        'Margin (%)': `${marginPct}%`,
+        'Omset Penjualan': item.omset,
+        'Estimasi Profit': item.profit,
+        'Zakat Terkumpul': item.zakat
+      };
     });
+    
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Penjualan");
+    XLSX.writeFile(wb, `Laporan_Penjualan_${startDate}_sd_${endDate}.xlsx`);
+  };
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Laporan_Penjualan_${startDate}_sd_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  const handleExportPDF = () => {
+    addLog('EXPORT_PDF', 'SYSTEM', `Export PDF Laporan Penjualan periode ${startDate} sd ${endDate}`);
+    const element = reportRef.current;
+    if (element) {
+      const opt = {
+        margin:       0.5,
+        filename:     `Laporan_Penjualan_${startDate}_sd_${endDate}.pdf`,
+        image:        { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const }
+      };
+      html2pdf().set(opt).from(element).save();
+    }
   };
 
   const handlePrintReport = () => {
@@ -116,12 +136,12 @@ export default function SalesReportPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={reportRef}>
       {/* Search and Filters Header */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-emerald-600" />
+            <TrendingUp className="w-5 h-5 text-green-600" />
             Rekapitulasi Penjualan Barang
           </h2>
           <p className="text-[11px] text-gray-400 mt-0.5">Analisa item terjual, omset, dan profit berdasarkan rentang tanggal</p>
@@ -158,20 +178,27 @@ export default function SalesReportPage() {
             />
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex gap-2 w-full md:w-auto flex-wrap">
             <button 
-              onClick={handleExportCSV}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+              onClick={handleExportExcel}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
             >
               <Download className="w-4 h-4" />
-              <span>CSV</span>
+              <span>Excel</span>
+            </button>
+            <button 
+              onClick={handleExportPDF}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              <span>PDF</span>
             </button>
             <button 
               onClick={handlePrintReport}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak Kertas</span>
+              <span>Cetak</span>
             </button>
           </div>
         </div>
@@ -188,7 +215,7 @@ export default function SalesReportPage() {
         </div>
         <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
           <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Total Omset</p>
-          <p className="text-xl font-extrabold text-emerald-800">Rp {grandTotal.omset.toLocaleString('id-ID')}</p>
+          <p className="text-xl font-extrabold text-green-800">Rp {grandTotal.omset.toLocaleString('id-ID')}</p>
         </div>
         <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
           <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Total Margin (Profit)</p>
@@ -231,8 +258,8 @@ export default function SalesReportPage() {
 
                   return (
                     <tr key={item.productId} className="hover:bg-slate-50/50">
-                      <td className="py-3 px-5 font-bold text-gray-900">{item.productName} <span className="text-[9px] font-normal text-emerald-600 block">(Akad Murabahah)</span></td>
-                      <td className="py-3 px-3 text-center text-emerald-700 font-bold bg-emerald-50/30">
+                      <td className="py-3 px-5 font-bold text-gray-900">{item.productName} <span className="text-[9px] font-normal text-green-600 block">(Akad Jual Beli)</span></td>
+                      <td className="py-3 px-3 text-center text-green-700 font-bold bg-green-50/30">
                         {item.qty}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-gray-500">
@@ -262,7 +289,7 @@ export default function SalesReportPage() {
               <tfoot className="bg-slate-50 font-bold text-gray-800 border-t-2 border-gray-200">
                 <tr>
                   <td className="py-3 px-5 text-right uppercase text-[10px] tracking-widest">Grand Total:</td>
-                  <td className="py-3 px-3 text-center text-emerald-700">{grandTotal.qty}</td>
+                  <td className="py-3 px-3 text-center text-green-700">{grandTotal.qty}</td>
                   <td className="py-3 px-3"></td>
                   <td className="py-3 px-3"></td>
                   <td className="py-3 px-3"></td>
@@ -279,8 +306,8 @@ export default function SalesReportPage() {
       {/* Printable Area - A4 Report */}
       <div className="printable-area printable-a4 space-y-6">
         <div className="text-center border-b-2 border-gray-800 pb-4">
-          <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">Berkah Amanah Mart</h1>
-          <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN PENJUALAN DAN KEUANGAN (MURABAHAH)</p>
+          <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
+          <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN PENJUALAN DAN KEUANGAN (BERDASARKAN AKAD SYARIAH)</p>
           <p className="text-xs text-gray-500 mt-1">Periode: {startDate} s/d {endDate}</p>
         </div>
         
@@ -332,7 +359,7 @@ export default function SalesReportPage() {
               return (
                 <tr key={item.productId}>
                   <td className="py-1.5 px-2 border border-gray-200">{index + 1}</td>
-                  <td className="py-1.5 px-2 border border-gray-200 font-semibold">{item.productName} <span className="text-[9px] font-normal text-gray-500">(Akad Murabahah)</span></td>
+                  <td className="py-1.5 px-2 border border-gray-200 font-semibold">{item.productName} <span className="text-[9px] font-normal text-gray-500">(Akad Jual Beli)</span></td>
                   <td className="py-1.5 px-2 border border-gray-200 text-center">{item.qty}</td>
                   <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {Math.round(avgCost).toLocaleString('id-ID')}</td>
                   <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {Math.round(avgSell).toLocaleString('id-ID')}</td>
@@ -367,11 +394,11 @@ export default function SalesReportPage() {
             </p>
           </div>
 
-          <div className="text-center w-56">
+          <div className="text-center">
             <p className="text-[11px] text-gray-600 mb-4">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p className="text-xs font-semibold mb-12">Mengetahui / Menyetujui,</p>
-            <p className="text-xs border-b border-gray-800 pb-1 font-bold">Yudi Hariyono</p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">Pemilik Toko</p>
+            <p className="text-xs font-semibold mb-12">Mengetahui/Menyetujui,</p>
+            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-4 whitespace-nowrap">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
+            <p className="text-xs text-gray-500 mt-1">Ketua Toko Koperasi KSA Mart</p>
           </div>
         </div>
       </div>

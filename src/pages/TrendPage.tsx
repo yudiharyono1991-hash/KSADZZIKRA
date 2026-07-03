@@ -177,7 +177,7 @@ export default function TrendPage() {
   const averageTxValue = totals.count > 0 ? totals.omset / totals.count : 0;
 
   const renderGrowth = (value: number) => {
-    if (value > 0) return <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-100">+{value.toFixed(1)}%</span>;
+    if (value > 0) return <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded border border-green-100">+{value.toFixed(1)}%</span>;
     if (value < 0) return <span className="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded border border-red-100">{value.toFixed(1)}%</span>;
     return <span className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200">0%</span>;
   };
@@ -188,7 +188,7 @@ export default function TrendPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
         <div>
           <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-emerald-600" />
+            <TrendingUp className="w-5 h-5 text-green-600" />
             Grafik Trend & Analitik
           </h1>
           <p className="text-xs text-gray-500 mt-1">Bandingkan performa omset, margin, dan zakat.</p>
@@ -198,7 +198,7 @@ export default function TrendPage() {
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as DateRange)}
-            className="text-sm font-bold text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-emerald-500 outline-none"
+            className="text-sm font-bold text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-green-500 outline-none"
           >
             <option value="TODAY">Hari Ini</option>
             <option value="7_DAYS">7 Hari Terakhir</option>
@@ -225,7 +225,7 @@ export default function TrendPage() {
             <h3 className="text-xl font-extrabold text-gray-800">Rp {totals.margin.toLocaleString('id-ID')}</h3>
             <div className="flex flex-col items-end gap-1">
               {renderGrowth(comparisons.margin)}
-              <span className="text-emerald-700 text-[10px] font-bold font-mono">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
+              <span className="text-green-700 text-[10px] font-bold font-mono">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
             </div>
           </div>
           <p className="text-[10px] text-gray-400 mt-2 font-medium">Margin berdasar transaksi rill kasir</p>
@@ -234,7 +234,7 @@ export default function TrendPage() {
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
           <p className="text-gray-400 text-xs font-semibold">Himpunan Zakat (Est. Penjualan)</p>
           <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-emerald-800">Rp {totals.zakat.toLocaleString('id-ID')}</h3>
+            <h3 className="text-xl font-extrabold text-green-800">Rp {totals.zakat.toLocaleString('id-ID')}</h3>
             {renderGrowth(comparisons.zakat)}
           </div>
           <p className="text-[10px] text-gray-400 mt-2 font-medium">Potensi Zakat perniagaan yang terkumpul</p>
@@ -258,12 +258,12 @@ export default function TrendPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="font-bold text-gray-800 text-sm">Grafik Perkembangan Penjualan</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">Analisa komparatif harian omset dan margin bersih BA Mart</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Analisa komparatif harian omset dan margin bersih KSA Mart</p>
             </div>
             
             <div className="flex items-center space-x-4 text-xs font-semibold">
               <span className="flex items-center space-x-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-green-600"></span>
                 <span className="text-gray-500">Omset</span>
               </span>
               <span className="flex items-center space-x-1">
@@ -333,7 +333,7 @@ export default function TrendPage() {
             {/* Pie Center content */}
             <div className="absolute text-center">
               <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Utama</p>
-              <p className="font-black text-emerald-950 text-md">{categoryShare.length > 0 ? categoryShare[0].name : 'N/A'}</p>
+              <p className="font-black text-green-950 text-md">{categoryShare.length > 0 ? categoryShare[0].name : 'N/A'}</p>
               <p className="text-[10px] text-slate-500 font-semibold font-mono">{categoryShare.length > 0 ? categoryShare[0].value : 0}%</p>
             </div>
           </div>

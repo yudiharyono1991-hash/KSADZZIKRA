@@ -48,7 +48,7 @@ export default function KasirRiwayatPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <History className="w-6 h-6 text-emerald-600" />
+            <History className="w-6 h-6 text-green-600" />
             Riwayat Transaksi
           </h1>
           <p className="text-sm text-gray-500 mt-1">Daftar penjualan shift hari ini untuk pencetakan ulang.</p>
@@ -64,7 +64,7 @@ export default function KasirRiwayatPage() {
               placeholder="Cari No Invoice..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
             />
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function KasirRiwayatPage() {
                       {tx.paymentMethod}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right font-bold text-emerald-700">
+                  <td className="px-6 py-4 text-right font-bold text-green-700">
                     Rp {tx.totalAmount.toLocaleString('id-ID')}
                   </td>
                   <td className="px-6 py-4 text-center space-x-2">
@@ -145,7 +145,7 @@ export default function KasirRiwayatPage() {
             {/* Simulated Thermic strip content */}
             <div id="printable-receipt" className="p-6 space-y-4 text-xs font-mono text-gray-700 border-b border-dashed border-gray-200 max-h-96 overflow-y-auto">
               <div className="text-center space-y-0.5 border-b border-gray-100 pb-3">
-                <p className="font-bold text-gray-800 text-sm">Toko Berkah Amanah Mart</p>
+                <p className="font-bold text-gray-800 text-sm">Toko KSA Mart</p>
                 <p className="text-slate-400 text-[10px] uppercase">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, Indonesia</p>
                 <p className="text-slate-400">Telp: 082210027952</p>
                 <p className="text-xs font-bold mt-1">(COPY / CETAK ULANG)</p>
@@ -179,13 +179,13 @@ export default function KasirRiwayatPage() {
                   <span>Uang Diterima:</span>
                   <span>Rp {selectedTx.amountPaid.toLocaleString('id-ID')}</span>
                 </div>
-                <div className="flex justify-between font-bold text-emerald-700 border-t border-gray-100 pt-1.5">
+                <div className="flex justify-between font-bold text-green-700 border-t border-gray-100 pt-1.5">
                   <span>Uang Kembali:</span>
                   <span>Rp {selectedTx.changeAmount.toLocaleString('id-ID')}</span>
                 </div>
               </div>
 
-              <div className="border-t border-emerald-900/20 pt-3 text-center text-[10px] text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 leading-normal">
+              <div className="border-t border-green-900/20 pt-3 text-center text-[10px] text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 leading-normal">
                 <p className="font-bold uppercase tracking-wider mb-1">Misi Berkah Beramal</p>
                 <p>Zakat Kontribusi Sebesar <b>Rp {selectedTx.zakatContribution.toLocaleString('id-ID')}</b> dari transaksi ini dicadangkan untuk kaum Dhuafa.</p>
               </div>
@@ -201,7 +201,7 @@ export default function KasirRiwayatPage() {
               </button>
               <button
                 onClick={() => window.print()}
-                className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg text-center shadow-xs"
+                className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs"
               >
                 Cetak Struk
               </button>

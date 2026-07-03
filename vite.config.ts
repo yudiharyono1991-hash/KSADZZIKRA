@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import path from 'path';
 import {defineConfig} from 'vite';
 
@@ -13,8 +14,8 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         devOptions: { enabled: true },
         manifest: {
-          name: 'BA Mart Syariah POS',
-          short_name: 'BA Mart',
+          name: 'Toko KSA Mart',
+          short_name: 'Toko KSA Mart',
           description: 'Aplikasi Kasir Pintar Syariah Terintegrasi',
           theme_color: '#064e3b',
           background_color: '#f8fafc',
@@ -27,6 +28,9 @@ export default defineConfig(() => {
               purpose: 'any maskable'
             }
           ]
+        },
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5000000
         }
       })
     ],

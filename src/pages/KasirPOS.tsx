@@ -54,20 +54,36 @@ export default function KasirPOS() {
   
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [selectedPromoId, setSelectedPromoId] = useState<string>('');
+  const [pointsToRedeemInput, setPointsToRedeemInput] = useState('');
 
   // Categories
-  const categories = ['ALL', 'Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
+  const categories = ['ALL', 'PROMO', 'Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
 
   // Filtered Products
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = product.name.toLowerCase().includes(searchLower) || 
+                          product.sku.toLowerCase().includes(searchLower) ||
+                          (product.barcode && product.barcode.toLowerCase().includes(searchLower)) ||
+                          (product.hasBoxUnit && product.boxBarcode && product.boxBarcode.toLowerCase().includes(searchLower));
+    
+    let matchesCategory = false;
+    if (selectedCategory === 'ALL') {
+      matchesCategory = true;
+    } else if (selectedCategory === 'PROMO') {
+      matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
+    } else {
+      matchesCategory = product.category === selectedCategory;
+    }
+
     const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
     return matchesSearch && matchesCategory && matchesBranch;
   });
 
   const getDynamicPrice = (item: any) => {
+    if (item.isBox && item.product.hasBoxUnit) {
+      return item.product.boxPrice || item.product.price;
+    }
     if (item.product.wholesalePrice && item.product.wholesaleMinQty && item.quantity >= item.product.wholesaleMinQty) {
       return item.product.wholesalePrice;
     }
@@ -93,12 +109,17 @@ export default function KasirPOS() {
     cartTotal += taxAmount;
   }
 
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  const maxRedeemablePoints = selectedCustomer ? Math.min(selectedCustomer.points, Math.floor(cartTotal / 10)) : 0;
+  const pointsDiscountVal = (Number(pointsToRedeemInput) || 0) * 10;
+  const finalTotalWithPoints = Math.max(0, cartTotal - pointsDiscountVal);
+
   const handleCheckoutSubmit = () => {
     let finalPaymentMethod: any = paymentMethod;
-    let finalAmountPaid = paymentMethod === 'CASH' ? Number(amountPaidInput) : cartTotal;
+    let finalAmountPaid = paymentMethod === 'CASH' ? Number(amountPaidInput) : finalTotalWithPoints;
     let splitParams = undefined;
 
-    if (finalAmountPaid < cartTotal) {
+    if (finalAmountPaid < finalTotalWithPoints) {
       alert("Jumlah uang dibayarkan kurang dari total belanja.");
       return;
     }
@@ -108,11 +129,13 @@ export default function KasirPOS() {
       amountPaid: finalAmountPaid,
       customerId: selectedCustomerId || undefined,
       promoId: selectedPromoId || undefined,
+      pointsToRedeem: Number(pointsToRedeemInput) || undefined,
       splitPayments: splitParams
     });
     if (tx) {
       setReceiptTx(tx);
       setAmountPaidInput('');
+      setPointsToRedeemInput('');
     } else {
       alert("Sistem POS mendapati kegagalan sirkulasi transaksi. Periksa kembali stok barang.");
     }
@@ -139,26 +162,26 @@ export default function KasirPOS() {
       `• ${it.productName} (${it.quantity}x @ Rp ${it.price.toLocaleString('id-ID')}) -> Rp ${(it.price * it.quantity).toLocaleString('id-ID')}`
     ).join('\n');
     
-    const textMessage = `🕌 *Toko Berkah Amanah Mart* 🕌\n` +
-      `Toko Berkah Amanah Mart, Indonesia\n` +
-      `Telp: 082210027952\n` +
+    const textMessage = `🕌 *Toko KSA Mart* 🕌\n` +
+      `Toko KSA Mart, Indonesia\n` +
+      `No. Struk: ${receiptTx.invoiceNo}\n` +
       `===============================\n` +
       `📄 *No Invoice:* ${receiptTx.invoiceNo}\n` +
       `⏰ *Waktu:* ${new Date(receiptTx.timestamp).toLocaleString('id-ID')}\n` +
       `👤 *Kasir:* ${receiptTx.cashierName}\n` +
       `💳 *Metode:* ${receiptTx.paymentMethod}\n` +
       `===============================\n\n` +
-      `===============================\n\n` +
       `${itemsText}\n\n` +
       `===============================\n` +
-      `===============================\n` +
       (receiptTx.discountAmount > 0 ? `🎊 *Diskon Promo:* -Rp ${receiptTx.discountAmount.toLocaleString('id-ID')}\n` : '') +
+      (receiptTx.pointsDiscount > 0 ? `🪙 *Tukar Poin:* -Rp ${receiptTx.pointsDiscount.toLocaleString('id-ID')} (${receiptTx.pointsRedeemed} Poin)\n` : '') +
       (receiptTx.taxAmount > 0 ? `🧾 *Pajak:* Rp ${receiptTx.taxAmount.toLocaleString('id-ID')}\n` : '') +
       `💰 *Total Belanja:* Rp ${receiptTx.totalAmount.toLocaleString('id-ID')}\n` +
       `💵 *Uang Diterima:* Rp ${receiptTx.amountPaid.toLocaleString('id-ID')}\n` +
-      `🪙 *Uang Kembali:* Rp ${receiptTx.changeAmount.toLocaleString('id-ID')}\n\n` +
-      `*Misi Berkah Beramal:*\n` +
-      `Zakat Kontribusi Sebesar *Rp ${receiptTx.zakatContribution.toLocaleString('id-ID')}* dari transaksi ini dicadangkan untuk kaum Dhuafa. Terima kasih atas kepercayaan Anda membeli barang halal di Toko Berkah Amanah Mart. Semoga berkah!`;
+      `🪙 *Uang Kembali:* Rp ${receiptTx.changeAmount.toLocaleString('id-ID')}\n` +
+      (receiptTx.pointsEarned > 0 ? `✨ *Poin Diperoleh:* +${receiptTx.pointsEarned} Poin\n` : '') +
+      `\n===============================\n\n` +
+      (receiptTx.zakatContribution > 0 ? `Zakat Kontribusi Sebesar *Rp ${receiptTx.zakatContribution.toLocaleString('id-ID')}* dari transaksi ini dicadangkan untuk kaum Dhuafa. Terima kasih atas kepercayaan Anda membeli barang halal di Toko KSA Mart. Semoga berkah!` : '');
 
     const encodedText = encodeURIComponent(textMessage);
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`;
@@ -177,10 +200,24 @@ export default function KasirPOS() {
             </span>
             <input
               type="text"
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-600"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/25 focus:border-green-600"
               placeholder="Cari item berdasar nama produk / SKU / No Barcode..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery.trim() !== '') {
+                  const exactMatch = products.find(p => p.barcode === searchQuery.trim() || p.sku === searchQuery.trim());
+                  const exactBoxMatch = products.find(p => p.hasBoxUnit && p.boxBarcode === searchQuery.trim());
+                  
+                  if (exactMatch) {
+                    addToCart(exactMatch, false);
+                    setSearchQuery('');
+                  } else if (exactBoxMatch) {
+                    addToCart(exactBoxMatch, true);
+                    setSearchQuery('');
+                  }
+                }
+              }}
             />
           </div>
 
@@ -191,7 +228,7 @@ export default function KasirPOS() {
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
                   selectedCategory === cat
-                    ? 'bg-emerald-700 text-white shadow-xs'
+                    ? 'bg-green-700 text-white shadow-xs'
                     : 'bg-slate-100 text-gray-600 hover:bg-slate-200'
                 }`}
               >
@@ -219,12 +256,12 @@ export default function KasirPOS() {
                   <div 
                     key={p.id}
                     className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
-                      isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-emerald-300'
+                      isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
                     }`}
                   >
                     {/* Halal Badge */}
                     <div className="absolute top-2.5 right-2.5 z-10">
-                      <span className="bg-emerald-50 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-emerald-100 uppercase tracking-widest shadow-sm backdrop-blur-md">
+                      <span className="bg-green-50 text-green-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">
                         Halal
                       </span>
                     </div>
@@ -276,12 +313,12 @@ export default function KasirPOS() {
                       ) : (
                         <button
                           onClick={() => addToCart(p)}
-                          className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all"
+                          className="w-full bg-green-700 hover:bg-green-800 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all"
                         >
                           <Plus className="w-3.5 h-3.5 mr-0.5" />
                           <span>Pilih Produk</span>
                           {cartQty > 0 && (
-                            <span className="bg-amber-400 text-emerald-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">
+                            <span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">
                               {cartQty}
                             </span>
                           )}
@@ -302,19 +339,19 @@ export default function KasirPOS() {
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <ShoppingCart className="w-5 h-5 text-emerald-800" />
+            <ShoppingCart className="w-5 h-5 text-green-800" />
             <h2 className="font-bold text-gray-800 text-md">Keranjang Belanja</h2>
           </div>
-          <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
+          <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full">
             {cart.reduce((s, c) => s + c.quantity, 0)} Pcs
           </span>
         </div>
 
         {/* Shariah Compliance & Locked Prices Indicator */}
-        <div className="bg-emerald-800 text-white p-3 border-b border-[#0e441b] text-[10px] space-y-1">
+        <div className="bg-green-800 text-white p-3 border-b border-[#0e441b] text-[10px] space-y-1">
           <p className="font-black uppercase tracking-wider flex items-center justify-between">
-            <span>AKAD: MURABAHAH (JUAL BELI)</span>
-            <span className="bg-amber-400 text-emerald-950 font-black px-1.5 py-0.5 rounded text-[8px]">TERKUNCI</span>
+            <span>AKAD: JUAL BELI</span>
+            <span className="bg-amber-400 text-green-950 font-black px-1.5 py-0.5 rounded text-[8px]">TERKUNCI</span>
           </p>
           <p className="text-gray-100/90 leading-relaxed font-medium">
             Harga beli dan jual barang/komoditas sudah otomatis ditentukan oleh sistem berdasarkan ketetapan Owner & Admin Syariah.
@@ -336,34 +373,34 @@ export default function KasirPOS() {
               >
                 <div className="flex-1 min-w-0 pr-2">
                   <h4 className="text-xs font-bold text-gray-800 truncate" title={item.product.name}>
-                    {item.product.name}
+                    {item.product.name} {item.isBox && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded ml-1 border border-indigo-100">Box</span>}
                   </h4>
                   <div className="flex items-center gap-2 mt-0.5">
                     <p className="text-[10px] text-gray-400 font-semibold">
-                      Rp {getDynamicPrice(item).toLocaleString('id-ID')} / {item.product.unit}
+                      Rp {getDynamicPrice(item).toLocaleString('id-ID')} / {item.isBox ? 'Box' : item.product.unit}
                     </p>
                     {getDynamicPrice(item) < item.product.price && (
-                      <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold">Harga Grosir</span>
+                      <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded font-bold">Harga Grosir</span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2 flex-shrink-0">
                   <button
-                    onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
+                    onClick={() => updateCartQuantity(item.product.id, item.quantity - 1, item.isBox)}
                     className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center hover:bg-slate-100 focus:outline-none"
                   >
                     <Minus className="w-3 h-3 text-gray-500" />
                   </button>
                   <span className="text-xs font-bold text-gray-800 w-5 text-center">{item.quantity}</span>
                   <button
-                    onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
+                    onClick={() => updateCartQuantity(item.product.id, item.quantity + 1, item.isBox)}
                     className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center hover:bg-slate-100 focus:outline-none"
                   >
                     <Plus className="w-3 h-3 text-gray-500" />
                   </button>
                   <button
-                    onClick={() => removeFromCart(item.product.id)}
+                    onClick={() => removeFromCart(item.product.id, item.isBox)}
                     className="text-gray-300 hover:text-red-500 p-1 transition-colors"
                     title="Buang"
                   >
@@ -380,7 +417,7 @@ export default function KasirPOS() {
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase">Pelanggan</label>
             <select 
-              className="w-full text-xs border border-gray-200 rounded p-1 outline-none focus:border-emerald-500"
+              className="w-full text-xs border border-gray-200 rounded p-1 outline-none focus:border-green-500"
               value={selectedCustomerId}
               onChange={e => setSelectedCustomerId(e.target.value)}
             >
@@ -391,7 +428,7 @@ export default function KasirPOS() {
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase">Promo</label>
             <select 
-              className="w-full text-xs border border-gray-200 rounded p-1 outline-none focus:border-emerald-500"
+              className="w-full text-xs border border-gray-200 rounded p-1 outline-none focus:border-green-500"
               value={selectedPromoId}
               onChange={e => setSelectedPromoId(e.target.value)}
             >
@@ -422,7 +459,7 @@ export default function KasirPOS() {
             )}
             <div className="flex justify-between items-center text-xs text-gray-500 font-medium pb-2 border-b border-gray-200 mt-1">
               <span>Zakat Kontribusi (Est.)</span>
-              <span className="text-emerald-700">Rp {((cartTotal - taxAmount - cart.reduce((s, i) => s + i.product.costPrice * i.quantity, 0)) * 0.025 > 0 ? (cartTotal - taxAmount - cart.reduce((s, i) => s + i.product.costPrice * i.quantity, 0)) * 0.025 : 0).toLocaleString('id-ID')}</span>
+              <span className="text-green-700">Rp {((cartTotal - taxAmount - cart.reduce((s, i) => s + i.product.costPrice * i.quantity, 0)) * 0.025 > 0 ? (cartTotal - taxAmount - cart.reduce((s, i) => s + i.product.costPrice * i.quantity, 0)) * 0.025 : 0).toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center mt-2 pt-1">
               <span className="font-bold text-gray-800 text-sm">Total Pembayaran</span>
@@ -449,8 +486,8 @@ export default function KasirPOS() {
               disabled={cart.length === 0}
               className={`py-2 text-xs font-bold rounded-lg transition-all text-center flex items-center justify-center space-x-1 shadow-xs ${
                 cart.length === 0
-                  ? 'bg-emerald-500/20 text-white/50 cursor-not-allowed'
-                  : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                  ? 'bg-green-500/20 text-white/50 cursor-not-allowed'
+                  : 'bg-green-700 hover:bg-green-800 text-white'
               }`}
             >
               <span>Bayar Sekarang</span>
@@ -476,10 +513,48 @@ export default function KasirPOS() {
 
             {/* Modal Content */}
             <div className="p-6 space-y-4">
-              <div className="bg-emerald-50/50 rounded-xl p-4 border border-emerald-100 text-center">
+              <div className="bg-green-50/50 rounded-xl p-4 border border-green-100 text-center">
                 <p className="text-xs text-gray-500 font-medium">Total Tagihan Belanja</p>
                 <p className="text-2xl font-extrabold text-gray-900 mt-1">Rp {cartTotal.toLocaleString('id-ID')}</p>
+                {pointsDiscountVal > 0 && (
+                  <p className="text-xs text-fuchsia-600 font-semibold mt-1">Potongan Poin: - Rp {pointsDiscountVal.toLocaleString('id-ID')}</p>
+                )}
+                {pointsDiscountVal > 0 && (
+                  <p className="text-sm font-extrabold text-green-800 mt-1 border-t border-dashed border-green-200 pt-1">Total Baru: Rp {finalTotalWithPoints.toLocaleString('id-ID')}</p>
+                )}
               </div>
+
+              {/* Points Redemption block */}
+              {selectedCustomer && selectedCustomer.points > 0 && (
+                <div className="bg-fuchsia-50/50 border border-fuchsia-100 rounded-xl p-3.5 space-y-2 animate-in fade-in zoom-in-95">
+                  <div className="flex justify-between items-center text-xs font-bold text-fuchsia-800">
+                    <span>Loyalitas Poin Pelanggan</span>
+                    <span>Tersedia: {selectedCustomer.points} Poin</span>
+                  </div>
+                  <p className="text-[10px] text-fuchsia-700">100 poin = Rp 1.000 diskon belanja. Maksimal tukar: {maxRedeemablePoints} poin (senilai Rp {maxRedeemablePoints * 10}).</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={maxRedeemablePoints}
+                      value={pointsToRedeemInput}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(maxRedeemablePoints, Number(e.target.value) || 0));
+                        setPointsToRedeemInput(val > 0 ? val.toString() : '');
+                      }}
+                      placeholder="Masukkan poin..."
+                      className="flex-1 bg-white border border-fuchsia-200 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPointsToRedeemInput(maxRedeemablePoints.toString())}
+                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Tukarkan Semua
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Payment Method selectors */}
               <div className="space-y-2">
@@ -489,36 +564,36 @@ export default function KasirPOS() {
                     onClick={() => { setPaymentMethod('CASH'); setAmountPaidInput(''); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'CASH'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        ? 'border-green-600 bg-green-50 text-green-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
                     }`}
                   >
-                    <Coins className="w-5 h-5 text-emerald-700" />
+                    <Coins className="w-5 h-5 text-green-700" />
                     <span className="text-[9px] font-bold">Tunai</span>
                   </button>
 
                   <button
                     disabled={settings.qrisEnabled === false}
-                    onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setAmountPaidInput(cartTotal.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
+                    onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setAmountPaidInput(finalTotalWithPoints.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'QRIS_SHARIAH'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        ? 'border-green-600 bg-green-50 text-green-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
                     } ${settings.qrisEnabled === false ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
                   >
-                    <QrCode className="w-5 h-5 text-emerald-700" />
+                    <QrCode className="w-5 h-5 text-green-700" />
                     <span className="text-[9px] font-bold">QRIS</span>
                   </button>
 
                   <button
-                    onClick={() => { setPaymentMethod('TRANSFER_BSI'); setAmountPaidInput(cartTotal.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
+                    onClick={() => { setPaymentMethod('TRANSFER_BSI'); setAmountPaidInput(finalTotalWithPoints.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
                     className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
                       paymentMethod === 'TRANSFER_BSI'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        ? 'border-green-600 bg-green-50 text-green-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
                     }`}
                   >
-                    <CreditCard className="w-5 h-5 text-emerald-700" />
+                    <CreditCard className="w-5 h-5 text-green-700" />
                     <span className="text-[9px] font-bold">Transfer</span>
                   </button>
                   
@@ -544,17 +619,17 @@ export default function KasirPOS() {
                     type="number"
                     value={amountPaidInput}
                     onChange={(e) => setAmountPaidInput(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
                     placeholder="Masukkan jumlah yang diserahkan pelanggan..."
                   />
                   
                   {/* Suggestions block */}
                   <div className="flex gap-1.5 mt-1">
-                    {[cartTotal, Math.ceil(cartTotal / 10000) * 10000, Math.ceil(cartTotal / 50000) * 50000, 100000, 200000].map((val) => (
+                    {[finalTotalWithPoints, Math.ceil(finalTotalWithPoints / 10000) * 10000, Math.ceil(finalTotalWithPoints / 50000) * 50000, 100000, 200000].map((val) => (
                       <button
                         key={val}
                         onClick={() => setAmountPaidInput(val.toString())}
-                        className="bg-slate-100 hover:bg-slate-200 text-gray-600 text-[10px] px-2 py-1 rounded"
+                        className="bg-slate-100 hover:bg-slate-200 text-gray-600 text-[10px] px-2 py-1 rounded cursor-pointer"
                       >
                         Rp {val.toLocaleString('id-ID')}
                       </button>
@@ -576,7 +651,7 @@ export default function KasirPOS() {
                     </div>
                   )}
                   {selectedCustomerId && (
-                    <div className="bg-white p-3 rounded-lg border border-emerald-200 text-center text-emerald-700 font-bold text-xs shadow-sm shadow-emerald-100 flex items-center justify-center gap-2">
+                    <div className="bg-white p-3 rounded-lg border border-green-200 text-center text-green-700 font-bold text-xs shadow-sm shadow-green-100 flex items-center justify-center gap-2">
                       <CheckCircle className="w-4 h-4" />
                       Pelanggan Dipilih. Siap Proses!
                     </div>
@@ -590,13 +665,13 @@ export default function KasirPOS() {
                       <div className="flex bg-slate-200/50 p-1 rounded-lg">
                         <button 
                           onClick={() => setQrisScanMode('MERCHANT')}
-                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'MERCHANT' ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'MERCHANT' ? 'bg-white text-green-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                           Pelanggan Scan QR Toko
                         </button>
                         <button 
                           onClick={() => { setQrisScanMode('CUSTOMER'); setTimeout(() => document.getElementById('barcode-scanner-input')?.focus(), 100); }}
-                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'CUSTOMER' ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'CUSTOMER' ? 'bg-white text-green-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
                           Kasir Scan QR Pelanggan
                         </button>
@@ -609,7 +684,7 @@ export default function KasirPOS() {
                             {settings.qrisImageUrl ? (
                               <img src={settings.qrisImageUrl} alt="QRIS Toko" className="w-full h-full object-contain" />
                             ) : (
-                              <div className="flex flex-col items-center justify-center text-emerald-800 opacity-60">
+                              <div className="flex flex-col items-center justify-center text-green-800 opacity-60">
                                 <QrCode className="w-16 h-16 mb-2" />
                                 <span className="text-[10px] text-center">Belum ada QRIS<br/>Upload di Pengaturan</span>
                               </div>
@@ -618,12 +693,12 @@ export default function KasirPOS() {
                           {!isQrisSimulated ? (
                             <button 
                               onClick={() => setIsQrisSimulated(true)}
-                              className="w-full py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition-colors"
+                              className="w-full py-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-lg border border-green-300 transition-colors"
                             >
                               Verifikasi Bukti QRIS Selesai
                             </button>
                           ) : (
-                            <div className="w-full py-2 bg-emerald-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                            <div className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
                               <CheckCircle className="w-4 h-4" />
                               <span>Pembayaran QRIS Diterima!</span>
                             </div>
@@ -645,13 +720,13 @@ export default function KasirPOS() {
                                   setIsQrisSimulated(true);
                                 }
                               }}
-                              className="w-full border-2 border-emerald-400 rounded-lg py-3 px-3 text-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/20 bg-white text-center font-mono font-bold tracking-widest placeholder:font-sans placeholder:tracking-normal placeholder:font-normal"
+                              className="w-full border-2 border-green-400 rounded-lg py-3 px-3 text-sm focus:outline-none focus:ring-4 focus:ring-green-500/20 bg-white text-center font-mono font-bold tracking-widest placeholder:font-sans placeholder:tracking-normal placeholder:font-normal"
                               placeholder="Klik di sini & Tembakkan Scanner..."
                             />
                             {!isQrisSimulated && (
                                <div className="absolute right-3 top-4 flex space-x-1">
-                                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-                                 <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                 <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
+                                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                                </div>
                             )}
                           </div>
@@ -662,12 +737,12 @@ export default function KasirPOS() {
                                 if (scannedCustomerToken.length > 5) setIsQrisSimulated(true);
                                 else alert("Silakan scan barcode pelanggan terlebih dahulu (minimal 6 karakter token).");
                               }}
-                              className="w-full py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition-colors"
+                              className="w-full py-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-lg border border-green-300 transition-colors"
                             >
                               Tarik Dana dari Pelanggan
                             </button>
                           ) : (
-                            <div className="w-full py-2 bg-emerald-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                            <div className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
                               <CheckCircle className="w-4 h-4" />
                               <span>Dana Berhasil Ditarik!</span>
                             </div>
@@ -685,7 +760,7 @@ export default function KasirPOS() {
                           type="text"
                           value={transferSenderName}
                           onChange={(e) => setTransferSenderName(e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white"
+                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-white"
                           placeholder="Masukkan nama pengirim untuk dicatat..."
                         />
                       </div>
@@ -715,10 +790,10 @@ export default function KasirPOS() {
               {paymentMethod === 'CASH' && Number(amountPaidInput) > 0 && (
                 <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-xs">
                   <span className="font-semibold text-gray-500">Uang Kembalian</span>
-                  <span className={`font-bold text-sm ${Number(amountPaidInput) - cartTotal < 0 ? 'text-red-500' : 'text-emerald-700'}`}>
-                    {Number(amountPaidInput) - cartTotal < 0 
-                      ? `Kurang Rp ${(cartTotal - Number(amountPaidInput)).toLocaleString('id-ID')}` 
-                      : `Rp ${(Number(amountPaidInput) - cartTotal).toLocaleString('id-ID')}`
+                  <span className={`font-bold text-sm ${Number(amountPaidInput) - finalTotalWithPoints < 0 ? 'text-red-500' : 'text-green-700'}`}>
+                    {Number(amountPaidInput) - finalTotalWithPoints < 0 
+                      ? `Kurang Rp ${(finalTotalWithPoints - Number(amountPaidInput)).toLocaleString('id-ID')}` 
+                      : `Rp ${(Number(amountPaidInput) - finalTotalWithPoints).toLocaleString('id-ID')}`
                     }
                   </span>
                 </div>
@@ -742,18 +817,18 @@ export default function KasirPOS() {
                 }}
                 disabled={
                   cart.length === 0 || 
-                  (paymentMethod === 'CASH' && Number(amountPaidInput) < cartTotal) ||
+                  (paymentMethod === 'CASH' && Number(amountPaidInput) < finalTotalWithPoints) ||
                   (paymentMethod === 'QRIS_SHARIAH' && !isQrisSimulated) ||
                   (paymentMethod === 'TRANSFER_BSI' && !isTransferSimulated) ||
                   (paymentMethod === 'KASBON' && !selectedCustomerId)
                 }
-                className={`py-2.5 text-xs font-bold rounded-lg shadow-xs transition-colors ${
-                  (paymentMethod === 'CASH' && Number(amountPaidInput) < cartTotal) ||
+                className={`py-2.5 text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer ${
+                  (paymentMethod === 'CASH' && Number(amountPaidInput) < finalTotalWithPoints) ||
                   (paymentMethod === 'QRIS_SHARIAH' && !isQrisSimulated) ||
                   (paymentMethod === 'TRANSFER_BSI' && !isTransferSimulated) ||
                   (paymentMethod === 'KASBON' && !selectedCustomerId)
-                    ? 'bg-emerald-300 text-emerald-50 cursor-not-allowed'
-                    : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+                    ? 'bg-green-300 text-green-50 cursor-not-allowed'
+                    : 'bg-green-700 hover:bg-green-800 text-white'
                 }`}
               >
                 Selesaikan Pembayaran
@@ -776,16 +851,16 @@ export default function KasirPOS() {
           `}} />
           <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Receipt headers */}
-            <div className="p-6 text-center border-b border-gray-100 bg-emerald-50/20">
-              <CheckCircle className="w-12 h-12 text-emerald-600 mx-auto mb-2" />
+            <div className="p-6 text-center border-b border-gray-100 bg-green-50/20">
+              <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-2" />
               <h3 className="font-extrabold text-gray-800 text-md">Pembayaran Sukses!</h3>
-              <p className="text-xs text-gray-400 mt-1">Struk Digital penjualan BA Mart</p>
+              <p className="text-xs text-gray-400 mt-1">Struk Digital penjualan KSA Mart</p>
             </div>
 
             {/* Simulated Thermic strip content */}
             <div className="printable-area printable-thermal p-6 space-y-4 text-xs font-mono text-gray-700 border-b border-dashed border-gray-200 max-h-96 overflow-y-auto">
               <div className="text-center space-y-0.5 border-b border-gray-100 pb-3">
-                <p className="font-bold text-gray-800 text-sm">Toko Berkah Amanah Mart</p>
+                <p className="font-bold text-gray-800 text-sm">Toko KSA Mart</p>
                 <p className="text-slate-400 text-[10px] uppercase">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, Indonesia</p>
                 <p className="text-slate-400">Telp: 082210027952</p>
               </div>
@@ -817,6 +892,18 @@ export default function KasirPOS() {
                     <span>- Rp {receiptTx.discountAmount.toLocaleString('id-ID')}</span>
                   </div>
                 )}
+                {receiptTx.pointsDiscount > 0 && (
+                  <div className="flex justify-between text-purple-600 font-bold border-b border-dashed border-gray-100 pb-1 mb-1">
+                    <span>Tukar Poin ({receiptTx.pointsRedeemed} Poin):</span>
+                    <span>- Rp {receiptTx.pointsDiscount.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {receiptTx.pointsEarned > 0 && (
+                  <div className="flex justify-between text-green-600 font-bold border-b border-dashed border-gray-100 pb-1 mb-1">
+                    <span>Poin Didapat:</span>
+                    <span>+ {receiptTx.pointsEarned} Poin</span>
+                  </div>
+                )}
                 {receiptTx.taxAmount > 0 && (
                   <div className="flex justify-between text-amber-600 font-bold border-b border-dashed border-gray-100 pb-1 mb-1">
                     <span>Pajak (PPN):</span>
@@ -842,20 +929,26 @@ export default function KasirPOS() {
                     <span>Rp {receiptTx.amountPaid.toLocaleString('id-ID')}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-emerald-700 border-t border-gray-100 pt-1.5 mt-1">
+                <div className="flex justify-between font-bold text-green-700 border-t border-gray-100 pt-1.5 mt-1">
                   <span>Uang Kembali:</span>
                   <span>Rp {receiptTx.changeAmount.toLocaleString('id-ID')}</span>
                 </div>
+                {receiptTx.pointsEarned > 0 && (
+                  <div className="flex justify-between text-green-850 font-bold border-t border-dashed border-green-100 pt-1 mt-1 bg-green-50 p-1.5 rounded">
+                    <span>Poin Diperoleh:</span>
+                    <span>+ {receiptTx.pointsEarned} Poin</span>
+                  </div>
+                )}
               </div>
 
-              <div className="border-t border-emerald-900/20 pt-3 text-center text-[10px] text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 leading-normal">
+              <div className="border-t border-green-900/20 pt-3 text-center text-[10px] text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 leading-normal">
                 <p className="font-bold uppercase tracking-wider mb-1">Misi Berkah Beramal</p>
                 <p>Zakat Kontribusi Sebesar <b>Rp {receiptTx.zakatContribution.toLocaleString('id-ID')}</b> dari transaksi ini dicadangkan untuk kaum Dhuafa.</p>
               </div>
             </div>
 
             {/* Kirim WhatsApp Struk */}
-            <div className="px-6 py-4 bg-emerald-50/30 border-t border-b border-gray-100 flex flex-col space-y-2">
+            <div className="px-6 py-4 bg-green-50/30 border-t border-b border-gray-100 flex flex-col space-y-2">
               <label className="text-[11px] font-bold text-gray-700 flex items-center space-x-1">
                 <span>📱 Kirim Struk Digital via WhatsApp</span>
               </label>
@@ -865,11 +958,11 @@ export default function KasirPOS() {
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   placeholder="No WhatsApp (misal: 08123456789)"
-                  className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
+                  className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-green-500 font-sans"
                 />
                 <button
                   onClick={handleSendWhatsApp}
-                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3 py-2 rounded-lg transition-all flex items-center space-x-1"
+                  className="bg-green-600 hover:bg-green-700 active:scale-95 text-white font-bold text-xs px-3 py-2 rounded-lg transition-all flex items-center space-x-1"
                 >
                   Kirim WA
                 </button>
@@ -886,7 +979,7 @@ export default function KasirPOS() {
               </button>
               <button
                 onClick={handlePrintReceipt}
-                className="flex-1 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg text-center shadow-xs"
+                className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs"
               >
                 Cetak Struk
               </button>

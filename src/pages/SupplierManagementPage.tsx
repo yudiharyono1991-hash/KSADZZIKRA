@@ -25,7 +25,7 @@ export default function SupplierManagementPage() {
     if (editingId) {
       updateSupplier(editingId, { name, contactPerson, phone, address });
     } else {
-      addSupplier({ name, contactPerson, phone, address, debtAmount: 0 });
+      addSupplier({ tenantId: currentUser?.tenantId || 'tenant_default', name, contactPerson, phone, address, debtAmount: 0 });
     }
     resetForm();
   };
@@ -105,7 +105,7 @@ export default function SupplierManagementPage() {
                 <input type="text" required value={address} onChange={e => setAddress(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
             </div>
-            <button type="submit" className="w-full md:w-auto bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg">Simpan Data</button>
+            <button type="submit" className="w-full md:w-auto bg-green-600 text-white font-bold py-2 px-6 rounded-lg">Simpan Data</button>
           </form>
         </div>
       )}
@@ -143,7 +143,7 @@ export default function SupplierManagementPage() {
                     {s.debtAmount > 0 ? (
                       <span className="text-red-600">Rp {s.debtAmount.toLocaleString('id-ID')}</span>
                     ) : (
-                      <span className="text-emerald-600">Lunas</span>
+                      <span className="text-green-600">Lunas</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-center space-x-2">

@@ -26,7 +26,7 @@ export default function PromoManagementPage() {
     if (editingId) {
       updatePromo(editingId, { name, type, value: Number(value), minPurchase: Number(minPurchase), isActive });
     } else {
-      addPromo({ name, type, value: Number(value), minPurchase: Number(minPurchase), isActive });
+      addPromo({ tenantId: currentUser?.tenantId || 'tenant_default', name, type, value: Number(value), minPurchase: Number(minPurchase), isActive });
     }
     resetForm();
   };
@@ -140,7 +140,7 @@ export default function PromoManagementPage() {
                   <td className="px-6 py-4 text-gray-600">Rp {p.minPurchase.toLocaleString('id-ID')}</td>
                   <td className="px-6 py-4 text-center">
                     {p.isActive ? (
-                      <span className="px-2 py-1 bg-emerald-100 text-emerald-800 font-bold rounded-full text-xs">Aktif</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 font-bold rounded-full text-xs">Aktif</span>
                     ) : (
                       <span className="px-2 py-1 bg-gray-100 text-gray-600 font-bold rounded-full text-xs">Nonaktif</span>
                     )}

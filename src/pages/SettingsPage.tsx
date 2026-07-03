@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Settings, Percent, Save, CheckCircle, Lock, AlertCircle, Building2, Wallet, Store, Copy, Link } from 'lucide-react';
+import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { settings, updateSettings, currentUser, users, updateUser } = useAppStore();
+  const { settings, updateSettings, currentUser, users, updateUser, clearAllData } = useAppStore();
   const [isTaxEnabled, setIsTaxEnabled] = useState(settings.isTaxEnabled);
   const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
   const [ownerBankName, setOwnerBankName] = useState(settings.ownerBankName || 'BSI (Bank Syariah Indonesia)');
@@ -11,12 +11,26 @@ export default function SettingsPage() {
   const [qrisEnabled, setQrisEnabled] = useState(settings.qrisEnabled ?? true);
   const [qrisImageUrl, setQrisImageUrl] = useState(settings.qrisImageUrl || '');
   const [showSuccess, setShowSuccess] = useState(false);
-  
   const [ownerName, setOwnerName] = useState(currentUser?.name || '');
-  const [storeName, setStoreName] = useState(settings.storeName || 'BA Mart Syariah');
+  const [storeName, setStoreName] = useState(settings.storeName || 'KSA Mart Syariah');
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress || '');
   const [storePhone, setStorePhone] = useState(settings.storePhone || '');
+  const [ownerWhatsapp, setOwnerWhatsapp] = useState(settings.ownerWhatsapp || '');
   const [businessType, setBusinessType] = useState<'KOPERASI' | 'UMUM'>(settings.businessType || 'KOPERASI');
+  const [ownerUsername, setOwnerUsername] = useState(currentUser?.username || '');
+  const [ownerPassword, setOwnerPassword] = useState('');
+
+  // Payment Methods
+  type BankEntry = { enabled: boolean; bankName: string; accountNumber: string; accountName: string; };
+  type EwalletEntry = { enabled: boolean; provider: string; number: string; accountName: string; };
+  const [bankTransfers, setBankTransfers] = useState<BankEntry[]>(
+    settings.paymentMethods?.bankTransfer || [
+      { enabled: true, bankName: 'BSI (Bank Syariah Indonesia)', accountNumber: '7182938495', accountName: 'KSA Mart' },
+    ]
+  );
+  const [ewallets, setEwallets] = useState<EwalletEntry[]>(
+    settings.paymentMethods?.ewallet || []
+  );
 
   const isOwner = currentUser?.role === 'OWNER';
 
@@ -26,28 +40,34 @@ export default function SettingsPage() {
   }, [settings]);
 
   const handleSave = () => {
-    // PROTEKSI AKUN DEMO: Hanya Pengembang Utama yang bisa merubah pengaturan profil toko asli
-    if (currentUser?.username !== 'admin' && currentUser?.username !== 'pengembang' && currentUser?.username !== 'yudiharyono1991@gmail.com') {
-      alert("⚠️ MODE DEMO (UJI COBA) ⚠️\n\nMaaf, Anda tidak diizinkan merubah Pengaturan Toko, Pajak, dan QRIS karena ini adalah akun uji coba. Hanya Bapak Yudi Haryono (Pengembang) yang memiliki otoritas untuk merubah data Master Profil Toko.");
-      return;
-    }
-
     updateSettings({
       isTaxEnabled,
       taxRate: Number(taxRate) || 0,
       ownerBankName,
       ownerBankAccount,
       qrisEnabled,
+      qrisImageUrl,
       storeName,
       storeAddress,
       storePhone,
-      businessType
+      businessType,
+      ownerWhatsapp,
+      paymentMethods: {
+        bankTransfer: bankTransfers,
+        ewallet: ewallets,
+      },
     });
 
     if (isOwner && currentUser) {
       const ownerUser = users.find(u => u.username === currentUser.username);
-      if (ownerUser && ownerUser.name !== ownerName) {
-        updateUser(ownerUser.id, { name: ownerName });
+      if (ownerUser) {
+        const updates: Partial<any> = {};
+        if (ownerName && ownerUser.name !== ownerName) updates.name = ownerName;
+        if (ownerUsername && ownerUser.username !== ownerUsername) updates.username = ownerUsername;
+        if (ownerPassword) updates.password = ownerPassword;
+        if (Object.keys(updates).length > 0) {
+          updateUser(ownerUser.id, updates);
+        }
       }
     }
     setShowSuccess(true);
@@ -69,8 +89,8 @@ export default function SettingsPage() {
       </div>
 
       {showSuccess && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
-          <CheckCircle className="w-5 h-5 text-emerald-600" />
+        <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle className="w-5 h-5 text-green-600" />
           <span className="font-bold text-sm">Pengaturan berhasil disimpan!</span>
         </div>
       )}
@@ -175,13 +195,25 @@ export default function SettingsPage() {
                         const file = e.target.files?.[0];
                         if (file) {
                           const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setQrisImageUrl(reader.result as string);
+                          reader.onload = (event) => {
+                            const img = new Image();
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              const MAX_WIDTH = 400;
+                              const scaleSize = MAX_WIDTH / img.width;
+                              canvas.width = MAX_WIDTH;
+                              canvas.height = img.height * scaleSize;
+                              const ctx = canvas.getContext('2d');
+                              ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                              const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                              setQrisImageUrl(dataUrl);
+                            };
+                            img.src = event.target?.result as string;
                           };
                           reader.readAsDataURL(file);
                         }
                       }}
-                      className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-gray-200 p-1 rounded-lg"
+                      className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer border border-gray-200 p-1 rounded-lg"
                     />
                     {qrisImageUrl && (
                       <div className="mt-2 w-32 h-32 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -214,7 +246,7 @@ export default function SettingsPage() {
         {/* Profil Toko Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center gap-2">
-            <Store className="w-5 h-5 text-emerald-600" />
+            <Store className="w-5 h-5 text-green-600" />
             <h2 className="font-bold text-gray-800">Profil & Identitas Toko</h2>
           </div>
           <div className="p-6 space-y-4">
@@ -226,9 +258,33 @@ export default function SettingsPage() {
                 value={ownerName}
                 onChange={(e) => setOwnerName(e.target.value)}
                 placeholder="Misal: Bapak/Ibu Owner"
-                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
               />
             </div>
+            {isOwner && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Username Login Owner</label>
+                  <input
+                    type="text"
+                    value={ownerUsername}
+                    onChange={(e) => setOwnerUsername(e.target.value)}
+                    placeholder="Username"
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Sandi Baru Owner (Opsional)</label>
+                  <input
+                    type="password"
+                    value={ownerPassword}
+                    onChange={(e) => setOwnerPassword(e.target.value)}
+                    placeholder="Kosongkan jika tidak ingin diubah"
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nama Toko (Sesuai KTP/NIB)</label>
               <input
@@ -236,8 +292,8 @@ export default function SettingsPage() {
                 disabled={!isOwner}
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                placeholder="Misal: Berkah Amanah Mart"
-                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                placeholder="Misal: KSA Mart"
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
               />
             </div>
             <div className="space-y-1">
@@ -248,7 +304,7 @@ export default function SettingsPage() {
                 value={storePhone}
                 onChange={(e) => setStorePhone(e.target.value)}
                 placeholder="Misal: 08123456789"
-                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
               />
             </div>
             <div className="space-y-1">
@@ -259,7 +315,7 @@ export default function SettingsPage() {
                 onChange={(e) => setStoreAddress(e.target.value)}
                 placeholder="Misal: Jl. Sudirman No. 123, Jakarta"
                 rows={3}
-                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
               />
             </div>
 
@@ -269,7 +325,7 @@ export default function SettingsPage() {
                 disabled={!isOwner}
                 value={businessType}
                 onChange={(e) => setBusinessType(e.target.value as 'KOPERASI' | 'UMUM')}
-                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
               >
                 <option value="KOPERASI">Toko Koperasi (Lengkap dengan SHU)</option>
                 <option value="UMUM">Toko Umum / Ritel Biasa</option>
@@ -301,7 +357,7 @@ export default function SettingsPage() {
             {isOwner ? (
               <button 
                 onClick={handleSave}
-                className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
+                className="mt-4 w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 Simpan Profil Toko
@@ -315,6 +371,141 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Metode Pembayaran (Owner Only) */}
+      {isOwner && (
+        <div className="mt-2 space-y-4">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <CreditCard className="w-5 h-5 text-blue-600" />
+            <h2 className="font-bold text-gray-800">Metode Pembayaran (Transfer & E-Wallet)</h2>
+          </div>
+
+          {/* Bank Transfer */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-bold text-gray-700 flex items-center gap-2"><Building2 className="w-4 h-4 text-blue-500"/>Transfer Bank</h3>
+              <button
+                onClick={() => setBankTransfers(prev => [...prev, { enabled: true, bankName: 'BSI (Bank Syariah Indonesia)', accountNumber: '', accountName: '' }])}
+                className="flex items-center gap-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Tambah Bank
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              {bankTransfers.length === 0 && <p className="text-sm text-gray-400 text-center py-2">Belum ada rekening bank yang ditambahkan.</p>}
+              {bankTransfers.map((b, i) => (
+                <div key={i} className="border border-gray-200 rounded-xl p-3 space-y-2 relative">
+                  <button onClick={() => setBankTransfers(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pr-6">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Bank</label>
+                      <select value={b.bankName} onChange={e => setBankTransfers(prev => prev.map((x,idx) => idx===i ? {...x, bankName: e.target.value} : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5">
+                        <option>BSI (Bank Syariah Indonesia)</option>
+                        <option>Bank BRI</option>
+                        <option>Bank BCA</option>
+                        <option>Bank Mandiri</option>
+                        <option>Bank BNI</option>
+                        <option>Bank Muamalat</option>
+                        <option>Bank MEGA Syariah</option>
+                        <option>Bank Permata Syariah</option>
+                        <option>Lainnya</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">No. Rekening</label>
+                      <input type="text" value={b.accountNumber} onChange={e => setBankTransfers(prev => prev.map((x,idx) => idx===i ? {...x, accountNumber: e.target.value} : x))} placeholder="contoh: 7182938495" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5"/>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Pemilik Rekening</label>
+                      <input type="text" value={b.accountName} onChange={e => setBankTransfers(prev => prev.map((x,idx) => idx===i ? {...x, accountName: e.target.value} : x))} placeholder="contoh: Yudi Haryono" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5"/>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* E-Wallet */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-bold text-gray-700 flex items-center gap-2"><Smartphone className="w-4 h-4 text-purple-500"/>E-Wallet / QRIS</h3>
+              <button
+                onClick={() => setEwallets(prev => [...prev, { enabled: true, provider: 'GoPay', number: '', accountName: '' }])}
+                className="flex items-center gap-1 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-3 py-1.5 rounded-lg border border-purple-200 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Tambah E-Wallet
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              {ewallets.length === 0 && <p className="text-sm text-gray-400 text-center py-2">Belum ada e-wallet yang ditambahkan.</p>}
+              {ewallets.map((w, i) => (
+                <div key={i} className="border border-gray-200 rounded-xl p-3 space-y-2 relative">
+                  <button onClick={() => setEwallets(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pr-6">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Provider</label>
+                      <select value={w.provider} onChange={e => setEwallets(prev => prev.map((x,idx) => idx===i ? {...x, provider: e.target.value} : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5">
+                        <option>GoPay</option>
+                        <option>OVO</option>
+                        <option>DANA</option>
+                        <option>ShopeePay</option>
+                        <option>LinkAja</option>
+                        <option>QRIS (Semua)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">No. / ID E-Wallet</label>
+                      <input type="text" value={w.number} onChange={e => setEwallets(prev => prev.map((x,idx) => idx===i ? {...x, number: e.target.value} : x))} placeholder="contoh: 08123456789" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5"/>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Akun</label>
+                      <input type="text" value={w.accountName} onChange={e => setEwallets(prev => prev.map((x,idx) => idx===i ? {...x, accountName: e.target.value} : x))} placeholder="contoh: Yudi Haryono" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5"/>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md">
+            <Save className="w-4 h-4" /> Simpan Metode Pembayaran
+          </button>
+        </div>
+      )}
+
+      {/* Zona Bahaya */}
+      {isOwner && (
+        <div className="mt-8 bg-red-50 p-6 rounded-2xl border border-red-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-red-100 text-red-600 rounded-lg">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-bold text-red-900">Zona Bahaya (Danger Zone)</h2>
+              <p className="text-sm text-red-700">Tindakan di bawah ini tidak dapat dibatalkan.</p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-xl border border-red-100 flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div>
+              <p className="font-bold text-gray-800 text-sm">Hapus Semua Data Uji Coba</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-lg leading-relaxed">
+                Mengosongkan seluruh data transaksi, produk, jurnal, kas, absensi, dan laporan ke kondisi 0 (Nol) agar aplikasi siap digunakan untuk produksi (Live).
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (confirm('PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SEMUA DATA?\\n\\nTindakan ini TIDAK BISA dibatalkan dan akan mereset aplikasi menjadi kosong.')) {
+                  clearAllData();
+                  alert('Berhasil! Semua data uji coba telah dihapus.');
+                  window.location.href = '/';
+                }
+              }}
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-sm transition shrink-0"
+            >
+              Reset Database
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     change_amount NUMERIC NOT NULL DEFAULT 0,
     zakat_contribution NUMERIC NOT NULL DEFAULT 0,
     margin_contribution NUMERIC NOT NULL DEFAULT 0,
+    customer_id TEXT,
+    points_earned NUMERIC DEFAULT 0,
+    points_redeemed NUMERIC DEFAULT 0,
+    points_discount NUMERIC DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

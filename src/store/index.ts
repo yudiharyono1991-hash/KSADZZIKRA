@@ -1,7 +1,22 @@
 import { create } from 'zustand';
-import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage } from '../types';
+import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage, CoaAccount } from '../types';
 import { supabaseService, isSupabaseConfigured } from '../lib/supabase';
 
+const getStorage = (key: string, tenantId?: string) => {
+  const suffix = tenantId ? `_${tenantId}` : '';
+  const saved = localStorage.getItem(`${key}${suffix}`);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {}
+  }
+  return null;
+};
+
+const saveStorage = (key: string, data: any, tenantId?: string) => {
+  const suffix = tenantId ? `_${tenantId}` : '';
+  localStorage.setItem(`${key}${suffix}`, JSON.stringify(data));
+};
 interface AppState {
   tenants: import('../types').Tenant[];
   registerTenant: (tenant: Omit<import('../types').Tenant, 'id' | 'status' | 'createdAt'>) => void;
@@ -69,7 +84,7 @@ interface AppState {
 
   // Attendance
   clockIn: (userId: string, userName: string, photoUrl?: string, latitude?: number, longitude?: number) => void;
-  clockOut: (attendanceId: string) => void;
+  clockOut: (attendanceId: string, photoUrl?: string, latitude?: number, longitude?: number) => void;
 
   // Auth Actions
   login: (username: string, password: string) => 'SUCCESS' | 'PENDING' | 'INVALID';
@@ -86,9 +101,9 @@ interface AppState {
   addJournalEntry: (entry: Omit<JournalEntry, 'id'>) => void;
 
   // Cart Actions (Admin)
-  addToCart: (product: Product) => void;
-  removeFromCart: (productId: string) => void;
-  updateCartQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, isBox?: boolean) => void;
+  removeFromCart: (productId: string, isBox?: boolean) => void;
+  updateCartQuantity: (productId: string, quantity: number, isBox?: boolean) => void;
   clearCart: () => void;
 
   // Customer Portal Actions
@@ -96,7 +111,7 @@ interface AppState {
   removeFromCustomerCart: (productId: string) => void;
   updateCustomerCartQuantity: (productId: string, quantity: number) => void;
   clearCustomerCart: () => void;
-  submitOnlineOrder: (customerId: string, customerName: string, customerPhone: string, notes?: string) => void;
+  submitOnlineOrder: (customerId: string, customerName: string, customerPhone: string, notes: string, customerAddress?: string) => void;
   updateOrderStatus: (orderId: string, status: OnlineOrder['status']) => void;
   sendChatMessage: (orderId: string, senderId: string, senderName: string, text: string) => void;
   processOnlineOrderPayment: (orderId: string, paymentMethod: 'CASH' | 'TRANSFER_BSI' | 'QRIS_SHARIAH') => void;
@@ -107,11 +122,13 @@ interface AppState {
     amountPaid: number;
     customerId?: string;
     promoId?: string;
+    pointsToRedeem?: number;
     splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
   }) => Transaction | null;
   
   // Product/Stock actions
   addProduct: (product: Omit<Product, 'id'>) => void;
+  addProductsBulk: (newProds: Omit<Product, 'id'>[]) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
   adjustStock: (productId: string, amount: number) => void;
@@ -126,27 +143,64 @@ interface AppState {
   addClosing: (closing: Omit<ClosingRecord, 'id' | 'timestamp' | 'createdBy'>) => void;
   clearAllData: () => void;
 
+  // Attendance Correction Actions
+  requestAttendanceCorrection: (attendanceId: string, correctionType: 'CLOCK_IN' | 'CLOCK_OUT' | 'BOTH', reason: string, requestedClockIn?: string, requestedClockOut?: string) => void;
+  reviewAttendanceCorrection: (attendanceId: string, approved: boolean) => void;
+
   // System Log API
   addLog: (action: string, category: AuditLog['category'], details: string) => void;
   
   // Supabase Initial Sync
   initializeStore: () => Promise<void>;
+
+  // CoA Actions
+  coaList: CoaAccount[];
+  addCoaAccount: (account: Omit<CoaAccount, 'id'>) => void;
+  updateCoaAccount: (account: CoaAccount) => void;
+  deleteCoaAccount: (id: string) => void;
 }
 
+const DEFAULT_COA: CoaAccount[] = [
+  { id: 'coa_1', tenantId: 'tenant_default', code: '1-1000', name: 'Kas Tunai Toko', category: 'ASSET', isActive: true },
+  { id: 'coa_2', tenantId: 'tenant_default', code: '1-1010', name: 'Bank Syariah Indonesia (BSI)', category: 'ASSET', isActive: true },
+  { id: 'coa_3', tenantId: 'tenant_default', code: '1-1020', name: 'QRIS Syariah Dana', category: 'ASSET', isActive: true },
+  { id: 'coa_4', tenantId: 'tenant_default', code: '1-1030', name: 'Piutang Kasbon Pelanggan', category: 'ASSET', isActive: true },
+  { id: 'coa_5', tenantId: 'tenant_default', code: '1-1040', name: 'Persediaan Barang Dagang', category: 'ASSET', isActive: true },
+  { id: 'coa_6', tenantId: 'tenant_default', code: '2-1000', name: 'Utang Dagang ke Supplier', category: 'LIABILITY', isActive: true },
+  { id: 'coa_7', tenantId: 'tenant_default', code: '2-1010', name: 'Utang Zakat Niaga Terhutang', category: 'LIABILITY', isActive: true },
+  { id: 'coa_8', tenantId: 'tenant_default', code: '3-1000', name: 'Modal Awal Ketua Koperasi', category: 'EQUITY', isActive: true },
+  { id: 'coa_9', tenantId: 'tenant_default', code: '3-1010', name: 'Dana SHU Koperasi Ditahan', category: 'EQUITY', isActive: true },
+  { id: 'coa_10', tenantId: 'tenant_default', code: '4-1000', name: 'Pendapatan Penjualan Toko', category: 'REVENUE', isActive: true },
+  { id: 'coa_11', tenantId: 'tenant_default', code: '4-1010', name: 'Margin Murabahah Penjualan', category: 'REVENUE', isActive: true },
+  { id: 'coa_12', tenantId: 'tenant_default', code: '5-1000', name: 'Beban Harga Pokok Penjualan (HPP)', category: 'EXPENSE', isActive: true },
+  { id: 'coa_13', tenantId: 'tenant_default', code: '5-1010', name: 'Beban Sewa Lapak Toko', category: 'EXPENSE', isActive: true },
+  { id: 'coa_14', tenantId: 'tenant_default', code: '5-1020', name: 'Beban Listrik, Air & Wifi', category: 'EXPENSE', isActive: true },
+  { id: 'coa_15', tenantId: 'tenant_default', code: '5-1030', name: 'Beban Gaji Karyawan & Staff', category: 'EXPENSE', isActive: true }
+];
+
+const getSavedCoaList = (): CoaAccount[] => {
+  const saved = localStorage.getItem('ba_coa_list');
+  if (saved) {
+    try { return JSON.parse(saved); } catch (e) {}
+  }
+  return DEFAULT_COA;
+};
+
 const DEFAULT_PRODUCTS: Product[] = [
-  { id: 'prod_1', sku: 'BRS-001', name: 'Beras Premium Cianjur 5kg', category: 'Sembako', price: 78000, costPrice: 68000, stock: 45, minStock: 10, unit: 'Pack', isHalal: true, barcode: '8991234560012', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_2', sku: 'MNG-002', name: 'Minyak Goreng SunCo 2L', category: 'Sembako', price: 34500, costPrice: 29000, stock: 32, minStock: 8, unit: 'Botol', isHalal: true, barcode: '8991234560029', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_3', sku: 'GLA-003', name: 'Gula Pasir Gulaku 1kg', category: 'Sembako', price: 17500, costPrice: 15000, stock: 40, minStock: 12, unit: 'Pack', isHalal: true, barcode: '8991234560036', image: 'https://images.unsplash.com/photo-1581428982868-e410dd147a90?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_4', sku: 'TLR-004', name: 'Telur Ayam Negeri 1kg', category: 'Sembako', price: 28000, costPrice: 24000, stock: 15, minStock: 15, unit: 'Kg', isHalal: true, barcode: '8991234560043', image: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_5', sku: 'BND-005', name: 'Ikan Bandeng Segar (Tanpa Duri)', category: 'Fresh Food', price: 42000, costPrice: 35000, stock: 8, minStock: 5, unit: 'Pack', isHalal: true, barcode: '8991234560050', image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_6', sku: 'KPP-006', name: 'Kopi Kapal Api 380g', category: 'Minuman', price: 24900, costPrice: 21500, stock: 24, minStock: 6, unit: 'Pack', isHalal: true, barcode: '8991234560067', image: 'https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_7', sku: 'TEH-007', name: 'Teh Celup Sariwangi isi 50', category: 'Minuman', price: 11000, costPrice: 9000, stock: 40, minStock: 8, unit: 'Kotak', isHalal: true, barcode: '8991234560074', image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8c0a1?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_8', sku: 'SBN-008', name: 'Sabun Lifebuoy Cair Refill 450ml', category: 'Kebutuhan Rumah', price: 23500, costPrice: 19500, stock: 18, minStock: 5, unit: 'Pouch', isHalal: true, barcode: '8991234560081', image: 'https://images.unsplash.com/photo-1584824486516-0555a07fc511?auto=format&fit=crop&q=80&w=300' }
+  { id: 'prod_1', tenantId: 'tenant_default', sku: 'BRS-001', name: 'Beras Premium Cianjur 5kg', category: 'Sembako', price: 78000, costPrice: 68000, stock: 45, minStock: 10, unit: 'Pack', isHalal: true, barcode: '8991234560012', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_2', tenantId: 'tenant_default', sku: 'MNG-002', name: 'Minyak Goreng SunCo 2L', category: 'Sembako', price: 34500, costPrice: 29000, stock: 32, minStock: 8, unit: 'Botol', isHalal: true, barcode: '8991234560029', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_3', tenantId: 'tenant_default', sku: 'GLA-003', name: 'Gula Pasir Gulaku 1kg', category: 'Sembako', price: 17500, costPrice: 15000, stock: 40, minStock: 12, unit: 'Pack', isHalal: true, barcode: '8991234560036', image: 'https://images.unsplash.com/photo-1581428982868-e410dd147a90?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_4', tenantId: 'tenant_default', sku: 'TLR-004', name: 'Telur Ayam Negeri 1kg', category: 'Sembako', price: 28000, costPrice: 24000, stock: 15, minStock: 15, unit: 'Kg', isHalal: true, barcode: '8991234560043', image: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_5', tenantId: 'tenant_default', sku: 'BND-005', name: 'Ikan Bandeng Segar (Tanpa Duri)', category: 'Fresh Food', price: 42000, costPrice: 35000, stock: 8, minStock: 5, unit: 'Pack', isHalal: true, barcode: '8991234560050', image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_6', tenantId: 'tenant_default', sku: 'KPP-006', name: 'Kopi Kapal Api 380g', category: 'Minuman', price: 24900, costPrice: 21500, stock: 24, minStock: 6, unit: 'Pack', isHalal: true, barcode: '8991234560067', image: 'https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_7', tenantId: 'tenant_default', sku: 'TEH-007', name: 'Teh Celup Sariwangi isi 50', category: 'Minuman', price: 11000, costPrice: 9000, stock: 40, minStock: 8, unit: 'Kotak', isHalal: true, barcode: '8991234560074', image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8c0a1?auto=format&fit=crop&q=80&w=300' },
+  { id: 'prod_8', tenantId: 'tenant_default', sku: 'SBN-008', name: 'Sabun Lifebuoy Cair Refill 450ml', category: 'Kebutuhan Rumah', price: 23500, costPrice: 19500, stock: 18, minStock: 5, unit: 'Pouch', isHalal: true, barcode: '8991234560081', image: 'https://images.unsplash.com/photo-1584824486516-0555a07fc511?auto=format&fit=crop&q=80&w=300' }
 ];
 
 const DEFAULT_TRANSACTIONS: Transaction[] = [
   {
     id: 'tx_1',
+    tenantId: 'tenant_default',
     invoiceNo: 'INV-20260607-001',
     timestamp: '2026-06-07T03:00:00Z',
     cashierName: 'Kasir Asy',
@@ -158,11 +212,12 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [
     paymentMethod: 'CASH',
     amountPaid: 150000,
     changeAmount: 3000,
-    zakatContribution: 525, // 2.5% of (147k - 126k profit = 21k profit => 21k * 2.5% = 525)
+    zakatContribution: 525,
     marginContribution: 21000
   },
   {
     id: 'tx_2',
+    tenantId: 'tenant_default',
     invoiceNo: 'INV-20260607-002',
     timestamp: '2026-06-07T03:15:00Z',
     cashierName: 'Kasir Asy',
@@ -175,22 +230,23 @@ const DEFAULT_TRANSACTIONS: Transaction[] = [
     paymentMethod: 'QRIS_SHARIAH',
     amountPaid: 122500,
     changeAmount: 0,
-    zakatContribution: 462.5, // 2.5% of 18.5k margin
+    zakatContribution: 462.5,
     marginContribution: 18500
   }
 ];
 
 const DEFAULT_AUDIT_LOGS: AuditLog[] = [
-  { id: 'log_1', timestamp: '2026-06-07T02:00:00Z', user: 'Kasir Asy', action: 'LOGIN', category: 'SYSTEM', details: 'Sesi kasir dimulai - BA Mart', ipAddress: '192.168.1.15' },
-  { id: 'log_2', timestamp: '2026-06-07T02:15:00Z', user: 'Kasir Asy', action: 'STOCK_CHECK', category: 'INVENTORY', details: 'Pemeriksaan stok harian produk sembako', ipAddress: '192.168.1.15' }
+  { id: 'log_1', tenantId: 'tenant_default', timestamp: '2026-06-07T02:00:00Z', user: 'Kasir Asy', action: 'LOGIN', category: 'SYSTEM', details: 'Sesi kasir dimulai - KSA Mart', ipAddress: '192.168.1.15' },
+  { id: 'log_2', tenantId: 'tenant_default', timestamp: '2026-06-07T02:15:00Z', user: 'Kasir Asy', action: 'STOCK_CHECK', category: 'INVENTORY', details: 'Pemeriksaan stok harian produk sembako', ipAddress: '192.168.1.15' }
 ];
 
 const DEFAULT_ZAKAT_RECORDS: ZakatCalculation[] = [
   {
     id: 'zk_1',
+    tenantId: 'tenant_default',
     timestamp: '2026-06-07T02:30:00Z',
     goldPricePerGram: 1450000,
-    nisabValue: 123250000, // 85 * 1.45m
+    nisabValue: 123250000,
     liquidAssets: 85000000,
     inventoryValue: 48000000,
     receivables: 5000000,
@@ -205,27 +261,12 @@ const DEFAULT_ZAKAT_RECORDS: ZakatCalculation[] = [
 const DEFAULT_ZAKAT_DISTRIBUTIONS: ZakatDistribution[] = [
   {
     id: 'zkd_1',
+    tenantId: 'tenant_default',
     timestamp: '2020-06-05T08:00:00Z',
     amount: 1500000,
     recipient: 'Fakir Miskin Sekitar Tazkia',
     esgCategory: 'SOCIAL',
     description: 'Penyaluran sembako bahan pokok pangan gratis untuk dhuafa terdekat'
-  },
-  {
-    id: 'zkd_2',
-    timestamp: '2020-06-03T10:00:00Z',
-    amount: 1200000,
-    recipient: 'Gharimin UMKM Binaan',
-    esgCategory: 'GOVERNANCE',
-    description: 'Bantuan modal bebas riba untuk melunasi utang usaha pedagang kecil'
-  },
-  {
-    id: 'zkd_3',
-    timestamp: '2020-06-01T14:30:00Z',
-    amount: 800000,
-    recipient: 'Fisabilillah Kampus Tazkia',
-    esgCategory: 'ENVIRONMENTAL',
-    description: 'Penyediaan pack ramah lingkungan sebagai kampanye zero-plastic pembagian zakat'
   }
 ];
 
@@ -233,14 +274,46 @@ const getSavedUsers = (): UserAccount[] => {
   const saved = localStorage.getItem('ba_users');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Force update owner name and credentials for Dr. Grandis if they already have localStorage
+      const hasOwner = parsed.some((u: any) => u.username === 'owner' || u.id === 'usr_3');
+      let updatedUsers = parsed.map((u: any) => {
+        if (u.username === 'owner' || u.id === 'usr_3') {
+          return { 
+            ...u, 
+            id: 'usr_3',
+            name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.',
+            username: 'owner',
+            password: 'owner123',
+            role: 'OWNER',
+            isActive: true,
+            isApproved: true,
+            tenantId: 'tenant_default'
+          };
+        }
+        return u;
+      });
+      if (!hasOwner) {
+        updatedUsers.push({
+          id: 'usr_3',
+          tenantId: 'tenant_default',
+          name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.',
+          username: 'owner',
+          password: 'owner123',
+          role: 'OWNER',
+          createdAt: new Date().toISOString(),
+          isActive: true,
+          isApproved: true
+        });
+      }
+      return updatedUsers;
     } catch (e) {}
   }
   return [
     { id: 'usr_0', tenantId: '', name: 'Platform Admin', username: 'superadmin.platform', password: 'superadmin123!', role: 'SUPERADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_1', tenantId: 'tenant_default', name: 'Kasir Asy', username: 'asy.23.kk', password: 'kasir123!', role: 'CASHIER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_2', tenantId: 'tenant_default', name: 'Superadmin BA', username: 'superadmin.23kk', password: 'admin123!', role: 'ADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
-    { id: 'usr_3', tenantId: 'tenant_default', name: 'Owner BA', username: 'owner.23kk', password: 'owner123!', role: 'OWNER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
+    { id: 'usr_3', tenantId: 'tenant_default', name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.', username: 'owner', password: 'owner123', role: 'OWNER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_4', tenantId: 'tenant_default', name: 'Pelanggan Setia', username: 'pelanggan1', password: 'password123', role: 'PELANGGAN', createdAt: new Date().toISOString(), isActive: true, isApproved: true }
   ];
 };
@@ -263,9 +336,9 @@ const getSavedExpenses = (): Expense[] => {
     try { return JSON.parse(saved); } catch (e) {}
   }
   return [
-    { id: 'exp_1', date: '2026-06-01', category: 'SEWA_LAPAK', amount: 500000, description: 'Sewa Lapak Mart Bulanan', createdBy: 'Superadmin BA' },
-    { id: 'exp_2', date: '2026-06-03', category: 'LISTRIK_AIR_WIFI', amount: 200000, description: 'Listrik & Wi-fi Toko', createdBy: 'Superadmin BA' },
-    { id: 'exp_3', date: '2026-06-05', category: 'GAJI', amount: 1000000, description: 'Gaji Bulanan Staff Utama', createdBy: 'Superadmin BA' }
+    { id: 'exp_1', tenantId: 'tenant_default', date: '2026-06-01', category: 'SEWA_LAPAK', amount: 500000, description: 'Sewa Lapak Mart Bulanan', createdBy: 'Superadmin BA' },
+    { id: 'exp_2', tenantId: 'tenant_default', date: '2026-06-03', category: 'LISTRIK_AIR_WIFI', amount: 200000, description: 'Listrik & Wi-fi Toko', createdBy: 'Superadmin BA' },
+    { id: 'exp_3', tenantId: 'tenant_default', date: '2026-06-05', category: 'GAJI', amount: 1000000, description: 'Gaji Bulanan Staff Utama', createdBy: 'Superadmin BA' }
   ];
 };
 
@@ -277,6 +350,7 @@ const getSavedClosings = (): ClosingRecord[] => {
   return [
     {
       id: 'cls_1',
+      tenantId: 'tenant_default',
       date: '2026-05-31',
       type: 'MONTHLY',
       revenue: 4200000,
@@ -355,7 +429,7 @@ const getSavedBranches = (): Branch[] => {
     } catch (e) {}
   }
   return [
-    { id: 'br_1', name: 'BA Mart Pusat Tazkia', address: 'Kampus Tazkia Sentul', phone: '08123456789', isActive: true, createdAt: new Date().toISOString() }
+    { id: 'br_1', tenantId: 'tenant_default', name: 'KSA Mart Pusat', address: 'Koperasi Syariah ADZ-ZIKRA', phone: '08123456789', isActive: true, createdAt: new Date().toISOString() }
   ];
 };
 
@@ -387,6 +461,7 @@ const getSavedSettings = (): StoreSettings => {
   const saved = localStorage.getItem('ba_settings');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return { 
+    tenantId: 'tenant_default',
     isTaxEnabled: false, 
     taxRate: 11,
     ownerBankName: 'BSI (Bank Syariah Indonesia)',
@@ -418,12 +493,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   tenants: (() => {
     const saved = localStorage.getItem('ba_tenants');
     const parsed = saved ? JSON.parse(saved) : [];
+    
+    // Force update owner name in default tenant for Dr. Grandis
+    const withUpdatedOwner = parsed.map((t: any) => {
+      if (t.id === 'tenant_default') {
+        return { ...t, ownerName: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.' };
+      }
+      return t;
+    });
+
     // Ensure default tenant always exists for demo data
-    if (!parsed.find((t: any) => t.id === 'tenant_default')) {
+    if (!withUpdatedOwner.find((t: any) => t.id === 'tenant_default')) {
       const defaultTenant = {
         id: 'tenant_default',
-        name: 'BA Mart Syariah',
-        ownerName: 'Owner BA',
+        name: 'KSA Mart Syariah',
+        ownerName: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.',
         email: 'owner.23kk',
         phone: '081234567890',
         address: 'Jl. Contoh No.1, Jakarta',
@@ -431,10 +515,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         status: 'ACTIVE' as const,
         createdAt: new Date().toISOString()
       };
-      parsed.unshift(defaultTenant);
-      localStorage.setItem('ba_tenants', JSON.stringify(parsed));
+      withUpdatedOwner.unshift(defaultTenant);
+      localStorage.setItem('ba_tenants', JSON.stringify(withUpdatedOwner));
     }
-    return parsed;
+    return withUpdatedOwner;
   })(),
   products: getSavedProducts(),
   cart: [],
@@ -445,7 +529,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   auditLogs: getSavedAuditLogs(),
   zakatRecords: getSavedZakatRecords(),
   zakatDistributions: getSavedZakatDistributions(),
-  currentUser: null, // Forces user log in first
+  currentUser: (() => {
+    const saved = localStorage.getItem('ba_current_user');
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return null;
+  })(),
   isLoading: false,
   expenses: getSavedExpenses(),
   closings: getSavedClosings(),
@@ -459,10 +549,44 @@ export const useAppStore = create<AppState>((set, get) => ({
   attendances: getSavedAttendances(),
   settings: getSavedSettings(),
   stockMovements: getSavedStockMovements(),
+  coaList: getSavedCoaList(),
   activeBranchId: '', // Default to global view initially
 
   // Branch implementations
   setActiveBranchId: (branchId) => set({ activeBranchId: branchId }),
+
+  // CoA Actions
+  addCoaAccount: (accountData) => {
+    const { currentUser } = get();
+    const newAccount: CoaAccount = {
+      ...accountData,
+      id: `coa_${Date.now()}`,
+      tenantId: currentUser?.tenantId || 'tenant_default',
+      isActive: true
+    };
+    const updated = [...get().coaList, newAccount];
+    set({ coaList: updated });
+    saveStorage('ba_coa_list', updated);
+    get().addLog('COA_ADD', 'FINANCE', `Menambah akun CoA baru: ${newAccount.code} - ${newAccount.name}`);
+  },
+
+  updateCoaAccount: (updatedAccount) => {
+    const { currentUser } = get();
+    const updated = get().coaList.map(c => c.id === updatedAccount.id ? updatedAccount : c);
+    set({ coaList: updated });
+    saveStorage('ba_coa_list', updated);
+    get().addLog('COA_UPDATE', 'FINANCE', `Mengubah akun CoA: ${updatedAccount.code} - ${updatedAccount.name}`);
+  },
+
+  deleteCoaAccount: (id) => {
+    const { currentUser } = get();
+    const account = get().coaList.find(c => c.id === id);
+    if (!account) return;
+    const updated = get().coaList.map(c => c.id === id ? { ...c, isActive: false } : c);
+    set({ coaList: updated });
+    saveStorage('ba_coa_list', updated);
+    get().addLog('COA_DELETE', 'FINANCE', `Menonaktifkan akun CoA: ${account.code} - ${account.name}`);
+  },
 
   // Settings
   updateSettings: (updates) => {
@@ -506,6 +630,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         prod.stock += item.quantity;
       }
       get().addStockMovement({
+        tenantId: currentUser.tenantId || 'tenant_default',
         productId: item.productId,
         type: 'IN',
         qty: item.quantity,
@@ -524,6 +649,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     relatedJournals.forEach((j, i) => {
       reversingJournals.push({
         id: `${jId}_${i}`,
+        tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
         account: j.account,
         description: `[Auto] VOID Reversal: ${j.description}`,
@@ -646,6 +772,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   clockIn: (userId, userName, photoUrl, latitude, longitude) => {
     const newAtt: Attendance = {
       id: `att_${Date.now()}`,
+      tenantId: get().currentUser?.tenantId || 'tenant_default',
       userId,
       userName,
       date: new Date().toISOString().split('T')[0],
@@ -660,13 +787,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
     get().addLog('ATTENDANCE', 'SYSTEM', `${userName} Clock-In Shift`);
   },
-  clockOut: (attendanceId) => {
+  clockOut: (attendanceId, photoUrl, latitude, longitude) => {
     const updated = get().attendances.map(a => 
-      a.id === attendanceId ? { ...a, clockOut: new Date().toISOString() } : a
+      a.id === attendanceId ? { ...a, clockOut: new Date().toISOString(), clockOutPhotoUrl: photoUrl, clockOutLatitude: latitude, clockOutLongitude: longitude } : a
     );
     set({ attendances: updated });
     saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
     get().addLog('ATTENDANCE', 'SYSTEM', `Selesai Shift (Clock-Out) ID: ${attendanceId}`);
+  },
+
+  requestAttendanceCorrection: (attendanceId, correctionType, reason, requestedClockIn, requestedClockOut) => {
+    const updated = get().attendances.map(a =>
+      a.id === attendanceId
+        ? { ...a, correctionStatus: 'PENDING' as const, correctionReason: reason, correctionType, requestedClockIn, requestedClockOut }
+        : a
+    );
+    set({ attendances: updated });
+    saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
+    get().addLog('ATTENDANCE', 'SYSTEM', `Permohonan koreksi absen diajukan untuk ID: ${attendanceId}`);
+  },
+
+  reviewAttendanceCorrection: (attendanceId, approved) => {
+    const updated = get().attendances.map(a => {
+      if (a.id !== attendanceId) return a;
+      if (!approved) {
+        return { ...a, correctionStatus: 'REJECTED' as const };
+      }
+      // Apply the requested corrections
+      const patch: Partial<typeof a> = { correctionStatus: 'APPROVED' as const, isRevised: true };
+      if (a.correctionType === 'CLOCK_IN' || a.correctionType === 'BOTH') {
+        if (a.requestedClockIn) patch.clockIn = a.requestedClockIn;
+      }
+      if (a.correctionType === 'CLOCK_OUT' || a.correctionType === 'BOTH') {
+        if (a.requestedClockOut) patch.clockOut = a.requestedClockOut;
+      }
+      return { ...a, ...patch };
+    });
+    set({ attendances: updated });
+    saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
+    get().addLog('ATTENDANCE', 'SYSTEM', `Koreksi absen ${approved ? 'DISETUJUI' : 'DITOLAK'} untuk ID: ${attendanceId}`);
   },
 
   // Authentication logic
@@ -756,6 +915,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     const log: AuditLog = {
       id: `log_${Date.now()}`,
+      tenantId: authUser.tenantId || 'tenant_default',
       timestamp: new Date().toISOString(),
       user: authUser.name,
       action: 'LOGIN',
@@ -765,70 +925,74 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     set(state => ({ auditLogs: [log, ...state.auditLogs] }));
     if (isSupabaseConfigured) { supabaseService.saveAuditLog(log); }
+    
+    // Save to localStorage for persistence
+    localStorage.setItem('ba_current_user', JSON.stringify(authUser));
+    
     return 'SUCCESS';
   },
-
 
   logout: () => {
     const { currentUser } = get();
     if (currentUser) {
-      const log: AuditLog = {
-        id: `log_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        user: currentUser.name,
-        action: 'LOGOUT',
-        category: 'SYSTEM',
-        details: `LOGOUT Sukses: ${currentUser.name}`,
-        ipAddress: '192.168.1.15'
-      };
-      set(state => ({ auditLogs: [log, ...state.auditLogs] }));
-      if (isSupabaseConfigured) {
-        supabaseService.saveAuditLog(log);
-      }
+      get().addLog('LOGOUT', 'SYSTEM', `Sesi pengguna diakhiri: ${currentUser.name}`);
     }
-    set({ currentUser: null, cart: [], customerCart: [], activeBranchId: '' });
+    set({ currentUser: null });
+    localStorage.removeItem('ba_current_user');
   },
 
   // Cart implementations (Admin)
-  addToCart: (product: Product) => {
+  addToCart: (product: Product, isBox: boolean = false) => {
     const { cart } = get();
-    if (product.stock <= 0) return;
+    // For box, we will check if stock >= pcsPerBox. We assume stock is always in pieces.
+    const requiredQty = isBox ? (product.pcsPerBox || 1) : 1;
+    if (product.stock < requiredQty) return;
     
-    const existing = cart.find(item => item.product.id === product.id);
-    if (existing) {
-      if (existing.quantity >= product.stock) return;
-      set({
-        cart: cart.map(item =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      });
+    // We treat Box and non-Box as the same cart item or separate? 
+    // It's better to treat them separately so Kasir can buy 1 box AND 2 pcs.
+    // We will use a unique key for the cart item: product.id + (isBox ? '_box' : '_pcs').
+    // But our cart currently just matches by product.id. We can keep it simple and just match by product.id and isBox flag.
+    const existingIndex = cart.findIndex(item => item.product.id === product.id && !!item.isBox === isBox);
+    
+    if (existingIndex >= 0) {
+      const existing = cart[existingIndex];
+      const newQuantity = existing.quantity + 1;
+      if ((newQuantity * requiredQty) > product.stock) return;
+      
+      const newCart = [...cart];
+      newCart[existingIndex] = { ...existing, quantity: newQuantity };
+      set({ cart: newCart });
     } else {
-      set({ cart: [...cart, { product, quantity: 1 }] });
+      set({ cart: [...cart, { product, quantity: 1, isBox }] });
     }
   },
   
-  removeFromCart: (productId: string) => {
-    set({ cart: get().cart.filter(item => item.product.id !== productId) });
+  removeFromCart: (productId: string, isBox?: boolean) => {
+    if (isBox === undefined) {
+       set({ cart: get().cart.filter(item => item.product.id !== productId) });
+    } else {
+       set({ cart: get().cart.filter(item => !(item.product.id === productId && !!item.isBox === isBox)) });
+    }
   },
   
-  updateCartQuantity: (productId: string, quantity: number) => {
+  updateCartQuantity: (productId: string, quantity: number, isBox: boolean = false) => {
     const { cart } = get();
-    const item = cart.find(i => i.product.id === productId);
-    if (!item) return;
+    const itemIndex = cart.findIndex(i => i.product.id === productId && !!i.isBox === isBox);
+    if (itemIndex < 0) return;
     
     if (quantity <= 0) {
-      get().removeFromCart(productId);
+      get().removeFromCart(productId, isBox);
       return;
     }
     
-    const newQty = Math.min(quantity, item.product.stock);
-    set({
-      cart: cart.map(i =>
-        i.product.id === productId ? { ...i, quantity: newQty } : i
-      )
-    });
+    const item = cart[itemIndex];
+    const requiredQty = isBox ? (item.product.pcsPerBox || 1) : 1;
+    const maxQty = Math.floor(item.product.stock / requiredQty);
+    const newQty = Math.min(quantity, maxQty);
+    
+    const newCart = [...cart];
+    newCart[itemIndex] = { ...item, quantity: newQty };
+    set({ cart: newCart });
   },
   
   clearCart: () => set({ cart: [] }),
@@ -877,7 +1041,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   clearCustomerCart: () => set({ customerCart: [] }),
 
-  submitOnlineOrder: (customerId, customerName, customerPhone, notes) => {
+  submitOnlineOrder: (customerId, customerName, customerPhone, notes, customerAddress) => {
     const { customerCart } = get();
     if (customerCart.length === 0) return;
 
@@ -885,10 +1049,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const orderNo = `ORD-${Date.now()}`;
     const newOrder: OnlineOrder = {
       id: `oo_${Date.now()}`,
+      tenantId: get().currentUser?.tenantId || 'tenant_default',
       orderNo,
       customerId,
       customerName,
       customerPhone,
+      customerAddress,
       items: customerCart.map(i => ({
         productId: i.product.id,
         productName: i.product.name,
@@ -940,6 +1106,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         totalCost += (itemCost * item.quantity);
         updatedProducts[prodIndex].stock -= item.quantity;
         get().addStockMovement({
+          tenantId: currentUser.tenantId || 'tenant_default',
           productId: item.productId,
           type: 'OUT',
           qty: item.quantity,
@@ -954,6 +1121,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
+      tenantId: currentUser.tenantId || 'tenant_default',
       invoiceNo,
       timestamp: new Date().toISOString(),
       cashierName: currentUser.name,
@@ -980,6 +1148,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newJournals: JournalEntry[] = [
       {
         id: `je_1_${Date.now()}`,
+        tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
         account: paymentMethod === 'TRANSFER_BSI' ? '1-1002 Kas di Bank' : '1-1001 Kas Tunai',
         description: `Penerimaan Online ${invoiceNo}`,
@@ -992,6 +1161,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
       {
         id: `je_2_${Date.now()}`,
+        tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
         account: '4-1001 Pendapatan Penjualan',
         description: `Penjualan Online ${invoiceNo}`,
@@ -1023,6 +1193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sendChatMessage: (orderId, senderId, senderName, text) => {
     const newMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
+      tenantId: get().currentUser?.tenantId || 'tenant_default',
       orderId,
       senderId,
       senderName,
@@ -1036,7 +1207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   // Checkout Implementation
   checkout: (options) => {
-    const { paymentMethod, amountPaid, customerId, promoId, splitPayments } = options;
+    const { paymentMethod, amountPaid, customerId, promoId, pointsToRedeem, splitPayments } = options;
     const { cart, currentUser, products, customers, promos, settings, addStockMovement } = get();
     if (cart.length === 0 || !currentUser) return null;
     
@@ -1062,7 +1233,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    let totalAmount = baseTotal - discountAmount;
+    const redeemed = pointsToRedeem || 0;
+    const pointsDiscount = redeemed * 10;
+    let totalAmount = Math.max(0, baseTotal - discountAmount - pointsDiscount);
     let taxAmount = 0;
     if (settings.isTaxEnabled) {
       taxAmount = totalAmount * (settings.taxRate / 100);
@@ -1084,15 +1257,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     const invoiceNo = `INV-20260607-${Math.floor(100 + Math.random() * 900)}`;
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
+      tenantId: currentUser.tenantId || 'tenant_default',
       invoiceNo,
       timestamp: new Date().toISOString(),
       cashierName: currentUser.name,
       items: cart.map(item => ({
         productId: item.product.id,
-        productName: item.product.name,
+        productName: item.isBox ? `${item.product.name} (Box)` : item.product.name,
         quantity: item.quantity,
         price: getDynamicPrice(item),
-        costPrice: item.product.costPrice
+        costPrice: item.isBox ? (item.product.boxCostPrice || 0) : item.product.costPrice
       })),
       totalAmount,
       paymentMethod,
@@ -1106,14 +1280,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       discountAmount,
       taxAmount,
       splitPayments,
-      branchId: currentUser.branchId
+      branchId: currentUser.branchId,
+      pointsEarned: paymentMethod !== 'KASBON' ? Math.floor(totalAmount / 1000) : 0,
+      pointsRedeemed: redeemed,
+      pointsDiscount: pointsDiscount
     };
     
     // Deduct stocks
     const updatedProducts = products.map(prod => {
-      const cartItem = cart.find(c => c.product.id === prod.id);
-      if (cartItem) {
-        const remainingStock = Math.max(0, prod.stock - cartItem.quantity);
+      const relatedCartItems = cart.filter(c => c.product.id === prod.id);
+      if (relatedCartItems.length > 0) {
+        let totalDeductQty = 0;
+        relatedCartItems.forEach(cartItem => {
+          totalDeductQty += cartItem.isBox ? (cartItem.quantity * (prod.pcsPerBox || 1)) : cartItem.quantity;
+        });
+        const remainingStock = Math.max(0, prod.stock - totalDeductQty);
         const updated = { ...prod, stock: remainingStock };
         if (isSupabaseConfigured) { supabaseService.saveProduct(updated); }
         return updated;
@@ -1135,12 +1316,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (paymentMethod === 'KASBON' && customerId) {
       get().updateCustomer(customerId, { debtAmount: (customer?.debtAmount || 0) + totalAmount });
     }
-    // Handle Customer Points (+1 point per 50.000 spent)
-    if (customerId && paymentMethod !== 'KASBON') {
-      const earnedPoints = Math.floor(totalAmount / 50000);
-      if (earnedPoints > 0) {
-        get().updateCustomer(customerId, { points: (customer?.points || 0) + earnedPoints });
-      }
+    // Handle Customer Points (+1 point per 1.000 spent)
+    if (customerId) {
+      const earnedPoints = paymentMethod !== 'KASBON' ? Math.floor(totalAmount / 1000) : 0;
+      get().updateCustomer(customerId, {
+        points: Math.max(0, (customer?.points || 0) - redeemed + earnedPoints)
+      });
     }
 
     // === JURNAL OTOMATIS dari Transaksi POS ===
@@ -1155,6 +1336,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const akunKas = sp.method === 'CASH' ? 'KAS' : sp.method === 'QRIS_SHARIAH' ? 'QRIS_SYARIAH' : 'BANK_BSI';
         autoJournals.push({
           id: `${jId}_${i+1}`,
+          tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
           account: akunKas,
           description: `[Auto] Penjualan SPLIT (${sp.method}) dari ${invoiceNo}`,
@@ -1170,6 +1352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const akunKas = paymentMethod === 'CASH' ? 'KAS' : paymentMethod === 'QRIS_SHARIAH' ? 'QRIS_SYARIAH' : paymentMethod === 'KASBON' ? 'PIUTANG_DAGANG' : 'BANK_BSI';
       autoJournals.push({
         id: `${jId}_1`,
+        tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
         account: akunKas,
         description: `[Auto] Penjualan ${paymentMethod} dari ${invoiceNo}`,
@@ -1184,6 +1367,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     autoJournals.push({
         id: `${jId}_2`,
+        tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
         account: 'PENDAPATAN',
         description: `[Auto] Pendapatan penjualan ${invoiceNo}`,
@@ -1198,6 +1382,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (taxAmount > 0) {
       autoJournals.push({
         id: `${jId}_tax`,
+        tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
         account: 'HUTANG_PAJAK',
         description: `[Auto] Pajak dari ${invoiceNo}`,
@@ -1236,6 +1421,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(product);
+    }
+  },
+  
+  addProductsBulk: (newProds) => {
+    const startId = Date.now();
+    const products: Product[] = newProds.map((p, idx) => ({
+      ...p,
+      id: `prod_${startId}_${idx}`
+    }));
+    const updated = [...get().products, ...products];
+    set({ products: updated });
+    saveStorage('ba_products', updated, get().currentUser?.tenantId);
+    get().addLog('PRODUCT_BULK_ADD', 'INVENTORY', `Mengimpor ${products.length} produk secara massal`);
+    
+    if (isSupabaseConfigured) {
+      supabaseService.saveProductsBulk(products);
     }
   },
   
@@ -1279,6 +1480,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Log stock movement
     get().addStockMovement({
+      tenantId: get().currentUser?.tenantId || 'tenant_default',
       productId,
       type: amount > 0 ? 'IN' : 'OUT',
       qty: Math.abs(amount),
@@ -1340,18 +1542,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (users.find(u => u.username === userData.username)) {
       return false; // username sudah dipakai
     }
+    const isPelanggan = userData.role === 'PELANGGAN';
     const newUser: UserAccount = {
       ...userData,
       id: `usr_${Date.now()}`,
       createdAt: new Date().toISOString(),
       isActive: true,
-      isApproved: false, // Semua pendaftar baru harus menunggu approval
-      role: 'CASHIER' // Default role, bisa diubah oleh Admin/Owner setelah approve
+      isApproved: isPelanggan ? true : false,
+      role: userData.role || 'CASHIER'
     };
     const updated = [...users, newUser];
     set({ users: updated });
-    saveStorage('ba_users', updated, get().currentUser?.tenantId);
-    get().addLog('USER_REGISTER', 'SYSTEM', `Pendaftaran akun baru (PENDING): ${newUser.name} (@${newUser.username}) — menunggu persetujuan Admin.`);
+    saveStorage('ba_users', updated);
+    
+    const statusText = isPelanggan ? 'AKTIF' : 'PENDING';
+    get().addLog('USER_REGISTER', 'SYSTEM', `Pendaftaran akun baru (${statusText}): ${newUser.name} (@${newUser.username})`);
+
+    // Create Customer profile dynamically for PELANGGAN
+    if (isPelanggan) {
+      const customerExists = get().customers.some(c => c.name === newUser.name || c.phone === newUser.phone);
+      if (!customerExists) {
+        const newCustomer: Customer = {
+          id: `cust_${Date.now()}`,
+          tenantId: newUser.tenantId || 'tenant_default',
+          name: newUser.name,
+          phone: newUser.phone || '',
+          points: 0,
+          debtAmount: 0,
+          createdAt: new Date().toISOString(),
+          isKoperasiMember: newUser.isKoperasiMember
+        };
+        const updatedCustomers = [...get().customers, newCustomer];
+        set({ customers: updatedCustomers });
+        saveStorage('ba_customers', updatedCustomers, get().currentUser?.tenantId);
+        if (isSupabaseConfigured) {
+          supabaseService.saveCustomer(newCustomer);
+        }
+      }
+    }
     
     if (isSupabaseConfigured) {
       supabaseService.saveUser(newUser);
@@ -1368,7 +1596,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       approvedAt: new Date().toISOString()
     } : u);
     set({ users: updated });
-    saveStorage('ba_users', updated, get().currentUser?.tenantId);
+    saveStorage('ba_users', updated);
     const approvedUser = updated.find(u => u.id === id);
     get().addLog('USER_APPROVE', 'SYSTEM', `Akun disetujui: ${approvedUser?.name} (@${approvedUser?.username}) oleh ${approverName}`);
     
@@ -1382,7 +1610,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rejected = users.find(u => u.id === id);
     const updated = users.filter(u => u.id !== id);
     set({ users: updated });
-    saveStorage('ba_users', updated, get().currentUser?.tenantId);
+    saveStorage('ba_users', updated);
     get().addLog('USER_REJECT', 'SYSTEM', `Pendaftaran ditolak: ${rejected?.name} (@${rejected?.username})`);
     
     if (isSupabaseConfigured) {
@@ -1394,12 +1622,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { users, currentUser } = get();
     const updated = users.map(u => u.id === id ? { ...u, ...updates } : u);
     set({ users: updated });
-    saveStorage('ba_users', updated, get().currentUser?.tenantId);
+    saveStorage('ba_users', updated);
     get().addLog('USER_UPDATE', 'SYSTEM', `Update data akun ID: ${id}`);
     
     const modifiedUser = updated.find(u => u.id === id);
     if (currentUser && modifiedUser && currentUser.username === modifiedUser.username) {
-      set({ currentUser: { name: modifiedUser.name, username: modifiedUser.username, role: modifiedUser.role, branchId: modifiedUser.branchId } });
+      const newCurrentUser = { name: modifiedUser.name, username: modifiedUser.username, role: modifiedUser.role, branchId: modifiedUser.branchId, tenantId: modifiedUser.tenantId };
+      set({ currentUser: newCurrentUser });
+      localStorage.setItem('ba_current_user', JSON.stringify(newCurrentUser));
     }
     
     if (isSupabaseConfigured && modifiedUser) {
@@ -1411,7 +1641,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { users } = get();
     const updated = users.filter(u => u.id !== id);
     set({ users: updated });
-    saveStorage('ba_users', updated, get().currentUser?.tenantId);
+    saveStorage('ba_users', updated);
     get().addLog('USER_DELETE', 'SYSTEM', `Penghapusan akun ID: ${id}`);
     
     if (isSupabaseConfigured) {
@@ -1421,7 +1651,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addPurchaseOrder: (poData) => {
     const { currentUser } = get();
-    const newPo: PurchaseOrder = { ...poData, id: `po_${Date.now()}` };
+    const newPo: PurchaseOrder = {
+      tenantId: currentUser?.tenantId || 'tenant_default',
+      ...poData,
+      id: `po_${Date.now()}`
+    };
     const updated = [newPo, ...get().purchaseOrders];
     set({ purchaseOrders: updated });
     saveStorage('ba_purchase_orders', updated, get().currentUser?.tenantId);
@@ -1432,6 +1666,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const poJournals: JournalEntry[] = [
       {
         id: `je_${Date.now()}_po1`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
         account: 'PERSEDIAAN',
         description: `[Auto] PO Pembelian ${newPo.poNumber} dari ${newPo.supplier}`,
@@ -1443,6 +1678,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
       {
         id: `je_${Date.now()}_po2`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
         account: 'HUTANG',
         description: `[Auto] Hutang usaha ke ${newPo.supplier} (${newPo.poNumber})`,
@@ -1467,7 +1703,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addJournalEntry: (entryData) => {
-    const newEntry: JournalEntry = { ...entryData, id: `je_${Date.now()}` };
+    const newEntry: JournalEntry = {
+      tenantId: get().currentUser?.tenantId || 'tenant_default',
+      ...entryData,
+      id: `je_${Date.now()}`
+    };
     const updated = [newEntry, ...get().journalEntries];
     set({ journalEntries: updated });
     saveStorage('ba_journal_entries', updated, get().currentUser?.tenantId);
@@ -1477,6 +1717,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addExpense: (expenseData) => {
     const { currentUser, expenses } = get();
     const newExpense: Expense = {
+      tenantId: currentUser?.tenantId || 'tenant_default',
       ...expenseData,
       id: `exp_${Date.now()}`,
       createdBy: currentUser ? currentUser.name : 'System'
@@ -1491,6 +1732,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const expJournals: JournalEntry[] = [
       {
         id: `je_${Date.now()}_exp1`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
         account: 'BEBAN',
         description: `[Auto] Beban ${newExpense.category}: ${newExpense.description}`,
@@ -1502,6 +1744,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
       {
         id: `je_${Date.now()}_exp2`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
         account: 'KAS',
         description: `[Auto] Kas keluar untuk ${newExpense.description}`,
@@ -1529,49 +1772,60 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  addClosing: (closingData) => {
-    const { currentUser, closings } = get();
+  addClosing: (closing) => {
+    const { currentUser } = get();
+    if (!currentUser) return;
     const newClosing: ClosingRecord = {
-      ...closingData,
+      tenantId: currentUser.tenantId || 'tenant_default',
+      ...closing,
       id: `cls_${Date.now()}`,
-      createdBy: currentUser ? currentUser.name : 'System',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      createdBy: currentUser.name
     };
-    const updated = [newClosing, ...closings];
+    const updated = [newClosing, ...get().closings];
     set({ closings: updated });
     saveStorage('ba_closings', updated, get().currentUser?.tenantId);
     get().addLog('CLOSING_PERFORMED', 'FINANCE', `Melakukan penutupan buku (${newClosing.type}) pada ${newClosing.date}. Laba Bersih: Rp ${newClosing.netProfit.toLocaleString('id-ID')}`);
   },
 
   clearAllData: () => {
-    const initialProducts = [
-      { id: 'prod_1', sku: 'BRS-001', name: 'Beras Premium Cianjur 5kg', category: 'Sembako', price: 78000, costPrice: 68000, stock: 45, minStock: 10, unit: 'Pack', isHalal: true, barcode: '8991234560012' },
-      { id: 'prod_2', sku: 'MNG-002', name: 'Minyak Goreng SunCo 2L', category: 'Sembako', price: 34500, costPrice: 29000, stock: 32, minStock: 8, unit: 'Botol', isHalal: true, barcode: '8991234560029' },
-      { id: 'prod_3', sku: 'GLA-003', name: 'Gula Pasir Gulaku 1kg', category: 'Sembako', price: 17500, costPrice: 15000, stock: 40, minStock: 12, unit: 'Pack', isHalal: true, barcode: '8991234560036' }
-    ];
-    set({
-      products: initialProducts,
+    const tenantId = get().currentUser?.tenantId;
+    
+    // Clear only transactional and product data
+    const emptyState = {
+      products: [],
       transactions: [],
-      expenses: [],
-      closings: [],
+      onlineOrders: [],
+      chatMessages: [],
+      auditLogs: [],
       zakatRecords: [],
       zakatDistributions: [],
-      cart: [],
-      auditLogs: [],
+      expenses: [],
+      closings: [],
       purchaseOrders: [],
-      journalEntries: []
+      journalEntries: [],
+      customers: [],
+      suppliers: [],
+      promos: [],
+      attendances: [],
+      stockMovements: []
+    };
+    
+    set(emptyState);
+    
+    // Update local storage
+    const keysToClear = [
+      'ba_products', 'ba_transactions', 'ba_online_orders', 'ba_chat_messages',
+      'ba_audit_logs', 'ba_zakat_records', 'ba_zakat_distributions', 'ba_expenses',
+      'ba_closings', 'ba_purchase_orders', 'ba_journal_entries', 'ba_customers',
+      'ba_suppliers', 'ba_promos', 'ba_attendances', 'ba_stock_movements'
+    ];
+    
+    keysToClear.forEach(key => {
+      saveStorage(key, [], tenantId);
     });
-    localStorage.removeItem('ba_expenses');
-    localStorage.removeItem('ba_closings');
-    localStorage.removeItem('ba_products');
-    localStorage.removeItem('ba_transactions');
-    localStorage.removeItem('ba_zakat_records');
-    localStorage.removeItem('ba_zakat_distributions');
-    localStorage.removeItem('ba_audit_logs');
-    localStorage.removeItem('ba_users');
-    localStorage.removeItem('ba_purchase_orders');
-    localStorage.removeItem('ba_journal_entries');
-    get().addLog('DATABASE_RESET', 'SYSTEM', 'Semua data transaksi dan laporan diset ulang untuk penggunaan dari awal.');
+
+    get().addLog('SYSTEM_RESET', 'SYSTEM', 'Seluruh data uji coba telah dihapus');
   },
   
   // Add Log implementation
@@ -1579,6 +1833,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { currentUser } = get();
     const log: AuditLog = {
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      tenantId: currentUser?.tenantId || 'tenant_default',
       timestamp: new Date().toISOString(),
       user: currentUser ? currentUser.name : 'System (Anonym)',
       action,
@@ -1625,6 +1880,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 const localP = localProducts.find((lp: any) => lp.id === p.id);
                 return {
                   id: p.id,
+                  tenantId: p.tenant_id || get().currentUser?.tenantId || 'tenant_default',
                   sku: p.sku,
                   name: p.name,
                   category: p.category,
@@ -1642,14 +1898,23 @@ export const useAppStore = create<AppState>((set, get) => ({
             }
           }),
           supabaseService.getUsers().then(remoteUsers => {
-            if (remoteUsers && remoteUsers.length > 0) {
-              set({ users: remoteUsers });
+            if (remoteUsers) {
+              const defaultUsers = getSavedUsers();
+              const merged = [...remoteUsers];
+              defaultUsers.forEach(du => {
+                if (!merged.some(ru => ru.username === du.username)) {
+                  merged.push(du);
+                  supabaseService.saveUser(du);
+                }
+              });
+              set({ users: merged });
             }
           }),
           supabaseService.getTransactions().then(remoteTxs => {
             if (remoteTxs && remoteTxs.length > 0) {
               const transactionsMap = remoteTxs.map(t => ({
                 id: t.id,
+                tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
                 invoiceNo: t.invoice_no,
                 timestamp: t.timestamp || t.created_at || new Date().toISOString(),
                 cashierName: t.cashier_name,
@@ -1668,6 +1933,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             if (remoteLogs && remoteLogs.length > 0) {
               const logsMap = remoteLogs.map(l => ({
                 id: l.id,
+                tenantId: l.tenant_id || get().currentUser?.tenantId || 'tenant_default',
                 timestamp: l.timestamp || l.created_at || new Date().toISOString(),
                 user: l.username,
                 action: l.action,
@@ -1682,6 +1948,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             if (remoteZk && remoteZk.length > 0) {
               const zkMap = remoteZk.map(zk => ({
                 id: zk.id,
+                tenantId: zk.tenant_id || get().currentUser?.tenantId || 'tenant_default',
                 timestamp: zk.timestamp || zk.created_at || new Date().toISOString(),
                 goldPricePerGram: Number(zk.gold_price),
                 nisabValue: Number(zk.nisab_value),
@@ -1701,6 +1968,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             if (remoteZkd && remoteZkd.length > 0) {
               const zkdMap = remoteZkd.map(zkd => ({
                 id: zkd.id,
+                tenantId: zkd.tenant_id || get().currentUser?.tenantId || 'tenant_default',
                 timestamp: zkd.timestamp || zkd.created_at || new Date().toISOString(),
                 amount: Number(zkd.amount),
                 recipient: zkd.recipient,

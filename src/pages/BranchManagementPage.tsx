@@ -51,14 +51,14 @@ export default function BranchManagementPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Store className="w-6 h-6 text-emerald-600" />
+            <Store className="w-6 h-6 text-green-600" />
             Manajemen Cabang Toko
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola data cabang BA Mart untuk multi-outlet</p>
+          <p className="text-sm text-gray-500 mt-1">Kelola data cabang KSA Mart untuk multi-outlet</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors"
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
           Tambah Cabang
@@ -74,7 +74,7 @@ export default function BranchManagementPage() {
               placeholder="Cari nama atau alamat cabang..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm"
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
             />
           </div>
         </div>
@@ -98,7 +98,7 @@ export default function BranchManagementPage() {
                   <td className="px-6 py-4 text-gray-600">{branch.phone}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      branch.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                      branch.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {branch.isActive ? 'Aktif' : 'Nonaktif'}
                     </span>
@@ -153,7 +153,7 @@ export default function BranchManagementPage() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="Mis. Cabang Bogor"
                 />
               </div>
@@ -164,7 +164,7 @@ export default function BranchManagementPage() {
                   rows={3}
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="Alamat lengkap cabang..."
                 />
               </div>
@@ -175,7 +175,7 @@ export default function BranchManagementPage() {
                   required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   placeholder="Mis. 0812345678"
                 />
               </div>
@@ -185,7 +185,7 @@ export default function BranchManagementPage() {
                   id="isActive"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                  className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
                 />
                 <label htmlFor="isActive" className="text-sm text-gray-700 font-medium">Cabang Aktif Beroperasi</label>
               </div>
@@ -200,7 +200,7 @@ export default function BranchManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 text-white font-medium hover:bg-emerald-700 rounded-lg transition-colors shadow-sm"
+                  className="px-4 py-2 bg-green-600 text-white font-medium hover:bg-green-700 rounded-lg transition-colors shadow-sm"
                 >
                   Simpan Cabang
                 </button>

@@ -13,7 +13,7 @@ export default function ArusKasPage() {
         cashMovements.push({
           id: `${t.id}_${i}`,
           date: t.timestamp,
-          description: `Pendapatan Murabahah ${t.invoiceNo} (Split: ${sp.method})`,
+          description: `Pendapatan Penjualan ${t.invoiceNo} (Split: ${sp.method})`,
           type: 'IN',
           amount: sp.amount - (i === 0 ? t.changeAmount : 0), // Adjust change on first payment
           method: sp.method
@@ -23,7 +23,7 @@ export default function ArusKasPage() {
       cashMovements.push({
         id: t.id,
         date: t.timestamp,
-        description: `Pendapatan Murabahah ${t.invoiceNo} (${t.paymentMethod})`,
+        description: `Pendapatan Penjualan ${t.invoiceNo} (${t.paymentMethod})`,
         type: 'IN',
         amount: t.totalAmount,
         method: t.paymentMethod
@@ -61,7 +61,7 @@ export default function ArusKasPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center space-x-3 mb-6">
-        <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl">
+        <div className="p-3 bg-green-100 text-green-800 rounded-xl">
           <Wallet className="w-6 h-6" />
         </div>
         <div>
@@ -74,10 +74,10 @@ export default function ArusKasPage() {
         <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm">
           <div>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Masuk (Tunai)</p>
-            <p className="text-lg font-mono font-bold text-emerald-600">Rp {totalInTunai.toLocaleString('id-ID')}</p>
+            <p className="text-lg font-mono font-bold text-green-600">Rp {totalInTunai.toLocaleString('id-ID')}</p>
           </div>
-          <div className="p-3 bg-emerald-50 rounded-full flex-shrink-0">
-            <ArrowDownLeft className="w-5 h-5 text-emerald-500" />
+          <div className="p-3 bg-green-50 rounded-full flex-shrink-0">
+            <ArrowDownLeft className="w-5 h-5 text-green-500" />
           </div>
         </div>
 
@@ -136,14 +136,14 @@ export default function ArusKasPage() {
                   <td className="p-4 text-center">
                     <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${
                       movement.type === 'IN' 
-                        ? (movement.method === 'CASH' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800') 
+                        ? (movement.method === 'CASH' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800') 
                         : 'bg-red-100 text-red-800'
                     }`}>
                       {movement.type === 'IN' ? <ArrowDownLeft className="w-3 h-3"/> : <ArrowUpRight className="w-3 h-3"/>}
                       <span>{movement.type === 'IN' ? (movement.method === 'CASH' ? 'MASUK TUNAI' : 'MASUK NON-TUNAI') : 'KELUAR'}</span>
                     </span>
                   </td>
-                  <td className={`p-4 text-right font-mono font-bold ${movement.type === 'IN' ? (movement.method === 'CASH' ? 'text-emerald-600' : 'text-blue-600') : 'text-red-600'}`}>
+                  <td className={`p-4 text-right font-mono font-bold ${movement.type === 'IN' ? (movement.method === 'CASH' ? 'text-green-600' : 'text-blue-600') : 'text-red-600'}`}>
                     {movement.type === 'IN' ? '+' : '-'}{movement.amount.toLocaleString('id-ID')}
                   </td>
                 </tr>

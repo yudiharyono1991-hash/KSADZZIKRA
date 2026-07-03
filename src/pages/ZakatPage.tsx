@@ -55,6 +55,7 @@ export default function ZakatPage() {
 
   const handleSaveRecord = () => {
     addZakatRecord({
+      tenantId: currentUser?.tenantId || 'tenant_default',
       goldPricePerGram: goldPriceNum,
       nisabValue,
       liquidAssets: cashVal,
@@ -97,6 +98,7 @@ export default function ZakatPage() {
     }
 
     addZakatDistribution({
+      tenantId: currentUser?.tenantId || 'tenant_default',
       amount: nominal,
       recipient: distRecipient,
       esgCategory: distEsgCategory,
@@ -125,7 +127,7 @@ export default function ZakatPage() {
             onClick={() => setActiveTab('CALCULATOR')}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
               activeTab === 'CALCULATOR'
-                ? 'bg-emerald-700 text-white shadow-xs'
+                ? 'bg-green-700 text-white shadow-xs'
                 : 'text-gray-500 hover:text-gray-900'
             }`}
           >
@@ -135,7 +137,7 @@ export default function ZakatPage() {
             onClick={() => setActiveTab('DISTRIBUTION')}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
               activeTab === 'DISTRIBUTION'
-                ? 'bg-emerald-700 text-white shadow-xs'
+                ? 'bg-green-700 text-white shadow-xs'
                 : 'text-gray-500 hover:text-gray-900'
             }`}
           >
@@ -152,7 +154,7 @@ export default function ZakatPage() {
           <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-5">
             <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
               <h3 className="font-extrabold text-gray-800 text-sm flex items-center space-x-2">
-                <Calculator className="w-5 h-5 text-emerald-700" />
+                <Calculator className="w-5 h-5 text-green-700" />
                 <span>Kalkulator Zakat Mal Perniagaan (DSN-MUI)</span>
               </h3>
               <span className="bg-amber-150 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Muzakki Usaha</span>
@@ -169,7 +171,7 @@ export default function ZakatPage() {
                     <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-400 font-bold">Rp</span>
                     <input
                       type="number"
-                      className="w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 font-mono font-bold focus:ring-1 focus:ring-emerald-650"
+                      className="w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 font-mono font-bold focus:ring-1 focus:ring-green-650"
                       value={goldPrice}
                       onChange={(e) => setGoldPrice(e.target.value)}
                     />
@@ -261,7 +263,7 @@ export default function ZakatPage() {
               <div className="pt-3">
                 <button
                   onClick={handleSaveRecord}
-                  className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-950/20 uppercase tracking-widest active:scale-98 transition-all cursor-pointer"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white font-extrabold text-xs py-3.5 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-green-950/20 uppercase tracking-widest active:scale-98 transition-all cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
                   <span>Simpan Histori Zakat Maal</span>
@@ -291,17 +293,17 @@ export default function ZakatPage() {
                 
                 <div className="flex justify-between font-black text-sm text-gray-800">
                   <span>HARTA PERNIAGAAN NETTO</span>
-                  <span className="font-mono text-emerald-900">Rp {netWealth.toLocaleString('id-ID')}</span>
+                  <span className="font-mono text-green-900">Rp {netWealth.toLocaleString('id-ID')}</span>
                 </div>
               </div>
 
               {/* Limit / Threshold Indicator alerts */}
               {isEligible ? (
-                <div className="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-250 flex items-start space-x-2.5">
-                  <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div className="bg-green-50 text-green-800 p-4 rounded-xl border border-green-250 flex items-start space-x-2.5">
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                   <div className="text-[11px] leading-relaxed">
                     <p className="font-bold">Status: Wajib Mengeluarkan Zakat</p>
-                    <p className="text-emerald-700/90 mt-0.5">
+                    <p className="text-green-700/90 mt-0.5">
                       Harta perniagaan bersih mencapai nishab (<b>Rp {nisabValue.toLocaleString('id-ID')}</b>). Kadar zakat yang wajib ditunaikan adalah sebesar 2.5% dari harta bersih perniagaan.
                     </p>
                   </div>
@@ -321,8 +323,8 @@ export default function ZakatPage() {
 
             {/* Zakat amount visualization */}
             <div className="pt-6 border-t border-gray-150 mt-6 lg:mt-0 font-sans">
-              <div className="p-4 bg-emerald-950 text-white rounded-xl text-center shadow-lg shadow-emerald-950/15">
-                <p className="text-[9px] text-emerald-400 uppercase tracking-widest font-black">Kewajiban Zakat yang Dibayar (2.5%)</p>
+              <div className="p-4 bg-green-950 text-white rounded-xl text-center shadow-lg shadow-green-950/15">
+                <p className="text-[9px] text-green-400 uppercase tracking-widest font-black">Kewajiban Zakat yang Dibayar (2.5%)</p>
                 <p className="text-2xl font-black text-amber-300 mt-1 font-mono">Rp {zakatDue.toLocaleString('id-ID')}</p>
               </div>
             </div>
@@ -331,7 +333,7 @@ export default function ZakatPage() {
           {/* Historical Calculations Table */}
           <div className="lg:col-span-12 bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center space-x-2">
-              <History className="w-4 h-4 text-emerald-700" />
+              <History className="w-4 h-4 text-green-700" />
               <h4 className="font-bold text-gray-800 text-xs">Arsip Histori Perhitungan Zakat Maal</h4>
             </div>
 
@@ -360,12 +362,12 @@ export default function ZakatPage() {
                         <td className="py-3 px-5 text-right font-mono text-gray-900">Rp {zk.netWealth.toLocaleString('id-ID')}</td>
                         <td className="py-3 px-5 text-center">
                           {zk.isZakatRequired ? (
-                            <span className="bg-emerald-50 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-black border border-emerald-100 uppercase">Wajib</span>
+                            <span className="bg-green-50 text-green-800 text-[9px] px-2 py-0.5 rounded-full font-black border border-green-100 uppercase">Wajib</span>
                           ) : (
                             <span className="bg-slate-100 text-slate-500 text-[9px] px-2 py-0.5 rounded-full font-black uppercase">Infaq</span>
                           )}
                         </td>
-                        <td className="py-3 px-5 text-right font-mono text-emerald-800">Rp {zk.zakatDue.toLocaleString('id-ID')}</td>
+                        <td className="py-3 px-5 text-right font-mono text-green-800">Rp {zk.zakatDue.toLocaleString('id-ID')}</td>
                         <td className="py-3 px-5 text-gray-550 font-medium truncate max-w-xs">{zk.notes}</td>
                       </tr>
                     ))
@@ -384,7 +386,7 @@ export default function ZakatPage() {
             
             <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
               <p className="text-gray-400 text-[10px] uppercase tracking-wider font-extrabold font-sans">Cadangan Zakat POS (2.5% Margin)</p>
-              <h3 className="text-xl font-extrabold text-emerald-800 mt-1 font-mono">Rp {totalZakatFromSales.toLocaleString('id-ID')}</h3>
+              <h3 className="text-xl font-extrabold text-green-800 mt-1 font-mono">Rp {totalZakatFromSales.toLocaleString('id-ID')}</h3>
             </div>
 
             <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
@@ -399,14 +401,14 @@ export default function ZakatPage() {
 
             <div className="bg-white p-5 rounded-xl border border-gray-200/80 shadow-xs">
               <p className="text-gray-400 text-[10px] uppercase tracking-wider font-extrabold font-sans">SALDO ZAKAT SIAP SALUR</p>
-              <h3 className="text-xl font-black text-emerald-950 mt-1 font-mono">Rp {remainingZakatPool.toLocaleString('id-ID')}</h3>
+              <h3 className="text-xl font-black text-green-950 mt-1 font-mono">Rp {remainingZakatPool.toLocaleString('id-ID')}</h3>
             </div>
           </div>
 
           {/* Form to Log Zakat Log & ESG Allocations */}
           <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4">
             <div className="border-b border-gray-100 pb-3 flex items-center space-x-2">
-              <Send className="w-5 h-5 text-emerald-800" />
+              <Send className="w-5 h-5 text-green-800" />
               <div>
                 <h3 className="font-extrabold text-gray-800 text-sm">Penyaluran & ESG Impact</h3>
                 <p className="text-[10px] text-gray-400 mt-0.5">Catatkan update dana zakat yang sukses disalurkan</p>
@@ -456,11 +458,11 @@ export default function ZakatPage() {
                     onClick={() => setDistEsgCategory('ENVIRONMENTAL')}
                     className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center space-y-1 transition-all ${
                       distEsgCategory === 'ENVIRONMENTAL'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        ? 'border-green-600 bg-green-50 text-green-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
                     }`}
                   >
-                    <Leaf className="w-4 h-4 text-emerald-600" />
+                    <Leaf className="w-4 h-4 text-green-600" />
                     <span className="text-[9px] font-black uppercase">Environment (E)</span>
                   </button>
 
@@ -469,7 +471,7 @@ export default function ZakatPage() {
                     onClick={() => setDistEsgCategory('SOCIAL')}
                     className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center space-y-1 transition-all ${
                       distEsgCategory === 'SOCIAL'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        ? 'border-green-600 bg-green-50 text-green-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
                     }`}
                   >
@@ -482,7 +484,7 @@ export default function ZakatPage() {
                     onClick={() => setDistEsgCategory('GOVERNANCE')}
                     className={`p-2.5 rounded-lg border text-center flex flex-col items-center justify-center space-y-1 transition-all ${
                       distEsgCategory === 'GOVERNANCE'
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        ? 'border-green-600 bg-green-50 text-green-800'
                         : 'border-gray-200 hover:bg-slate-50 text-gray-600'
                     }`}
                   >
@@ -507,7 +509,7 @@ export default function ZakatPage() {
               {/* Distribute Button */}
               <button
                 type="submit"
-                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs py-3 rounded-lg flex items-center justify-center space-x-1 shadow-xs uppercase tracking-wider"
+                className="w-full bg-green-700 hover:bg-green-800 text-white font-extrabold text-xs py-3 rounded-lg flex items-center justify-center space-x-1 shadow-xs uppercase tracking-wider"
               >
                 <span>Catatkan Penyaluran Zakat</span>
               </button>
@@ -547,7 +549,7 @@ export default function ZakatPage() {
                             </td>
                             <td className="py-3 px-4 text-center">
                               {dist.esgCategory === 'ENVIRONMENTAL' ? (
-                                <span className="bg-emerald-50 text-emerald-800 text-[8px] font-black px-2 py-0.5 rounded border border-emerald-100 uppercase tracking-widest flex items-center justify-center w-24 mx-auto gap-1">
+                                <span className="bg-green-50 text-green-800 text-[8px] font-black px-2 py-0.5 rounded border border-green-100 uppercase tracking-widest flex items-center justify-center w-24 mx-auto gap-1">
                                   <Leaf className="w-2.5 h-2.5" />
                                   <span>Eco Friendly</span>
                                 </span>
@@ -563,7 +565,7 @@ export default function ZakatPage() {
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-4 text-right font-mono text-emerald-800 text-xs">
+                            <td className="py-3 px-4 text-right font-mono text-green-800 text-xs">
                               Rp {dist.amount.toLocaleString('id-ID')}
                             </td>
                           </tr>
@@ -577,7 +579,7 @@ export default function ZakatPage() {
 
             {/* Visual bottom banner ESG Info */}
             <div className="m-4 mt-8 p-3 bg-slate-50 border border-slate-150 rounded-xl flex items-start space-x-2.5">
-              <Sparkles className="w-4.5 h-4.5 text-emerald-700 flex-shrink-0 mt-0.5" />
+              <Sparkles className="w-4.5 h-4.5 text-green-700 flex-shrink-0 mt-0.5" />
               <div className="text-[10px] leading-relaxed text-gray-550">
                 <p className="font-bold text-gray-800">Framework Syariah ESG Integration 2026</p>
                 <p className="font-medium">

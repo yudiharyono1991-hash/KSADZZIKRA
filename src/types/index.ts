@@ -32,6 +32,12 @@ export interface StoreSettings {
   storeAddress?: string;
   storePhone?: string;
   businessType?: 'KOPERASI' | 'UMUM';
+  // Payment Methods for customer orders
+  paymentMethods?: {
+    bankTransfer?: { enabled: boolean; bankName: string; accountNumber: string; accountName: string; }[];
+    ewallet?: { enabled: boolean; provider: string; number: string; accountName: string; }[];
+  };
+  ownerWhatsapp?: string;
 }
 
 export interface StockMovement {
@@ -56,6 +62,7 @@ export interface Customer {
   debtAmount: number;
   createdAt: string;
   branchId?: string;
+  isKoperasiMember?: boolean;
 }
 
 export interface Supplier {
@@ -95,6 +102,17 @@ export interface Attendance {
   photoUrl?: string;
   latitude?: number;
   longitude?: number;
+  clockOutPhotoUrl?: string;
+  clockOutLatitude?: number;
+  clockOutLongitude?: number;
+  
+  // Correction Request Fields
+  correctionStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  correctionReason?: string;
+  correctionType?: 'CLOCK_IN' | 'CLOCK_OUT' | 'BOTH';
+  requestedClockIn?: string;
+  requestedClockOut?: string;
+  isRevised?: boolean;
 }
 
 export interface Product {
@@ -113,13 +131,21 @@ export interface Product {
   wholesalePrice?: number;
   wholesaleMinQty?: number;
   branchId?: string; // Optional for backward compatibility, but should be required eventually
-  image?: string; // Product photo URL
+  image?: string; // Product photo URL (Base64)
   expiryDate?: string; // Tanggal Kadaluarsa
+  hasBoxUnit?: boolean; // Pilihan dijual per box
+  boxBarcode?: string; // Barcode untuk box
+  pcsPerBox?: number; // Jumlah satuan per box
+  boxPrice?: number; // Harga jual per box
+  boxCostPrice?: number; // Modal per box
+  salesCoaCode?: string; // Akun Pendapatan
+  cogsCoaCode?: string;  // Akun HPP
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
+  isBox?: boolean;
 }
 
 export interface Transaction {
@@ -151,6 +177,9 @@ export interface Transaction {
   voidReason?: string;
   taxAmount?: number;
   splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
+  pointsEarned?: number;
+  pointsRedeemed?: number;
+  pointsDiscount?: number;
 }
 
 export interface AuditLog {
@@ -241,6 +270,7 @@ export interface UserAccount {
   approvedAt?: string;
   phone?: string;
   branchId?: string;
+  isKoperasiMember?: boolean;
 }
 
 export interface PurchaseOrder {
@@ -286,6 +316,7 @@ export interface OnlineOrder {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  customerAddress?: string;
   items: {
     productId: string;
     productName: string;
@@ -308,5 +339,14 @@ export interface ChatMessage {
   senderName: string;
   text: string;
   timestamp: string;
+}
+
+export interface CoaAccount {
+  id: string;
+  tenantId: string;
+  code: string;
+  name: string;
+  category: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+  isActive: boolean;
 }
 
