@@ -1,99 +1,104 @@
-# 🟢 SmartPOS Shariah - Digital POS & Accounting Platform
+# 🟢 KSA Mart Syariah - Sistem POS & Akuntansi Koperasi Digital
 
-> Platform Kasir Terintegrasi dengan Akuntansi Syariah, Manajemen Inventori, dan Kalkulasi Zakat Otomatis untuk UMKM Indonesia
+> Platform Kasir Terintegrasi dengan Akuntansi Syariah, Manajemen Inventori, dan Kalkulasi Zakat Otomatis untuk Koperasi Syariah ADZ-ZIKRA
 
-Proyek ini telah dirapikan secara modular dan siap digunakan langsung di VS Code Anda. Seluruh file utama, routing, state management (Zustand), styling (Tailwind CSS), dan visualizer analitik (Recharts) sudah dikonfigurasi dengan aman, teruji lint bebas error, dan siap dijalankan.
+**Project:** KSADZZIKRA | **Supabase ID:** rxuwdnaycysgmofazjmz | **GitHub:** yudiharyono1991-hash/KSADZZIKRA
 
 ---
 
-## 🚀 Panduan Membuka & Menjalankan di VS Code
+## 🚀 Panduan Menjalankan di Lokal (VS Code)
 
-### 1. Ekspor & Unduh Proyek
-Pilih menu **Settings** di pojok kanan atas Google AI Studio, lalu pilih **Export to ZIP** untuk mengunduh seluruh folder proyek ini ke komputer lokal Anda.
-
-### 2. Buka di VS Code
-- Ekstrak file zip yang diunduh.
-- Jalankan VS Code, pilih **File -> Open Folder**, lalu pilih folder hasil ekstrak tersebut.
-
-### 3. Instalasi Dependensi
-Buka terminal baru di VS Code (`Ctrl + ~`), lalu jalankan perintah berikut untuk menginstal seluruh package yang diperlukan:
+### 1. Instalasi Dependensi
 ```bash
 npm install
 ```
 
-### 4. Jalankan Development Server
-Setelah instalasi selesai, jalankan perintah development server:
+### 2. Jalankan Development Server
 ```bash
 npm run dev
 ```
-Aplikasi POS Syariah Anda akan siap diakses di URL lokal (biasanya `http://localhost:3000` atau `http://localhost:5173`).
+Aplikasi bisa diakses di: `http://localhost:3000`
 
 ---
 
-## 📁 Struktur Folder Proyek yang Dirapikan
+## 📁 Struktur Folder Proyek
 
 ```
-smartpos-shariah/
+KSAMart/
 ├── src/
 │   ├── components/
 │   │   └── Layout/
-│   │       ├── Sidebar.tsx        # Navigasi Menu Shariah Emerald Theme
-│   │       ├── TopBar.tsx         # Live KPI & Jam Waktu Rill
+│   │       ├── Sidebar.tsx        # Navigasi Menu Syariah Emerald Theme
+│   │       ├── TopBar.tsx         # Live KPI & Status Supabase
 │   │       ├── MainLayout.tsx     # Frame Layar Utama Terpadu
 │   │       └── index.ts           # Modular Export Layout
 │   ├── pages/
-│   │   ├── KasirPOS.tsx          # Konsol Transaksi POS (QRIS, Tunai, Bank Transfer)
-│   │   ├── InventoryPage.tsx      # Manajemen Stok & Batas Kritik Inventori
-│   │   ├── TrendPage.tsx          # Analitik Penjualan, Margin, & Zakat (Recharts)
-│   │   ├── SalesReportPage.tsx    # Arsip Invoice Struk Belanja & Cetak Ulang
-│   │   ├── FinancialReportPage.tsx# Laporan Laba Rugi & Neraca Berimbang
-│   │   ├── ZakatPage.tsx          # Kalkulator Zakat Mal Dagang (Acuan Nisab Emas)
-│   │   ├── AuditLogPage.tsx       # Log Audit Sistem & Keamanan Operator
+│   │   ├── KasirPOS.tsx          # Konsol Transaksi POS (QRIS, Tunai, BSI)
+│   │   ├── InventoryPage.tsx      # Manajemen Stok & Inventori
+│   │   ├── TrendPage.tsx          # Analitik Penjualan & Margin (Recharts)
+│   │   ├── SalesReportPage.tsx    # Arsip Invoice & Cetak Struk
+│   │   ├── CustomerPortal.tsx     # Portal Belanja Pelanggan Member
+│   │   ├── KatalogUmumPage.tsx    # Katalog Belanja Umum (non-member)
+│   │   ├── OnlineOrdersPage.tsx   # Kelola Pesanan Online Masuk
+│   │   ├── ZakatPage.tsx          # Kalkulator Zakat Mal Dagang
+│   │   ├── SettingsPage.tsx       # Pengaturan Toko & Supabase Sync
 │   │   └── index.ts               # Modular Export Pages
 │   ├── store/
 │   │   └── index.ts               # Global State (Zustand) & Logic Kasir
+│   ├── lib/
+│   │   └── supabase.ts            # Koneksi Supabase KSADZZIKRA
 │   ├── types/
-│   │   └── index.ts               # Strict Typings (Product, Transaction, Zakat, Logs)
-│   ├── App.tsx                    # React Router Index Declarations
-│   ├── index.css                  # Tailwind CSS Core Imports
-│   └── main.tsx                   # React DOM Renderer Bootstrapper
-├── package.json                   # Dependensi & Script Project
-├── vite.config.ts                 # Konfigurasi Build Pipeline Vite
-├── tsconfig.json                  # Konfigurasi Kompiler TypeScript
-└── README.md                      # Dokumentasi Panduan Berjalan
+│   │   └── index.ts               # TypeScript Types
+│   ├── App.tsx                    # React Router & Routes
+│   └── main.tsx                   # Entry Point
+├── supabase_schema.sql            # ✅ SATU FILE SQL Lengkap untuk KSADZZIKRA
+├── .env                           # Kredensial Supabase (tidak masuk GitHub)
+├── .env.example                   # Contoh format .env
+├── netlify.toml                   # Konfigurasi Deploy Netlify
+└── package.json                   # Dependensi & Script
 ```
 
 ---
 
-## 📋 Fitur Utama yang Telah Diimplementasikan
+## 📋 Fitur Utama
 
-1. **Kasir POS Terpadu (`/kasir`)**
-   * Cari produk berdasarkan nama/SKU/Barcode.
-   * Filter cepat berdasarkan komoditas barang.
-   * Keranjang belanja dinamis berbasis stok produk rill.
-   * Dialog pembayaran interaktif: Cash (autocalculate kembalian), QRIS Shariah, atau Transfer BSI.
-   * Tampilan mockup cetak struk lengkap dengan pencadangan sedekah/zakat 2.5% dari profit margin.
+1. **Kasir POS Terpadu** - Transaksi Cash, QRIS Syariah, Transfer BSI
+2. **Manajemen Stok & Inventori** - Barcode, multi-unit (Pcs/Box), ekspiry date
+3. **Portal Pelanggan Member** - Login, poin loyalitas, riwayat pesanan, diskon
+4. **Katalog Belanja Umum** - Order tanpa login, cek jarak GPS, periode delivery
+5. **Pesanan Online** - Sinkronisasi real-time ke dashboard admin
+6. **Akuntansi Syariah** - Jurnal umum, CoA, laporan laba rugi, neraca
+7. **Zakat Otomatis** - Kalkulasi zakat mal & distribusi ESG
+8. **Manajemen SDM** - Absensi, shift, koreksi jam, cash opname
+9. **Koperasi** - Anggota koperasi, SHU, simpanan
+10. **Multi-cabang** - Filter data per cabang, admin pusat
 
-2. **Manajemen Stok (`/inventory`)**
-   * Kartu metrik: Jumlah SKU, status kritis (menipis), dan estimasi total aset modal.
-   * Tabel master stok dilengkapi tombol penyesuaian cepat (+/- stok).
-   * Modal form penambahan SKU baru dengan validasi syariah (Harga Jual wajib ≥ Harga Beli).
+---
 
-3. **Tren & Grafik Analitik (`/trend`)**
-   * Digerakkan penuh oleh pustaka visualisasi **Recharts**.
-   * Grafik Area perkembangan Omset Vs Margin Mingguan.
-   * Distribusi share kategori utama toko menggunakan donat Pie chart.
-   * Akumulasi potensi Zakat terkumpul harian dalam format Bar chart.
+## ⚙️ Konfigurasi Supabase KSADZZIKRA
 
-4. **Laporan Keuangan Madani (`/laporan-keuangan`)**
-   * Laporan Laba Rugi rill (Omset, HPP, Laba Kotor, Beban Operasional, Laba Bersih, Cadangan Zakat Usaha).
-   * Neraca Keuangan seimbang (Total Aktiva/Aset = Pasiva/Hutang + Modal Sendiri).
+Buat file `.env` di root folder:
+```env
+VITE_SUPABASE_URL=https://rxuwdnaycysgmofazjmz.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4dXdkbmF5Y3lzZ21vZmF6am16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDQzODMsImV4cCI6MjA5ODUyMDM4M30.OOmVoWbtCbpavCReyh5jVOWhTe0uhywV3NA3nXmcfXI
+```
 
-5. **Kalkulator Zakat Mal Perniagaan (`/zakat`)**
-   * Menghitung kelayakan nishab mal (setara nilai pasar 85g emas).
-   * Menghitung total porsi harta wajib zakat dikurangi kewajiban hutang toko.
-   * Menyimpan histori pencatatan zakat periodik.
+Jalankan `supabase_schema.sql` di SQL Editor Supabase KSADZZIKRA untuk membuat semua tabel.
 
-6. **Audit Trail Keamanan (`/audit-log`)**
-   * Log rill dari aktivitas operator: login kasir, penambahan produk baru, mutasi stok, hingga pencatatan POS.
-   * Jejak alamat IP dan penanda kategori log (POS, Finance, Inventory, System).
+---
+
+## 🌐 Deploy ke Netlify
+
+1. Push ke GitHub: `git push origin main`
+2. Buka Netlify → **Add new site** → **Import from Git** → pilih repo `KSADZZIKRA`
+3. Build settings:
+   - **Build command:** `npm run build`
+   - **Publish directory:** `dist`
+4. Environment Variables:
+   - `VITE_SUPABASE_URL` = `https://rxuwdnaycysgmofazjmz.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY` = (key KSADZZIKRA di atas)
+5. Klik **Deploy Site**
+
+---
+
+*KSA Mart Syariah — Halal. Amanah. Berkah. 🕌✨*
