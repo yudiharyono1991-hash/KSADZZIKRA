@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { History, Search, Printer, CheckCircle, XOctagon } from 'lucide-react';
 
 export default function KasirRiwayatPage() {
-  const { transactions, currentUser, voidTransaction, activeBranchId } = useAppStore();
+  const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId } = useBranchData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [txToVoid, setTxToVoid] = useState<any>(null);
@@ -38,7 +38,7 @@ export default function KasirRiwayatPage() {
       alert("Alasan pembatalan harus diisi!");
       return;
     }
-    voidTransaction(txToVoid.id, voidReason);
+    requestVoidTransaction(txToVoid.id, voidReason);
     setTxToVoid(null);
     setVoidReason('');
   };
@@ -105,14 +105,35 @@ export default function KasirRiwayatPage() {
                     >
                       <Printer className="w-4 h-4" />
                     </button>
-                    {!tx.isVoided ? (
+                    {!tx.isVoided && tx.voidStatus !== 'PENDING' && tx.voidStatus !== 'REJECTED' ? (
                       <button
                         onClick={() => { setTxToVoid(tx); setVoidReason(''); }}
                         className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-block border border-red-200 shadow-xs"
-                        title="Batalkan (Void)"
+                        title="Ajukan Pembatalan (Void)"
                       >
                         <XOctagon className="w-4 h-4" />
                       </button>
+                    ) : tx.voidStatus === 'PENDING' ? (
+                      <div className="inline-flex flex-col gap-1 items-center">
+                        <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold uppercase">Pending Void</span>
+                        {['MANAGER', 'OWNER', 'SUPERADMIN'].includes(currentUser?.role || '') && (
+                          <div className="flex gap-1 mt-1">
+                            <button onClick={() => approveVoidTransaction(tx.id, true)} className="text-[9px] bg-green-500 text-white px-2 py-1 rounded">Approve</button>
+                            <button onClick={() => approveVoidTransaction(tx.id, false)} className="text-[9px] bg-red-500 text-white px-2 py-1 rounded">Reject</button>
+                          </div>
+                        )}
+                      </div>
+                    ) : tx.voidStatus === 'REJECTED' ? (
+                      <div className="inline-flex flex-col gap-1 items-center">
+                        <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-1 rounded font-bold uppercase">Void Ditolak</span>
+                        <button
+                          onClick={() => { setTxToVoid(tx); setVoidReason(''); }}
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-block border border-red-200 shadow-xs mt-1"
+                          title="Ajukan Pembatalan (Void) Ulang"
+                        >
+                          <XOctagon className="w-4 h-4" />
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded font-bold uppercase">Voided</span>
                     )}
@@ -215,8 +236,8 @@ export default function KasirRiwayatPage() {
           <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 text-center border-b border-gray-100 bg-red-50">
               <XOctagon className="w-12 h-12 text-red-500 mx-auto mb-2" />
-              <h3 className="font-extrabold text-gray-800 text-md">Batalkan Transaksi</h3>
-              <p className="text-xs text-red-600 mt-1">Aksi ini akan mengembalikan stok & membuat jurnal balik pembatalan.</p>
+              <h3 className="font-extrabold text-gray-800 text-md">Ajukan Batal Transaksi</h3>
+              <p className="text-xs text-red-600 mt-1">Pengajuan akan dikirim ke Manager untuk persetujuan (Approval).</p>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm font-bold text-gray-800">No Invoice: {txToVoid.invoiceNo}</p>
@@ -242,7 +263,7 @@ export default function KasirRiwayatPage() {
                 onClick={handleVoid}
                 className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg text-center shadow-xs"
               >
-                Konfirmasi Void
+                Ajukan Void
               </button>
             </div>
           </div>

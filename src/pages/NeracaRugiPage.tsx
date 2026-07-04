@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import * as XLSX from 'xlsx';
 import html2pdf from 'html2pdf.js';
 import { 
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function NeracaRugiPage() {
-  const { transactions, products, expenses, currentUser, activeBranchId, branches } = useAppStore();
+  const { transactions, products, expenses, currentUser, activeBranchId, branches, addLog, addNotification, settings } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
 
   // WIB (Asia/Jakarta) Date Initialization
@@ -99,7 +99,8 @@ export default function NeracaRugiPage() {
   const grossProfit = totalRevenue - totalHPP;
   const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
   const netProfit = grossProfit - totalExpenses;
-  const zakatReserve = Math.max(0, netProfit) * 0.025; // 2.5% Zakat Niaga berdasarkan Keuntungan Bersih
+  const zakatRateDecimal = (settings.zakatRate || 2.5) / 100;
+  const zakatReserve = Math.max(0, netProfit) * zakatRateDecimal; // Zakat Niaga berdasarkan Keuntungan Bersih
 
   // Cumulative all-time balances supporting position (Balance Sheet)
   const allTimeRevenue = (transactions || [])
@@ -244,6 +245,23 @@ export default function NeracaRugiPage() {
             />
           </div>
 
+          <button
+            onClick={() => {
+              addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate} untuk persetujuan Owner.`);
+              addNotification({
+                title: 'Approval Laporan Keuangan',
+                message: `Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate} dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
+                type: 'APPROVAL',
+                targetRole: ['OWNER', 'PENGURUS'],
+                link: '/laba-rugi'
+              });
+              alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
+          >
+            <span>Kirim Laporan</span>
+          </button>
+          
           <button
             onClick={handleExportExcel}
             className="bg-white hover:bg-slate-50 text-gray-700 border border-gray-200 font-bold text-xs py-1.5 px-3 rounded-lg flex items-center space-x-1 shadow-2xs transition-colors"
@@ -390,8 +408,8 @@ export default function NeracaRugiPage() {
           </div>
 
           <div className="mt-6 space-y-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between font-extrabold text-slate-900 text-sm py-3 bg-slate-55 px-3.5 rounded-lg border">
-              <span>{netProfit >= 0 ? 'LABA BERSIH BERJALAN' : 'RUGI BERSIH BERJALAN'}</span>
+            <div className="flex justify-between font-extrabold text-slate-900 text-sm py-3 bg-slate-50 px-3.5 rounded-lg border">
+              <span>{netProfit >= 0 ? 'LABA BERSIH (SEBELUM ZAKAT)' : 'RUGI BERSIH BERJALAN'}</span>
               <span className={`${netProfit >= 0 ? 'text-green-800' : 'text-red-600'} font-mono`}>
                 {netProfit < 0 ? '-' : ''}Rp {Math.abs(netProfit).toLocaleString('id-ID')}
               </span>
@@ -401,14 +419,23 @@ export default function NeracaRugiPage() {
               <div className="flex justify-between items-center font-bold mb-1">
                 <span className="flex items-center space-x-1">
                   <Coins className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Cadangan Zakat Usaha (2.5%)</span>
+                  <span>Kewajiban Zakat Niaga ({settings.zakatRate || 2.5}%)</span>
                 </span>
-                <span className="font-mono font-black">Rp {zakatReserve.toLocaleString('id-ID')}</span>
+                <span className="font-mono font-black text-amber-700">Rp {zakatReserve.toLocaleString('id-ID')}</span>
               </div>
               <p className="text-[10px] text-green-800 font-medium">
-                Sesuai Fatwa Shariah, kewajiban zakat mall dhuafa ditarik otomatis dari surplus laba bersih perdagangan demi keseimbangan maqashid syariah.
+                Sesuai Fatwa Syariah, kewajiban zakat ditarik otomatis dari surplus laba bersih.
               </p>
             </div>
+
+            {netProfit >= 0 && (
+              <div className="flex justify-between font-extrabold text-white text-sm py-3 bg-green-700 px-3.5 rounded-lg border border-green-800 shadow-sm">
+                <span>SHU BERSIH (SIAP BAGI HASIL MUDHARABAH)</span>
+                <span className="font-mono">
+                  Rp {(netProfit - zakatReserve).toLocaleString('id-ID')}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -664,21 +691,27 @@ export default function NeracaRugiPage() {
           </div>
         </div>
 
-        <div className="mt-8 pt-8 flex justify-between items-end px-12">
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-16">Dibuat Oleh,</p>
-            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-4">
-              {currentUser?.role === 'OWNER' ? 'Administrator' : (currentUser?.name || '_______________________')}
+        <div className="mt-8 pt-8 flex justify-between items-end border-t-2 border-gray-300 px-4">
+          <div className="text-center w-1/3 px-2">
+            <p className="text-xs font-semibold mb-12">Diperiksa Oleh,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
+              {currentUser?.role === 'ADMIN' ? currentUser.name : ''}
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {currentUser?.role === 'OWNER' ? 'Admin Toko' : currentUser?.role === 'ADMIN' ? 'Administrator' : 'Kasir / Staff'}
-            </p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Admin</p>
           </div>
           
-          <div className="text-center">
-            <p className="text-[11px] text-gray-600 mb-4">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p className="text-xs font-semibold mb-12">Mengetahui/Menyetujui,</p>
-            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-4 whitespace-nowrap">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
+          <div className="text-center w-1/3 px-2 border-l border-gray-200">
+            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
+              {currentUser?.role === 'MANAGER' ? currentUser.name : ''}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Manager Cabang</p>
+          </div>
+
+          <div className="text-center w-1/3 px-2 border-l border-gray-200">
+            <p className="text-[10px] text-gray-600 mb-2">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-xs font-semibold mb-12">Menyetujui,</p>
+            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-2 whitespace-nowrap h-6 flex items-end justify-center">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
             <p className="text-xs text-gray-500 mt-1">Ketua Toko Koperasi KSA Mart</p>
           </div>
         </div>

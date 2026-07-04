@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { UserCheck, Clock, CheckCircle, Search, AlertTriangle, ThumbsUp, ThumbsDown, Banknote, Calculator, Printer, AlertCircle } from 'lucide-react';
 
 export default function StaffManagementPage() {
-  const { attendances, users, currentUser, transactions, expenses, reviewAttendanceCorrection } = useAppStore();
+  const store = useBranchData();
+  const { users, currentUser, transactions } = store;
+  const attendances: any[] = (store as any).attendances || [];
+  const expenses: any[] = (store as any).expenses || [];
+  const addAttendanceCorrection = (store as any).addAttendanceCorrection || (() => {});
+  const updateAttendanceCorrection = (store as any).updateAttendanceCorrection || (() => {});
+  const reviewAttendanceCorrection = (store as any).reviewAttendanceCorrection || ((id: string, approve: boolean) => {});
+
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'LOG' | 'CORRECTIONS' | 'CASH_OPNAME'>('LOG');
 
@@ -17,7 +24,7 @@ export default function StaffManagementPage() {
     difference: number; notes: string; recordedBy: string; timestamp: string;
   }>>([]);
 
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 

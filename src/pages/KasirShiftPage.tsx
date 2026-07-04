@@ -7,6 +7,7 @@ export default function KasirShiftPage() {
   
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
+  const [actualCash, setActualCash] = useState<string>('');
   const [isShiftClosed, setIsShiftClosed] = useState(false);
   const [clockingMode, setClockingMode] = useState<'IN' | 'OUT' | null>(null);
   const [selfieData, setSelfieData] = useState<string>('');
@@ -105,10 +106,15 @@ export default function KasirShiftPage() {
   };
 
   const handleCloseShift = () => {
+    if (actualCash === '') {
+      alert('Silakan masukkan jumlah uang fisik di laci terlebih dahulu!');
+      return;
+    }
+    const variance = Number(actualCash) - expectedCash;
     addLog(
       'SHIFT_CLOSED',
       'SYSTEM',
-      `Tutup Shift ${currentUser?.name}. Tunai Seharusnya: Rp ${expectedCash.toLocaleString('id-ID')}`
+      `Tutup Shift ${currentUser?.name}. Tunai Seharusnya: Rp ${expectedCash.toLocaleString('id-ID')} | Fisik: Rp ${Number(actualCash).toLocaleString('id-ID')} | Selisih: Rp ${variance.toLocaleString('id-ID')}`
     );
     setIsShiftClosed(true);
     setTimeout(() => {

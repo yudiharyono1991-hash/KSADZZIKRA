@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { Award, Search, TrendingUp, Users, Gift, ShieldCheck } from 'lucide-react';
 
 export default function LoyaltyProgramPage() {
-  const { customers, transactions, currentUser } = useAppStore();
+  const { customers, transactions, currentUser } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Protect route
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER' && currentUser?.role !== 'SUPERADMIN') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4 py-20">
         <ShieldCheck className="w-16 h-16 text-red-400" />

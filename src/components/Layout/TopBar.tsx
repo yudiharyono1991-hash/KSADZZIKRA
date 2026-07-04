@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppStore } from '../../store';
+import { useBranchData } from '../../hooks/useBranchData';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { 
   Building, 
@@ -16,7 +16,8 @@ import {
   X,
   Users,
   Bell,
-  RefreshCw
+  RefreshCw,
+  ShoppingBag
 } from 'lucide-react';
 
 interface TopBarProps {
@@ -25,7 +26,7 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopBarProps) {
-  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser } = useAppStore();
+  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser, onlineOrders, notifications, markNotificationAsRead } = useBranchData();
   const [time, setTime] = useState(new Date());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -70,6 +71,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
     : 'Pusat';
 
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
+  const pendingOnlineOrdersCount = onlineOrders?.filter(o => o.status === 'PENDING').length || 0;
 
   // Find expiring products (30 days)
   const thirtyDaysFromNow = new Date();
@@ -78,6 +80,17 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
     if (!p.expiryDate || p.stock <= 0) return false;
     return new Date(p.expiryDate) <= thirtyDaysFromNow;
   });
+  
+  // Filter notifications for current user
+  const unreadNotifications = notifications?.filter(n => {
+    if (n.isRead) return false;
+    if (n.targetRole) {
+      const roles = Array.isArray(n.targetRole) ? n.targetRole : [n.targetRole];
+      if (!roles.includes(currentUser?.role as any)) return false;
+    }
+    if (n.branchId && currentUser?.branchId && n.branchId !== currentUser.branchId) return false;
+    return true;
+  }) || [];
   
   const handleRefresh = () => {
     window.location.reload();
@@ -208,7 +221,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
               className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
             >
               <Bell className="w-5 h-5" />
-              {(lowStockCount > 0 || pendingUsersCount > 0 || expiringProducts.length > 0) && (
+              {(lowStockCount > 0 || pendingUsersCount > 0 || expiringProducts.length > 0 || pendingOnlineOrdersCount > 0 || unreadNotifications.length > 0) && (
                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
               )}
             </button>
@@ -222,6 +235,24 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                     <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">Baru</span>
                   </div>
                   <div className="max-h-64 overflow-y-auto">
+                    {unreadNotifications.map(notif => (
+                      <div 
+                        key={notif.id} 
+                        className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer"
+                        onClick={() => {
+                          markNotificationAsRead(notif.id);
+                          setIsNotifOpen(false);
+                          if (notif.link) window.location.hash = `#${notif.link}`;
+                        }}
+                      >
+                        <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg shrink-0"><Bell className="w-4 h-4"/></div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">{notif.title}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{notif.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                    
                     {pendingUsersCount > 0 && currentUser.role === 'OWNER' && (
                       <div className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
                         <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0"><Users className="w-4 h-4"/></div>
@@ -249,7 +280,16 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                         </div>
                       </div>
                     )}
-                    {lowStockCount === 0 && pendingUsersCount === 0 && expiringProducts.length === 0 && (
+                    {pendingOnlineOrdersCount > 0 && (
+                      <div className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer" onClick={() => { setIsNotifOpen(false); window.location.hash = '#/online-orders'; }}>
+                        <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg shrink-0"><ShoppingBag className="w-4 h-4"/></div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Pesanan Online Baru</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">Ada {pendingOnlineOrdersCount} pesanan online baru yang menunggu diproses.</p>
+                        </div>
+                      </div>
+                    )}
+                    {lowStockCount === 0 && pendingUsersCount === 0 && expiringProducts.length === 0 && pendingOnlineOrdersCount === 0 && unreadNotifications.length === 0 && (
                       <div className="px-4 py-6 text-center">
                         <p className="text-xs text-gray-400">Belum ada notifikasi baru</p>
                       </div>
@@ -311,8 +351,10 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                   </button>
                   <button 
                     onClick={() => {
-                      setIsUserMenuOpen(false);
-                      logout();
+                      if (window.confirm("Apakah Anda yakin ingin keluar dari sistem? Anda harus login kembali setelah ini.")) {
+                        setIsUserMenuOpen(false);
+                        logout();
+                      }
                     }}
                     className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 transition-colors font-medium cursor-pointer"
                   >

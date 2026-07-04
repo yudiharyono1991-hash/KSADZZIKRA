@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { Users, Plus, Search, Trash2, Edit, CreditCard } from 'lucide-react';
 
 export default function CustomerManagementPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry } = useAppStore();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry } = useBranchData();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export default function CustomerManagementPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 

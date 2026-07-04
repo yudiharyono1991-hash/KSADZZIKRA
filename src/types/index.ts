@@ -38,6 +38,16 @@ export interface StoreSettings {
     ewallet?: { enabled: boolean; provider: string; number: string; accountName: string; }[];
   };
   ownerWhatsapp?: string;
+  paymentTimeoutMinutes?: number;
+  // Location & Delivery Restrictions
+  storeLocationLat?: number;
+  storeLocationLng?: number;
+  maxDeliveryRadiusKm?: number;
+  // Advanced Config
+  maintenanceMode?: boolean;
+  minimumCashBalance?: number;
+  zakatRate?: number; // e.g. 2.5
+  autoApproveTransactions?: boolean;
 }
 
 export interface StockMovement {
@@ -140,12 +150,14 @@ export interface Product {
   boxCostPrice?: number; // Modal per box
   salesCoaCode?: string; // Akun Pendapatan
   cogsCoaCode?: string;  // Akun HPP
+  isPPOB?: boolean; // PPOB/Digital Product flag
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
   isBox?: boolean;
+  targetNumber?: string; // e.g. Phone number for Pulsa, ID for PDAM
 }
 
 export interface Transaction {
@@ -160,6 +172,7 @@ export interface Transaction {
     quantity: number;
     price: number;
     costPrice: number;
+    targetNumber?: string;
   }[];
   totalAmount: number;
   paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
@@ -174,7 +187,9 @@ export interface Transaction {
   branchId?: string;
   // Phase 2 Enterprise additions
   isVoided?: boolean;
+  voidStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   voidReason?: string;
+  voidRequestedBy?: string;
   taxAmount?: number;
   splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
   pointsEarned?: number;
@@ -219,7 +234,7 @@ export interface ZakatDistribution {
   description: string;
 }
 
-export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'PELANGGAN';
+export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'MANAGER' | 'PENGURUS' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'PELANGGAN';
 
 export interface CurrentUser {
   name: string;
@@ -228,6 +243,7 @@ export interface CurrentUser {
   password?: string; // Optional for active credentials modification
   tenantId?: string; // Empty if SUPERADMIN
   branchId?: string;
+  employeeId?: string;
 }
 
 export interface Expense {
@@ -263,6 +279,38 @@ export interface UserAccount {
   username: string;
   password?: string;
   role: UserRole;
+  jobTitle?: string;
+  employeeId?: string;
+  branchId?: string;
+  isApproved?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+  phone?: string;
+  approvedBy?: string;
+  isKoperasiMember?: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  tenantId: string;
+  branchId?: string;
+  targetRole?: UserRole | UserRole[]; // If specific roles should see this
+  title: string;
+  message: string;
+  type: 'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR' | 'APPROVAL';
+  isRead: boolean;
+  createdAt: string;
+  link?: string; // Optional route to navigate to
+}
+
+export interface UserAccountExtended {
+  id: string;
+  tenantId: string;
+  name: string;
+  username: string;
+  password?: string;
+  role: UserRole;
+  jobTitle?: string; // Jabatan spesifik, e.g., "Ketua DPS", "Sekretaris"
   createdAt: string;
   isActive: boolean;
   isApproved: boolean; // false = pending persetujuan Admin/Owner
@@ -329,6 +377,8 @@ export interface OnlineOrder {
   updatedAt: string;
   branchId?: string;
   notes?: string;
+  paymentCode?: string;
+  distanceKm?: number;
 }
 
 export interface ChatMessage {

@@ -1,9 +1,9 @@
 import React from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet } from 'lucide-react';
 
 export default function ArusKasPage() {
-  const { transactions, expenses, journalEntries } = useAppStore();
+  const { transactions, expenses, journalEntries, currentUser, activeBranchId, addLog, addNotification } = useBranchData();
 
   const cashMovements: any[] = [];
   
@@ -60,13 +60,39 @@ export default function ArusKasPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="p-3 bg-green-100 text-green-800 rounded-xl">
-          <Wallet className="w-6 h-6" />
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="p-3 bg-green-100 text-green-800 rounded-xl">
+            <Wallet className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Laporan Arus Kas</h1>
+            <p className="text-xs font-semibold text-slate-500 mt-1">Pantau pergerakan uang masuk (Tunai & Non-Tunai) dan keluar.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Laporan Arus Kas</h1>
-          <p className="text-xs font-semibold text-slate-500 mt-1">Pantau pergerakan uang masuk (Tunai & Non-Tunai) dan keluar.</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Arus Kas untuk persetujuan Owner.`);
+              addNotification({
+                title: 'Approval Laporan Arus Kas',
+                message: `Laporan Arus Kas dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
+                type: 'APPROVAL',
+                targetRole: ['OWNER', 'PENGURUS'],
+                link: '/arus-kas'
+              });
+              alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition"
+          >
+            Kirim Laporan
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition"
+          >
+            Cetak PDF
+          </button>
         </div>
       </div>
 
@@ -155,6 +181,65 @@ export default function ArusKasPage() {
               Belum ada pergerakan kas.
             </div>
           )}
+        </div>
+      </div>
+      {/* Printable Report Section */}
+      <div className="hidden print:block printable-area">
+        <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
+          <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
+          <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN ARUS KAS</p>
+        </div>
+        
+        <table className="w-full text-left border-collapse text-sm mb-8">
+          <thead>
+            <tr className="bg-gray-100 border-y border-gray-300">
+              <th className="py-2 px-2">Tanggal</th>
+              <th className="py-2 px-2">Keterangan</th>
+              <th className="py-2 px-2 text-center">Tipe</th>
+              <th className="py-2 px-2 text-right">Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allMovements.map((movement) => (
+              <tr key={movement.id} className="border-b border-gray-200">
+                <td className="py-1 px-2">{new Date(movement.date).toLocaleDateString('id-ID')}</td>
+                <td className="py-1 px-2">{movement.description}</td>
+                <td className="py-1 px-2 text-center">{movement.type === 'IN' ? 'MASUK' : 'KELUAR'}</td>
+                <td className="py-1 px-2 text-right">{movement.amount.toLocaleString('id-ID')}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="font-bold border-t-2 border-gray-800">
+              <td colSpan={3} className="py-2 px-2 text-right">SALDO BERSIH:</td>
+              <td className="py-2 px-2 text-right">Rp {netCash.toLocaleString('id-ID')}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div className="mt-16 pt-8 flex justify-between items-end border-t-2 border-gray-300">
+          <div className="text-center w-1/3 px-2">
+            <p className="text-xs font-semibold mb-12">Diperiksa Oleh,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
+              {currentUser?.role === 'ADMIN' ? currentUser.name : ''}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Admin</p>
+          </div>
+          
+          <div className="text-center w-1/3 px-2 border-l border-gray-200">
+            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
+              {currentUser?.role === 'MANAGER' ? currentUser.name : ''}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Manager Cabang</p>
+          </div>
+
+          <div className="text-center w-1/3 px-2 border-l border-gray-200">
+            <p className="text-[10px] text-gray-600 mb-2">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-xs font-semibold mb-12">Menyetujui,</p>
+            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-2 whitespace-nowrap h-6 flex items-end justify-center">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
+            <p className="text-xs text-gray-500 mt-1">Ketua Toko Koperasi KSA Mart</p>
+          </div>
         </div>
       </div>
     </div>

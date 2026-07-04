@@ -18,7 +18,7 @@ export default function PurchaseOrderPage() {
   const [printPo, setPrintPo] = useState<any>(null);
 
   // Prevent accessing if not admin or owner
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4">
         <ShieldAlert className="w-16 h-16 text-red-400" />

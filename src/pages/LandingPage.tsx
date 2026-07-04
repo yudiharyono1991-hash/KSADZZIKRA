@@ -19,7 +19,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-green-50 text-green-950'} font-sans relative overflow-hidden flex flex-col transition-colors duration-500`}>
+    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-green-50 text-green-950'} font-sans relative overflow-x-hidden flex flex-col transition-colors duration-500 pb-10`}>
       {/* Ticker */}
       <div className={`${isDarkMode ? 'bg-slate-950 text-amber-500' : 'bg-green-900 text-amber-300'} py-1 overflow-hidden whitespace-nowrap transition-colors duration-500`}>
         <div className="animate-[marquee_20s_linear_infinite] flex space-x-12">
@@ -79,7 +79,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 z-10 py-0 sm:py-2">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 z-10 py-8 sm:py-12">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -125,18 +125,18 @@ export default function LandingPage() {
             Sistem Kasir Pintar Berbasis Syariah — terintegrasi laporan keuangan, zakat otomatis, dan manajemen operasional koperasi. <span className={`font-bold whitespace-nowrap ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>Halal. Amanah. Berkah.</span>
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-0 sm:pt-2">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center pt-4 sm:pt-6 shrink-0 mt-4">
             <button 
               onClick={() => navigate('/login')}
-              className={`px-6 py-3 sm:px-8 sm:py-4 rounded-xl font-bold shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-green-500 text-white hover:bg-green-400 hover:shadow-green-500/20' : 'bg-green-700 text-white hover:bg-green-800 hover:shadow-green-900/20'}`}
+              className={`px-6 py-3 sm:px-8 sm:py-4 rounded-xl font-bold shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 shrink-0 ${isDarkMode ? 'bg-green-500 text-white hover:bg-green-400 hover:shadow-green-500/20' : 'bg-green-700 text-white hover:bg-green-800 hover:shadow-green-900/20'}`}
             >
-              <LogIn size={20} className="w-4 h-4 sm:w-5 sm:h-5" /> Login / Anggota
+              <LogIn size={20} className="w-5 h-5" /> Login / Anggota
             </button>
             <button 
               onClick={() => navigate('/katalog')}
-              className={`px-6 py-3 sm:px-8 sm:py-4 rounded-xl font-bold shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-amber-600 text-white hover:bg-amber-500 hover:shadow-amber-500/20' : 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-amber-900/20'}`}
+              className={`px-6 py-3 sm:px-8 sm:py-4 rounded-xl font-bold shadow-xl transition-all hover:-translate-y-1 flex items-center justify-center gap-2 shrink-0 ${isDarkMode ? 'bg-amber-600 text-white hover:bg-amber-500 hover:shadow-amber-500/20' : 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-amber-900/20'}`}
             >
-              <ShoppingBag size={20} className="w-4 h-4 sm:w-5 sm:h-5" /> Belanja Umum
+              <ShoppingBag size={20} className="w-5 h-5" /> Belanja Umum
             </button>
           </div>
         </motion.div>
@@ -146,7 +146,7 @@ export default function LandingPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full max-w-5xl"
+          className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 w-full max-w-5xl shrink-0"
         >
           <div 
             onClick={() => navigate('/quran')}

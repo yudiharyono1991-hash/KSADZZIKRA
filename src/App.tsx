@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/Layout/MainLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import { useAppStore } from './store';
 import {
@@ -39,12 +40,14 @@ import {
   KatalogUmumPage,
   CoAPage,
   BeritaPusatPage,
-  LoyaltyProgramPage
+  LoyaltyProgramPage,
+  KasirShiftPage,
+  PPOBInventoryPage
 } from './pages';
 
 // Komponen pembungkus untuk route yang membutuhkan otentikasi
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { currentUser } = useAppStore();
+  const { currentUser, settings } = useAppStore();
   
   if (!currentUser) {
     return <Navigate to="/login" replace />;
@@ -52,6 +55,30 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (currentUser.role === 'PELANGGAN') {
     return <Navigate to="/member" replace />;
+  }
+  if (settings?.maintenanceMode && currentUser.role !== 'OWNER' && currentUser.role !== 'SUPERADMIN') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center text-white p-6 text-center">
+        <div className="w-16 h-16 bg-rose-500 rounded-full flex items-center justify-center mb-6">
+          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h1 className="text-3xl font-black mb-2">Mode Pemeliharaan</h1>
+        <p className="text-slate-400 max-w-md mx-auto mb-8 leading-relaxed">
+          Sistem saat ini sedang dalam perbaikan atau rekonsiliasi data oleh Owner. Anda telah diputus secara otomatis untuk mencegah inkonsistensi transaksi. Silakan hubungi Owner.
+        </p>
+        <button 
+          onClick={() => {
+            localStorage.removeItem('ba_current_user');
+            window.location.href = '/';
+          }}
+          className="bg-indigo-600 hover:bg-indigo-700 font-bold py-3 px-8 rounded-xl"
+        >
+          Kembali ke Beranda
+        </button>
+      </div>
+    );
   }
   
   return <MainLayout>{children}</MainLayout>;
@@ -75,9 +102,10 @@ export default function App() {
   }
 
   return (
-    <HashRouter>
-      <Routes>
-        {/* Public Routes */}
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -91,8 +119,10 @@ export default function App() {
         
         {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
         <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
+        <Route path="/kasir-shift" element={<ProtectedRoute><KasirShiftPage /></ProtectedRoute>} />
         <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
+        <Route path="/inventory-ppob" element={<ProtectedRoute><PPOBInventoryPage /></ProtectedRoute>} />
         <Route path="/trend" element={<ProtectedRoute><TrendPage /></ProtectedRoute>} />
         <Route path="/laporan-penjualan" element={<ProtectedRoute><SalesReportPage /></ProtectedRoute>} />
         <Route path="/jurnal-umum" element={<ProtectedRoute><JurnalUmumPage /></ProtectedRoute>} />
@@ -116,22 +146,18 @@ export default function App() {
         
         {/* Berita Koperasi */}
         <Route path="/berita-koperasi" element={
-          <ProtectedRoute allowedRoles={['CASHIER', 'ADMIN', 'OWNER']}>
+          <ProtectedRoute>
             <BeritaPusatPage />
           </ProtectedRoute>
         } />
 
-        {/* Koperasi Syariah Routes */}
-        <Route path="/koperasi-anggota" element={<ProtectedRoute><KoperasiAnggotaPage /></ProtectedRoute>} />
-        <Route path="/koperasi-shu" element={<ProtectedRoute><KoperasiSHUPage /></ProtectedRoute>} />
-        <Route path="/koperasi-pembiayaan" element={<ProtectedRoute><KoperasiPembiayaanPage /></ProtectedRoute>} />
-        <Route path="/koperasi-keuangan" element={<ProtectedRoute><KoperasiKeuanganPage /></ProtectedRoute>} />
+        {/* Buku Panduan */}
         <Route path="/buku-panduan" element={<ProtectedRoute><BukuPanduanPage /></ProtectedRoute>} />
         
         {/* Fallback Catch-all Route */}
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </HashRouter>
+        </Routes>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }
-

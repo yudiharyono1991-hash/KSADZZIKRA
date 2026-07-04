@@ -34,7 +34,7 @@ export default function KoperasiAnggotaPage() {
   const [simpananPokok, setSimpananPokok] = useState(100000);
   const [simpananWajib, setSimpananWajib] = useState(10000);
 
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 

@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter } from 'lucide-react';
 
 export default function StockOpnamePage() {
-  const { products, stockMovements, adjustStock, currentUser, activeBranchId, addLog } = useAppStore();
+  const { products, stockMovements, adjustStock, addStockMovement, currentUser, activeBranchId, addLog } = useBranchData();
   const [selectedProductId, setSelectedProductId] = useState('');
   const [physicalCount, setPhysicalCount] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
   
-  if (currentUser?.role !== 'OWNER' && currentUser?.role !== 'ADMIN') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500 font-bold">Akses ditolak.</div>;
   }
 
@@ -27,9 +27,7 @@ export default function StockOpnamePage() {
       alert("Stok fisik sama dengan stok sistem. Tidak ada penyesuaian yang perlu dilakukan.");
       return;
     }
-    
     adjustStock(selectedProductId, variance);
-    
     addLog('STOCK_OPNAME', 'INVENTORY', `Opname: ${prod.name}. Fisik: ${physical}, Sistem sblm: ${currentStock}. Variance: ${variance > 0 ? '+' : ''}${variance}`);
     
     setPhysicalCount('');

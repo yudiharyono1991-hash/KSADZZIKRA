@@ -14,28 +14,36 @@ export default function BukuPanduanPage() {
     const role = currentUser?.role || 'KASIR';
     
     const kasirGuide = [
-      { id: 'k1', title: 'Cara Memulai Shift Kasir', content: 'Masuk ke menu Kasir POS. Anda bisa langsung melayani transaksi.' },
-      { id: 'k2', title: 'Cara Transaksi Penjualan', content: 'Masuk ke menu Kasir POS. Anda bisa scan barcode barang atau ketik nama/SKU di kolom pencarian lalu tekan Enter. Pastikan barang masuk ke keranjang, pilih metode pembayaran, dan cetak struk.' }
+      { id: 'k1', title: 'Cara Memulai Shift Kasir', content: 'Masuk ke menu Belanja Produk (sebelumnya Kasir POS). Anda bisa langsung melayani transaksi.' },
+      { id: 'k2', title: 'Cara Transaksi Penjualan & Pembayaran QRIS', content: 'Di menu Belanja Produk, scan barcode barang atau ketik nama/SKU di kolom pencarian. Pada saat Checkout, jika memilih metode pembayaran QRIS, layar Anda akan memunculkan gambar QRIS Toko secara otomatis. Anda dapat meminta pembeli untuk men-scan layar HP atau monitor Anda langsung. Tekan "Verifikasi Bukti QRIS Selesai" jika pelanggan sudah berhasil bayar.' },
+      { id: 'k3', title: 'Cara Menukarkan Poin Pelanggan', content: 'Saat Checkout, pastikan Anda telah memilih Nama Pelanggan (Anggota) di bagian atas. Jika pelanggan memiliki saldo poin loyalitas, sistem akan memunculkan opsi potong poin secara otomatis. Anda tinggal memasukkan jumlah poin yang ingin ditukarkan untuk mendiskon total belanjanya.' }
     ];
     
     const adminGuide = [
       { id: 'a1', title: 'Manajemen Data Barang', content: 'Masuk ke menu Inventory & Stok. Anda dapat menambah, mengedit, atau menghapus barang. Pastikan Barcode dan SKU unik. Anda juga bisa mengatur jumlah minimum stok untuk notifikasi.' },
-      { id: 'a2', title: 'Laporan Keuangan', content: 'Masuk ke Dashboard & Laporan. Anda bisa melihat Jurnal Umum, Laporan Penjualan, dan Arus Kas. Anda bisa mencetak laporan ke PDF atau Excel.' },
-      { id: 'a3', title: 'Stock Opname', content: 'Masuk ke Stock Opname, lalu masukkan jumlah fisik barang yang ada di rak. Sistem akan otomatis menghitung selisih dan mencatatnya.' }
+      { id: 'a2', title: 'Stock Opname Dasar', content: 'Masuk ke Stock Opname, lalu masukkan jumlah fisik barang yang ada di rak. Sistem akan otomatis menghitung selisih dan mencatatnya.' },
+      { id: 'a3', title: 'Pembatalan Transaksi (Void)', content: 'Jika terjadi kesalahan, Anda dapat menekan tombol Void pada Riwayat Transaksi. Pembatalan ini akan berstatus Pending dan dikirim ke notifikasi Manager untuk disetujui.' }
     ];
-    
+
+    const managerGuide = [
+      { id: 'm1', title: 'Laporan Keuangan', content: 'Masuk ke Dashboard & Laporan. Anda bisa melihat Jurnal Umum, Laporan Penjualan, dan Arus Kas. Anda bisa mencetak laporan ke PDF atau Excel dengan blok tanda tangan 3 tingkat (Admin, Manager, Ketua). Anda juga bisa mengirim permohonan persetujuan.' },
+      { id: 'm2', title: 'Persetujuan Akses Staf', content: 'Bisa menyetujui akun Kasir atau Admin baru yang mendaftar via menu Manajemen Akun untuk cabang Anda.' },
+      { id: 'm3', title: 'Manajemen Cabang', content: 'Mengelola dan memantau stok serta aktivitas di setiap cabang yang ada.' },
+      { id: 'm4', title: 'Approval Pembatalan (Void)', content: 'Setiap pengajuan pembatalan (Void) dari Kasir/Admin akan masuk ke ikon Lonceng (Notifikasi). Anda bisa langsung menuju Riwayat untuk Approve atau Reject.' }
+    ];
+
     const ownerGuide = [
-      { id: 'o1', title: 'Pengaturan Koperasi Syariah', content: 'Masuk ke menu Tata Kelola > Pengaturan Toko. Aktifkan tipe bisnis KOPERASI. Anda dapat mengatur nama bank koperasi, nomor rekening BSI, dan mengunggah QRIS Toko untuk pembayaran digital anggota secara realtime.' },
-      { id: 'o2', title: 'Laporan Laba Rugi & Neraca Syariah', content: 'Akses menu Dashboard & Laporan > Neraca Laba Rugi. Laporan ini memisahkan margin keuntungan (murabahah) dengan pendapatan lainnya secara syariah. Mempermudah penghitungan zakat niaga dan sisa hasil usaha (SHU).' },
-      { id: 'o3', title: 'Manajemen Chart of Accounts (CoA)', content: 'Gunakan menu baru "Daftar Akun (CoA)" untuk menambah, mengubah, atau menonaktifkan kode akun akuntansi. Anda juga dapat memetakan akun pendapatan dan akun HPP pada setiap barang di menu Inventory agar pencatatan jurnal umum berjalan otomatis.' },
-      { id: 'o4', title: 'Manajemen Loyalitas Poin Belanja', content: 'KSA Mart menggunakan rasio poin loyalitas otomatis: setiap belanja kelipatan Rp 1.000, pelanggan mendapatkan 1 poin. Poin tersebut dapat ditukarkan di POS Kasir dengan nilai 100 poin = Rp 1.000 diskon belanja. Jumlah poin terkumpul dapat dipantau langsung oleh pelanggan di Member Portal mereka.' },
-      { id: 'o5', title: 'Akses User & Mandiri Register', content: 'Pelanggan dapat mendaftar mandiri via halaman login (klasifikasi Anggota vs Non-Anggota Koperasi) dan langsung otomatis disetujui (auto-approve) untuk masuk ke Member Portal. Sedangkan pendaftar dengan peran Kasir atau Admin harus disetujui secara manual oleh Owner di menu "Akses & Akun Pengguna".' },
-      { id: 'o6', title: 'Zakat & Pembagian SHU', content: 'Akses menu Dashboard & Laporan > Zakat untuk menghitung zakat maal/niaga berdasarkan nisab emas 85gr. Untuk pembagian keuntungan anggota koperasi, akses menu Koperasi Syariah > Pembagian SHU untuk mendistribusikan SHU secara merata berdasarkan keaktifan simpanan/belanja.' }
+      { id: 'o1', title: 'Konfigurasi Sistem Tingkat Lanjut', content: 'Masuk ke menu Tata Kelola > Pengaturan Toko. Di bagian bawah terdapat "Konfigurasi Sistem Tingkat Lanjut". Anda bisa mengatur Mode Pemeliharaan (memblokir sementara akses login staf), Batas Minimum Saldo Kas, Presentase Zakat Niaga (Default 2.5%), dan opsi Auto-Approval.' },
+      { id: 'o2', title: 'Standar Akuntansi Syariah (Laba Rugi & Neraca)', content: 'Akses menu Dashboard & Laporan > Laporan Laba Rugi. Laporan ini telah memisahkan antara Laba Bersih dan Zakat Niaga. Zakat ditarik otomatis dari surplus laba bersih, menyisakan SHU Bersih untuk dibagihasilkan secara Mudharabah. Fitur ini dirancang sesuai tinjauan dan standar kepatuhan syariah (Review Pak Grandis).' },
+      { id: 'o3', title: 'Manajemen Chart of Accounts (CoA)', content: 'Gunakan menu "Daftar Akun (CoA)" untuk menyesuaikan tata letak akuntansi (misal menambahkan pos Zakat, Infak, atau Bagi Hasil khusus).' },
+      { id: 'o4', title: 'Zakat Niaga Otomatis', content: 'Sistem mengkalkulasi kewajiban zakat (zakatReserve) otomatis sebesar 2.5% (atau sesuai pengaturan) dari netProfit berjalan jika usahanya untung. Transparan tanpa intervensi manual.' },
+      { id: 'o5', title: 'Manajemen Pengguna Terpusat', content: 'Akses menu Manajemen Akun. Anda bisa melihat semua staf dari semua cabang. Manager hanya bisa melihat cabang mereka sendiri.' }
     ];
 
     if (role === 'KASIR') return kasirGuide;
-    if (role === 'ADMIN') return [...kasirGuide, ...adminGuide];
-    return [...kasirGuide, ...adminGuide, ...ownerGuide]; // OWNER sees all
+    if (role === 'ADMIN') return adminGuide;
+    if (role === 'MANAGER') return managerGuide;
+    return ownerGuide; // OWNER / SUPERADMIN / PENGURUS
   };
 
   const guides = getGuideByRole();
@@ -79,32 +87,60 @@ export default function BukuPanduanPage() {
         </div>
 
         <div className="space-y-4">
+          <h2 className="font-bold text-gray-800 text-lg border-b pb-2">Integrasi Perangkat & Sistem Eksternal</h2>
+          <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm space-y-4 text-sm text-blue-900 leading-relaxed">
+            <h3 className="font-bold text-blue-800 text-base mb-2">1. Dukungan Perangkat Keras (Hardware)</h3>
+            <ul className="list-disc pl-5 space-y-2">
+              <li><strong>Barcode Scanner:</strong> Aplikasi KSA Mart sepenuhnya mendukung pemindai *barcode* standar (USB/Bluetooth). Cukup arahkan kursor ke kolom pencarian di halaman Kasir POS, lalu *scan* barang. Scanner akan otomatis mengetikkan kode dan menekan tombol *Enter* untuk memasukkan barang ke keranjang secara instan.</li>
+              <li><strong>Mesin Printer Kasir (Thermal):</strong> Pencetakan struk transaksi menggunakan fungsi cetak bawaan sistem (`window.print()`). Anda dapat menghubungkan printer kasir (Bluetooth/USB ukuran 58mm atau 80mm) ke komputer/tablet, lalu memilih printer tersebut pada jendela *Print Dialog* browser.</li>
+            </ul>
+            <h3 className="font-bold text-blue-800 text-base mt-4 mb-2">2. Kerjasama Pihak Ketiga (PPOB, E-Wallet, VA)</h3>
+            <ul className="list-disc pl-5 space-y-2">
+              <li>Aplikasi KSA Mart dikembangkan dengan arsitektur modern (React) yang sangat siap dan mudah dikoneksikan dengan layanan API Pihak Ketiga (seperti Payment Gateway Midtrans, Xendit, atau penyedia PPOB).</li>
+              <li>Untuk tahap produksi selanjutnya, ketika koperasi sudah melakukan penandatanganan kontrak dengan penyedia PPOB/VA, integrasi *backend API* (Webhook) dapat langsung disematkan pada sistem ini tanpa merombak ulang tampilan aplikasi.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="space-y-4">
           <h2 className="font-bold text-gray-800 text-lg border-b pb-2">Hubungan Peran & Izin</h2>
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="bg-green-100 p-2 rounded-lg text-green-700 mt-1"><UserCheck className="w-5 h-5"/></div>
-              <div>
-                <h3 className="font-bold text-gray-800">1. KASIR</h3>
-                <p className="text-xs text-gray-500 mt-1">Akses sangat terbatas pada operasional harian (Transaksi POS, Riwayat Transaksi). Tidak dapat mengedit harga barang atau menghapus log.</p>
+            {((currentUser?.role as any) === 'KASIR' || (currentUser?.role as any) === 'KASIR_TOKO') && (
+              <div className="flex items-start gap-3">
+                <div className="bg-green-100 p-2 rounded-lg text-green-700 mt-1"><UserCheck className="w-5 h-5"/></div>
+                <div>
+                  <h3 className="font-bold text-gray-800">KASIR</h3>
+                  <p className="text-xs text-gray-500 mt-1">Akses sangat terbatas pada operasional harian (Transaksi POS, Riwayat Transaksi). Tidak dapat mengedit harga barang atau menghapus log.</p>
+                </div>
               </div>
-            </div>
+            )}
             
-            {(currentUser?.role === 'ADMIN' || currentUser?.role === 'OWNER') && (
+            {currentUser?.role === 'ADMIN' && (
               <div className="flex items-start gap-3">
                 <div className="bg-amber-100 p-2 rounded-lg text-amber-700 mt-1"><ShieldCheck className="w-5 h-5"/></div>
                 <div>
-                  <h3 className="font-bold text-gray-800">2. ADMIN</h3>
-                  <p className="text-xs text-gray-500 mt-1">Akses manajerial. Bisa mengatur inventori, mencetak laporan arus kas, serta mendata supplier dan pelanggan. Tidak punya akses ke audit log sensitif atau hak menyetujui akun.</p>
+                  <h3 className="font-bold text-gray-800">ADMIN</h3>
+                  <p className="text-xs text-gray-500 mt-1">Akses staf untuk inventori dasar dan mencatat pesanan. Tidak punya akses ke Laba Rugi atau Pengaturan Toko.</p>
                 </div>
               </div>
             )}
 
-            {currentUser?.role === 'OWNER' && (
+            {currentUser?.role === 'MANAGER' && (
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-100 p-2 rounded-lg text-blue-700 mt-1"><Users className="w-5 h-5"/></div>
+                <div>
+                  <h3 className="font-bold text-gray-800">MANAGER</h3>
+                  <p className="text-xs text-gray-500 mt-1">Akses manajerial. Bisa mengatur cabang, menyetujui akun, dan melihat laporan penjualan serta kas. Tidak dapat mengubah pengaturan krusial toko.</p>
+                </div>
+              </div>
+            )}
+
+            {(currentUser?.role === 'OWNER' || currentUser?.role === 'PENGURUS' || currentUser?.role === 'SUPERADMIN') && (
               <div className="flex items-start gap-3">
                 <div className="bg-purple-100 p-2 rounded-lg text-purple-700 mt-1"><Settings className="w-5 h-5"/></div>
                 <div>
-                  <h3 className="font-bold text-gray-800">3. OWNER (Ketua Koperasi)</h3>
-                  <p className="text-xs text-gray-500 mt-1">Hak akses penuh (Superadmin). Pemilik bisa melihat Neraca Laba Rugi, mengatur semua Hak Akses, Zakat, hingga fitur penuh Koperasi Syariah.</p>
+                  <h3 className="font-bold text-gray-800">OWNER / PENGAWAS</h3>
+                  <p className="text-xs text-gray-500 mt-1">Hak akses penuh (Superadmin). Pemilik bisa melihat Neraca Laba Rugi, mengatur semua Hak Akses, Zakat, hingga fitur penuh Tata Kelola Toko.</p>
                 </div>
               </div>
             )}

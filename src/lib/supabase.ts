@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve Supabase environment variables from Vite env config.
-const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || 'https://wzfwiuolqzxbovpcpbli.supabase.co';
-const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6ZndpdW9scXp4Ym92cGNwYmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NjA3NjgsImV4cCI6MjA3NzUzNjc2OH0.gpe9qIamqwXIUUqe8ui5pVBbq14xS0CXOfxyJDyWqMw';
+const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || 'https://rxuwdnaycysgmofazjmz.supabase.co';
+const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4dXdkbmF5Y3lzZ21vZmF6am16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDQzODMsImV4cCI6MjA5ODUyMDM4M30.OOmVoWbtCbpavCReyh5jVOWhTe0uhywV3NA3nXmcfXI';
+
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'https://your-project.supabase.co');
 
@@ -573,6 +574,133 @@ export const supabaseService = {
       return true;
     } catch (err: any) {
       logSync(`Failed to save customer ${customer.name}: ${err.message}`, true);
+      return false;
+    }
+  },
+  
+  // NEW APIS
+  async getCustomers(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('customers').select('*');
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch customers: ${err.message}`, true);
+      return null;
+    }
+  },
+  async getCoaAccounts(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('coa_accounts').select('*');
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch coa_accounts: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveCoaAccount(coa: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('coa_accounts').upsert(coa);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save coa_account: ${err.message}`, true);
+      return false;
+    }
+  },
+  async getStoreSettings(): Promise<any | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('store_settings').select('*').limit(1).single();
+      if (error && error.code !== 'PGRST116') throw error; // ignore no rows
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch store settings: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveStoreSettings(settings: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('store_settings').upsert({ ...settings, id: 'settings_1' });
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save store settings: ${err.message}`, true);
+      return false;
+    }
+  },
+  async getOnlineOrders(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('online_orders').select('*');
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch online_orders: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveOnlineOrder(order: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('online_orders').upsert({
+        id: order.id,
+        tenant_id: order.tenantId,
+        order_no: order.orderNo,
+        customer_id: order.customerId,
+        customer_name: order.customerName,
+        customer_phone: order.customerPhone,
+        customer_address: order.customerAddress,
+        distance_km: order.distanceKm,
+        total_amount: order.totalAmount,
+        status: order.status,
+        payment_code: order.paymentCode,
+        notes: order.notes,
+        items: order.items,
+        created_at: order.createdAt,
+        updated_at: order.updatedAt
+      });
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save online order: ${err.message}`, true);
+      return false;
+    }
+  },
+  async getJournalEntries(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('journal_entries').select('*');
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch journal_entries: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveJournalEntry(entry: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('journal_entries').upsert({
+        id: entry.id,
+        tenant_id: entry.tenantId,
+        date: entry.date,
+        description: entry.description,
+        reference: entry.reference,
+        amount: entry.amount,
+        type: entry.type,
+        account_id: entry.accountId,
+        created_at: entry.createdAt
+      });
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save journal_entry: ${err.message}`, true);
       return false;
     }
   }

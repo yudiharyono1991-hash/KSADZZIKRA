@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import * as XLSX from 'xlsx';
 import { 
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { products, addProduct, addProductsBulk, updateProduct, deleteProduct, adjustStock, currentUser, activeBranchId, coaList } = useAppStore();
+  const { products, addProduct, addProductsBulk, updateProduct, deleteProduct, adjustStock, currentUser, activeBranchId, coaList } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
@@ -81,6 +81,7 @@ export default function InventoryPage() {
   const [image, setImage] = useState('');
   const [salesCoaCode, setSalesCoaCode] = useState('');
   const [cogsCoaCode, setCogsCoaCode] = useState('');
+  const [isPPOB, setIsPPOB] = useState(false);
   
   // Box Configuration
   const [hasBoxUnit, setHasBoxUnit] = useState(false);
@@ -89,7 +90,7 @@ export default function InventoryPage() {
   const [boxPrice, setBoxPrice] = useState('');
   const [boxCostPrice, setBoxCostPrice] = useState('');
 
-  const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
+  const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
 
   // Stats Counters
   const totalSku = products.length;
@@ -99,6 +100,7 @@ export default function InventoryPage() {
 
   // Filter products
   const filteredProducts = products.filter(product => {
+    if (product.isPPOB) return false; // Hide PPOB from physical inventory
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           product.sku.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
@@ -129,6 +131,7 @@ export default function InventoryPage() {
     setBoxCostPrice('');
     setSalesCoaCode('');
     setCogsCoaCode('');
+    setIsPPOB(false);
     setIsModalOpen(true);
   };
 
@@ -156,6 +159,7 @@ export default function InventoryPage() {
     setBoxCostPrice(p.boxCostPrice ? p.boxCostPrice.toString() : '');
     setSalesCoaCode(p.salesCoaCode || '');
     setCogsCoaCode(p.cogsCoaCode || '');
+    setIsPPOB(p.isPPOB || false);
     setIsModalOpen(true);
   };
 
@@ -219,12 +223,13 @@ export default function InventoryPage() {
       isHalal: true,
       image: image || undefined,
       hasBoxUnit,
-      boxBarcode: boxBarcode || undefined,
+      boxBarcode: hasBoxUnit ? boxBarcode : undefined,
       pcsPerBox: hasBoxUnit && pcsPerBox ? Number(pcsPerBox) : undefined,
       boxPrice: hasBoxUnit && boxPrice ? Number(boxPrice) : undefined,
       boxCostPrice: hasBoxUnit && boxCostPrice ? Number(boxCostPrice) : undefined,
       salesCoaCode: salesCoaCode || undefined,
-      cogsCoaCode: cogsCoaCode || undefined
+      cogsCoaCode: cogsCoaCode || undefined,
+      isPPOB: false // Always false for physical inventory
     };
 
     if (editingProduct) {
@@ -240,8 +245,8 @@ export default function InventoryPage() {
   };
 
   const downloadTemplate = () => {
-    const headers = ['sku', 'name', 'category', 'price', 'costPrice', 'stock', 'minStock', 'unit', 'barcode', 'expiryDate', 'isHalal'];
-    const sampleRow = ['BRS-001', 'Beras Premium Cianjur 5kg', 'Sembako', 78000, 68000, 45, 10, 'Pack', '8991234560012', '', true];
+    const headers = ['sku', 'name', 'category', 'price', 'costPrice', 'stock', 'minStock', 'unit', 'barcode', 'expiryDate', 'isHalal', 'salesCoaCode', 'cogsCoaCode'];
+    const sampleRow = ['BRS-001', 'Beras Premium Cianjur 5kg', 'Sembako', 78000, 68000, 45, 10, 'Pack', '8991234560012', '31/12/2026', true, '410', '510'];
     
     const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
     const wb = XLSX.utils.book_new();
@@ -282,6 +287,8 @@ export default function InventoryPage() {
         const idxBarcode = headers.indexOf('barcode');
         const idxExpiry = headers.indexOf('expirydate');
         const idxHalal = headers.indexOf('ishalal');
+        const idxSalesCoa = headers.indexOf('salescoacode');
+        const idxCogsCoa = headers.indexOf('cogscoacode');
 
         if (idxName === -1) {
           alert('Format kolom salah. File Excel wajib memiliki kolom "name". Kolom lainnya: sku, name, category, price, costPrice, stock, minStock, unit, barcode, expiryDate, isHalal');
@@ -303,7 +310,21 @@ export default function InventoryPage() {
           const minStockVal = idxMinStock !== -1 ? parseFloat(row[idxMinStock]) || 10 : 10;
           const unitVal = idxUnit !== -1 ? String(row[idxUnit] || '').trim() : 'Pcs';
           const barcodeVal = idxBarcode !== -1 ? String(row[idxBarcode] || '').trim() : '';
-          const expiryDateVal = idxExpiry !== -1 ? String(row[idxExpiry] || '').trim() : '';
+          
+          let expiryDateVal = idxExpiry !== -1 ? String(row[idxExpiry] || '').trim() : '';
+          if (expiryDateVal) {
+            // Coba parsing format: 08072026, 08/07/2026, 08-07-2026
+            const cleanDate = expiryDateVal.replace(/[\/\-]/g, ''); // jadikan 08072026
+            if (cleanDate.length === 8) {
+              const d = cleanDate.substring(0,2);
+              const m = cleanDate.substring(2,4);
+              const y = cleanDate.substring(4,8);
+              expiryDateVal = `${y}-${m}-${d}`;
+            }
+          }
+          
+          const salesCoaVal = idxSalesCoa !== -1 ? String(row[idxSalesCoa] || '').trim() : '';
+          const cogsCoaVal = idxCogsCoa !== -1 ? String(row[idxCogsCoa] || '').trim() : '';
           
           let isHalalVal = true;
           if (idxHalal !== -1 && row[idxHalal] !== undefined) {
@@ -324,7 +345,9 @@ export default function InventoryPage() {
             barcode: barcodeVal || undefined,
             expiryDate: expiryDateVal || undefined,
             isHalal: isHalalVal,
-            hasBoxUnit: false
+            hasBoxUnit: false,
+            salesCoaCode: salesCoaVal || undefined,
+            cogsCoaCode: cogsCoaVal || undefined
           });
         }
 
@@ -622,16 +645,18 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Kode SKU</label>
-                          <input
-                            type="text"
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono font-bold bg-gray-50 focus:outline-none"
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Kode SKU</label>
+                          <input 
+                            type="text" 
+                            required 
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 font-mono text-sm"
                             value={sku}
-                            onChange={(e) => setSku(e.target.value)}
-                            required
+                            onChange={e => setSku(e.target.value)}
                           />
                         </div>
+                      </div>
 
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-gray-600">Kategori</label>
                           <select

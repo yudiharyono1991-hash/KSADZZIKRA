@@ -30,7 +30,8 @@ import {
   PieChart,
   Package,
   HelpCircle,
-  Newspaper
+  Newspaper,
+  Smartphone
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -74,7 +75,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
   let menuData: MenuData = [];
 
-  if (currentUser.role === 'OWNER') {
+  if (currentUser.role === 'OWNER' || currentUser.role === 'SUPERADMIN' || currentUser.role === 'PENGURUS' || currentUser.role === 'MANAGER') {
     menuData = [
       {
         label: 'Transaksi',
@@ -102,7 +103,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory & Stok', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
         ]
@@ -122,7 +124,6 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Tata Kelola',
         icon: Settings,
         items: [
-          { path: '/staff', label: 'Kinerja & Absensi HR', icon: UserCheck },
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
@@ -138,25 +139,22 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
-    if (settings.businessType === 'KOPERASI') {
-      menuData.splice(4, 0, {
-        label: 'Manajemen KS ADZ-ZIKRA',
-        icon: UsersRound,
-        items: [
-          { path: '/koperasi-anggota', label: 'Manajemen Anggota', icon: Users },
-          { path: '/koperasi-pembiayaan', label: 'Pembiayaan Koperasi', icon: Wallet },
-          { path: '/koperasi-shu', label: 'Pembagian SHU', icon: Wallet },
-          { path: '/koperasi-keuangan', label: 'Laporan Keuangan', icon: PieChart },
-          { path: '/berita-koperasi', label: 'Berita & Info Pusat', icon: Newspaper },
-        ]
-      });
-    }
-  } else if (currentUser.role === 'ADMIN') {
+  } else if (currentUser.role === 'ADMIN' || currentUser.role === 'STAFF_GUDANG' || currentUser.role === 'STAFF_LAPANGAN') {
     menuData = [
+      {
+        label: 'Transaksi',
+        icon: ShoppingCart,
+        items: [
+          { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
+          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
+        ]
+      },
       {
         label: 'Laporan Keuangan',
         icon: PieChart,
         items: [
+          { path: '/trend', label: 'Grafik Trend', icon: LineChart },
           { path: '/laporan-penjualan', label: 'Laporan Penjualan', icon: TrendingUp },
           { path: '/arus-kas', label: 'Laporan Arus Kas', icon: Wallet },
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
@@ -167,7 +165,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory & Stok', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
         ]
@@ -183,19 +182,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         ]
       },
       {
-        label: 'Transaksi',
-        icon: ShoppingCart,
-        items: [
-          { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
-          { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
-          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
-        ]
-      },
-      {
         label: 'Tata Kelola',
         icon: Settings,
         items: [
-          { path: '/staff', label: 'Kinerja & Absensi HR', icon: UserCheck },
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
@@ -211,17 +200,6 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
-    if (settings.businessType === 'KOPERASI') {
-      menuData.splice(4, 0, {
-        label: 'Koperasi Syariah',
-        icon: UsersRound,
-        items: [
-          { path: '/koperasi-anggota', label: 'Manajemen Anggota', icon: Users },
-          { path: '/koperasi-shu', label: 'Pembagian SHU', icon: Wallet },
-          { path: '/berita-koperasi', label: 'Berita & Info Pusat', icon: Newspaper },
-        ]
-      });
-    }
   } else {
     // CASHIER
     menuData = [
@@ -231,6 +209,14 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
+          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
+        ]
+      },
+      {
+        label: 'Analisa & Trend',
+        icon: PieChart,
+        items: [
+          { path: '/trend', label: 'Grafik Trend', icon: LineChart },
         ]
       },
       {
@@ -238,7 +224,6 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Store,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
-          { path: '/berita-koperasi', label: 'Berita & Info Pusat', icon: Newspaper },
         ]
       },
       {
@@ -321,7 +306,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
               onClick={onExpand}
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-green-300 rounded-xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500"></div>
-              <div className="relative w-16 md:w-32 h-12 md:h-16 bg-white rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition duration-300 overflow-hidden">
+              <div className={`relative ${isCollapsed ? 'w-10 h-10 md:w-12 md:h-12' : 'w-16 md:w-32 h-12 md:h-16'} bg-white rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition-all duration-300 overflow-hidden`}>
                 {/* Clean Logo Display */}
                 <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-full h-full object-contain" />
               </div>

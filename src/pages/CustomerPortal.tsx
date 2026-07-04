@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { ShoppingBag, CreditCard, History, Search, MessageSquare, Send, CheckCircle, Package, ArrowLeft, LogOut, HelpCircle, Tag } from 'lucide-react';
+import { ShoppingBag, CreditCard, History, Search, MessageSquare, Send, CheckCircle, Package, ArrowLeft, LogOut, HelpCircle, Tag, AlertTriangle, MapPin } from 'lucide-react';
+import { calculateDistanceKm } from '../utils/distance';
 
 export default function CustomerPortal() {
   const { 
@@ -21,9 +22,29 @@ export default function CustomerPortal() {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CATALOG' | 'PROMO' | 'CART' | 'ORDERS' | 'POINTS' | 'GUIDE'>('DASHBOARD');
   const [searchQuery, setSearchQuery] = useState('');
   const [checkoutNotes, setCheckoutNotes] = useState('');
+  const [deliveryPeriod, setDeliveryPeriod] = useState('Periode 1 (08.00-09.00)');
+  const [customerDistanceKm, setCustomerDistanceKm] = useState<number | null>(null);
+    const [isCheckingLocation, setIsCheckingLocation] = useState(false);
   
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [chatText, setChatText] = useState('');
+
+  const [isOutsideHours, setIsOutsideHours] = useState(false);
+
+  React.useEffect(() => {
+    const checkHours = () => {
+      const currentHour = new Date().getHours();
+      // Operational hours: 07:00 (7) to 18:59 (19 is outside)
+      if (currentHour < 7 || currentHour >= 19) {
+        setIsOutsideHours(true);
+      } else {
+        setIsOutsideHours(false);
+      }
+    };
+    checkHours();
+    const interval = setInterval(checkHours, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const { customers, promos } = useAppStore();
 
@@ -75,15 +96,81 @@ export default function CustomerPortal() {
   const myOrders = onlineOrders.filter(o => o.customerName === currentUser.name);
   const totalBelanja = myOrders.filter(o => o.status === 'COMPLETED').reduce((sum, o) => sum + o.totalAmount, 0);
 
+  // Calculate total hemat (discount obtained) by checking if order items had a wholesale price
+  let totalHemat = 0;
+  myOrders.filter(o => o.status === 'COMPLETED').forEach(o => {
+    o.items.forEach(item => {
+      const prod = products.find(p => p.name === item.productName);
+      if (prod && prod.price > item.price) {
+        totalHemat += (prod.price - item.price) * item.quantity;
+      }
+    });
+  });
+
   const cartTotal = customerCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
   const filteredProducts = products.filter(p => p.stock > 0 && p.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const promoProducts = products.filter(p => p.stock > 0 && (p.wholesalePrice !== undefined && p.wholesalePrice < p.price));
 
-  const handleCheckout = () => {
+  
+    const handleCheckLocation = () => {
+      if (!settings.storeLocationLat || !settings.storeLocationLng) {
+        alert("Mohon maaf, lokasi toko belum diatur oleh admin. Silakan hubungi admin KSA Mart.");
+        return;
+      }
+      
+      setIsCheckingLocation(true);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          setIsCheckingLocation(false);
+          const dist = calculateDistanceKm(
+            settings.storeLocationLat!, 
+            settings.storeLocationLng!, 
+            position.coords.latitude, 
+            position.coords.longitude
+          );
+          setCustomerDistanceKm(dist);
+        }, (error) => {
+          setIsCheckingLocation(false);
+          alert("Gagal mendapatkan lokasi Anda. Pastikan izin akses lokasi/GPS diaktifkan. " + error.message);
+        });
+      } else {
+        setIsCheckingLocation(false);
+        alert("Geolocation tidak didukung oleh browser Anda.");
+      }
+    };
+
+    const handleCheckout = () => {
     if (customerCart.length === 0) return;
-    submitOnlineOrder(currentUser.username, currentUser.name, "08xxxx", checkoutNotes);
-    alert("Pesanan berhasil dibuat! Notifikasi WhatsApp telah dikirim ke Admin/Toko.");
+    
+    // Asumsikan semua pesanan di portal pelanggan menggunakan transfer/QRIS untuk simplicity mock
+    const paymentCode = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    const finalNotes = `[WAKTU PENGIRIMAN: ${deliveryPeriod}] ${checkoutNotes ? checkoutNotes : ''}`;
+    submitOnlineOrder(currentUser.username, currentUser.name, currentUser.username || "08xxxx", finalNotes, undefined, paymentCode, customerDistanceKm || undefined);
+    
+    let savedAmount = 0;
+    customerCart.forEach(item => {
+      const prod = products.find(p => p.id === item.product.id);
+      if (prod && prod.price > item.product.price) {
+        savedAmount += (prod.price - item.product.price) * item.quantity;
+      }
+    });
+
+    const waNumber = settings.ownerWhatsapp?.replace(/^0/, '62');
+    if (waNumber) {
+      const itemList = customerCart.map(c => `- ${c.quantity}x ${c.product.name}`).join('\n');
+      const waMessage = `Assalamualaikum KSA Mart,\n\nSaya, *${currentUser.name}* (Member KSA Mart), ingin memesan:\n${itemList}\n\nTotal Belanja: Rp ${cartTotal.toLocaleString('id-ID')}\nKode Pembayaran: *${paymentCode}*\n\nCatatan & Pengiriman:\n${finalNotes}\n\nMohon segera diproses pesanan saya dan beritahu saya cara pembayarannya. Terima kasih!`;
+      const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`;
+      window.open(waUrl, '_blank');
+    }
+    
+    if (savedAmount > 0) {
+      alert(`Pesanan berhasil dibuat! Anda telah MENGHEMAT Rp ${savedAmount.toLocaleString('id-ID')} pada pesanan ini berkat diskon/promo. Anda akan dialihkan ke WhatsApp Toko KSA Mart untuk konfirmasi.`);
+    } else {
+      alert("Pesanan berhasil dibuat! Anda akan dialihkan ke WhatsApp Toko KSA Mart untuk konfirmasi.");
+    }
+    
     setCheckoutNotes('');
     setActiveTab('ORDERS');
   };
@@ -108,7 +195,11 @@ export default function CustomerPortal() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm font-medium hidden sm:block">Ahlan wa Sahlan, {currentUser.name}</span>
-          <button onClick={logout} className="p-2 bg-green-800 hover:bg-green-900 rounded-lg transition-colors" title="Keluar">
+          <button onClick={() => {
+            if (window.confirm("Apakah Anda yakin ingin keluar dari Member Portal? Anda harus login kembali setelah ini.")) {
+              logout();
+            }
+          }} className="p-2 bg-green-800 hover:bg-green-900 rounded-lg transition-colors" title="Keluar">
             <LogOut className="w-5 h-5" />
           </button>
         </div>
@@ -117,29 +208,41 @@ export default function CustomerPortal() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6">
         
+        {isOutsideHours && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl mb-6 shadow-sm flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-bold text-sm">Di Luar Jam Operasional (07:00 - 19:00)</p>
+              <p className="text-xs mt-1 leading-relaxed">
+                Saat ini KSA Mart sedang tutup. Anda tetap dapat melakukan pemesanan, namun pesanan Anda akan diproses dan dikirim pada jam operasional kami berikutnya.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-2 mb-6 pb-2 no-scrollbar">
           <button 
             onClick={() => setActiveTab('DASHBOARD')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'DASHBOARD' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'DASHBOARD' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
             <CreditCard className="w-4 h-4"/> Dashboard
           </button>
           <button 
             onClick={() => setActiveTab('CATALOG')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'CATALOG' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'CATALOG' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
             <Package className="w-4 h-4"/> Katalog Belanja
           </button>
           <button 
             onClick={() => setActiveTab('PROMO')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'PROMO' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'PROMO' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
             <Tag className="w-4 h-4"/> Promo Spesial
           </button>
           <button 
             onClick={() => setActiveTab('CART')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors relative ${activeTab === 'CART' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors relative ${activeTab === 'CART' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
             <ShoppingBag className="w-4 h-4"/> Keranjang
             {customerCart.length > 0 && (
@@ -148,49 +251,55 @@ export default function CustomerPortal() {
           </button>
           <button 
             onClick={() => setActiveTab('ORDERS')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'ORDERS' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'ORDERS' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
             <History className="w-4 h-4"/> Pesanan Saya
           </button>
           <button 
             onClick={() => setActiveTab('POINTS')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'POINTS' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'POINTS' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
             <Tag className="w-4 h-4"/> Riwayat Poin
           </button>
           <button 
             onClick={() => setActiveTab('GUIDE')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'GUIDE' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'GUIDE' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
           >
-            <HelpCircle className="w-4 h-4"/> Panduan
+            <HelpCircle className="w-4 h-4"/> Panduan & Info
           </button>
         </div>
 
         {/* Tab: Dashboard */}
         {activeTab === 'DASHBOARD' && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-gradient-to-br from-green-600 to-teal-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><ShoppingBag className="w-24 h-24"/></div>
-                <p className="text-green-100 font-medium mb-1">Total Belanja Selesai</p>
+                <p className="text-green-100 font-medium mb-1">Total Belanja</p>
                 <h3 className="text-3xl font-black">Rp {totalBelanja.toLocaleString('id-ID')}</h3>
-                <p className="text-sm text-green-200 mt-4 bg-black/20 inline-block px-3 py-1 rounded-full">
+                <p className="text-xs text-green-200 mt-4 bg-black/20 inline-block px-3 py-1 rounded-full">
                   {myCustomerProfile?.isKoperasiMember ? 'Anggota Koperasi Syariah' : 'Pelanggan Umum'}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-fuchsia-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><Tag className="w-24 h-24"/></div>
-                <p className="text-fuchsia-100 font-medium mb-1">Loyalitas Poin Anda</p>
+                <p className="text-blue-100 font-medium mb-1">Total Hemat & Diskon</p>
+                <h3 className="text-3xl font-black">Rp {totalHemat.toLocaleString('id-ID')}</h3>
+                <p className="text-[10px] text-blue-200 mt-4 bg-black/20 inline-block px-2 py-1 rounded-full">Akumulasi dari Promo & Grosir</p>
+              </div>
+              <div className="bg-gradient-to-br from-fuchsia-600 to-purple-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 opacity-10"><Tag className="w-24 h-24"/></div>
+                <p className="text-fuchsia-100 font-medium mb-1">Loyalitas Poin</p>
                 <h3 className="text-3xl font-black">{points} Poin</h3>
                 <p className="text-xs text-fuchsia-200 mt-4 bg-black/20 inline-block px-3 py-1 rounded-full">Senilai Rp {(points * 10).toLocaleString('id-ID')}</p>
               </div>
               <div className="bg-gradient-to-br from-rose-500 to-red-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><CreditCard className="w-24 h-24"/></div>
-                <p className="text-rose-100 font-medium mb-1">Total Tagihan / Utang Koperasi</p>
+                <p className="text-rose-100 font-medium mb-1">Tagihan/Utang Koperasi</p>
                 <h3 className="text-3xl font-black">Rp {totalUtang.toLocaleString('id-ID')}</h3>
                 <button 
                   onClick={() => alert(`Harap hubungi kasir/toko KSA Mart dengan menyebutkan nama: ${currentUser.name} untuk pembayaran tagihan kasbon sebesar Rp ${totalUtang.toLocaleString('id-ID')}.`)}
-                  className="mt-4 bg-white/25 hover:bg-white/35 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors cursor-pointer"
+                  className="mt-4 bg-white/25 hover:bg-white/35 text-white px-4 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer"
                 >
                   Bayar Tagihan
                 </button>
@@ -392,7 +501,40 @@ export default function CustomerPortal() {
                 </div>
                 
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-4">
+                  {/* Deteksi Lokasi Otomatis */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
+                    <p className="font-bold text-blue-800 mb-2">Deteksi Jarak Otomatis (GPS)</p>
+                    {customerDistanceKm !== null ? (
+                      <p className="text-blue-700">Jarak Anda ke toko KSA Mart: <span className="font-black text-lg">{customerDistanceKm.toFixed(2)} km</span></p>
+                    ) : (
+                      <p className="text-blue-600 text-xs mb-2">Aktifkan GPS agar kami bisa menghitung jarak pengiriman otomatis.</p>
+                    )}
+                    <button 
+                      onClick={handleCheckLocation}
+                      disabled={isCheckingLocation}
+                      className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm disabled:opacity-50"
+                    >
+                      {isCheckingLocation ? 'Mendeteksi...' : (customerDistanceKm !== null ? 'Perbarui Lokasi' : 'Cek Jarak ke Toko')}
+                    </button>
+                    {customerDistanceKm !== null && settings.maxDeliveryRadiusKm && customerDistanceKm > settings.maxDeliveryRadiusKm && (
+                      <p className="mt-2 text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 p-2 rounded">Perhatian: Jarak Anda melebihi batas pengiriman ({settings.maxDeliveryRadiusKm} km).</p>
+                    )}
+                  </div>
+
                   <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Periode Pengiriman / Pengambilan</label>
+                    <select 
+                      value={deliveryPeriod}
+                      onChange={e => setDeliveryPeriod(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white mb-4"
+                    >
+                      <option value="Periode 1 (08.00-09.00)">Periode 1 (08.00 - 09.00)</option>
+                      <option value="Periode 2 (11.00-12.00)">Periode 2 (11.00 - 12.00)</option>
+                      <option value="Periode 3 (14.00-15.00)">Periode 3 (14.00 - 15.00)</option>
+                      <option value="Periode 4 (17.00-18.00)">Periode 4 (17.00 - 18.00)</option>
+                      <option value="Periode 5 (20.00-21.00)">Periode 5 (20.00 - 21.00)</option>
+                    </select>
+
                     <label className="block text-sm font-bold text-slate-700 mb-1">Catatan Pesanan (Opsional)</label>
                     <input 
                       type="text" 
@@ -608,15 +750,28 @@ export default function CustomerPortal() {
           </div>
         )}
 
-        {/* Tab: Guide */}
+        {/* Tab: Guide & Info */}
         {activeTab === 'GUIDE' && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm">
               <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2 border-b pb-4">
-                <HelpCircle className="w-6 h-6 text-green-600" /> Pusat Bantuan & Panduan Anggota
+                <HelpCircle className="w-6 h-6 text-green-600" /> Pusat Bantuan & Informasi Pelanggan
               </h2>
               
               <div className="space-y-6">
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6">
+                  <h3 className="font-bold text-amber-900 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" /> Jam Operasional & Syarat Ketentuan
+                  </h3>
+                  <ul className="text-amber-800 text-sm leading-relaxed space-y-2 list-disc list-inside">
+                    <li><strong>Jam Operasional KSA Mart:</strong> 07.00 - 19.00 WIB setiap hari.</li>
+                    <li>Pesanan yang masuk <strong>di luar jam operasional</strong> akan otomatis diproses dan dikirimkan pada jam kerja operasional berikutnya.</li>
+                    <li>Layanan pesan antar (delivery) berlaku untuk jarak <strong>maksimal 5 KM</strong> dari lokasi KSA Mart.</li>
+                    <li>Pastikan alamat pengiriman Anda sudah benar dan nomor HP / WhatsApp Anda aktif untuk memudahkan kurir/kasir melakukan konfirmasi pesanan.</li>
+                    <li>Pembayaran dapat dilakukan melalui transfer atau QRIS sesuai yang diinstruksikan oleh admin kami melalui WhatsApp.</li>
+                  </ul>
+                </div>
+
                 <div>
                   <h3 className="font-bold text-green-800 mb-2">1. Cara Memesan Barang</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -630,9 +785,9 @@ export default function CustomerPortal() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-bold text-green-800 mb-2">3. Tagihan & Utang Koperasi</h3>
+                  <h3 className="font-bold text-green-800 mb-2">3. Tagihan & Poin Loyalitas</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">
-                    Di tab <strong>Dashboard</strong>, Anda bisa memantau akumulasi total belanja Anda, serta sisa Tagihan atau Utang Koperasi yang Anda miliki (apabila menggunakan fitur Kasbon Koperasi).
+                    Di tab <strong>Dashboard</strong>, Anda bisa memantau akumulasi total belanja Anda, serta jumlah Poin Loyalitas yang Anda miliki untuk ditukarkan menjadi diskon di kasir KSA Mart.
                   </p>
                 </div>
                 <div className="bg-green-50 border border-green-100 p-4 rounded-xl">

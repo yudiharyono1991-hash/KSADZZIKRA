@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import { 
   Search, 
@@ -16,7 +16,11 @@ import {
   AlertCircle,
   Package,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  Smartphone,
+  Store,
+  ChevronDown,
+  XOctagon
 } from 'lucide-react';
 
 export default function KasirPOS() {
@@ -32,7 +36,7 @@ export default function KasirPOS() {
     promos,
     settings,
     activeBranchId
-  } = useAppStore();
+  } = useBranchData();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -44,10 +48,21 @@ export default function KasirPOS() {
   const [receiptTx, setReceiptTx] = useState<any>(null); // To show transaction receipt after checkout
   const [customerPhone, setCustomerPhone] = useState('');
   
+  // PPOB States
+  const [activeTab, setActiveTab] = useState<'PHYSICAL' | 'PPOB'>('PHYSICAL');
+  const [ppobModalOpen, setPpobModalOpen] = useState(false);
+  const [selectedPpobProduct, setSelectedPpobProduct] = useState<Product | null>(null);
+  const [ppobTargetNumber, setPpobTargetNumber] = useState('');
+  
   // Payment Simulation States for Presentation
   const [isQrisSimulated, setIsQrisSimulated] = useState(false);
   const [isTransferSimulated, setIsTransferSimulated] = useState(false);
   const [transferSenderName, setTransferSenderName] = useState('');
+  
+  // New States for QRIS simulation
+  const [isQrisEnlarged, setIsQrisEnlarged] = useState(false);
+  const [qrisValidationStatus, setQrisValidationStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS'>('IDLE');
+  const [qrisRefCode, setQrisRefCode] = useState('');
   
   const [qrisScanMode, setQrisScanMode] = useState<'MERCHANT' | 'CUSTOMER'>('MERCHANT');
   const [scannedCustomerToken, setScannedCustomerToken] = useState('');
@@ -56,8 +71,37 @@ export default function KasirPOS() {
   const [selectedPromoId, setSelectedPromoId] = useState<string>('');
   const [pointsToRedeemInput, setPointsToRedeemInput] = useState('');
 
+  // Countdown Timer
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isExpired, setIsExpired] = useState(false);
+
+  React.useEffect(() => {
+    let timer: any;
+    const timeoutMins = settings.paymentTimeoutMinutes || 0;
+    
+    if (timeoutMins > 0 && isCheckoutOpen && !isExpired && qrisValidationStatus !== 'SUCCESS' && !isTransferSimulated) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setIsExpired(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isCheckoutOpen, isExpired, qrisValidationStatus, isTransferSimulated, settings.paymentTimeoutMinutes]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
   // Categories
-  const categories = ['ALL', 'PROMO', 'Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
+  const categories = ['ALL', 'PROMO', 'Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
 
   // Filtered Products
   const filteredProducts = products.filter(product => {
@@ -77,8 +121,33 @@ export default function KasirPOS() {
     }
 
     const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+    
+    // Tab filter
+    if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
+    if (activeTab === 'PPOB' && !product.isPPOB) return false;
+
     return matchesSearch && matchesCategory && matchesBranch;
   });
+
+  const ppobCategories = ['ALL', 'Pulsa', 'Token Listrik', 'PDAM', 'BPJS'];
+  const displayCategories = activeTab === 'PHYSICAL' ? categories : ppobCategories;
+
+  const handlePpobClick = (product: Product) => {
+    setSelectedPpobProduct(product);
+    setPpobTargetNumber('');
+    setPpobModalOpen(true);
+  };
+
+  const handleAddPpobToCart = () => {
+    if (selectedPpobProduct && ppobTargetNumber) {
+      addToCart(selectedPpobProduct, false, ppobTargetNumber);
+      setPpobModalOpen(false);
+      setSelectedPpobProduct(null);
+      setPpobTargetNumber('');
+    } else {
+      alert("Masukkan nomor tujuan/ID Pelanggan terlebih dahulu!");
+    }
+  };
 
   const getDynamicPrice = (item: any) => {
     if (item.isBox && item.product.hasBoxUnit) {
@@ -158,9 +227,10 @@ export default function KasirPOS() {
       formattedPhone = '62' + formattedPhone.slice(1);
     }
     
-    const itemsText = receiptTx.items.map((it: any) => 
-      `• ${it.productName} (${it.quantity}x @ Rp ${it.price.toLocaleString('id-ID')}) -> Rp ${(it.price * it.quantity).toLocaleString('id-ID')}`
-    ).join('\n');
+    const itemsText = receiptTx.items.map((it: any) => {
+      const targetStr = it.targetNumber ? `\n   [No: ${it.targetNumber}]` : '';
+      return `• ${it.productName}${targetStr} (${it.quantity}x @ Rp ${it.price.toLocaleString('id-ID')}) -> Rp ${(it.price * it.quantity).toLocaleString('id-ID')}`;
+    }).join('\n');
     
     const textMessage = `🕌 *Toko KSA Mart* 🕌\n` +
       `Toko KSA Mart, Indonesia\n` +
@@ -189,9 +259,32 @@ export default function KasirPOS() {
   };
 
   return (
-    <div className="flex flex-col md:grid md:grid-cols-12 gap-4 md:gap-6 h-auto md:h-[calc(100vh-120px)]">
+    <div className="flex flex-col xl:flex-row gap-4 md:gap-6 flex-1 min-h-[500px]">
       {/* Product Catalog Grid - Left */}
-      <div className="md:col-span-7 lg:col-span-8 flex flex-col h-[55vh] md:h-full space-y-4">
+      <div className="flex-1 flex flex-col h-[60vh] xl:h-full space-y-4">
+        
+        {/* Type Tabs */}
+        <div className="flex gap-2">
+          <button 
+            onClick={() => { setActiveTab('PHYSICAL'); setSelectedCategory('ALL'); }}
+            className={`flex-1 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+              activeTab === 'PHYSICAL' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Package className="w-5 h-5" />
+            Produk Fisik
+          </button>
+          <button 
+            onClick={() => { setActiveTab('PPOB'); setSelectedCategory('ALL'); }}
+            className={`flex-1 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+              activeTab === 'PPOB' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Smartphone className="w-5 h-5" />
+            PPOB & Digital
+          </button>
+        </div>
+
         {/* Search & Filter Header */}
         <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="relative flex-1">
@@ -200,7 +293,7 @@ export default function KasirPOS() {
             </span>
             <input
               type="text"
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/25 focus:border-green-600"
+              className="w-full pl-10 pr-4 py-2 bg-white text-slate-800 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/25 focus:border-green-600"
               placeholder="Cari item berdasar nama produk / SKU / No Barcode..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -221,15 +314,15 @@ export default function KasirPOS() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
+          <div className="flex overflow-x-auto hide-scrollbar gap-2 py-1">
+            {displayCategories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all ${
+                className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   selectedCategory === cat
-                    ? 'bg-green-700 text-white shadow-xs'
-                    : 'bg-slate-100 text-gray-600 hover:bg-slate-200'
+                    ? (activeTab === 'PHYSICAL' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700')
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {cat}
@@ -255,6 +348,13 @@ export default function KasirPOS() {
                 return (
                   <div 
                     key={p.id}
+                    onClick={() => {
+                      if (activeTab === 'PPOB') {
+                        handlePpobClick(p);
+                      } else if (!isOutOfStock) {
+                        addToCart(p, false);
+                      }
+                    }}
                     className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
                       isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
                     }`}
@@ -293,17 +393,21 @@ export default function KasirPOS() {
                         </span>
                         
                         {/* Stock pill */}
-                        {isOutOfStock ? (
-                          <span className="text-[10px] font-semibold text-white bg-red-500 px-2 py-0.5 rounded-full">Habis</span>
-                        ) : isLowStock ? (
-                          <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">{p.stock} {p.unit}</span>
+                        {!p.isPPOB ? (
+                          isOutOfStock ? (
+                            <span className="text-[10px] font-semibold text-white bg-red-500 px-2 py-0.5 rounded-full">Habis</span>
+                          ) : isLowStock ? (
+                            <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">{p.stock} {p.unit}</span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{p.stock} {p.unit}</span>
+                          )
                         ) : (
-                          <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{p.stock} {p.unit}</span>
+                           <span className="text-[10px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">Digital</span>
                         )}
                       </div>
 
                       {/* Add button / active inventory controller */}
-                      {isOutOfStock ? (
+                      {isOutOfStock && !p.isPPOB ? (
                         <button
                           disabled
                           className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed"
@@ -311,18 +415,15 @@ export default function KasirPOS() {
                           Stok Kosong
                         </button>
                       ) : (
-                        <button
-                          onClick={() => addToCart(p)}
-                          className="w-full bg-green-700 hover:bg-green-800 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all"
-                        >
+                        <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
                           <Plus className="w-3.5 h-3.5 mr-0.5" />
-                          <span>Pilih Produk</span>
+                          <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
                           {cartQty > 0 && (
                             <span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">
                               {cartQty}
                             </span>
                           )}
-                        </button>
+                        </div>
                       )}
                       </div>
                     </div>
@@ -335,7 +436,7 @@ export default function KasirPOS() {
       </div>
 
       {/* Shopping Cart Section - Right */}
-      <div className="md:col-span-5 lg:col-span-4 bg-white rounded-xl border border-gray-200 shadow-xs flex flex-col h-[70vh] md:h-full overflow-hidden mt-4 md:mt-0">
+      <div className="xl:w-[400px] 2xl:w-[450px] shrink-0 h-auto xl:h-full flex flex-col bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden mt-4 md:mt-0">
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -368,20 +469,18 @@ export default function KasirPOS() {
           ) : (
             cart.map((item) => (
               <div 
-                key={item.product.id}
+                key={item.product.id + (item.targetNumber || '')}
                 className="flex items-center justify-between p-2 rounded-lg border border-gray-100 hover:bg-slate-50/50"
               >
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="text-xs font-bold text-gray-800 truncate" title={item.product.name}>
+                  <h4 className="text-xs font-bold text-gray-800 truncate">
                     {item.product.name} {item.isBox && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded ml-1 border border-indigo-100">Box</span>}
                   </h4>
+                  {item.targetNumber && <p className="text-[10px] text-blue-600 font-bold">No: {item.targetNumber}</p>}
                   <div className="flex items-center gap-2 mt-0.5">
                     <p className="text-[10px] text-gray-400 font-semibold">
                       Rp {getDynamicPrice(item).toLocaleString('id-ID')} / {item.isBox ? 'Box' : item.product.unit}
                     </p>
-                    {getDynamicPrice(item) < item.product.price && (
-                      <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded font-bold">Harga Grosir</span>
-                    )}
                   </div>
                 </div>
 
@@ -459,7 +558,7 @@ export default function KasirPOS() {
             )}
             <div className="flex justify-between items-center text-xs text-gray-500 font-medium pb-2 border-b border-gray-200 mt-1">
               <span>Zakat Kontribusi (Est.)</span>
-              <span className="text-green-700">Rp {((cartTotal - taxAmount - cart.reduce((s, i) => s + i.product.costPrice * i.quantity, 0)) * 0.025 > 0 ? (cartTotal - taxAmount - cart.reduce((s, i) => s + i.product.costPrice * i.quantity, 0)) * 0.025 : 0).toLocaleString('id-ID')}</span>
+              <span className="text-green-700">Rp {((cartTotal - taxAmount - cart.reduce((s, i) => s + (i.product.costPrice || 0) * i.quantity, 0)) * 0.025 > 0 ? (cartTotal - taxAmount - cart.reduce((s, i) => s + (i.product.costPrice || 0) * i.quantity, 0)) * 0.025 : 0).toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center mt-2 pt-1">
               <span className="font-bold text-gray-800 text-sm">Total Pembayaran</span>
@@ -481,7 +580,11 @@ export default function KasirPOS() {
             </button>
             <button
               onClick={() => {
-                if(cart.length > 0) setIsCheckoutOpen(true);
+                if(cart.length > 0) {
+                  setIsCheckoutOpen(true);
+                  setTimeLeft((settings.paymentTimeoutMinutes || 0) * 60);
+                  setIsExpired(false);
+                }
               }}
               disabled={cart.length === 0}
               className={`py-2 text-xs font-bold rounded-lg transition-all text-center flex items-center justify-center space-x-1 shadow-xs ${
@@ -498,17 +601,26 @@ export default function KasirPOS() {
 
       {/* Checkout Processing Dialog / Modal overlay */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsCheckoutOpen(false)}></div>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden relative animate-in slide-in-from-bottom-8 duration-300">
             {/* Modal Header */}
-            <div className="p-5 border-b border-gray-100 bg-slate-50 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 text-md">Pencatatan Pembayaran POS</h3>
-              <button 
-                onClick={() => setIsCheckoutOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold"
-              >
-                ✕
-              </button>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white/50 backdrop-blur-md">
+              <h2 className="text-lg font-bold text-gray-800 tracking-tight">Pencatatan Pembayaran POS</h2>
+              <div className="flex items-center gap-4">
+                {(settings.paymentTimeoutMinutes || 0) > 0 && isCheckoutOpen && !isExpired && qrisValidationStatus !== 'SUCCESS' && !isTransferSimulated && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-200 text-xs font-bold font-mono">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                    {formatTime(timeLeft)}
+                  </div>
+                )}
+                <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <XOctagon className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Content */}
@@ -525,7 +637,7 @@ export default function KasirPOS() {
               </div>
 
               {/* Points Redemption block */}
-              {selectedCustomer && selectedCustomer.points > 0 && (
+              {!isExpired && selectedCustomer && selectedCustomer.points > 0 && (
                 <div className="bg-fuchsia-50/50 border border-fuchsia-100 rounded-xl p-3.5 space-y-2 animate-in fade-in zoom-in-95">
                   <div className="flex justify-between items-center text-xs font-bold text-fuchsia-800">
                     <span>Loyalitas Poin Pelanggan</span>
@@ -557,253 +669,239 @@ export default function KasirPOS() {
               )}
 
               {/* Payment Method selectors */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-gray-600 uppercase tracking-widest mb-1">Metode Pembayaran Syariah</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button
-                    onClick={() => { setPaymentMethod('CASH'); setAmountPaidInput(''); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
-                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
-                      paymentMethod === 'CASH'
-                        ? 'border-green-600 bg-green-50 text-green-800'
-                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    }`}
-                  >
-                    <Coins className="w-5 h-5 text-green-700" />
-                    <span className="text-[9px] font-bold">Tunai</span>
-                  </button>
-
-                  <button
-                    disabled={settings.qrisEnabled === false}
-                    onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setAmountPaidInput(finalTotalWithPoints.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
-                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
-                      paymentMethod === 'QRIS_SHARIAH'
-                        ? 'border-green-600 bg-green-50 text-green-800'
-                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    } ${settings.qrisEnabled === false ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
-                  >
-                    <QrCode className="w-5 h-5 text-green-700" />
-                    <span className="text-[9px] font-bold">QRIS</span>
-                  </button>
-
-                  <button
-                    onClick={() => { setPaymentMethod('TRANSFER_BSI'); setAmountPaidInput(finalTotalWithPoints.toString()); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
-                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
-                      paymentMethod === 'TRANSFER_BSI'
-                        ? 'border-green-600 bg-green-50 text-green-800'
-                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    }`}
-                  >
-                    <CreditCard className="w-5 h-5 text-green-700" />
-                    <span className="text-[9px] font-bold">Transfer</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => { setPaymentMethod('KASBON'); setAmountPaidInput('0'); setIsQrisSimulated(false); setIsTransferSimulated(false); setScannedCustomerToken(''); }}
-                    className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center space-y-1.5 transition-all ${
-                      paymentMethod === 'KASBON'
-                        ? 'border-rose-600 bg-rose-50 text-rose-800'
-                        : 'border-gray-200 hover:bg-slate-50 text-gray-600'
-                    }`}
-                  >
-                    <Users className="w-5 h-5 text-rose-700" />
-                    <span className="text-[9px] font-bold">Kasbon</span>
-                  </button>
-                </div>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Metode Pembayaran Syariah</p>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                <button onClick={() => { setPaymentMethod('CASH'); setTimeLeft((settings.paymentTimeoutMinutes || 0) * 60); setIsExpired(false); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border ${paymentMethod === 'CASH' ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-500/20' : 'border-gray-200 text-gray-500 hover:bg-slate-50'} transition-all`}>
+                  <Coins className="w-5 h-5 mb-1" />
+                  <span className="text-[10px] font-bold">Tunai</span>
+                </button>
+                <button disabled={isExpired || settings.qrisEnabled === false} onClick={() => { setPaymentMethod('QRIS_SHARIAH'); setTimeLeft((settings.paymentTimeoutMinutes || 0) * 60); setIsExpired(false); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border ${paymentMethod === 'QRIS_SHARIAH' ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-500/20' : 'border-gray-200 text-gray-500 hover:bg-slate-50'} transition-all ${isExpired ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <QrCode className="w-5 h-5 mb-1" />
+                  <span className="text-[10px] font-bold">QRIS</span>
+                </button>
+                <button disabled={isExpired} onClick={() => { setPaymentMethod('TRANSFER_BSI'); setTimeLeft((settings.paymentTimeoutMinutes || 0) * 60); setIsExpired(false); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border ${paymentMethod === 'TRANSFER_BSI' ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-500/20' : 'border-gray-200 text-gray-500 hover:bg-slate-50'} transition-all ${isExpired ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <CreditCard className="w-5 h-5 mb-1" />
+                  <span className="text-[10px] font-bold">Transfer</span>
+                </button>
+                <button disabled={isExpired} onClick={() => { setPaymentMethod('KASBON'); setTimeLeft((settings.paymentTimeoutMinutes || 0) * 60); setIsExpired(false); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border ${paymentMethod === 'KASBON' ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-500/20' : 'border-gray-200 text-gray-500 hover:bg-slate-50'} transition-all ${isExpired ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <Users className="w-5 h-5 mb-1" />
+                  <span className="text-[10px] font-bold">Kasbon</span>
+                </button>
               </div>
 
-              {/* Input fields based on method */}
-              {paymentMethod === 'CASH' ? (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-600">Terima Uang Cash (Rp)</label>
-                  <input
-                    type="number"
-                    value={amountPaidInput}
-                    onChange={(e) => setAmountPaidInput(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                    placeholder="Masukkan jumlah yang diserahkan pelanggan..."
-                  />
-                  
-                  {/* Suggestions block */}
-                  <div className="flex gap-1.5 mt-1">
-                    {[finalTotalWithPoints, Math.ceil(finalTotalWithPoints / 10000) * 10000, Math.ceil(finalTotalWithPoints / 50000) * 50000, 100000, 200000].map((val) => (
-                      <button
-                        key={val}
-                        onClick={() => setAmountPaidInput(val.toString())}
-                        className="bg-slate-100 hover:bg-slate-200 text-gray-600 text-[10px] px-2 py-1 rounded cursor-pointer"
-                      >
-                        Rp {val.toLocaleString('id-ID')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : paymentMethod === 'KASBON' ? (
-                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 space-y-3 animate-in fade-in zoom-in-95">
-                  <div className="flex items-start gap-3 text-rose-800">
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-bold">Peringatan Transaksi Kasbon!</p>
-                      <p className="text-xs mt-1 text-rose-700/80">Anda wajib memilih <b>Nama Pelanggan</b> di bagian atas untuk mencatat piutang ini. Total belanja akan otomatis masuk ke tagihan (hutang) pelanggan tersebut.</p>
-                    </div>
-                  </div>
-                  {!selectedCustomerId && (
-                    <div className="bg-white p-3 rounded-lg border border-rose-200 text-center text-rose-600 font-bold text-xs animate-pulse shadow-sm shadow-rose-100">
-                      ⚠️ SILAKAN PILIH PELANGGAN DULU!
-                    </div>
-                  )}
-                  {selectedCustomerId && (
-                    <div className="bg-white p-3 rounded-lg border border-green-200 text-center text-green-700 font-bold text-xs shadow-sm shadow-green-100 flex items-center justify-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
-                      Pelanggan Dipilih. Siap Proses!
-                    </div>
-                  )}
+              {/* Expiration Message */}
+              {isExpired ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-800 animate-in zoom-in-95">
+                  <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-bold mb-1">Sesi Pembayaran Berakhir</h3>
+                  <p className="text-sm">Waktu tunggu pembayaran telah melebihi batas maksimal (5 Menit). Silakan batalkan transaksi dan coba lagi.</p>
                 </div>
               ) : (
-                <div className="bg-slate-50 rounded-lg p-3 border border-gray-100 text-xs text-slate-500 leading-relaxed">
-                  {paymentMethod === 'QRIS_SHARIAH' ? (
-                    <div className="flex flex-col space-y-3">
-                      {/* Tabs for Scan Mode */}
-                      <div className="flex bg-slate-200/50 p-1 rounded-lg">
-                        <button 
-                          onClick={() => setQrisScanMode('MERCHANT')}
-                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'MERCHANT' ? 'bg-white text-green-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          Pelanggan Scan QR Toko
-                        </button>
-                        <button 
-                          onClick={() => { setQrisScanMode('CUSTOMER'); setTimeout(() => document.getElementById('barcode-scanner-input')?.focus(), 100); }}
-                          className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'CUSTOMER' ? 'bg-white text-green-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          Kasir Scan QR Pelanggan
-                        </button>
+                <>
+                  {/* Payment Inputs */}
+                  {paymentMethod === 'CASH' ? (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-600">Terima Uang Cash (Rp)</label>
+                      <input
+                        type="number"
+                        value={amountPaidInput}
+                        onChange={(e) => setAmountPaidInput(e.target.value)}
+                        className="w-full pl-4 pr-4 py-2 bg-white text-slate-800 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/25 focus:border-green-600 font-bold"
+                        placeholder="Masukkan jumlah yang diserahkan pelanggan..."
+                      />
+                      <div className="flex gap-1.5 mt-1">
+                        {[finalTotalWithPoints, Math.ceil(finalTotalWithPoints / 10000) * 10000, Math.ceil(finalTotalWithPoints / 50000) * 50000, 100000, 200000].map((val) => (
+                          <button key={val} onClick={() => setAmountPaidInput(val.toString())} className="bg-slate-100 hover:bg-slate-200 text-gray-600 text-[10px] px-2 py-1 rounded cursor-pointer">
+                            Rp {val.toLocaleString('id-ID')}
+                          </button>
+                        ))}
                       </div>
-
-                      {qrisScanMode === 'MERCHANT' ? (
-                        <div className="flex flex-col items-center">
-                          <p className="text-center font-medium mb-3">Arahkan pelanggan untuk scan QR Code statis toko dan tunjukkan bukti berhasil pada layar HP mereka.</p>
-                          <div className="w-40 h-40 bg-white border border-gray-200 rounded-xl flex items-center justify-center p-2 shadow-sm overflow-hidden mb-3">
-                            {settings.qrisImageUrl ? (
-                              <img src={settings.qrisImageUrl} alt="QRIS Toko" className="w-full h-full object-contain" />
-                            ) : (
-                              <div className="flex flex-col items-center justify-center text-green-800 opacity-60">
-                                <QrCode className="w-16 h-16 mb-2" />
-                                <span className="text-[10px] text-center">Belum ada QRIS<br/>Upload di Pengaturan</span>
-                              </div>
-                            )}
-                          </div>
-                          {!isQrisSimulated ? (
-                            <button 
-                              onClick={() => setIsQrisSimulated(true)}
-                              className="w-full py-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-lg border border-green-300 transition-colors"
-                            >
-                              Verifikasi Bukti QRIS Selesai
-                            </button>
-                          ) : (
-                            <div className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
-                              <CheckCircle className="w-4 h-4" />
-                              <span>Pembayaran QRIS Diterima!</span>
-                            </div>
-                          )}
+                    </div>
+                  ) : paymentMethod === 'KASBON' ? (
+                    <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 space-y-3">
+                      <div className="flex items-start gap-3 text-rose-800">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div className="text-sm">
+                          <p className="font-bold">Peringatan Transaksi Kasbon!</p>
+                          <p className="text-xs mt-1 text-rose-700/80">Anda wajib memilih <b>Nama Pelanggan</b> di bagian atas untuk mencatat piutang ini.</p>
                         </div>
-                      ) : (
-                        <div className="flex flex-col space-y-3">
-                          <p className="text-center font-medium">Arahkan Scanner (Barcode Gun) ke layar HP pelanggan (GoPay/OVO/Dana) lalu tekan tombol tembak.</p>
-                          
-                          <div className="relative">
-                            <input
-                              id="barcode-scanner-input"
-                              type="text"
-                              autoFocus
-                              value={scannedCustomerToken}
-                              onChange={(e) => setScannedCustomerToken(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && scannedCustomerToken.length > 5) {
-                                  setIsQrisSimulated(true);
-                                }
-                              }}
-                              className="w-full border-2 border-green-400 rounded-lg py-3 px-3 text-sm focus:outline-none focus:ring-4 focus:ring-green-500/20 bg-white text-center font-mono font-bold tracking-widest placeholder:font-sans placeholder:tracking-normal placeholder:font-normal"
-                              placeholder="Klik di sini & Tembakkan Scanner..."
-                            />
-                            {!isQrisSimulated && (
-                               <div className="absolute right-3 top-4 flex space-x-1">
-                                 <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-                                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                               </div>
-                            )}
-                          </div>
-
-                          {!isQrisSimulated ? (
-                            <button 
-                              onClick={() => {
-                                if (scannedCustomerToken.length > 5) setIsQrisSimulated(true);
-                                else alert("Silakan scan barcode pelanggan terlebih dahulu (minimal 6 karakter token).");
-                              }}
-                              className="w-full py-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-lg border border-green-300 transition-colors"
-                            >
-                              Tarik Dana dari Pelanggan
-                            </button>
-                          ) : (
-                            <div className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
-                              <CheckCircle className="w-4 h-4" />
-                              <span>Dana Berhasil Ditarik!</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <p>Pastikan dana masuk ke rekening: <b>{settings.ownerBankName || 'BSI'}</b> No. Rek: <b>{settings.ownerBankAccount || '-'}</b>.</p>
-                      
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-gray-600 uppercase">Nama Pengirim (Sesuai Mutasi Bank)</label>
-                        <input
-                          type="text"
-                          value={transferSenderName}
-                          onChange={(e) => setTransferSenderName(e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-white"
-                          placeholder="Masukkan nama pengirim untuk dicatat..."
-                        />
-                      </div>
+                    <div className="bg-slate-50 rounded-lg p-3 border border-gray-100 text-xs text-slate-500 leading-relaxed">
+                      {paymentMethod === 'QRIS_SHARIAH' ? (
+                        <div className="flex flex-col space-y-3">
+                          {/* Tabs for Scan Mode */}
+                          <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                            <button 
+                              onClick={() => setQrisScanMode('MERCHANT')}
+                              className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'MERCHANT' ? 'bg-white text-green-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                              Pelanggan Scan QR Toko
+                            </button>
+                            <button 
+                              onClick={() => { setQrisScanMode('CUSTOMER'); setTimeout(() => document.getElementById('barcode-scanner-input')?.focus(), 100); }}
+                              className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all ${qrisScanMode === 'CUSTOMER' ? 'bg-white text-green-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                              Kasir Scan QR Pelanggan
+                            </button>
+                          </div>
 
-                      {!isTransferSimulated ? (
-                        <button 
-                          onClick={() => {
-                            if (!transferSenderName) { alert("Masukkan nama pengirim untuk verifikasi!"); return; }
-                            setIsTransferSimulated(true);
-                          }}
-                          className="w-full py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded-lg border border-blue-300 transition-colors"
-                        >
-                          Verifikasi Dana Masuk (Mutasi)
-                        </button>
+                          {qrisScanMode === 'MERCHANT' ? (
+                            <div className="flex flex-col items-center">
+                              <p className="text-center font-medium mb-3">Arahkan pelanggan untuk scan QR Code statis toko dan tunjukkan bukti berhasil pada layar HP mereka.</p>
+                              <div 
+                                className="w-40 h-40 bg-white border border-gray-200 rounded-xl flex items-center justify-center p-2 shadow-sm overflow-hidden mb-3 cursor-pointer hover:shadow-md hover:border-green-300 transition-all group relative"
+                                onClick={() => setIsQrisEnlarged(true)}
+                              >
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="text-white text-[10px] font-bold">Perbesar</span>
+                                </div>
+                                {settings.qrisImageUrl ? (
+                                  <img src={settings.qrisImageUrl} alt="QRIS Toko" className="w-full h-full object-contain" />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center text-green-800 opacity-60">
+                                    <QrCode className="w-16 h-16 mb-2" />
+                                    <span className="text-[10px] text-center">Belum ada QRIS<br/>Upload di Pengaturan</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {qrisValidationStatus === 'IDLE' && (
+                                <button 
+                                  onClick={() => {
+                                    setQrisValidationStatus('LOADING');
+                                    setTimeout(() => {
+                                      setQrisValidationStatus('SUCCESS');
+                                      setQrisRefCode(`QRS-${Math.floor(100000 + Math.random() * 900000)}`);
+                                      setIsQrisSimulated(true);
+                                    }, 2000);
+                                  }}
+                                  className="w-full py-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-lg border border-green-300 transition-colors"
+                                >
+                                  Verifikasi Bukti QRIS Selesai
+                                </button>
+                              )}
+                              
+                              {qrisValidationStatus === 'LOADING' && (
+                                <div className="w-full py-2 bg-slate-100 text-slate-600 font-bold rounded-lg text-center flex items-center justify-center space-x-2 border border-slate-200">
+                                  <div className="w-4 h-4 border-2 border-slate-400 border-t-slate-600 rounded-full animate-spin"></div>
+                                  <span>Menunggu Pembayaran...</span>
+                                </div>
+                              )}
+                              
+                              {qrisValidationStatus === 'SUCCESS' && (
+                                <div className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-center flex flex-col items-center justify-center shadow-xs">
+                                  <div className="flex items-center space-x-1 mb-1">
+                                    <CheckCircle className="w-4 h-4" />
+                                    <span>Pembayaran QRIS Berhasil!</span>
+                                  </div>
+                                  <span className="text-[10px] bg-green-800 px-2 py-0.5 rounded-full">Ref: {qrisRefCode}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col space-y-3">
+                              <p className="text-center font-medium">Arahkan Scanner (Barcode Gun) ke layar HP pelanggan (GoPay/OVO/Dana) lalu tekan tombol tembak.</p>
+                              
+                              <div className="relative">
+                                <input
+                                  id="barcode-scanner-input"
+                                  type="text"
+                                  autoFocus
+                                  value={scannedCustomerToken}
+                                  onChange={(e) => setScannedCustomerToken(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && scannedCustomerToken.length > 5) {
+                                      setIsQrisSimulated(true);
+                                    }
+                                  }}
+                                  className="w-full pl-10 pr-4 py-3 bg-white text-slate-800 border-2 border-green-500 rounded-xl focus:outline-none focus:ring-4 focus:ring-green-500/20 text-center font-mono text-lg font-bold tracking-widest placeholder-gray-300 shadow-inner"
+                                  placeholder="Klik di sini & Tembakkan Scanner..."
+                                />
+                                {!isQrisSimulated && (
+                                   <div className="absolute right-3 top-4 flex space-x-1">
+                                     <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
+                                     <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                   </div>
+                                )}
+                              </div>
+
+                              {!isQrisSimulated ? (
+                                <button 
+                                  onClick={() => {
+                                    if (scannedCustomerToken.length > 5) setIsQrisSimulated(true);
+                                    else alert("Silakan scan barcode pelanggan terlebih dahulu (minimal 6 karakter token).");
+                                  }}
+                                  className="w-full py-2 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-lg border border-green-300 transition-colors"
+                                >
+                                  Tarik Dana dari Pelanggan
+                                </button>
+                              ) : (
+                                <div className="w-full py-2 bg-green-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                                  <CheckCircle className="w-4 h-4" />
+                                  <span>Dana Berhasil Ditarik!</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <div className="w-full py-2 bg-blue-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
-                          <CheckCircle className="w-4 h-4" />
-                          <span>Dana Masuk Diverifikasi!</span>
+                        <div className="space-y-3">
+                          <p>Pastikan dana masuk ke rekening: <b>{settings.ownerBankName || 'BSI'}</b> No. Rek: <b>{settings.ownerBankAccount || '-'}</b>.</p>
+                          
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-600 uppercase">Nama Pengirim (Sesuai Mutasi Bank)</label>
+                            <input
+                              type="text"
+                              value={transferSenderName}
+                              onChange={(e) => setTransferSenderName(e.target.value)}
+                              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 bg-white"
+                              placeholder="Masukkan nama pengirim untuk dicatat..."
+                            />
+                          </div>
+
+                          {!isTransferSimulated ? (
+                            <button 
+                              onClick={() => {
+                                if (!transferSenderName) { alert("Masukkan nama pengirim untuk verifikasi!"); return; }
+                                setIsTransferSimulated(true);
+                              }}
+                              className="w-full py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded-lg border border-blue-300 transition-colors"
+                            >
+                              Verifikasi Dana Masuk (Mutasi)
+                            </button>
+                          ) : (
+                            <div className="w-full py-2 bg-blue-600 text-white font-bold rounded-lg text-center flex items-center justify-center space-x-1 shadow-xs">
+                              <CheckCircle className="w-4 h-4" />
+                              <span>Dana Masuk Diverifikasi!</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Show Cash changes */}
-              {paymentMethod === 'CASH' && Number(amountPaidInput) > 0 && (
-                <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-xs">
-                  <span className="font-semibold text-gray-500">Uang Kembalian</span>
-                  <span className={`font-bold text-sm ${Number(amountPaidInput) - finalTotalWithPoints < 0 ? 'text-red-500' : 'text-green-700'}`}>
-                    {Number(amountPaidInput) - finalTotalWithPoints < 0 
-                      ? `Kurang Rp ${(finalTotalWithPoints - Number(amountPaidInput)).toLocaleString('id-ID')}` 
-                      : `Rp ${(Number(amountPaidInput) - finalTotalWithPoints).toLocaleString('id-ID')}`
-                    }
-                  </span>
-                </div>
+                  {/* Show Cash changes */}
+                  {!isExpired && paymentMethod === 'CASH' && Number(amountPaidInput) > 0 && (
+                    <div className="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-xs">
+                      <span className="font-semibold text-gray-500">Uang Kembalian</span>
+                      <span className={`font-bold text-sm ${Number(amountPaidInput) - finalTotalWithPoints < 0 ? 'text-red-500' : 'text-green-700'}`}>
+                        {Number(amountPaidInput) - finalTotalWithPoints < 0 
+                          ? `Kurang Rp ${(finalTotalWithPoints - Number(amountPaidInput)).toLocaleString('id-ID')}` 
+                          : `Rp ${(Number(amountPaidInput) - finalTotalWithPoints).toLocaleString('id-ID')}`
+                        }
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* Modal Actions */}
             <div className="p-4 bg-slate-50 border-t border-gray-100 grid grid-cols-2 gap-2">
               <button
-                onClick={() => { setIsCheckoutOpen(false); setIsQrisSimulated(false); setIsTransferSimulated(false); }}
+                onClick={() => { setIsCheckoutOpen(false); setIsQrisSimulated(false); setIsTransferSimulated(false); setQrisValidationStatus('IDLE'); setIsExpired(false); }}
                 className="py-2.5 bg-white border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-slate-50"
               >
                 Batal
@@ -814,8 +912,11 @@ export default function KasirPOS() {
                   setIsCheckoutOpen(false);
                   setIsQrisSimulated(false);
                   setIsTransferSimulated(false);
+                  setQrisValidationStatus('IDLE');
+                  setIsExpired(false);
                 }}
                 disabled={
+                  isExpired ||
                   cart.length === 0 || 
                   (paymentMethod === 'CASH' && Number(amountPaidInput) < finalTotalWithPoints) ||
                   (paymentMethod === 'QRIS_SHARIAH' && !isQrisSimulated) ||
@@ -823,6 +924,7 @@ export default function KasirPOS() {
                   (paymentMethod === 'KASBON' && !selectedCustomerId)
                 }
                 className={`py-2.5 text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer ${
+                  isExpired ||
                   (paymentMethod === 'CASH' && Number(amountPaidInput) < finalTotalWithPoints) ||
                   (paymentMethod === 'QRIS_SHARIAH' && !isQrisSimulated) ||
                   (paymentMethod === 'TRANSFER_BSI' && !isTransferSimulated) ||
@@ -875,9 +977,10 @@ export default function KasirPOS() {
 
               <div className="border-t border-b border-gray-100 py-2 space-y-2">
                 {receiptTx.items.map((it: any, index: number) => (
-                  <div key={index} className="flex justify-between">
+                  <div key={index} className="flex justify-between items-start text-xs font-bold text-slate-700">
                     <div>
-                      <p className="font-semibold text-gray-800">{it.productName}</p>
+                      <p>{it.productName}</p>
+                      {it.targetNumber && <p className="text-[9px] text-blue-600">No: {it.targetNumber}</p>}
                       <p className="text-slate-400 text-[10px]">{it.quantity} x Rp {it.price.toLocaleString('id-ID')}</p>
                     </div>
                     <span>Rp {(it.price * it.quantity).toLocaleString('id-ID')}</span>
@@ -948,6 +1051,35 @@ export default function KasirPOS() {
             </div>
 
             {/* Kirim WhatsApp Struk */}
+            <a id="wa-receipt-link" href="#" target="_blank" className="hidden">Kirim WA</a>
+            
+            {/* QRIS Enlarge Modal */}
+            {isQrisEnlarged && (
+              <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-200" onClick={() => setIsQrisEnlarged(false)}>
+                <button className="absolute top-6 right-6 text-white hover:text-gray-300 transition-colors" onClick={() => setIsQrisEnlarged(false)}>
+                  <XOctagon className="w-10 h-10" />
+                </button>
+                
+                <div className="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">QRIS {settings.storeName}</h3>
+                  <p className="text-sm text-gray-500 mb-6 text-center">Arahkan kamera ke layar ini untuk membayar.</p>
+                  
+                  {settings.qrisImageUrl ? (
+                    <img src={settings.qrisImageUrl} alt="QRIS Besar" className="w-full max-h-[50vh] object-contain rounded-xl border border-gray-100 p-2" />
+                  ) : (
+                    <div className="w-64 h-64 border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center text-gray-400">
+                      Belum ada QRIS
+                    </div>
+                  )}
+                  
+                  <div className="mt-8 bg-green-50 w-full py-4 rounded-xl border border-green-100 text-center">
+                    <p className="text-xs font-bold text-green-700 uppercase mb-1">Total Tagihan Pelanggan</p>
+                    <p className="text-3xl font-black text-green-800 tracking-tight">Rp {finalTotalWithPoints.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="px-6 py-4 bg-green-50/30 border-t border-b border-gray-100 flex flex-col space-y-2">
               <label className="text-[11px] font-bold text-gray-700 flex items-center space-x-1">
                 <span>📱 Kirim Struk Digital via WhatsApp</span>
@@ -987,6 +1119,52 @@ export default function KasirPOS() {
           </div>
         </div>
       )}
+
+      {/* PPOB Input Modal */}
+      {ppobModalOpen && selectedPpobProduct && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-blue-600 p-4 text-white">
+              <h3 className="font-bold text-lg">Input Data {selectedPpobProduct.category}</h3>
+              <p className="text-blue-100 text-sm">{selectedPpobProduct.name}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Nomor Tujuan / ID Pelanggan</label>
+                <input
+                  type="text"
+                  value={ppobTargetNumber}
+                  onChange={(e) => setPpobTargetNumber(e.target.value)}
+                  className="w-full pl-4 pr-4 py-3 bg-white text-slate-800 border-2 border-blue-500 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 text-lg font-bold placeholder-gray-300 shadow-inner"
+                  placeholder="Misal: 0812xxxx / 5123xxxx"
+                  autoFocus
+                />
+              </div>
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Harga Bayar</span>
+                  <span className="font-black text-xl text-blue-700">Rp {selectedPpobProduct.price.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-2">
+              <button
+                onClick={() => setPpobModalOpen(false)}
+                className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-200 rounded-lg"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleAddPpobToCart}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm"
+              >
+                Tambahkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

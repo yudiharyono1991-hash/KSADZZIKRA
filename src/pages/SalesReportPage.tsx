@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import * as XLSX from 'xlsx';
 import html2pdf from 'html2pdf.js';
 import { 
@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 
 export default function SalesReportPage() {
-  const { transactions, activeBranchId, currentUser, addLog } = useAppStore();
+  const { transactions, currentUser, addLog, addNotification } = useBranchData();
+  const { activeBranchId } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
   const reportRef = useRef<HTMLDivElement>(null);
   
@@ -177,28 +178,43 @@ export default function SalesReportPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-
-          <div className="flex gap-2 w-full md:w-auto flex-wrap">
-            <button 
-              onClick={handleExportExcel}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Penjualan periode ${startDate} sd ${endDate} untuk persetujuan Owner.`);
+                addNotification({
+                  title: 'Approval Laporan Penjualan',
+                  message: `Laporan Penjualan periode ${startDate} sd ${endDate} dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
+                  type: 'APPROVAL',
+                  targetRole: ['OWNER', 'PENGURUS'],
+                  link: '/laporan-penjualan'
+                });
+                alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
+              }}
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-semibold"
             >
-              <Download className="w-4 h-4" />
+              <span>Kirim Laporan</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition font-semibold"
+            >
+              <Download className="w-5 h-5" />
               <span>Excel</span>
             </button>
-            <button 
+            <button
               onClick={handleExportPDF}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+              className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition font-semibold"
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-5 h-5" />
               <span>PDF</span>
             </button>
-            <button 
+            <button
               onClick={handlePrintReport}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+              className="flex items-center space-x-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition font-semibold"
             >
-              <Printer className="w-4 h-4" />
-              <span>Cetak</span>
+              <Printer className="w-5 h-5" />
+              <span>Cetak / PDF</span>
             </button>
           </div>
         </div>
@@ -383,21 +399,27 @@ export default function SalesReportPage() {
           )}
         </table>
         
-        <div className="mt-8 pt-8 flex justify-between items-end">
-          <div className="text-center w-48">
-            <p className="text-xs font-semibold mb-12">Dibuat Oleh,</p>
-            <p className="text-xs border-b border-gray-800 pb-1 font-bold">
-              {currentUser?.role === 'OWNER' ? 'Administrator' : (currentUser?.name || 'Admin')}
+        <div className="mt-8 pt-8 flex justify-between items-end border-t-2 border-gray-300">
+          <div className="text-center w-1/3 px-2">
+            <p className="text-xs font-semibold mb-12">Diperiksa Oleh,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
+              {currentUser?.role === 'ADMIN' ? currentUser.name : ''}
             </p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">
-              {currentUser?.role === 'OWNER' ? 'ADMIN TOKO' : currentUser?.role || 'SYSTEM'}
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Admin</p>
+          </div>
+          
+          <div className="text-center w-1/3 px-2 border-l border-gray-200">
+            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
+            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
+              {currentUser?.role === 'MANAGER' ? currentUser.name : ''}
             </p>
+            <p className="text-[10px] text-gray-500 mt-1 uppercase">Manager Cabang</p>
           </div>
 
-          <div className="text-center">
-            <p className="text-[11px] text-gray-600 mb-4">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p className="text-xs font-semibold mb-12">Mengetahui/Menyetujui,</p>
-            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-4 whitespace-nowrap">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
+          <div className="text-center w-1/3 px-2 border-l border-gray-200">
+            <p className="text-[10px] text-gray-600 mb-2">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-xs font-semibold mb-12">Menyetujui,</p>
+            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-2 whitespace-nowrap h-6 flex items-end justify-center">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
             <p className="text-xs text-gray-500 mt-1">Ketua Toko Koperasi KSA Mart</p>
           </div>
         </div>

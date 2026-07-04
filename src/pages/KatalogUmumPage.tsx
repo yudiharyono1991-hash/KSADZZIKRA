@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle } from 'lucide-react';
+import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MapPin } from 'lucide-react';
+import { calculateDistanceKm } from '../utils/distance';
 import { useNavigate } from 'react-router-dom';
 
 export default function KatalogUmumPage() {
@@ -23,34 +24,135 @@ export default function KatalogUmumPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+
+  const [isOutsideHours, setIsOutsideHours] = useState(false);
+
+  React.useEffect(() => {
+    const checkHours = () => {
+      const currentHour = new Date().getHours();
+      // Operational hours: 07:00 (7) to 18:59 (19 is outside)
+      if (currentHour < 7 || currentHour >= 19) {
+        setIsOutsideHours(true);
+      } else {
+        setIsOutsideHours(false);
+      }
+    };
+    checkHours();
+    const interval = setInterval(checkHours, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
   const [checkoutNotes, setCheckoutNotes] = useState('');
+  const [deliveryPeriod, setDeliveryPeriod] = useState('Periode 1 (08.00-09.00)');
+  const [customerDistanceKm, setCustomerDistanceKm] = useState<number | null>(null);
+  const [isCheckingLocation, setIsCheckingLocation] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'TRANSFER' | 'QRIS' | 'EWALLET'>('COD');
+  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
 
   const cartTotal = customerCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const filteredProducts = products.filter(p => p.stock > 0 && p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  
+  const handleCheckLocation = () => {
+    if (!settings.storeLocationLat || !settings.storeLocationLng) {
+      alert("Mohon maaf, lokasi toko belum diatur oleh admin. Silakan hubungi admin KSA Mart.");
+      return;
+    }
+    
+    setIsCheckingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        setIsCheckingLocation(false);
+        const dist = calculateDistanceKm(
+          settings.storeLocationLat!, 
+          settings.storeLocationLng!, 
+          position.coords.latitude, 
+          position.coords.longitude
+        );
+        setCustomerDistanceKm(dist);
+      }, (error) => {
+        setIsCheckingLocation(false);
+        alert("Gagal mendapatkan lokasi Anda. Pastikan izin akses lokasi/GPS diaktifkan. " + error.message);
+      });
+    } else {
+      setIsCheckingLocation(false);
+      alert("Geolocation tidak didukung oleh browser Anda.");
+    }
+  };
+
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
     if (customerCart.length === 0) return;
+    if (!customerName.trim() || !customerPhone.trim() || !customerAddress.trim()) {
+      alert("Mohon lengkapi Nama, No WhatsApp, dan Alamat Pengiriman!");
+      return;
+    }
+    if (paymentMethod !== 'COD' && !isPaymentConfirmed) {
+      alert("Mohon centang konfirmasi bahwa Anda sudah melakukan transfer/pembayaran.");
+      return;
+    }
     
     // We use a generated ID since it's a public user
     const customerId = `public_${Date.now()}`;
+    
+    const finalNotes = `[WAKTU PENGIRIMAN: ${deliveryPeriod}] [Metode: ${paymentMethod}] ${checkoutNotes ? checkoutNotes : ''}`;
+    
+    // Generate unique payment code if not COD
+    const paymentCode = paymentMethod !== 'COD' ? `PAY-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
     
     submitOnlineOrder(
       customerId, 
       customerName, 
       customerPhone, 
-      checkoutNotes,
-      customerAddress
+      finalNotes,
+      customerAddress,
+      paymentCode
     );
     
-    alert("Pesanan berhasil dibuat! Admin kami akan segera menghubungi WhatsApp Anda.");
+    // Redirect to WhatsApp
+    const defaultWa = '085881893650'; // Fallback to Pak Grandis's number
+    const storeWa = settings.ownerWhatsapp || defaultWa;
+    const waNumber = storeWa.replace(/^0/, '62');
     
-    // Reset Form
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerAddress('');
-    setCheckoutNotes('');
-    setActiveTab('CATALOG');
+    if (waNumber) {
+      const itemList = customerCart.map(c => `▪ ${c.quantity}x ${c.product.name}`).join('\n');
+      
+      // Format payment method text for better readability
+      let paymentText = paymentMethod;
+      if (paymentMethod === 'TRANSFER') paymentText = 'Transfer Bank';
+      if (paymentMethod === 'QRIS') paymentText = 'QRIS Syariah';
+      if (paymentMethod === 'EWALLET') paymentText = 'E-Wallet';
+      
+      let waMessage = `Assalamu'alaikum Warahmatullahi Wabarakatuh,\nAdmin KSA Mart, saya ingin melakukan pemesanan barang dengan rincian sebagai berikut:\n\n*🛒 DAFTAR PESANAN:*\n${itemList}\n\n*💰 TOTAL BELANJA:* Rp ${cartTotal.toLocaleString('id-ID')}\n*💳 METODE PEMBAYARAN:* (${paymentText})`;
+      
+      if (paymentCode) {
+        waMessage += `\n*🔢 KODE PEMBAYARAN:* ${paymentCode}`;
+      }
+      
+      waMessage += `\n\n*📦 DATA PENGIRIMAN:*\n- Nama: ${customerName}\n- No. HP: ${customerPhone}\n- Alamat: ${customerAddress}`;
+      
+      if (checkoutNotes) {
+        waMessage += `\n- Catatan: ${checkoutNotes}`;
+      }
+      
+      waMessage += `\n- Waktu Pengiriman: ${deliveryPeriod}`;
+      
+      waMessage += `\n\nMohon bantuannya untuk segera diproses. Berikut saya lampirkan bukti pembayarannya (jika non-COD).\nTerima kasih! 🙏`;
+      
+      // Use official wa.me link which guarantees opening the App on Mobile (Android/iOS)
+      const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`;
+      
+      // Reset Form first before navigating away
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+      setCheckoutNotes('');
+      setIsPaymentConfirmed(false);
+      setPaymentMethod('COD');
+      setActiveTab('CATALOG');
+      
+      // Navigate in the same tab to avoid Pop-up Blockers which cause infinite spinning
+      window.location.href = waUrl;
+    }
   };
 
   return (
@@ -70,7 +172,19 @@ export default function KatalogUmumPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 pb-24">
+        
+        {isOutsideHours && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl mb-6 shadow-sm flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-bold text-sm">Di Luar Jam Operasional (07:00 - 19:00)</p>
+              <p className="text-xs mt-1 leading-relaxed">
+                Saat ini KSA Mart sedang tutup. Anda tetap dapat melakukan pemesanan, namun pesanan Anda akan diproses dan dikirim pada jam operasional kami berikutnya.
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Navigation Tabs */}
         <div className="flex gap-2 mb-6 border-b border-slate-200 pb-2">
@@ -91,9 +205,9 @@ export default function KatalogUmumPage() {
           </button>
           <button 
             onClick={() => setActiveTab('GUIDE')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-bold transition-colors ${activeTab === 'GUIDE' ? 'border-b-4 border-green-600 text-green-700' : 'text-slate-500 hover:text-green-600'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'GUIDE' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
           >
-            <HelpCircle className="w-4 h-4"/> Cara Pesan
+            <HelpCircle className="w-4 h-4"/> Panduan & Info
           </button>
         </div>
 
@@ -201,6 +315,27 @@ export default function KatalogUmumPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-fit sticky top-24">
                   <h3 className="font-bold text-lg text-slate-800 mb-4 border-b border-slate-100 pb-2">Informasi Pengiriman</h3>
                   <form onSubmit={handleCheckout} className="space-y-4">
+                    {/* Deteksi Lokasi Otomatis */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
+                      <p className="font-bold text-blue-800 mb-2">Deteksi Jarak Otomatis (GPS)</p>
+                      {customerDistanceKm !== null ? (
+                        <p className="text-blue-700">Jarak Anda ke toko KSA Mart: <span className="font-black text-lg">{customerDistanceKm.toFixed(2)} km</span></p>
+                      ) : (
+                        <p className="text-blue-600 text-xs mb-2">Aktifkan GPS agar kami bisa menghitung jarak pengiriman otomatis.</p>
+                      )}
+                      <button 
+                        type="button"
+                        onClick={handleCheckLocation}
+                        disabled={isCheckingLocation}
+                        className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm disabled:opacity-50"
+                      >
+                        {isCheckingLocation ? 'Mendeteksi...' : (customerDistanceKm !== null ? 'Perbarui Lokasi' : 'Cek Jarak ke Toko')}
+                      </button>
+                      {customerDistanceKm !== null && settings.maxDeliveryRadiusKm && customerDistanceKm > settings.maxDeliveryRadiusKm && (
+                        <p className="mt-2 text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 p-2 rounded">Perhatian: Jarak Anda melebihi batas pengiriman ({settings.maxDeliveryRadiusKm} km).</p>
+                      )}
+                    </div>
+
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap *</label>
                       <input type="text" required value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" placeholder="Masukkan Nama Lengkap" />
@@ -214,45 +349,114 @@ export default function KatalogUmumPage() {
                       <textarea required value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none h-20" placeholder="Masukkan alamat lengkap pengiriman..."></textarea>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Catatan Pesanan (Opsional)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Periode Pengiriman / Pengambilan *</label>
+                      <select 
+                        value={deliveryPeriod}
+                        onChange={e => setDeliveryPeriod(e.target.value)}
+                        className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
+                      >
+                        <option value="Periode 1 (08.00-09.00)">Periode 1 (08.00 - 09.00)</option>
+                        <option value="Periode 2 (11.00-12.00)">Periode 2 (11.00 - 12.00)</option>
+                        <option value="Periode 3 (14.00-15.00)">Periode 3 (14.00 - 15.00)</option>
+                        <option value="Periode 4 (17.00-18.00)">Periode 4 (17.00 - 18.00)</option>
+                        <option value="Periode 5 (20.00-21.00)">Periode 5 (20.00 - 21.00)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Catatan Tambahan (Opsional)</label>
                       <input type="text" value={checkoutNotes} onChange={e => setCheckoutNotes(e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" placeholder="Misal: Tambah sambal, dsb." />
                     </div>
-                    
-                    {/* Panduan Pembayaran */}
-                    <div className="bg-green-50/50 border border-green-200/50 rounded-xl p-3 text-xs space-y-2">
-                      <p className="font-bold text-green-800 flex items-center gap-1.5">
-                        <span className="text-green-700">💳</span> Metode Pembayaran
-                      </p>
-                      <div className="space-y-1.5 text-gray-700">
-                        {(!settings.paymentMethods?.bankTransfer || settings.paymentMethods.bankTransfer.length === 0) && 
-                         (!settings.paymentMethods?.ewallet || settings.paymentMethods.ewallet.length === 0) ? (
-                          <div className="p-2 bg-white rounded border border-green-100 shadow-xs">
-                            <p className="font-bold text-green-800">Transfer Bank Syariah (BSI)</p>
-                            <p className="text-[11px] font-mono">No. Rek: <span className="font-bold text-slate-900">7182938495</span></p>
-                            <p className="text-[10px] text-gray-500">a.n. KSA Mart Syariah</p>
-                          </div>
-                        ) : (
-                          <>
-                            {settings.paymentMethods?.bankTransfer?.map((b, idx) => (
-                              <div key={idx} className="p-2 bg-white rounded border border-green-100 shadow-xs">
-                                <p className="font-bold text-green-800">{b.bankName}</p>
-                                <p className="text-[11px] font-mono">No. Rek: <span className="font-bold text-slate-900">{b.accountNumber}</span></p>
-                                <p className="text-[10px] text-gray-500">a.n. {b.accountName}</p>
-                              </div>
-                            ))}
-                            {settings.paymentMethods?.ewallet?.map((w, idx) => (
-                              <div key={idx} className="p-2 bg-white rounded border border-green-100 shadow-xs">
-                                <p className="font-bold text-purple-800">{w.provider}</p>
-                                <p className="text-[11px] font-mono">No / ID: <span className="font-bold text-slate-900">{w.number}</span></p>
-                                <p className="text-[10px] text-gray-500">a.n. {w.accountName}</p>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                        <p className="text-[10px] text-gray-500 italic mt-1 leading-relaxed">
-                          * Silakan lakukan transfer ke rekening/ewallet di atas. Admin kami akan segera memproses & mengonfirmasi pesanan Anda via WhatsApp.
-                        </p>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Pilih Metode Pembayaran *</label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <button type="button" onClick={() => setPaymentMethod('COD')} className={`p-2 rounded-lg border text-[10px] font-bold text-center ${paymentMethod === 'COD' ? 'bg-green-100 border-green-500 text-green-800' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>Bayar di Tempat (COD)</button>
+                        <button type="button" onClick={() => setPaymentMethod('TRANSFER')} className={`p-2 rounded-lg border text-[10px] font-bold text-center ${paymentMethod === 'TRANSFER' ? 'bg-blue-100 border-blue-500 text-blue-800' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>Transfer Bank</button>
+                        <button type="button" onClick={() => setPaymentMethod('EWALLET')} className={`p-2 rounded-lg border text-[10px] font-bold text-center ${paymentMethod === 'EWALLET' ? 'bg-purple-100 border-purple-500 text-purple-800' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>E-Wallet (Dana/OVO)</button>
+                        <button type="button" onClick={() => setPaymentMethod('QRIS')} className={`p-2 rounded-lg border text-[10px] font-bold text-center ${paymentMethod === 'QRIS' ? 'bg-fuchsia-100 border-fuchsia-500 text-fuchsia-800' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>QRIS Toko</button>
                       </div>
+                    </div>
+                    
+                    {/* Panduan Pembayaran Berdasarkan Pilihan */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-3">
+                      <p className="font-bold text-slate-800 flex items-center gap-1.5 border-b pb-2">
+                        <span className="text-xl">💳</span> Instruksi Pembayaran
+                      </p>
+                      
+                      {paymentMethod === 'COD' && (
+                        <p className="text-slate-600 leading-relaxed">
+                          Anda memilih <b>Bayar di Tempat (COD)</b>. Silakan siapkan uang pas sebesar <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b> saat kurir atau admin kami mengantarkan pesanan ke alamat Anda.
+                        </p>
+                      )}
+
+                      {paymentMethod === 'TRANSFER' && (
+                        <div className="space-y-2">
+                          <p className="text-slate-600">Silakan transfer sebesar <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b> ke rekening berikut:</p>
+                          {(!settings.paymentMethods?.bankTransfer || settings.paymentMethods.bankTransfer.length === 0) ? (
+                            <div className="p-3 bg-white rounded border border-blue-200 shadow-sm">
+                              <p className="font-bold text-blue-800">Bank Syariah Indonesia (BSI)</p>
+                              <p className="font-mono text-base mt-1">7182938495</p>
+                              <p className="text-gray-500 mt-1">a.n. KSA Mart Syariah</p>
+                            </div>
+                          ) : (
+                            settings.paymentMethods.bankTransfer.map((b, idx) => (
+                              <div key={idx} className="p-3 bg-white rounded border border-blue-200 shadow-sm">
+                                <p className="font-bold text-blue-800">{b.bankName}</p>
+                                <p className="font-mono text-base mt-1">{b.accountNumber}</p>
+                                <p className="text-gray-500 mt-1">a.n. {b.accountName}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+
+                      {paymentMethod === 'EWALLET' && (
+                        <div className="space-y-2">
+                          <p className="text-slate-600">Silakan transfer sebesar <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b> ke e-wallet berikut:</p>
+                          {(!settings.paymentMethods?.ewallet || settings.paymentMethods.ewallet.length === 0) ? (
+                            <div className="p-3 bg-white rounded border border-purple-200 shadow-sm">
+                              <p className="font-bold text-purple-800">DANA / OVO</p>
+                              <p className="font-mono text-base mt-1">Belum diatur oleh toko</p>
+                            </div>
+                          ) : (
+                            settings.paymentMethods.ewallet.map((w, idx) => (
+                              <div key={idx} className="p-3 bg-white rounded border border-purple-200 shadow-sm">
+                                <p className="font-bold text-purple-800">{w.provider}</p>
+                                <p className="font-mono text-base mt-1">{w.number}</p>
+                                <p className="text-gray-500 mt-1">a.n. {w.accountName}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+
+                      {paymentMethod === 'QRIS' && (
+                        <div className="space-y-2 flex flex-col items-center">
+                          <p className="text-slate-600 text-center w-full">Silakan scan kode QRIS di bawah ini dengan nominal <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b>:</p>
+                          {settings.qrisImageUrl ? (
+                            <img src={settings.qrisImageUrl} alt="QRIS KSA Mart" className="w-full max-w-[200px] h-auto object-contain rounded-xl border-2 border-fuchsia-200 shadow-sm p-1 bg-white" />
+                          ) : (
+                            <div className="p-4 bg-rose-50 text-rose-700 rounded-lg text-center w-full">
+                              Toko belum mengunggah kode QRIS. Silakan pilih metode lain.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {paymentMethod !== 'COD' && (
+                        <label className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            required 
+                            checked={isPaymentConfirmed} 
+                            onChange={e => setIsPaymentConfirmed(e.target.checked)} 
+                            className="mt-0.5 w-4 h-4 text-blue-600" 
+                          />
+                          <span className="text-blue-900 font-medium text-xs leading-relaxed">
+                            Saya <b>sudah</b> melakukan transfer/pembayaran sebesar Rp {cartTotal.toLocaleString('id-ID')} sesuai instruksi di atas dan siap mengirimkan bukti transfer via WhatsApp ke admin.
+                          </span>
+                        </label>
+                      )}
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 mt-4">
@@ -260,10 +464,16 @@ export default function KatalogUmumPage() {
                         <span className="text-slate-600 font-medium">Total Belanja</span>
                         <span className="text-xl font-black text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</span>
                       </div>
-                      <button type="submit" className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow flex items-center justify-center gap-2 transition-colors">
-                        <Send className="w-5 h-5"/> Buat Pesanan
+                      <button 
+                        type="submit" 
+                        className={`w-full py-3 text-white font-bold rounded-xl shadow flex items-center justify-center gap-2 transition-colors ${
+                          (paymentMethod !== 'COD' && !isPaymentConfirmed) ? 'bg-slate-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                        disabled={paymentMethod !== 'COD' && !isPaymentConfirmed}
+                      >
+                        <Send className="w-5 h-5"/> Buat Pesanan Sekarang
                       </button>
-                      <p className="text-center text-[10px] text-slate-400 mt-2">Dengan menekan tombol ini, Anda akan dihubungi oleh Admin kami.</p>
+                      <p className="text-center text-[10px] text-slate-400 mt-2">Dengan menekan tombol ini, Anda akan otomatis dihubungi oleh Admin kami.</p>
                     </div>
                   </form>
                 </div>
@@ -272,15 +482,28 @@ export default function KatalogUmumPage() {
           </div>
         )}
 
-        {/* Tab: Guide */}
+        {/* Tab: Guide & Info */}
         {activeTab === 'GUIDE' && (
           <div className="space-y-6 animate-in fade-in duration-200 max-w-2xl mx-auto mt-8">
             <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm">
               <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2 border-b pb-4">
-                <HelpCircle className="w-6 h-6 text-green-600" /> Panduan Pemesanan (Pelanggan Umum)
+                <HelpCircle className="w-6 h-6 text-green-600" /> Panduan & Informasi Umum
               </h2>
               
               <div className="space-y-6">
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6">
+                  <h3 className="font-bold text-amber-900 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" /> Jam Operasional & Syarat Ketentuan
+                  </h3>
+                  <ul className="text-amber-800 text-sm leading-relaxed space-y-2 list-disc list-inside">
+                    <li><strong>Jam Operasional KSA Mart:</strong> 07.00 - 19.00 WIB setiap hari.</li>
+                    <li>Pesanan yang masuk <strong>di luar jam operasional</strong> akan otomatis diproses dan dikirimkan pada jam kerja operasional berikutnya.</li>
+                    <li>Layanan pesan antar (delivery) berlaku untuk jarak <strong>maksimal 5 KM</strong> dari lokasi KSA Mart.</li>
+                    <li>Pastikan alamat pengiriman Anda sudah benar dan nomor HP / WhatsApp Anda aktif untuk memudahkan kurir/kasir melakukan konfirmasi pesanan.</li>
+                    <li>Pembayaran dapat dilakukan melalui transfer atau QRIS sesuai yang diinstruksikan oleh admin kami melalui WhatsApp.</li>
+                  </ul>
+                </div>
+
                 <div>
                   <h3 className="font-bold text-green-800 mb-2">1. Pilih Barang Anda</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -294,9 +517,9 @@ export default function KatalogUmumPage() {
                   </p>
                 </div>
                 <div>
-                  <h3 className="font-bold text-green-800 mb-2">3. Buat Pesanan</h3>
+                  <h3 className="font-bold text-green-800 mb-2">3. Buat Pesanan & Bayar via WhatsApp</h3>
                   <p className="text-slate-600 text-sm leading-relaxed">
-                    Tekan tombol "Buat Pesanan". Sistem akan menyimpan pesanan Anda dan <strong>Admin Toko KSA Mart akan langsung menghubungi nomor WhatsApp Anda</strong> untuk memproses pembayaran dan pengiriman barang.
+                    Tekan tombol "Buat Pesanan". <strong>Sistem akan otomatis mengarahkan Anda ke aplikasi WhatsApp</strong> dengan format pesanan yang sudah rapi. Anda bisa langsung chat dengan Admin Toko, mengirimkan bukti pembayaran, dan melacak status pengiriman.
                   </p>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { ShoppingCart, MessageSquare, Check, X, Clock, Send, Store } from 'lucide-react';
 
 export default function OnlineOrdersPage() {
@@ -10,7 +10,7 @@ export default function OnlineOrdersPage() {
     processOnlineOrderPayment,
     chatMessages, 
     sendChatMessage 
-  } = useAppStore();
+  } = useBranchData();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [chatText, setChatText] = useState('');
@@ -68,6 +68,11 @@ export default function OnlineOrdersPage() {
                     </span>
                   </div>
                   <div className="text-sm text-slate-600 mb-1 flex items-center gap-1"><Store className="w-3 h-3"/> {order.customerName}</div>
+                  {order.distanceKm !== undefined && (
+                    <div className="text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-1.5 py-0.5 rounded mb-1 border border-blue-100">
+                      Jarak: {order.distanceKm.toFixed(2)} km
+                    </div>
+                  )}
                   <div className="flex justify-between items-center mt-2">
                     <span className="text-xs text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(order.createdAt).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</span>
                     <span className="font-bold text-indigo-700">Rp {order.totalAmount.toLocaleString('id-ID')}</span>
@@ -92,7 +97,18 @@ export default function OnlineOrdersPage() {
                   <div>
                     <h3 className="font-bold text-slate-800 text-lg">{order.orderNo}</h3>
                     <p className="text-sm text-slate-600">Pelanggan: <strong className="text-slate-800">{order.customerName}</strong> ({order.customerPhone})</p>
+                    {order.distanceKm !== undefined && (
+                      <p className="text-xs mt-1 text-blue-700 font-bold bg-blue-50 w-fit px-2 py-0.5 rounded border border-blue-200">
+                        Jarak Pengiriman: {order.distanceKm.toFixed(2)} km
+                      </p>
+                    )}
                     {order.notes && <p className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded mt-1 border border-amber-100">Catatan: {order.notes}</p>}
+                    {order.paymentCode && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-[10px] text-blue-600 font-bold uppercase">Kode Pembayaran (Validasi)</p>
+                        <p className="font-mono text-lg font-black text-blue-800 tracking-wider">{order.paymentCode}</p>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Action Buttons */}
@@ -109,7 +125,8 @@ export default function OnlineOrdersPage() {
                     {order.status === 'READY' && (
                       <div className="flex flex-col gap-1">
                         <button onClick={() => { if(confirm('Terima pembayaran Tunai dan Selesaikan Pesanan?')) processOnlineOrderPayment(order.id, 'CASH'); }} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar Cash & Selesai</button>
-                        <button onClick={() => { if(confirm('Terima pembayaran Transfer BSI dan Selesaikan Pesanan?')) processOnlineOrderPayment(order.id, 'TRANSFER_BSI'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar Transfer BSI & Selesai</button>
+                        <button onClick={() => { if(confirm('Terima pembayaran Transfer BSI dan Selesaikan Pesanan? Pastikan Kode Pembayaran sesuai.')) processOnlineOrderPayment(order.id, 'TRANSFER_BSI'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar Transfer BSI & Selesai</button>
+                        <button onClick={() => { if(confirm('Terima pembayaran QRIS dan Selesaikan Pesanan? Pastikan Kode Pembayaran sesuai.')) processOnlineOrderPayment(order.id, 'QRIS_SHARIAH'); }} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar QRIS & Selesai</button>
                       </div>
                     )}
                   </div>

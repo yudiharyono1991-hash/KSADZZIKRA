@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { Tag, Plus, Search, Trash2, Edit } from 'lucide-react';
 
 export default function PromoManagementPage() {
-  const { promos, addPromo, updatePromo, deletePromo, currentUser } = useAppStore();
+  const { promos, addPromo, updatePromo, deletePromo, currentUser } = useBranchData();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -15,7 +15,7 @@ export default function PromoManagementPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  if (currentUser?.role !== 'ADMIN' && currentUser?.role !== 'OWNER') {
+  if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 

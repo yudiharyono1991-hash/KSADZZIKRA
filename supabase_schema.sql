@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     unit TEXT,
     barcode TEXT,
     is_halal BOOLEAN DEFAULT true,
+    is_ppob BOOLEAN DEFAULT false,
     image TEXT,
     expiry_date TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
@@ -27,6 +28,28 @@ DROP POLICY IF EXISTS "Allow public read access for products" ON public.products
 DROP POLICY IF EXISTS "Allow public write access for products" ON public.products;
 CREATE POLICY "Allow public read access for products" ON public.products FOR SELECT USING (true);
 CREATE POLICY "Allow public write access for products" ON public.products FOR ALL USING (true) WITH CHECK (true);
+
+
+-- 14. TABEL: customers (Pelanggan CRM)
+CREATE TABLE IF NOT EXISTS public.customers (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    name TEXT NOT NULL,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    points NUMERIC DEFAULT 0,
+    debt_amount NUMERIC DEFAULT 0,
+    branch_id TEXT,
+    is_koperasi_member BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access for customers" ON public.customers;
+DROP POLICY IF EXISTS "Allow public write access for customers" ON public.customers;
+CREATE POLICY "Allow public read access for customers" ON public.customers FOR SELECT USING (true);
+CREATE POLICY "Allow public write access for customers" ON public.customers FOR ALL USING (true) WITH CHECK (true);
 
 
 -- 2. TABEL: transactions
@@ -199,3 +222,118 @@ DROP POLICY IF EXISTS "Allow public read access for shifts" ON public.shifts;
 DROP POLICY IF EXISTS "Allow public write access for shifts" ON public.shifts;
 CREATE POLICY "Allow public read access for shifts" ON public.shifts FOR SELECT USING (true);
 CREATE POLICY "Allow public write access for shifts" ON public.shifts FOR ALL USING (true) WITH CHECK (true);
+
+-- ========================================================================
+-- TAMBAHAN: DUMMY DATA PRODUK PPOB
+-- ========================================================================
+-- Jalankan insert di bawah ini jika Mimin butuh produk PPOB default.
+-- Jangan lupa sesuaikan 'tenant_default' jika menggunakan fitur multi-tenant.
+
+INSERT INTO public.products (id, sku, name, category, price, cost_price, stock, min_stock, unit, is_halal, is_ppob)
+VALUES 
+('ppob_1', 'PPOB-PLS-50', 'Pulsa Telkomsel 50.000', 'Pulsa', 51500, 50000, 9999, 0, 'Trx', true, true),
+('ppob_2', 'PPOB-PLN-100', 'Token PLN 100.000', 'Token Listrik', 102500, 100000, 9999, 0, 'Trx', true, true),
+('ppob_3', 'PPOB-PDAM', 'Tagihan PDAM (Admin)', 'PDAM', 2500, 1000, 9999, 0, 'Trx', true, true),
+('ppob_4', 'PPOB-BPJS', 'Bayar BPJS (Admin)', 'BPJS', 2500, 1000, 9999, 0, 'Trx', true, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- ========================================================================
+-- TAMBAHAN TABEL BARU (Fitur Jurnal Umum, CoA, Pesanan Online, Pengaturan)
+-- ========================================================================
+
+-- 10. TABEL: coa_accounts (Chart of Accounts)
+CREATE TABLE IF NOT EXISTS public.coa_accounts (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.coa_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access for coa_accounts" ON public.coa_accounts;
+DROP POLICY IF EXISTS "Allow public write access for coa_accounts" ON public.coa_accounts;
+CREATE POLICY "Allow public read access for coa_accounts" ON public.coa_accounts FOR SELECT USING (true);
+CREATE POLICY "Allow public write access for coa_accounts" ON public.coa_accounts FOR ALL USING (true) WITH CHECK (true);
+
+
+-- 11. TABEL: journal_entries (Jurnal Umum)
+CREATE TABLE IF NOT EXISTS public.journal_entries (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    date TEXT,
+    account TEXT,
+    description TEXT,
+    debit NUMERIC DEFAULT 0,
+    credit NUMERIC DEFAULT 0,
+    reference_id TEXT,
+    reference_type TEXT,
+    created_by TEXT,
+    branch_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access for journal_entries" ON public.journal_entries;
+DROP POLICY IF EXISTS "Allow public write access for journal_entries" ON public.journal_entries;
+CREATE POLICY "Allow public read access for journal_entries" ON public.journal_entries FOR SELECT USING (true);
+CREATE POLICY "Allow public write access for journal_entries" ON public.journal_entries FOR ALL USING (true) WITH CHECK (true);
+
+
+-- 12. TABEL: online_orders (Pesanan Online)
+CREATE TABLE IF NOT EXISTS public.online_orders (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    order_no TEXT NOT NULL,
+    customer_id TEXT,
+    customer_name TEXT,
+    customer_phone TEXT,
+    customer_address TEXT,
+    items JSONB DEFAULT '[]'::jsonb,
+    total_amount NUMERIC DEFAULT 0,
+    status TEXT DEFAULT 'PENDING',
+    branch_id TEXT,
+    notes TEXT,
+    payment_code TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.online_orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access for online_orders" ON public.online_orders;
+DROP POLICY IF EXISTS "Allow public write access for online_orders" ON public.online_orders;
+CREATE POLICY "Allow public read access for online_orders" ON public.online_orders FOR SELECT USING (true);
+CREATE POLICY "Allow public write access for online_orders" ON public.online_orders FOR ALL USING (true) WITH CHECK (true);
+
+
+-- 13. TABEL: store_settings (Pengaturan Toko & Radius)
+CREATE TABLE IF NOT EXISTS public.store_settings (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    is_tax_enabled BOOLEAN DEFAULT false,
+    tax_rate NUMERIC DEFAULT 0,
+    store_name TEXT,
+    store_address TEXT,
+    store_phone TEXT,
+    business_type TEXT,
+    owner_whatsapp TEXT,
+    payment_timeout_minutes INTEGER DEFAULT 60,
+    store_location_lat NUMERIC,
+    store_location_lng NUMERIC,
+    max_delivery_radius_km NUMERIC DEFAULT 5,
+    qris_enabled BOOLEAN DEFAULT true,
+    qris_image_url TEXT,
+    maintenance_mode BOOLEAN DEFAULT false,
+    minimum_cash_balance NUMERIC DEFAULT 1000000,
+    zakat_rate NUMERIC DEFAULT 2.5,
+    auto_approve_transactions BOOLEAN DEFAULT false,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read access for store_settings" ON public.store_settings;
+DROP POLICY IF EXISTS "Allow public write access for store_settings" ON public.store_settings;
+CREATE POLICY "Allow public read access for store_settings" ON public.store_settings FOR SELECT USING (true);
+CREATE POLICY "Allow public write access for store_settings" ON public.store_settings FOR ALL USING (true) WITH CHECK (true);

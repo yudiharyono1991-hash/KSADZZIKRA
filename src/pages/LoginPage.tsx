@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Store, User, Lock, AlertCircle, Sparkles, Eye, EyeOff, UserPlus, ArrowLeft, Phone, Mail } from 'lucide-react';
+import { Store, User, Lock, AlertCircle, Sparkles, Eye, EyeOff, UserPlus, ArrowLeft, Phone, Mail, HelpCircle } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, registerUser, branches } = useAppStore();
+  const { login, registerUser, branches, settings } = useAppStore();
 
   const verses = [
     {
@@ -45,13 +45,13 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState(''); // No pre-fill
   const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [registerRole, setRegisterRole] = useState<'CASHIER' | 'ADMIN' | 'OWNER' | 'PELANGGAN' | 'SUPERADMIN'>('PELANGGAN');
+  const [registerRole] = useState<'PELANGGAN'>('PELANGGAN');
   const [isKoperasiMember, setIsKoperasiMember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
-  const showDemoAccess = true;
+  const showDemoAccess = false;
 
   const pwdStrength = getPasswordStrength(password);
   let strengthLabel = '';
@@ -78,7 +78,7 @@ export default function LoginPage() {
     setErrorMsg('');
     setSuccessMsg('');
     
-    if (!username || !password || (isRegisterMode && (!name || !phone))) {
+    if (!username || !password || (isRegisterMode && !name)) {
       setErrorMsg('Pendaftaran gagal: Harap lengkapi semua kolom wajib (Nama, Email/No HP, dan Kata Sandi).');
       return;
     }
@@ -89,11 +89,11 @@ export default function LoginPage() {
         name: fullName,
         username,
         password,
-        phone,
+        phone: username, // Use username (phone number) as phone
         role: registerRole,
         branchId: selectedBranchId || undefined,
         tenantId: 'default',
-        isKoperasiMember: registerRole === 'PELANGGAN' ? isKoperasiMember : false
+        isKoperasiMember: false
       });
       if (success) {
         if (registerRole === 'PELANGGAN') {
@@ -110,13 +110,18 @@ export default function LoginPage() {
     } else {
       const result = login(username, password);
       if (result === 'SUCCESS') {
-        // Login berhasil, store akan update currentUser dan App.tsx akan re-render
-        // Reset hash route berdasarkan role agar tidak tersangkut di halaman user sebelumnya
         const currentUser = useAppStore.getState().currentUser;
         if (currentUser) {
-          if (currentUser.role === 'OWNER') {
+          if (settings?.maintenanceMode && currentUser.role !== 'OWNER' && currentUser.role !== 'SUPERADMIN') {
+            useAppStore.setState({ currentUser: null });
+            localStorage.removeItem('ba_current_user');
+            setErrorMsg('⛔ Login Ditolak: Sistem sedang dalam Mode Pemeliharaan. Hanya Owner yang diizinkan masuk.');
+            return;
+          }
+
+          if (currentUser.role === 'OWNER' || currentUser.role === 'SUPERADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'PENGURUS') {
             window.location.hash = '#/trend';
-          } else if (currentUser.role === 'ADMIN' || currentUser.role === 'SUPERADMIN') {
+          } else if (currentUser.role === 'ADMIN' || currentUser.role === 'STAFF_GUDANG' || currentUser.role === 'STAFF_LAPANGAN') {
             window.location.hash = '#/laporan-penjualan';
           } else if (currentUser.role === 'PELANGGAN') {
             window.location.hash = '#/member';
@@ -180,12 +185,12 @@ export default function LoginPage() {
       <div className="absolute top-0 w-full bg-green-950 text-green-50 py-1.5 z-[100] overflow-hidden shadow-md border-b border-green-500/30">
         <div className="animate-marquee-store text-[10px] md:text-xs font-bold tracking-wider">
           {/* Double the content so it seamlessly loops */}
-          <span className="mx-8">✨ Koperasi Konsumen Syariah Adz Zikra. Dari KITA, oleh KITA, untuk KITA. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
-          <span className="mx-8">✨ Koperasi Konsumen Syariah Adz Zikra. Dari KITA, oleh KITA, untuk KITA. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
-          <span className="mx-8">✨ Koperasi Konsumen Syariah Adz Zikra. Dari KITA, oleh KITA, untuk KITA. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
-          <span className="mx-8">✨ Koperasi Konsumen Syariah Adz Zikra. Dari KITA, oleh KITA, untuk KITA. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
-          <span className="mx-8">✨ Koperasi Konsumen Syariah Adz Zikra. Dari KITA, oleh KITA, untuk KITA. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
-          <span className="mx-8">✨ Koperasi Konsumen Syariah Adz Zikra. Dari KITA, oleh KITA, untuk KITA. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
+          <span className="mx-8">✨ KSA Mart Syariah. Berbelanja hemat dan berkah. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
+          <span className="mx-8">✨ KSA Mart Syariah. Berbelanja hemat dan berkah. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
+          <span className="mx-8">✨ KSA Mart Syariah. Berbelanja hemat dan berkah. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
+          <span className="mx-8">✨ KSA Mart Syariah. Berbelanja hemat dan berkah. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
+          <span className="mx-8">✨ KSA Mart Syariah. Berbelanja hemat dan berkah. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
+          <span className="mx-8">✨ KSA Mart Syariah. Berbelanja hemat dan berkah. Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨</span>
         </div>
       </div>
 
@@ -245,7 +250,7 @@ export default function LoginPage() {
       {/* Left Side: Login Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center relative z-10 order-first px-2 lg:px-4">
         <div className="w-full max-w-[640px] relative">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 md:p-4 lg:p-5 w-full border border-gray-100 animate-in fade-in slide-in-from-bottom-8 duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl p-3 md:p-4 lg:p-5 w-full border border-gray-100 animate-in fade-in slide-in-from-bottom-8 duration-200 max-h-[90vh] overflow-y-auto">
         
         {/* Brand Modern Logo Header */}
         <div className="flex flex-col items-center text-center space-y-0.5 mb-2">
@@ -333,94 +338,23 @@ export default function LoginPage() {
           )}
 
           {/* Username/Email Field */}
-
           <div className="space-y-1">
             <label className="text-[10px] md:text-xs uppercase tracking-wider font-bold text-gray-600">
-              {isRegisterMode ? 'Email' : 'Email atau No Handphone'}
+              Username / No. Handphone
             </label>
             <div className="relative group">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-green-500 transition-colors">
-                {isRegisterMode ? <Mail className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                <User className="w-4 h-4 md:w-5 md:h-5" />
               </span>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={isRegisterMode ? "Masukkan email..." : "Masukkan email atau no hp..."}
+                placeholder={isRegisterMode ? "Masukkan email..." : "Masukkan Username atau No. HP..."}
                 className="w-full bg-slate-50 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[10px] md:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800"
               />
             </div>
           </div>
-
-          {isRegisterMode && (
-            <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider font-bold text-gray-600">No Handphone</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Phone className="w-5 h-5 text-slate-400" />
-                </span>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Masukkan nomor handphone..."
-                  className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-11 pr-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800"
-                />
-              </div>
-            </div>
-          )}
-
-          {isRegisterMode && (
-            <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider font-bold text-gray-600">Daftar Sebagai (Uji Coba)</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <User className="w-5 h-5 text-slate-400" />
-                </span>
-                <select
-                  id="register-role"
-                  value={registerRole}
-                  onChange={(e) => setRegisterRole(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-11 pr-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800 appearance-none"
-                >
-                  <option value="PELANGGAN">Pelanggan / Member (Langsung Aktif)</option>
-                  <option value="SUPERADMIN">Super Admin</option>
-                  <option value="ADMIN">Admin / Supervisor</option>
-                  <option value="CASHIER">Kasir (Cashier)</option>
-                  <option value="OWNER">Pemilik (Owner)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {isRegisterMode && registerRole === 'PELANGGAN' && (
-            <div className="space-y-1.5 pt-1">
-              <label className="text-xs uppercase tracking-wider font-bold text-gray-600">Status Keanggotaan Koperasi</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-gray-200 py-2.5 px-4 rounded-xl flex-1 hover:border-green-500 transition-colors">
-                  <input
-                    type="radio"
-                    name="isKoperasiMember"
-                    checked={isKoperasiMember === true}
-                    onChange={() => setIsKoperasiMember(true)}
-                    className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
-                  />
-                  <span className="text-xs font-bold text-gray-700">Anggota Koperasi</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-gray-200 py-2.5 px-4 rounded-xl flex-1 hover:border-green-500 transition-colors">
-                  <input
-                    type="radio"
-                    name="isKoperasiMember"
-                    checked={isKoperasiMember === false}
-                    onChange={() => setIsKoperasiMember(false)}
-                    className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300"
-                  />
-                  <span className="text-xs font-bold text-gray-700">Non Anggota</span>
-                </label>
-              </div>
-              <p className="text-[10px] text-gray-500">Anggota Koperasi berkesempatan mendapatkan SHU & potongan khusus.</p>
-            </div>
-          )}
 
           {isRegisterMode && (
             <div className="space-y-1">
@@ -485,13 +419,18 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Submit Action Button */}
           <button
             type="submit"
             className="w-full bg-green-700 hover:bg-green-800 text-white font-extrabold text-[10px] md:text-xs tracking-wider py-2 md:py-2.5 rounded-lg uppercase shadow-md shadow-green-950/20 active:scale-98 transform transition-all cursor-pointer flex items-center justify-center gap-1.5 mt-2"
           >
             {isRegisterMode ? <><UserPlus className="w-4 h-4" /> DAFTAR AKUN</> : 'MASUK KE APLIKASI'}
           </button>
+          
+          {isRegisterMode && (
+            <p className="text-center text-[9px] text-gray-500 font-medium mt-2">
+              Dengan mendaftar, Anda menyetujui bahwa <b>pengiriman pesanan maksimal radius 5 KM</b> dari KSA Mart.
+            </p>
+          )}
         </form>
 
         {!isRegisterMode && showDemoAccess && (
@@ -551,9 +490,21 @@ export default function LoginPage() {
           </button>
           
           {!isRegisterMode && (
-            <p className="text-[9px] md:text-[10px] text-gray-500 font-medium">
-              Lupa password? <a href="#" onClick={(e) => { e.preventDefault(); alert("Silakan hubungi Pengembang (WA: 082210027952 / Email: yudiharyono1991@gmail.com) untuk mereset password Anda."); }} className="text-green-600 hover:text-green-700 font-bold underline decoration-green-600/30 underline-offset-2">Hubungi Pengembang</a>
-            </p>
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-[9px] md:text-[10px] text-gray-500 font-medium">
+                Lupa password? <a href="#" onClick={(e) => { e.preventDefault(); alert("Silakan hubungi Pengembang (WA: 082210027952 / Email: yudiharyono1991@gmail.com) untuk mereset password Anda."); }} className="text-green-600 hover:text-green-700 font-bold underline decoration-green-600/30 underline-offset-2">Hubungi Pengembang</a>
+              </p>
+              
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-left w-full max-w-[280px]">
+                <h4 className="font-bold text-slate-700 text-[10px] mb-1.5 flex items-center gap-1.5"><HelpCircle className="w-3 h-3 text-green-600"/> Panduan Login</h4>
+                <ul className="text-[9px] text-slate-600 space-y-1 list-disc pl-4">
+                  <li>Masukkan <b>Username</b> dan <b>Password</b> yang telah didaftarkan.</li>
+                  <li>Jika Anda Kasir/Admin, tanyakan kredensial ke Ketua Toko.</li>
+                  <li>Pelanggan Umum bisa mendaftar akun baru terlebih dahulu.</li>
+                  <li className="text-rose-600 font-bold">Layanan pesan antar maksimal 5 KM dari lokasi KSA Mart.</li>
+                </ul>
+              </div>
+            </div>
           )}
         </div>
 

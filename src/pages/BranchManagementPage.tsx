@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { Store, Plus, Search, Edit2, Trash2 } from 'lucide-react';
 
 export default function BranchManagementPage() {
-  const { branches, addBranch, updateBranch, deleteBranch } = useAppStore();
+  const { branches, addBranch, updateBranch, deleteBranch, currentUser } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -15,10 +15,15 @@ export default function BranchManagementPage() {
     isActive: true
   });
 
-  const filteredBranches = branches.filter(b => 
-    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.address.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const isGlobalAdmin = ['OWNER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '');
+
+  const filteredBranches = branches.filter(b => {
+    // Manager only sees their own branch
+    if (!isGlobalAdmin && currentUser?.branchId && b.id !== currentUser.branchId) return false;
+    
+    return b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           b.address.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const handleOpenModal = (branch: any = null) => {
     if (branch) {
@@ -56,13 +61,15 @@ export default function BranchManagementPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">Kelola data cabang KSA Mart untuk multi-outlet</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Cabang
-        </button>
+        {isGlobalAdmin && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah Cabang
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -111,17 +118,19 @@ export default function BranchManagementPage() {
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Yakin ingin menghapus cabang ${branch.name}?`)) {
-                          deleteBranch(branch.id);
-                        }
-                      }}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Hapus Cabang"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isGlobalAdmin && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Yakin ingin menghapus cabang ini?')) {
+                            deleteBranch(branch.id);
+                          }
+                        }}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Hapus Cabang"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
