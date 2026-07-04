@@ -331,7 +331,7 @@ const getSavedUsers = (): UserAccount[] => {
   return [
     { id: 'usr_0', tenantId: '', name: 'Platform Admin', username: 'superadmin.platform', password: 'superadmin123!', role: 'SUPERADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_1', tenantId: 'tenant_default', name: 'Kasir Asy', username: 'asy.23.kk', password: 'kasir123!', role: 'CASHIER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
-    { id: 'usr_2', tenantId: 'tenant_default', name: 'Superadmin BA', username: 'superadmin.23kk', password: 'admin123!', role: 'ADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
+    { id: 'usr_2', tenantId: 'tenant_default', name: 'Superadmin KSA Mart', username: 'superadmin.23kk', password: 'admin123!', role: 'ADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_3', tenantId: 'tenant_default', name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.', username: 'owner', password: 'owner123', role: 'OWNER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_4', tenantId: 'tenant_default', name: 'Pelanggan Setia', username: 'pelanggan1', password: 'password123', role: 'PELANGGAN', createdAt: new Date().toISOString(), isActive: true, isApproved: true }
   ];
@@ -355,9 +355,9 @@ const getSavedExpenses = (): Expense[] => {
     try { return JSON.parse(saved); } catch (e) {}
   }
   return [
-    { id: 'exp_1', tenantId: 'tenant_default', date: '2026-06-01', category: 'SEWA_LAPAK', amount: 500000, description: 'Sewa Lapak Mart Bulanan', createdBy: 'Superadmin BA' },
-    { id: 'exp_2', tenantId: 'tenant_default', date: '2026-06-03', category: 'LISTRIK_AIR_WIFI', amount: 200000, description: 'Listrik & Wi-fi Toko', createdBy: 'Superadmin BA' },
-    { id: 'exp_3', tenantId: 'tenant_default', date: '2026-06-05', category: 'GAJI', amount: 1000000, description: 'Gaji Bulanan Staff Utama', createdBy: 'Superadmin BA' }
+    { id: 'exp_1', tenantId: 'tenant_default', date: '2026-06-01', category: 'SEWA_LAPAK', amount: 500000, description: 'Sewa Lapak Mart Bulanan', createdBy: 'Superadmin KSA Mart' },
+    { id: 'exp_2', tenantId: 'tenant_default', date: '2026-06-03', category: 'LISTRIK_AIR_WIFI', amount: 200000, description: 'Listrik & Wi-fi Toko', createdBy: 'Superadmin KSA Mart' },
+    { id: 'exp_3', tenantId: 'tenant_default', date: '2026-06-05', category: 'GAJI', amount: 1000000, description: 'Gaji Bulanan Staff Utama', createdBy: 'Superadmin KSA Mart' }
   ];
 };
 
