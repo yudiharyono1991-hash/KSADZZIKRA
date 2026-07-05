@@ -114,7 +114,7 @@ export default function LoginPage() {
         if (currentUser) {
           if (settings?.maintenanceMode && currentUser.role !== 'OWNER' && currentUser.role !== 'SUPERADMIN') {
             useAppStore.setState({ currentUser: null });
-            localStorage.removeItem('ba_current_user');
+            localStorage.removeItem('ksa_current_user');
             setErrorMsg('⛔ Login Ditolak: Sistem sedang dalam Mode Pemeliharaan. Hanya Owner yang diizinkan masuk.');
             return;
           }
@@ -520,7 +520,7 @@ export default function LoginPage() {
       </div>
         {/* Corporate Development Metadata positioned relatively so it doesn't cause scrolling */}
         <div className="mt-2 text-center text-green-50 text-[10px] md:text-xs font-mono tracking-wider space-y-1 drop-shadow-sm opacity-90 pointer-events-none">
-          <p className="font-semibold">KSA Mart &ndash; Versi 1.0 2026 IT Development SmartPOS Shariah <span className="text-amber-500">ADZ-ZIKRA</span></p>
+          <p className="font-semibold">KSA Mart &ndash; Versi 1.0 2026 IT Development KSA Mart Syariah <span className="text-amber-500">ADZ-ZIKRA</span></p>
         </div>
       </div>
       

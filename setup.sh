@@ -1,86 +1,57 @@
 #!/bin/bash
 
-# Setup Script untuk SmartPOS Shariah - Berkah Amanah Mart
-# Dibuat otomatis oleh AI Coding Agent untuk eksekusi cepat di VS Code Terminal
-
-# Reset styling
-NC='\033;0m'
-GREEN='\033;0;32m'
-BG_GREEN='\033;42;1;37m'
-BLUE='\033;0;34m'
-YELLOW='\033;1;33m'
-RED='\033;0;31m'
-BOLD='\033;1m'
+# Setup Script - KSA Mart Syariah (KSADZZIKRA)
+# Koperasi Syariah ADZ-ZIKRA - Sistem POS & Akuntansi Syariah
 
 clear
-echo -e "${GREEN}========================================================================${NC}"
-echo -e "${GREEN}              🚀 SELAMAT DATANG DI SETUP OTOMATIS SMARTPOS 🚀            ${NC}"
-echo -e "${GREEN}                        BERKAH AMANAH MART SYARIAH                       ${NC}"
-echo -e "${GREEN}========================================================================${NC}"
+echo "========================================================================"
+echo "         KSA MART SYARIAH - KOPERASI SYARIAH ADZ-ZIKRA"
+echo "         Setup Otomatis - Sistem POS & Akuntansi Syariah"
+echo "========================================================================"
 echo ""
 
-# 1. Verifikasi Instalasi Node.js & NPM
-echo -e "${BLUE}[1/5] Verifikasi Lingkungan Node.js...${NC}"
+# 1. Verifikasi Node.js
+echo "[1/4] Verifikasi Lingkungan Node.js..."
 if ! command -v node &> /dev/null
 then
-    echo -e "${RED}❌ ERROR: Node.js tidak terdeteksi di sistem Anda!${NC}"
-    echo -e "${YELLOW}Silakan unduh dan instal Node.js terlebih dahulu di: https://nodejs.org/${NC}"
+    echo "ERROR: Node.js tidak terdeteksi!"
+    echo "Silakan install di: https://nodejs.org/"
     exit 1
 else
     NODE_VER=$(node -v)
-    NPM_VER=$(npm -v)
-    echo -e "   ✅ Node.js Terdeteksi: ${GREEN}${NODE_VER}${NC}"
-    echo -e "   ✅ NPM Terdeteksi: ${GREEN}${NPM_VER}${NC}"
+    echo "   OK - Node.js Terdeteksi: ${NODE_VER}"
 fi
 
-# 2. Sinkronisasi File Environment (.env)
-echo -e "${BLUE}[2/5] Mengatur File Konfigurasi (.env)...${NC}"
-if [ -f .env.example ]; then
-    cp .env.example .env
-    echo -e "   ✅ File ${GREEN}.env${NC} berhasil disalin dari .env.example secara otomatis."
+# 2. Buat .env jika belum ada
+echo "[2/4] Mengatur File Konfigurasi (.env)..."
+if [ ! -f .env ]; then
+    echo 'VITE_SUPABASE_URL=https://stiatomaelzrptazayml.supabase.co' > .env
+    echo 'VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0' >> .env
+    echo "   OK - File .env dibuat dengan kredensial KSADZZIKRA."
 else
-    echo -e "   ⚠️ File .env.example tidak ditemukan. Membuat file .env baru..."
-    echo 'VITE_SUPABASE_URL="https://wzfwiuolqzxbovpcpbli.supabase.co"' > .env
-    echo 'VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6ZndpdW9scXp4Ym92cGNwYmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NjA3NjgsImV4cCI6MjA3NzUzNjc2OH0.gpe9qIamqwXIUUqe8ui5pVBbq14xS0CXOfxyJDyWqMw"' >> .env
-    echo -e "   ✅ File ${GREEN}.env${NC} berhasil dibuat otomatis."
+    echo "   OK - File .env sudah ada."
 fi
 
-# 3. Instalasi Dependensi Otomatis
-echo -e "${BLUE}[3/5] Mengunduh & Menginstal File Dependensi (npm install)...${NC}"
-echo -e "      (Proses ini memakan waktu beberapa detik, mohon bersabar...)"
+# 3. Install dependencies
+echo "[3/4] Menginstal Dependensi (npm install)..."
 npm install
-
 if [ $? -eq 0 ]; then
-    echo -e "   ✅ Seluruh package dependencies berhasil diinstal!"
+    echo "   OK - Semua dependencies berhasil diinstal!"
 else
-    echo -e "${RED}❌ Gagal menginstal dependencies. Periksa koneksi internet Anda atau jalankan 'npm install' secara manual.${NC}"
+    echo "ERROR: Gagal install dependencies."
     exit 1
 fi
 
-# 4. Melakukan Uji Build (npm run build)
-echo -e "${BLUE}[4/5] Menguji Build Produksi Lokal (npm run build)...${NC}"
-npm run build
-
-if [ $? -eq 0 ]; then
-    echo -e "   ✅ Uji Build BERHASIL! Folder '${GREEN}dist${NC}' siap dipublish."
-else
-    echo -e "${RED}❌ ERROR: Build gagal. Pastikan tidak ada kodingan yang error di VS Code Anda.${NC}"
-    exit 1
-fi
-
-# 5. Panduan Selesai & Ready to Run!
+# 4. Selesai
 echo ""
-echo -e "${GREEN}========================================================================${NC}"
-echo -e "             🎉 PROSES SETUP OTOMATIS SELESAI DENGAN SUKSES! 🎉          "
-echo -e "${GREEN}========================================================================${NC}"
+echo "========================================================================"
+echo "         SETUP SELESAI! KSA MART SYARIAH SIAP DIGUNAKAN"
+echo "========================================================================"
 echo ""
-echo -e "${BOLD}Cara Menjalankan Server POS Syariah Lokal (Development Mode):${NC}"
-echo -e "👉 Jalankan perintah berikut di VS Code terminal Anda:"
-echo -e "   ${YELLOW}npm run dev${NC}"
+echo "Jalankan aplikasi:"
+echo "   npm run dev"
 echo ""
-echo -e "${BOLD}Cara Deploy ke Netlify dalam 1 Menit:${NC}"
-echo -e "👉 Silakan ikuti instruksi lengkap di panduan ${GREEN}NETLIFY_DEPLOY_GUIDE.md${NC}."
+echo "Akses di browser: http://localhost:3000"
+echo "Panduan deploy: NETLIFY_DEPLOY_GUIDE.md"
+echo "Supabase KSADZZIKRA: https://stiatomaelzrptazayml.supabase.co"
 echo ""
-echo -e "Hubungkan juga dengan repository GitHub Anda:"
-echo -e "👉 ${BLUE}git remote add origin https://github.com/Yharyono123/Yudi-Hariyono---Shariah-Accounting-Dashboard..git${NC}"
-echo -e "========================================================================"

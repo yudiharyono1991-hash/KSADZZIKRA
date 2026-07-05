@@ -2,7 +2,7 @@
 -- KSA MART SYARIAH - KSADZZIKRA
 -- Supabase Schema Lengkap (Versi Final)
 -- Jalankan SELURUH script ini di SQL Editor Supabase KSADZZIKRA
--- Project ID: rxuwdnaycysgmofazjmz
+-- Project ID: stiatomaelzrptazayml
 -- ============================================================
 
 -- ============================================================
@@ -148,6 +148,9 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     minimum_cash_balance NUMERIC DEFAULT 1000000,
     zakat_rate NUMERIC DEFAULT 2.5,
     auto_approve_transactions BOOLEAN DEFAULT false,
+    owner_bank_name TEXT,
+    owner_bank_account TEXT,
+    payment_methods JSONB DEFAULT '{"bankTransfer": [], "ewallet": []}'::jsonb,
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
@@ -269,9 +272,9 @@ CREATE POLICY "zakat_distributions_all" ON public.zakat_distributions FOR ALL US
 
 
 -- ============================================================
--- 11. TABEL: ba_users (Akun Pengguna Aplikasi)
+-- 11. TABEL: ksa_users (Akun Pengguna Aplikasi)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.ba_users (
+CREATE TABLE IF NOT EXISTS public.ksa_users (
     id TEXT PRIMARY KEY,
     tenant_id TEXT,
     name TEXT NOT NULL,
@@ -286,17 +289,17 @@ CREATE TABLE IF NOT EXISTS public.ba_users (
     approved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-ALTER TABLE public.ba_users ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "ba_users_select" ON public.ba_users;
-DROP POLICY IF EXISTS "ba_users_all" ON public.ba_users;
-CREATE POLICY "ba_users_select" ON public.ba_users FOR SELECT USING (true);
-CREATE POLICY "ba_users_all" ON public.ba_users FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE public.ksa_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ksa_users_select" ON public.ksa_users;
+DROP POLICY IF EXISTS "ksa_users_all" ON public.ksa_users;
+CREATE POLICY "ksa_users_select" ON public.ksa_users FOR SELECT USING (true);
+CREATE POLICY "ksa_users_all" ON public.ksa_users FOR ALL USING (true) WITH CHECK (true);
 
 
 -- ============================================================
--- 12. TABEL: ba_branches (Cabang / Toko)
+-- 12. TABEL: ksa_branches (Cabang / Toko)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS public.ba_branches (
+CREATE TABLE IF NOT EXISTS public.ksa_branches (
     id TEXT PRIMARY KEY,
     tenant_id TEXT,
     name TEXT NOT NULL,
@@ -305,11 +308,11 @@ CREATE TABLE IF NOT EXISTS public.ba_branches (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-ALTER TABLE public.ba_branches ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "ba_branches_select" ON public.ba_branches;
-DROP POLICY IF EXISTS "ba_branches_all" ON public.ba_branches;
-CREATE POLICY "ba_branches_select" ON public.ba_branches FOR SELECT USING (true);
-CREATE POLICY "ba_branches_all" ON public.ba_branches FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE public.ksa_branches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ksa_branches_select" ON public.ksa_branches;
+DROP POLICY IF EXISTS "ksa_branches_all" ON public.ksa_branches;
+CREATE POLICY "ksa_branches_select" ON public.ksa_branches FOR SELECT USING (true);
+CREATE POLICY "ksa_branches_all" ON public.ksa_branches FOR ALL USING (true) WITH CHECK (true);
 
 
 -- ============================================================

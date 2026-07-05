@@ -44,39 +44,47 @@ export default function NeracaRugiPage() {
 
   // Persistent Input values for Balance Sheet (saves to localStorage)
   const [receivablesVal, setReceivablesVal] = useState(() => {
-    const saved = localStorage.getItem('ba_neraca_receivables');
-    return saved ? Number(saved) : 1200000;
+    const saved = localStorage.getItem('ksa_neraca_receivables');
+    return saved ? Number(saved) : 0;
   });
   const [accountsPayables, setAccountsPayables] = useState(() => {
-    const saved = localStorage.getItem('ba_neraca_payables');
-    return saved ? Number(saved) : 8500000;
+    const saved = localStorage.getItem('ksa_neraca_payables');
+    return saved ? Number(saved) : 0;
   });
   const [equityCapitalInput, setEquityCapitalInput] = useState(() => {
-    const saved = localStorage.getItem('ba_neraca_equity');
-    return saved ? Number(saved) : 14385000;
+    const saved = localStorage.getItem('ksa_neraca_equity');
+    return saved ? Number(saved) : 0;
+  });
+  const [initialStoreCapital, setInitialStoreCapital] = useState(() => {
+    const saved = localStorage.getItem('ksa_neraca_initial_capital');
+    return saved ? Number(saved) : 0;
   });
 
   // Balanced Lock state
   const [isAutoBalanced, setIsAutoBalanced] = useState(() => {
-    const saved = localStorage.getItem('ba_neraca_auto_balanced');
+    const saved = localStorage.getItem('ksa_neraca_auto_balanced');
     return saved ? saved === 'true' : true;
   });
 
   // Save editable positions to localStorage when modified
   useEffect(() => {
-    localStorage.setItem('ba_neraca_receivables', String(receivablesVal));
+    localStorage.setItem('ksa_neraca_receivables', String(receivablesVal));
   }, [receivablesVal]);
 
   useEffect(() => {
-    localStorage.setItem('ba_neraca_payables', String(accountsPayables));
+    localStorage.setItem('ksa_neraca_payables', String(accountsPayables));
   }, [accountsPayables]);
 
   useEffect(() => {
-    localStorage.setItem('ba_neraca_equity', String(equityCapitalInput));
+    localStorage.setItem('ksa_neraca_equity', String(equityCapitalInput));
   }, [equityCapitalInput]);
 
   useEffect(() => {
-    localStorage.setItem('ba_neraca_auto_balanced', String(isAutoBalanced));
+    localStorage.setItem('ksa_neraca_initial_capital', String(initialStoreCapital));
+  }, [initialStoreCapital]);
+
+  useEffect(() => {
+    localStorage.setItem('ksa_neraca_auto_balanced', String(isAutoBalanced));
   }, [isAutoBalanced]);
 
   // Calculations for Laba Rugi (Profit & Loss) inside the filtered timeframe
@@ -131,8 +139,7 @@ export default function NeracaRugiPage() {
 
   const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses;
 
-  // Sound liquid capital: Rp 15.000.000 initial seed + revenues cumulative - expenses cumulative
-  const initialStoreCapital = 15000000; 
+  // Sound liquid capital: initial seed + revenues cumulative - expenses cumulative
   const cashOnHand = initialStoreCapital + allTimeRevenue - allTimeExpenses;
 
   // Unsold merchandise stock valuation (asset)
@@ -473,6 +480,19 @@ export default function NeracaRugiPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-500 font-medium">Persediaan Barang Dagang</span>
                   <span className="font-mono font-semibold text-slate-900">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-150 shadow-2xs">
+                  <span className="text-gray-650 font-bold">Modal Awal Toko (Seed):</span>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
+                    <input 
+                      type="number" 
+                      value={initialStoreCapital}
+                      onChange={(e) => setInitialStoreCapital(Number(e.target.value))}
+                      className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-150 shadow-2xs">

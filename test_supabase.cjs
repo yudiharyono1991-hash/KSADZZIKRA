@@ -13,7 +13,7 @@ const defaultUsers = [
 
 async function seedDefaultUsers() {
   console.log("Seeding default users to Supabase...");
-  const { data, error } = await supabase.from('ba_users').upsert(defaultUsers);
+  const { data, error } = await supabase.from('ksa_users').upsert(defaultUsers);
   
   if (error) {
     console.error("Error seeding users:", error);

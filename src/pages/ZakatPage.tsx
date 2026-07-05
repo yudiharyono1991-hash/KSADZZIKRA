@@ -25,20 +25,37 @@ export default function ZakatPage() {
     addZakatRecord, 
     zakatDistributions, 
     addZakatDistribution,
-    currentUser 
+    currentUser,
+    expenses
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'CALCULATOR' | 'DISTRIBUTION'>('CALCULATOR');
 
   // ================= TAB 1: CALCULATOR STATE & LOGIC =================
   const [goldPrice, setGoldPrice] = useState('1450000'); // default 1.45m/g
-  const liveCash = 15000000 + transactions.reduce((sum, tx) => sum + tx.totalAmount, 0);
+  
+  const initialStoreCapital = (() => {
+    const saved = localStorage.getItem('ksa_neraca_initial_capital');
+    return saved ? Number(saved) : 0;
+  })();
+  const savedReceivables = (() => {
+    const saved = localStorage.getItem('ksa_neraca_receivables');
+    return saved ? Number(saved) : 0;
+  })();
+  const savedPayables = (() => {
+    const saved = localStorage.getItem('ksa_neraca_payables');
+    return saved ? Number(saved) : 0;
+  })();
+
+  const allTimeRevenue = (transactions || []).reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+  const allTimeExpenses = (expenses || []).reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  const liveCash = initialStoreCapital + allTimeRevenue - allTimeExpenses;
   const liveInventory = products.reduce((sum, p) => sum + (p.costPrice * p.stock), 0);
   
   const [cashAsset, setCashAsset] = useState(liveCash.toString());
   const [inventoryAsset, setInventoryAsset] = useState(liveInventory.toString());
-  const [receivableAsset, setReceivableAsset] = useState('1200000');
-  const [liabilityAsset, setLiabilityAsset] = useState('8000000');
+  const [receivableAsset, setReceivableAsset] = useState(savedReceivables.toString());
+  const [liabilityAsset, setLiabilityAsset] = useState(savedPayables.toString());
   const [customNotes, setCustomNotes] = useState('');
 
   const goldPriceNum = Number(goldPrice);

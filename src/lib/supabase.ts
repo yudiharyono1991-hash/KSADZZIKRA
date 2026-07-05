@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve Supabase environment variables from Vite env config.
-const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || 'https://rxuwdnaycysgmofazjmz.supabase.co';
-const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4dXdkbmF5Y3lzZ21vZmF6am16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDQzODMsImV4cCI6MjA5ODUyMDM4M30.OOmVoWbtCbpavCReyh5jVOWhTe0uhywV3NA3nXmcfXI';
+const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || 'https://stiatomaelzrptazayml.supabase.co';
+const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0';
 
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'https://your-project.supabase.co');
@@ -460,7 +460,7 @@ export const supabaseService = {
     if (!supabase) return null;
     try {
       const { data, error } = await supabase
-        .from('ba_users')
+        .from('ksa_users')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -505,7 +505,7 @@ export const supabaseService = {
       };
 
       const { error } = await supabase
-        .from('ba_users')
+        .from('ksa_users')
         .upsert(payload);
 
       if (error) throw error;
@@ -521,7 +521,7 @@ export const supabaseService = {
     if (!supabase) return false;
     try {
       const { error } = await supabase
-        .from('ba_users')
+        .from('ksa_users')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -626,7 +626,31 @@ export const supabaseService = {
   async saveStoreSettings(settings: any): Promise<boolean> {
     if (!supabase) return false;
     try {
-      const { error } = await supabase.from('store_settings').upsert({ ...settings, id: 'settings_1' });
+      const mapped = {
+        id: 'settings_1',
+        tenant_id: settings.tenantId || 'tenant_default',
+        store_name: settings.storeName || '',
+        store_address: settings.storeAddress || '',
+        store_phone: settings.storePhone || '',
+        business_type: settings.businessType || 'KOPERASI',
+        owner_whatsapp: settings.ownerWhatsapp || '',
+        is_tax_enabled: Boolean(settings.isTaxEnabled),
+        tax_rate: Number(settings.taxRate) || 0,
+        payment_timeout_minutes: Number(settings.paymentTimeoutMinutes) || 60,
+        store_location_lat: settings.storeLocationLat ? Number(settings.storeLocationLat) : null,
+        store_location_lng: settings.storeLocationLng ? Number(settings.storeLocationLng) : null,
+        max_delivery_radius_km: Number(settings.maxDeliveryRadiusKm) || 5,
+        qris_enabled: Boolean(settings.qrisEnabled),
+        qris_image_url: settings.qrisImageUrl || null,
+        maintenance_mode: Boolean(settings.maintenanceMode),
+        minimum_cash_balance: Number(settings.minimumCashBalance) || 1000000,
+        zakat_rate: Number(settings.zakatRate) || 2.5,
+        auto_approve_transactions: Boolean(settings.autoApproveTransactions),
+        owner_bank_name: settings.ownerBankName || null,
+        owner_bank_account: settings.ownerBankAccount || null,
+        payment_methods: settings.paymentMethods || { bankTransfer: [], ewallet: [] }
+      };
+      const { error } = await supabase.from('store_settings').upsert(mapped);
       if (error) throw error;
       return true;
     } catch (err: any) {

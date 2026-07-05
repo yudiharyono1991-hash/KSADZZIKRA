@@ -168,17 +168,17 @@ export default function SettingsPage() {
         const data = JSON.parse(event.target?.result as string);
         if (data.products && data.transactions) {
           // A very rudimentary but effective local storage overwrite
-          if (data.products) localStorage.setItem('ba_products', JSON.stringify(data.products));
-          if (data.transactions) localStorage.setItem('ba_transactions', JSON.stringify(data.transactions));
-          if (data.onlineOrders) localStorage.setItem('ba_online_orders', JSON.stringify(data.onlineOrders));
-          if (data.users) localStorage.setItem('ba_users', JSON.stringify(data.users));
-          if (data.attendances) localStorage.setItem('ba_attendances', JSON.stringify(data.attendances));
-          if (data.expenses) localStorage.setItem('ba_expenses', JSON.stringify(data.expenses));
-          if (data.closings) localStorage.setItem('ba_closings', JSON.stringify(data.closings));
-          if (data.branches) localStorage.setItem('ba_branches', JSON.stringify(data.branches));
-          if (data.customers) localStorage.setItem('ba_customers', JSON.stringify(data.customers));
-          if (data.suppliers) localStorage.setItem('ba_suppliers', JSON.stringify(data.suppliers));
-          if (data.settings) localStorage.setItem('ba_settings', JSON.stringify(data.settings));
+          if (data.products) localStorage.setItem('ksa_products', JSON.stringify(data.products));
+          if (data.transactions) localStorage.setItem('ksa_transactions', JSON.stringify(data.transactions));
+          if (data.onlineOrders) localStorage.setItem('ksa_online_orders', JSON.stringify(data.onlineOrders));
+          if (data.users) localStorage.setItem('ksa_users', JSON.stringify(data.users));
+          if (data.attendances) localStorage.setItem('ksa_attendances', JSON.stringify(data.attendances));
+          if (data.expenses) localStorage.setItem('ksa_expenses', JSON.stringify(data.expenses));
+          if (data.closings) localStorage.setItem('ksa_closings', JSON.stringify(data.closings));
+          if (data.branches) localStorage.setItem('ksa_branches', JSON.stringify(data.branches));
+          if (data.customers) localStorage.setItem('ksa_customers', JSON.stringify(data.customers));
+          if (data.suppliers) localStorage.setItem('ksa_suppliers', JSON.stringify(data.suppliers));
+          if (data.settings) localStorage.setItem('ksa_settings', JSON.stringify(data.settings));
           
           alert('Database berhasil dipulihkan! Halaman akan dimuat ulang.');
           window.location.reload();

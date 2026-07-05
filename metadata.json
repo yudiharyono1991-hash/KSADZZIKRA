@@ -1,6 +1,6 @@
 {
-  "name": "SmartPOS Shariah",
-  "description": "Digital POS and Shariah Accounting system designed for Indonesian retail stores with interactive zakat calculators and audit logging",
+  "name": "KSA Mart Syariah",
+  "description": "Digital POS and Shariah Accounting system for KSA Mart - Koperasi Syariah ADZ-ZIKRA with interactive zakat calculators and audit logging",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

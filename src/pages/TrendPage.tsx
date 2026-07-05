@@ -152,13 +152,13 @@ export default function TrendPage() {
     const bopo = curTotals.margin > 0 ? (curTotals.expenses / curTotals.margin) * 100 : 0;
     
     // Liquidity/Solvency snapshot
-    const receivablesVal = Number(localStorage.getItem('ba_neraca_receivables') || 1200000);
-    const accountsPayables = Number(localStorage.getItem('ba_neraca_payables') || 8500000);
-    const equityCapitalInput = Number(localStorage.getItem('ba_neraca_equity') || 14385000);
+    const receivablesVal = Number(localStorage.getItem('ksa_neraca_receivables') || 0);
+    const accountsPayables = Number(localStorage.getItem('ksa_neraca_payables') || 0);
+    const equityCapitalInput = Number(localStorage.getItem('ksa_neraca_equity') || 0);
 
     const allTimeRevenue = (transactions || []).reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
     const allTimeExpenses = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    const initialCapital = 15000000;
+    const initialCapital = Number(localStorage.getItem('ksa_neraca_initial_capital') || 0);
     const cashOnHand = initialCapital + allTimeRevenue - allTimeExpenses;
     const inventoryVal = (products || []).reduce((sum, p) => sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
     

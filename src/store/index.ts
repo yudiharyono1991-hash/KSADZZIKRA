@@ -192,7 +192,7 @@ const DEFAULT_COA: CoaAccount[] = [
 ];
 
 const getSavedCoaList = (): CoaAccount[] => {
-  const saved = localStorage.getItem('ba_coa_list');
+  const saved = localStorage.getItem('ksa_coa_list');
   if (saved) {
     try { return JSON.parse(saved); } catch (e) {}
   }
@@ -200,97 +200,23 @@ const getSavedCoaList = (): CoaAccount[] => {
 };
 
 const DEFAULT_PRODUCTS: Product[] = [
-  { id: 'prod_1', tenantId: 'tenant_default', sku: 'BRS-001', name: 'Beras Premium Cianjur 5kg', category: 'Sembako', price: 78000, costPrice: 68000, stock: 45, minStock: 10, unit: 'Pack', isHalal: true, barcode: '8991234560012', image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_2', tenantId: 'tenant_default', sku: 'MNG-002', name: 'Minyak Goreng SunCo 2L', category: 'Sembako', price: 34500, costPrice: 29000, stock: 32, minStock: 8, unit: 'Botol', isHalal: true, barcode: '8991234560029', image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_3', tenantId: 'tenant_default', sku: 'GLA-003', name: 'Gula Pasir Gulaku 1kg', category: 'Sembako', price: 17500, costPrice: 15000, stock: 40, minStock: 12, unit: 'Pack', isHalal: true, barcode: '8991234560036', image: 'https://images.unsplash.com/photo-1581428982868-e410dd147a90?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_4', tenantId: 'tenant_default', sku: 'TLR-004', name: 'Telur Ayam Negeri 1kg', category: 'Sembako', price: 28000, costPrice: 24000, stock: 15, minStock: 15, unit: 'Kg', isHalal: true, barcode: '8991234560043', image: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_5', tenantId: 'tenant_default', sku: 'BND-005', name: 'Ikan Bandeng Segar (Tanpa Duri)', category: 'Fresh Food', price: 42000, costPrice: 35000, stock: 8, minStock: 5, unit: 'Pack', isHalal: true, barcode: '8991234560050', image: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_6', tenantId: 'tenant_default', sku: 'KPP-006', name: 'Kopi Kapal Api 380g', category: 'Minuman', price: 24900, costPrice: 21500, stock: 24, minStock: 6, unit: 'Pack', isHalal: true, barcode: '8991234560067', image: 'https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_7', tenantId: 'tenant_default', sku: 'TEH-007', name: 'Teh Celup Sariwangi isi 50', category: 'Minuman', price: 11000, costPrice: 9000, stock: 40, minStock: 8, unit: 'Kotak', isHalal: true, barcode: '8991234560074', image: 'https://images.unsplash.com/photo-1594631252845-29fc4cc8c0a1?auto=format&fit=crop&q=80&w=300' },
-  { id: 'prod_8', tenantId: 'tenant_default', sku: 'SBN-008', name: 'Sabun Lifebuoy Cair Refill 450ml', category: 'Kebutuhan Rumah', price: 23500, costPrice: 19500, stock: 18, minStock: 5, unit: 'Pouch', isHalal: true, barcode: '8991234560081', image: 'https://images.unsplash.com/photo-1584824486516-0555a07fc511?auto=format&fit=crop&q=80&w=300' },
-  
-  // PPOB Dummy Data
+  // PPOB System Products
   { id: 'ppob_1', tenantId: 'tenant_default', sku: 'PPOB-PLS-50', name: 'Pulsa Telkomsel 50.000', category: 'Pulsa', price: 51500, costPrice: 50000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true },
   { id: 'ppob_2', tenantId: 'tenant_default', sku: 'PPOB-PLN-100', name: 'Token PLN 100.000', category: 'Token Listrik', price: 102500, costPrice: 100000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true },
   { id: 'ppob_3', tenantId: 'tenant_default', sku: 'PPOB-PDAM', name: 'Tagihan PDAM (Admin)', category: 'PDAM', price: 2500, costPrice: 1000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true },
   { id: 'ppob_4', tenantId: 'tenant_default', sku: 'PPOB-BPJS', name: 'Bayar BPJS (Admin)', category: 'BPJS', price: 2500, costPrice: 1000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true }
 ];
 
-const DEFAULT_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'tx_1',
-    tenantId: 'tenant_default',
-    invoiceNo: 'INV-20260607-001',
-    timestamp: '2026-06-07T03:00:00Z',
-    cashierName: 'Kasir Asy',
-    items: [
-      { productId: 'prod_1', productName: 'Beras Premium Cianjur 5kg', quantity: 1, price: 78000, costPrice: 68000 },
-      { productId: 'prod_2', productName: 'Minyak Goreng SunCo 2L', quantity: 2, price: 34500, costPrice: 29000 }
-    ],
-    totalAmount: 147000,
-    paymentMethod: 'CASH',
-    amountPaid: 150000,
-    changeAmount: 3000,
-    zakatContribution: 525,
-    marginContribution: 21000
-  },
-  {
-    id: 'tx_2',
-    tenantId: 'tenant_default',
-    invoiceNo: 'INV-20260607-002',
-    timestamp: '2026-06-07T03:15:00Z',
-    cashierName: 'Kasir Asy',
-    items: [
-      { productId: 'prod_3', productName: 'Gula Pasir Gulaku 1kg', quantity: 3, price: 17500, costPrice: 15000 },
-      { productId: 'prod_4', productName: 'Telur Ayam Negeri 1kg', quantity: 1, price: 28000, costPrice: 24000 },
-      { productId: 'prod_5', productName: 'Ikan Bandeng Segar (Tanpa Duri)', quantity: 1, price: 42000, costPrice: 35000 }
-    ],
-    totalAmount: 122500,
-    paymentMethod: 'QRIS_SHARIAH',
-    amountPaid: 122500,
-    changeAmount: 0,
-    zakatContribution: 462.5,
-    marginContribution: 18500
-  }
-];
+const DEFAULT_TRANSACTIONS: Transaction[] = [];
 
-const DEFAULT_AUDIT_LOGS: AuditLog[] = [
-  { id: 'log_1', tenantId: 'tenant_default', timestamp: '2026-06-07T02:00:00Z', user: 'Kasir Asy', action: 'LOGIN', category: 'SYSTEM', details: 'Sesi kasir dimulai - KSA Mart', ipAddress: '192.168.1.15' },
-  { id: 'log_2', tenantId: 'tenant_default', timestamp: '2026-06-07T02:15:00Z', user: 'Kasir Asy', action: 'STOCK_CHECK', category: 'INVENTORY', details: 'Pemeriksaan stok harian produk sembako', ipAddress: '192.168.1.15' }
-];
+const DEFAULT_AUDIT_LOGS: AuditLog[] = [];
 
-const DEFAULT_ZAKAT_RECORDS: ZakatCalculation[] = [
-  {
-    id: 'zk_1',
-    tenantId: 'tenant_default',
-    timestamp: '2026-06-07T02:30:00Z',
-    goldPricePerGram: 1450000,
-    nisabValue: 123250000,
-    liquidAssets: 85000000,
-    inventoryValue: 48000000,
-    receivables: 5000000,
-    liabilities: 12000000,
-    netWealth: 126000000,
-    isZakatRequired: true,
-    zakatDue: 3150000,
-    notes: 'Kalkulasi Zakat Perdagangan - Sesuai FATWA MUI'
-  }
-];
+const DEFAULT_ZAKAT_RECORDS: ZakatCalculation[] = [];
 
-const DEFAULT_ZAKAT_DISTRIBUTIONS: ZakatDistribution[] = [
-  {
-    id: 'zkd_1',
-    tenantId: 'tenant_default',
-    timestamp: '2020-06-05T08:00:00Z',
-    amount: 1500000,
-    recipient: 'Fakir Miskin Sekitar Tazkia',
-    esgCategory: 'SOCIAL',
-    description: 'Penyaluran sembako bahan pokok pangan gratis untuk dhuafa terdekat'
-  }
-];
+const DEFAULT_ZAKAT_DISTRIBUTIONS: ZakatDistribution[] = [];
 
 const getSavedUsers = (): UserAccount[] => {
-  const saved = localStorage.getItem('ba_users');
+  const saved = localStorage.getItem('ksa_users');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -338,54 +264,35 @@ const getSavedUsers = (): UserAccount[] => {
 };
 
 const getSavedPurchaseOrders = (): PurchaseOrder[] => {
-  const saved = localStorage.getItem('ba_purchase_orders');
+  const saved = localStorage.getItem('ksa_purchase_orders');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedJournalEntries = (): JournalEntry[] => {
-  const saved = localStorage.getItem('ba_journal_entries');
+  const saved = localStorage.getItem('ksa_journal_entries');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedExpenses = (): Expense[] => {
-  const saved = localStorage.getItem('ba_expenses');
+  const saved = localStorage.getItem('ksa_expenses');
   if (saved) {
     try { return JSON.parse(saved); } catch (e) {}
   }
-  return [
-    { id: 'exp_1', tenantId: 'tenant_default', date: '2026-06-01', category: 'SEWA_LAPAK', amount: 500000, description: 'Sewa Lapak Mart Bulanan', createdBy: 'Superadmin KSA Mart' },
-    { id: 'exp_2', tenantId: 'tenant_default', date: '2026-06-03', category: 'LISTRIK_AIR_WIFI', amount: 200000, description: 'Listrik & Wi-fi Toko', createdBy: 'Superadmin KSA Mart' },
-    { id: 'exp_3', tenantId: 'tenant_default', date: '2026-06-05', category: 'GAJI', amount: 1000000, description: 'Gaji Bulanan Staff Utama', createdBy: 'Superadmin KSA Mart' }
-  ];
+  return [];
 };
 
 const getSavedClosings = (): ClosingRecord[] => {
-  const saved = localStorage.getItem('ba_closings');
+  const saved = localStorage.getItem('ksa_closings');
   if (saved) {
     try { return JSON.parse(saved); } catch (e) {}
   }
-  return [
-    {
-      id: 'cls_1',
-      tenantId: 'tenant_default',
-      date: '2026-05-31',
-      type: 'MONTHLY',
-      revenue: 4200000,
-      expensesTotal: 1700000,
-      netProfit: 2500000,
-      zakatContribution: 62500,
-      isBalanced: true,
-      notes: 'Penutupan Buku Final Bulanan Mei 2026',
-      createdBy: 'Superadmin BA',
-      timestamp: '2026-05-31T23:59:00Z'
-    }
-  ];
+  return [];
 };
 
 const getSavedProducts = (): Product[] => {
-  const saved = localStorage.getItem('ba_products');
+  const saved = localStorage.getItem('ksa_products');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -396,7 +303,7 @@ const getSavedProducts = (): Product[] => {
 };
 
 const getSavedTransactions = (): Transaction[] => {
-  const saved = localStorage.getItem('ba_transactions');
+  const saved = localStorage.getItem('ksa_transactions');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -407,7 +314,7 @@ const getSavedTransactions = (): Transaction[] => {
 };
 
 const getSavedAuditLogs = (): AuditLog[] => {
-  const saved = localStorage.getItem('ba_audit_logs');
+  const saved = localStorage.getItem('ksa_audit_logs');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -418,7 +325,7 @@ const getSavedAuditLogs = (): AuditLog[] => {
 };
 
 const getSavedZakatRecords = (): ZakatCalculation[] => {
-  const saved = localStorage.getItem('ba_zakat_records');
+  const saved = localStorage.getItem('ksa_zakat_records');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -429,7 +336,7 @@ const getSavedZakatRecords = (): ZakatCalculation[] => {
 };
 
 const getSavedZakatDistributions = (): ZakatDistribution[] => {
-  const saved = localStorage.getItem('ba_zakat_distributions');
+  const saved = localStorage.getItem('ksa_zakat_distributions');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -440,7 +347,7 @@ const getSavedZakatDistributions = (): ZakatDistribution[] => {
 };
 
 const getSavedBranches = (): Branch[] => {
-  const saved = localStorage.getItem('ba_branches');
+  const saved = localStorage.getItem('ksa_branches');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
@@ -453,31 +360,31 @@ const getSavedBranches = (): Branch[] => {
 };
 
 const getSavedCustomers = (): Customer[] => {
-  const saved = localStorage.getItem('ba_customers');
+  const saved = localStorage.getItem('ksa_customers');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedSuppliers = (): Supplier[] => {
-  const saved = localStorage.getItem('ba_suppliers');
+  const saved = localStorage.getItem('ksa_suppliers');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedPromos = (): Promo[] => {
-  const saved = localStorage.getItem('ba_promos');
+  const saved = localStorage.getItem('ksa_promos');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedAttendances = (): Attendance[] => {
-  const saved = localStorage.getItem('ba_attendances');
+  const saved = localStorage.getItem('ksa_attendances');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedSettings = (): StoreSettings => {
-  const saved = localStorage.getItem('ba_settings');
+  const saved = localStorage.getItem('ksa_settings');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return { 
     tenantId: 'tenant_default',
@@ -493,26 +400,26 @@ const getSavedSettings = (): StoreSettings => {
 };
 
 const getSavedStockMovements = (): StockMovement[] => {
-  const saved = localStorage.getItem('ba_stock_movements');
+  const saved = localStorage.getItem('ksa_stock_movements');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedOnlineOrders = (): OnlineOrder[] => {
-  const saved = localStorage.getItem('ba_online_orders');
+  const saved = localStorage.getItem('ksa_online_orders');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 const getSavedChatMessages = (): ChatMessage[] => {
-  const saved = localStorage.getItem('ba_chat_messages');
+  const saved = localStorage.getItem('ksa_chat_messages');
   if (saved) { try { return JSON.parse(saved); } catch (e) {} }
   return [];
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
   tenants: (() => {
-    const saved = localStorage.getItem('ba_tenants');
+    const saved = localStorage.getItem('ksa_tenants');
     const parsed = saved ? JSON.parse(saved) : [];
     
     // Force update owner name in default tenant for Dr. Grandis
@@ -537,7 +444,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         createdAt: new Date().toISOString()
       };
       withUpdatedOwner.unshift(defaultTenant);
-      localStorage.setItem('ba_tenants', JSON.stringify(withUpdatedOwner));
+      localStorage.setItem('ksa_tenants', JSON.stringify(withUpdatedOwner));
     }
     return withUpdatedOwner;
   })(),
@@ -551,7 +458,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   zakatRecords: getSavedZakatRecords(),
   zakatDistributions: getSavedZakatDistributions(),
   currentUser: (() => {
-    const saved = localStorage.getItem('ba_current_user');
+    const saved = localStorage.getItem('ksa_current_user');
     if (saved) {
       try { return JSON.parse(saved); } catch(e) {}
     }
@@ -568,7 +475,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   suppliers: getSavedSuppliers(),
   promos: getSavedPromos(),
   attendances: getSavedAttendances(),
-  settings: getStorage('ba_settings', undefined) || {
+  settings: getStorage('ksa_settings', undefined) || {
     tenantId: 'tenant_default',
     isTaxEnabled: true,
     taxRate: 11,
@@ -581,10 +488,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     zakatRate: 2.5,
     autoApproveTransactions: false,
   },
-  stockMovements: getStorage('ba_stock_movements', undefined) || [],
+  stockMovements: getStorage('ksa_stock_movements', undefined) || [],
   activeBranchId: '', // Default to global view initially
-  notifications: getStorage('ba_notifications', undefined) || [],
-  coaList: getStorage('ba_coa_list', undefined) || [],
+  notifications: getStorage('ksa_notifications', undefined) || [],
+  coaList: getStorage('ksa_coa_list', undefined) || [],
 
   // Branch implementations
   setActiveBranchId: (branchId) => set({ activeBranchId: branchId }),
@@ -600,7 +507,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [...get().coaList, newAccount];
     set({ coaList: updated });
-    saveStorage('ba_coa_list', updated);
+    saveStorage('ksa_coa_list', updated);
     get().addLog('COA_ADD', 'FINANCE', `Menambah akun CoA baru: ${newAccount.code} - ${newAccount.name}`);
     
     if (isSupabaseConfigured) {
@@ -612,7 +519,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { currentUser } = get();
     const updated = get().coaList.map(c => c.id === updatedAccount.id ? updatedAccount : c);
     set({ coaList: updated });
-    saveStorage('ba_coa_list', updated);
+    saveStorage('ksa_coa_list', updated);
     get().addLog('COA_UPDATE', 'FINANCE', `Mengubah akun CoA: ${updatedAccount.code} - ${updatedAccount.name}`);
     
     if (isSupabaseConfigured) {
@@ -627,7 +534,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedAccount = { ...account, isActive: false };
     const updated = get().coaList.map(c => c.id === id ? updatedAccount : c);
     set({ coaList: updated });
-    saveStorage('ba_coa_list', updated);
+    saveStorage('ksa_coa_list', updated);
     get().addLog('COA_DELETE', 'FINANCE', `Menonaktifkan akun CoA: ${account.code} - ${account.name}`);
     
     if (isSupabaseConfigured) {
@@ -639,7 +546,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateSettings: (updates) => {
     const updated = { ...get().settings, ...updates };
     set({ settings: updated });
-    saveStorage('ba_settings', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_settings', updated, get().currentUser?.tenantId);
     get().addLog('SETTINGS_UPDATE', 'SYSTEM', 'Update pengaturan toko (Pajak)');
     
     if (isSupabaseConfigured) {
@@ -659,7 +566,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newMovement, ...get().stockMovements];
     set({ stockMovements: updated });
-    saveStorage('ba_stock_movements', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_stock_movements', updated, get().currentUser?.tenantId);
   },
 
   // Notifications
@@ -673,13 +580,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newNotif, ...get().notifications];
     set({ notifications: updated });
-    saveStorage('ba_notifications', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_notifications', updated, get().currentUser?.tenantId);
   },
 
   markNotificationAsRead: (id) => {
     const updated = get().notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
     set({ notifications: updated });
-    saveStorage('ba_notifications', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_notifications', updated, get().currentUser?.tenantId);
   },
 
   // Void
@@ -693,7 +600,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedTransactions = transactions.map(t => t.id === txId ? updatedTx : t);
     
     set({ transactions: updatedTransactions });
-    saveStorage('ba_transactions', updatedTransactions, currentUser.tenantId);
+    saveStorage('ksa_transactions', updatedTransactions, currentUser.tenantId);
     get().addLog('TRANSACTION_VOID_REQUEST', 'POS', `Pengajuan void transaksi ${tx.invoiceNo}: ${reason}`);
 
     get().addNotification({
@@ -716,7 +623,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const updatedTx = { ...tx, voidStatus: 'REJECTED' as const };
       const updatedTransactions = transactions.map(t => t.id === txId ? updatedTx : t);
       set({ transactions: updatedTransactions });
-      saveStorage('ba_transactions', updatedTransactions, currentUser.tenantId);
+      saveStorage('ksa_transactions', updatedTransactions, currentUser.tenantId);
       get().addLog('TRANSACTION_VOID_REJECT', 'POS', `Penolakan void transaksi ${tx.invoiceNo} oleh ${currentUser.name}`);
       return;
     }
@@ -773,9 +680,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       journalEntries: updatedJournals
     });
 
-    saveStorage('ba_transactions', updatedTransactions, get().currentUser?.tenantId);
-    saveStorage('ba_products', updatedProducts, get().currentUser?.tenantId);
-    saveStorage('ba_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    saveStorage('ksa_transactions', updatedTransactions, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updatedProducts, get().currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
 
     get().addLog('TRANSACTION_VOID_APPROVED', 'POS', `Void transaksi ${tx.invoiceNo} disetujui oleh ${currentUser.name}`);
   },
@@ -788,14 +695,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [...get().branches, newBranch];
     set({ branches: updated });
-    saveStorage('ba_branches', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_branches', updated, get().currentUser?.tenantId);
     get().addLog('BRANCH_ADD', 'SYSTEM', `Menambah cabang baru: ${newBranch.name}`);
   },
 
   updateBranch: (id, updates) => {
     const updated = get().branches.map(b => b.id === id ? { ...b, ...updates } : b);
     set({ branches: updated });
-    saveStorage('ba_branches', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_branches', updated, get().currentUser?.tenantId);
     get().addLog('BRANCH_UPDATE', 'SYSTEM', `Update data cabang: ${updated.find(b => b.id === id)?.name}`);
   },
 
@@ -803,7 +710,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const branch = get().branches.find(b => b.id === id);
     const updated = get().branches.filter(b => b.id !== id);
     set({ branches: updated });
-    saveStorage('ba_branches', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_branches', updated, get().currentUser?.tenantId);
     if (branch) {
       get().addLog('BRANCH_DELETE', 'SYSTEM', `Menghapus cabang: ${branch.name}`);
     }
@@ -814,14 +721,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newCustomer: Customer = { ...customerData, id: `cust_${Date.now()}`, createdAt: new Date().toISOString() };
     const updated = [...get().customers, newCustomer];
     set({ customers: updated });
-    saveStorage('ba_customers', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_customers', updated, get().currentUser?.tenantId);
     get().addLog('CUSTOMER_ADD', 'SYSTEM', `Menambah pelanggan: ${newCustomer.name}`);
     if (isSupabaseConfigured) supabaseService.saveCustomer(newCustomer);
   },
   updateCustomer: (id, updates) => {
     const updated = get().customers.map(c => c.id === id ? { ...c, ...updates } : c);
     set({ customers: updated });
-    saveStorage('ba_customers', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_customers', updated, get().currentUser?.tenantId);
     get().addLog('CUSTOMER_UPDATE', 'SYSTEM', `Update pelanggan ID: ${id}`);
     const cust = updated.find(c => c.id === id);
     if (cust && isSupabaseConfigured) supabaseService.saveCustomer(cust);
@@ -829,7 +736,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteCustomer: (id) => {
     const updated = get().customers.filter(c => c.id !== id);
     set({ customers: updated });
-    saveStorage('ba_customers', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_customers', updated, get().currentUser?.tenantId);
     get().addLog('CUSTOMER_DELETE', 'SYSTEM', `Menghapus pelanggan ID: ${id}`);
   },
 
@@ -837,19 +744,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newSupplier: Supplier = { ...supplierData, id: `sup_${Date.now()}`, createdAt: new Date().toISOString() };
     const updated = [...get().suppliers, newSupplier];
     set({ suppliers: updated });
-    saveStorage('ba_suppliers', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_ADD', 'SYSTEM', `Menambah supplier: ${newSupplier.name}`);
   },
   updateSupplier: (id, updates) => {
     const updated = get().suppliers.map(s => s.id === id ? { ...s, ...updates } : s);
     set({ suppliers: updated });
-    saveStorage('ba_suppliers', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_UPDATE', 'SYSTEM', `Update supplier ID: ${id}`);
   },
   deleteSupplier: (id) => {
     const updated = get().suppliers.filter(s => s.id !== id);
     set({ suppliers: updated });
-    saveStorage('ba_suppliers', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_DELETE', 'SYSTEM', `Menghapus supplier ID: ${id}`);
   },
 
@@ -858,19 +765,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newPromo: Promo = { ...promoData, id: `prm_${Date.now()}`, createdAt: new Date().toISOString() };
     const updated = [...get().promos, newPromo];
     set({ promos: updated });
-    saveStorage('ba_promos', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_promos', updated, get().currentUser?.tenantId);
     get().addLog('PROMO_ADD', 'SYSTEM', `Menambah promo: ${newPromo.name}`);
   },
   updatePromo: (id, updates) => {
     const updated = get().promos.map(p => p.id === id ? { ...p, ...updates } : p);
     set({ promos: updated });
-    saveStorage('ba_promos', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_promos', updated, get().currentUser?.tenantId);
     get().addLog('PROMO_UPDATE', 'SYSTEM', `Update promo ID: ${id}`);
   },
   deletePromo: (id) => {
     const updated = get().promos.filter(p => p.id !== id);
     set({ promos: updated });
-    saveStorage('ba_promos', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_promos', updated, get().currentUser?.tenantId);
     get().addLog('PROMO_DELETE', 'SYSTEM', `Menghapus promo ID: ${id}`);
   },
 
@@ -890,7 +797,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newAtt, ...get().attendances];
     set({ attendances: updated });
-    saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
     get().addLog('ATTENDANCE', 'SYSTEM', `${userName} Clock-In Shift`);
   },
   clockOut: (attendanceId, photoUrl, latitude, longitude) => {
@@ -898,7 +805,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       a.id === attendanceId ? { ...a, clockOut: new Date().toISOString(), clockOutPhotoUrl: photoUrl, clockOutLatitude: latitude, clockOutLongitude: longitude } : a
     );
     set({ attendances: updated });
-    saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
     get().addLog('ATTENDANCE', 'SYSTEM', `Selesai Shift (Clock-Out) ID: ${attendanceId}`);
   },
 
@@ -909,7 +816,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         : a
     );
     set({ attendances: updated });
-    saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
     get().addLog('ATTENDANCE', 'SYSTEM', `Permohonan koreksi absen diajukan untuk ID: ${attendanceId}`);
   },
 
@@ -930,7 +837,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { ...a, ...patch };
     });
     set({ attendances: updated });
-    saveStorage('ba_attendances', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
     get().addLog('ATTENDANCE', 'SYSTEM', `Koreksi absen ${approved ? 'DISETUJUI' : 'DITOLAK'} untuk ID: ${attendanceId}`);
   },
 
@@ -945,7 +852,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updatedTenants = [...get().tenants, newTenant];
     set({ tenants: updatedTenants });
-    saveStorage('ba_tenants', updatedTenants);
+    saveStorage('ksa_tenants', updatedTenants);
   },
 
   approveTenant: (tenantId) => {
@@ -955,7 +862,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     tenant.status = 'ACTIVE';
     set({ tenants: [...tenants] });
-    saveStorage('ba_tenants', get().tenants);
+    saveStorage('ksa_tenants', get().tenants);
 
     // Create owner account
     const ownerAccount: import('../types').UserAccount = {
@@ -970,31 +877,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       isApproved: true
     };
     
-    const users = getStorage('ba_users') || [];
+    const users = getStorage('ksa_users') || [];
     users.push(ownerAccount);
-    saveStorage('ba_users', users);
+    saveStorage('ksa_users', users);
   },
 
   loadTenantData: (tenantId) => {
     set({
-      settings: getStorage('ba_settings', tenantId) || { isTaxEnabled: false, taxRate: 11, businessType: 'KOPERASI', tenantId },
-      stockMovements: getStorage('ba_stock_movements', tenantId) || [],
-      transactions: getStorage('ba_transactions', tenantId) || [],
-      products: getStorage('ba_products', tenantId) || [],
-      journalEntries: getStorage('ba_journal_entries', tenantId) || [],
-      branches: getStorage('ba_branches', tenantId) || [],
-      customers: getStorage('ba_customers', tenantId) || [],
-      suppliers: getStorage('ba_suppliers', tenantId) || [],
-      promos: getStorage('ba_promos', tenantId) || [],
-      attendances: getStorage('ba_attendances', tenantId) || [],
-      onlineOrders: getStorage('ba_online_orders', tenantId) || [],
-      chatMessages: getStorage('ba_chat_messages', tenantId) || [],
-      zakatRecords: getStorage('ba_zakat_records', tenantId) || [],
-      zakatDistributions: getStorage('ba_zakat_distributions', tenantId) || [],
-      purchaseOrders: getStorage('ba_purchase_orders', tenantId) || [],
-      expenses: getStorage('ba_expenses', tenantId) || [],
-      closings: getStorage('ba_closings', tenantId) || [],
-      auditLogs: getStorage('ba_audit_logs', tenantId) || []
+      settings: getStorage('ksa_settings', tenantId) || { isTaxEnabled: false, taxRate: 11, businessType: 'KOPERASI', tenantId },
+      stockMovements: getStorage('ksa_stock_movements', tenantId) || [],
+      transactions: getStorage('ksa_transactions', tenantId) || [],
+      products: getStorage('ksa_products', tenantId) || [],
+      journalEntries: getStorage('ksa_journal_entries', tenantId) || [],
+      branches: getStorage('ksa_branches', tenantId) || [],
+      customers: getStorage('ksa_customers', tenantId) || [],
+      suppliers: getStorage('ksa_suppliers', tenantId) || [],
+      promos: getStorage('ksa_promos', tenantId) || [],
+      attendances: getStorage('ksa_attendances', tenantId) || [],
+      onlineOrders: getStorage('ksa_online_orders', tenantId) || [],
+      chatMessages: getStorage('ksa_chat_messages', tenantId) || [],
+      zakatRecords: getStorage('ksa_zakat_records', tenantId) || [],
+      zakatDistributions: getStorage('ksa_zakat_distributions', tenantId) || [],
+      purchaseOrders: getStorage('ksa_purchase_orders', tenantId) || [],
+      expenses: getStorage('ksa_expenses', tenantId) || [],
+      closings: getStorage('ksa_closings', tenantId) || [],
+      auditLogs: getStorage('ksa_audit_logs', tenantId) || []
     });
   },
 
@@ -1035,7 +942,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured) { supabaseService.saveAuditLog(log); }
     
     // Save to localStorage for persistence
-    localStorage.setItem('ba_current_user', JSON.stringify(authUser));
+    localStorage.setItem('ksa_current_user', JSON.stringify(authUser));
     
     return 'SUCCESS';
   },
@@ -1047,7 +954,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     // Set currentUser to null and CLEAR customerCart
     set({ currentUser: null, customerCart: [] });
-    localStorage.removeItem('ba_current_user');
+    localStorage.removeItem('ksa_current_user');
   },
 
   // Cart implementations (Admin)
@@ -1185,7 +1092,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const updatedOrders = [newOrder, ...get().onlineOrders];
     set({ onlineOrders: updatedOrders, customerCart: [] });
-    saveStorage('ba_online_orders', updatedOrders, get().currentUser?.tenantId);
+    saveStorage('ksa_online_orders', updatedOrders, get().currentUser?.tenantId);
     
     if (isSupabaseConfigured) {
       supabaseService.saveOnlineOrder(newOrder);
@@ -1200,7 +1107,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       o.id === orderId ? { ...o, status, updatedAt: new Date().toISOString() } : o
     );
     set({ onlineOrders: updatedOrders });
-    saveStorage('ba_online_orders', updatedOrders, get().currentUser?.tenantId);
+    saveStorage('ksa_online_orders', updatedOrders, get().currentUser?.tenantId);
     
     if (isSupabaseConfigured) {
       const updatedOrder = updatedOrders.find(o => o.id === orderId);
@@ -1357,9 +1264,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       journalEntries: updatedJournals
     });
     
-    saveStorage('ba_products', updatedProducts, get().currentUser?.tenantId);
-    saveStorage('ba_transactions', updatedTxs, get().currentUser?.tenantId);
-    saveStorage('ba_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updatedProducts, get().currentUser?.tenantId);
+    saveStorage('ksa_transactions', updatedTxs, get().currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
     
     if (isSupabaseConfigured) {
       supabaseService.saveTransaction(newTx);
@@ -1386,7 +1293,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updatedMsgs = [...get().chatMessages, newMessage];
     set({ chatMessages: updatedMsgs });
-    saveStorage('ba_chat_messages', updatedMsgs, get().currentUser?.tenantId);
+    saveStorage('ksa_chat_messages', updatedMsgs, get().currentUser?.tenantId);
   },
   
   // Checkout Implementation
@@ -1497,8 +1404,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     
     // Save to localStorage immediately
-    saveStorage('ba_products', updatedProducts, get().currentUser?.tenantId);
-    saveStorage('ba_transactions', [newTx, ...get().transactions], get().currentUser?.tenantId);
+    saveStorage('ksa_products', updatedProducts, get().currentUser?.tenantId);
+    saveStorage('ksa_transactions', [newTx, ...get().transactions], get().currentUser?.tenantId);
 
     // Handle KASBON customer debt logic
     if (paymentMethod === 'KASBON' && customerId) {
@@ -1646,7 +1553,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const updatedJournals = [...autoJournals, ...journalEntries];
     set({ journalEntries: updatedJournals });
-    saveStorage('ba_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
     // === END JURNAL OTOMATIS ===
     
     get().addLog(
@@ -1665,7 +1572,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const product: Product = { ...newProd, id };
     const updated = [...get().products, product];
     set({ products: updated });
-    saveStorage('ba_products', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_ADD', 'INVENTORY', `Menambah produk baru: ${product.name} [SKU: ${product.sku}]`);
     
     if (isSupabaseConfigured) {
@@ -1681,7 +1588,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
     const updated = [...get().products, ...products];
     set({ products: updated });
-    saveStorage('ba_products', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_BULK_ADD', 'INVENTORY', `Mengimpor ${products.length} produk secara massal`);
     
     if (isSupabaseConfigured) {
@@ -1694,7 +1601,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       products: updated
     });
-    saveStorage('ba_products', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_UPDATE', 'INVENTORY', `Ubah informasi produk: ${updatedProd.name}`);
     
     if (isSupabaseConfigured) {
@@ -1706,7 +1613,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const prod = get().products.find(p => p.id === id);
     const updated = get().products.filter(p => p.id !== id);
     set({ products: updated });
-    saveStorage('ba_products', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     if (prod) {
       get().addLog('PRODUCT_DELETE', 'INVENTORY', `Menghapus produk: ${prod.name}`);
     }
@@ -1725,7 +1632,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       products: updatedList
     });
-    saveStorage('ba_products', updatedList, get().currentUser?.tenantId);
+    saveStorage('ksa_products', updatedList, get().currentUser?.tenantId);
 
     // Log stock movement
     get().addStockMovement({
@@ -1753,7 +1660,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newRecord, ...get().zakatRecords];
     set({ zakatRecords: updated });
-    saveStorage('ba_zakat_records', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_zakat_records', updated, get().currentUser?.tenantId);
     get().addLog(
       'ZAKAT_CALCULATION',
       'ZAKAT',
@@ -1774,7 +1681,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newDist, ...get().zakatDistributions];
     set({ zakatDistributions: updated });
-    saveStorage('ba_zakat_distributions', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_zakat_distributions', updated, get().currentUser?.tenantId);
     get().addLog(
       'ZAKAT_DISTRIBUTION',
       'ZAKAT',
@@ -1802,7 +1709,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [...users, newUser];
     set({ users: updated });
-    saveStorage('ba_users', updated);
+    saveStorage('ksa_users', updated);
     
     const statusText = isPelanggan ? 'AKTIF' : 'PENDING';
     get().addLog('USER_REGISTER', 'SYSTEM', `Pendaftaran akun baru (${statusText}): ${newUser.name} (@${newUser.username})`);
@@ -1823,7 +1730,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         };
         const updatedCustomers = [...get().customers, newCustomer];
         set({ customers: updatedCustomers });
-        saveStorage('ba_customers', updatedCustomers, get().currentUser?.tenantId);
+        saveStorage('ksa_customers', updatedCustomers, get().currentUser?.tenantId);
         if (isSupabaseConfigured) {
           supabaseService.saveCustomer(newCustomer);
         }
@@ -1845,7 +1752,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       approvedAt: new Date().toISOString()
     } : u);
     set({ users: updated });
-    saveStorage('ba_users', updated);
+    saveStorage('ksa_users', updated);
     const approvedUser = updated.find(u => u.id === id);
     get().addLog('USER_APPROVE', 'SYSTEM', `Akun disetujui: ${approvedUser?.name} (@${approvedUser?.username}) oleh ${approverName}`);
     
@@ -1859,7 +1766,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rejected = users.find(u => u.id === id);
     const updated = users.filter(u => u.id !== id);
     set({ users: updated });
-    saveStorage('ba_users', updated);
+    saveStorage('ksa_users', updated);
     get().addLog('USER_REJECT', 'SYSTEM', `Pendaftaran ditolak: ${rejected?.name} (@${rejected?.username})`);
     
     if (isSupabaseConfigured) {
@@ -1871,14 +1778,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { users, currentUser } = get();
     const updated = users.map(u => u.id === id ? { ...u, ...updates } : u);
     set({ users: updated });
-    saveStorage('ba_users', updated);
+    saveStorage('ksa_users', updated);
     get().addLog('USER_UPDATE', 'SYSTEM', `Update data akun ID: ${id}`);
     
     const modifiedUser = updated.find(u => u.id === id);
     if (currentUser && modifiedUser && currentUser.username === modifiedUser.username) {
       const newCurrentUser = { name: modifiedUser.name, username: modifiedUser.username, role: modifiedUser.role, branchId: modifiedUser.branchId, tenantId: modifiedUser.tenantId };
       set({ currentUser: newCurrentUser });
-      localStorage.setItem('ba_current_user', JSON.stringify(newCurrentUser));
+      localStorage.setItem('ksa_current_user', JSON.stringify(newCurrentUser));
     }
     
     if (isSupabaseConfigured && modifiedUser) {
@@ -1890,7 +1797,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { users } = get();
     const updated = users.filter(u => u.id !== id);
     set({ users: updated });
-    saveStorage('ba_users', updated);
+    saveStorage('ksa_users', updated);
     get().addLog('USER_DELETE', 'SYSTEM', `Penghapusan akun ID: ${id}`);
     
     if (isSupabaseConfigured) {
@@ -1907,7 +1814,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newPo, ...get().purchaseOrders];
     set({ purchaseOrders: updated });
-    saveStorage('ba_purchase_orders', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_purchase_orders', updated, get().currentUser?.tenantId);
     get().addLog('PO_CREATE', 'INVENTORY', `Membuat PO baru: ${newPo.poNumber} ke ${newPo.supplier} senilai Rp ${newPo.totalAmount.toLocaleString('id-ID')}`);
 
     // === JURNAL OTOMATIS dari Purchase Order ===
@@ -1940,14 +1847,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     ];
     const updatedJournals = [...poJournals, ...get().journalEntries];
     set({ journalEntries: updatedJournals });
-    saveStorage('ba_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
     // === END JURNAL OTOMATIS ===
   },
 
   updatePurchaseOrder: (id, updates) => {
     const updated = get().purchaseOrders.map(p => p.id === id ? { ...p, ...updates } : p);
     set({ purchaseOrders: updated });
-    saveStorage('ba_purchase_orders', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_purchase_orders', updated, get().currentUser?.tenantId);
     get().addLog('PO_UPDATE', 'INVENTORY', `Update PO ID: ${id}`);
   },
 
@@ -1959,7 +1866,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newEntry, ...get().journalEntries];
     set({ journalEntries: updated });
-    saveStorage('ba_journal_entries', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updated, get().currentUser?.tenantId);
     get().addLog('JOURNAL_ENTRY', 'FINANCE', `Mencatat Jurnal: ${newEntry.description}`);
     
     if (isSupabaseConfigured) {
@@ -1971,7 +1878,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { journalEntries, currentUser, addLog } = get();
     const updated = journalEntries.filter(j => j.referenceId !== refId);
     set({ journalEntries: updated });
-    saveStorage('ba_journal_entries', updated, currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updated, currentUser?.tenantId);
     addLog('JOURNAL_ENTRY', 'FINANCE', `Menghapus Group Jurnal: ${refId}`);
   },
 
@@ -1985,7 +1892,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newExpense, ...expenses];
     set({ expenses: updated });
-    saveStorage('ba_expenses', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
     get().addLog('EXPENSE_ADD', 'FINANCE', `Mencatat pengeluaran: ${newExpense.description} Rp ${newExpense.amount.toLocaleString('id-ID')} oleh ${newExpense.createdBy}`);
 
     // === JURNAL OTOMATIS dari Pengeluaran ===
@@ -2018,7 +1925,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     ];
     const updatedJournals = [...expJournals, ...get().journalEntries];
     set({ journalEntries: updatedJournals });
-    saveStorage('ba_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
     // === END JURNAL OTOMATIS ===
   },
 
@@ -2027,7 +1934,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const exp = expenses.find(e => e.id === id);
     const updated = expenses.filter(e => e.id !== id);
     set({ expenses: updated });
-    saveStorage('ba_expenses', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
     if (exp) {
       get().addLog('EXPENSE_DELETE', 'FINANCE', `Menghapus pengeluaran: ${exp.description}`);
     }
@@ -2045,7 +1952,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [newClosing, ...get().closings];
     set({ closings: updated });
-    saveStorage('ba_closings', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_closings', updated, get().currentUser?.tenantId);
     get().addLog('CLOSING_PERFORMED', 'FINANCE', `Melakukan penutupan buku (${newClosing.type}) pada ${newClosing.date}. Laba Bersih: Rp ${newClosing.netProfit.toLocaleString('id-ID')}`);
   },
 
@@ -2076,10 +1983,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     // Update local storage
     const keysToClear = [
-      'ba_products', 'ba_transactions', 'ba_online_orders', 'ba_chat_messages',
-      'ba_audit_logs', 'ba_zakat_records', 'ba_zakat_distributions', 'ba_expenses',
-      'ba_closings', 'ba_purchase_orders', 'ba_journal_entries', 'ba_customers',
-      'ba_suppliers', 'ba_promos', 'ba_attendances', 'ba_stock_movements'
+      'ksa_products', 'ksa_transactions', 'ksa_online_orders', 'ksa_chat_messages',
+      'ksa_audit_logs', 'ksa_zakat_records', 'ksa_zakat_distributions', 'ksa_expenses',
+      'ksa_closings', 'ksa_purchase_orders', 'ksa_journal_entries', 'ksa_customers',
+      'ksa_suppliers', 'ksa_promos', 'ksa_attendances', 'ksa_stock_movements'
     ];
     
     keysToClear.forEach(key => {
@@ -2104,7 +2011,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const updated = [log, ...get().auditLogs];
     set({ auditLogs: updated });
-    saveStorage('ba_audit_logs', updated, get().currentUser?.tenantId);
+    saveStorage('ksa_audit_logs', updated, get().currentUser?.tenantId);
 
     if (isSupabaseConfigured) {
       supabaseService.saveAuditLog(log);
@@ -2152,7 +2059,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           }),
           supabaseService.getProducts().then(remoteProducts => {
             if (remoteProducts && remoteProducts.length > 0) {
-              const localProducts = JSON.parse(localStorage.getItem('ba_products') || '[]');
+              const localProducts = JSON.parse(localStorage.getItem('ksa_products') || '[]');
               const productsMap = remoteProducts.map(p => {
                 const localP = localProducts.find((lp: any) => lp.id === p.id);
                 return {
@@ -2327,7 +2234,14 @@ export const useAppStore = create<AppState>((set, get) => ({
                   maintenanceMode: remoteSettings.maintenance_mode,
                   minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
                   zakatRate: Number(remoteSettings.zakat_rate),
-                  autoApproveTransactions: remoteSettings.auto_approve_transactions
+                  autoApproveTransactions: remoteSettings.auto_approve_transactions,
+                  storeName: remoteSettings.store_name || 'KSA Mart Syariah',
+                  storeAddress: remoteSettings.store_address || '',
+                  storePhone: remoteSettings.store_phone || '',
+                  paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes) || 60,
+                  storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
+                  storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
+                  paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
                 }
               });
             }

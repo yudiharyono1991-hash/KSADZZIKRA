@@ -70,7 +70,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         </p>
         <button 
           onClick={() => {
-            localStorage.removeItem('ba_current_user');
+            localStorage.removeItem('ksa_current_user');
             window.location.href = '/';
           }}
           className="bg-indigo-600 hover:bg-indigo-700 font-bold py-3 px-8 rounded-xl"
