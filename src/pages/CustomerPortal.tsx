@@ -143,6 +143,13 @@ export default function CustomerPortal() {
     const handleCheckout = () => {
     if (customerCart.length === 0) return;
     
+    // Validasi radius pengiriman maksimal 5KM
+    const maxRadius = settings.maxDeliveryRadiusKm || 5;
+    if (customerDistanceKm !== null && customerDistanceKm > maxRadius) {
+      alert(`Mohon maaf, lokasi Anda berjarak ${customerDistanceKm.toFixed(2)} km dari toko. Maksimal radius pengiriman adalah ${maxRadius} km. Silakan pilih opsi ambil sendiri di toko.`);
+      return;
+    }
+    
     // Asumsikan semua pesanan di portal pelanggan menggunakan transfer/QRIS untuk simplicity mock
     const paymentCode = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
     

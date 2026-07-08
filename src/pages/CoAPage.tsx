@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { CoaAccount } from '../types';
-import { BookOpen, Plus, Edit, Trash2, CheckCircle, Search, Filter, AlertCircle } from 'lucide-react';
+import { BookOpen, Plus, Edit, Trash2, CheckCircle, Search, Filter, AlertCircle, Download, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function CoAPage() {
-  const { coaList, addCoaAccount, updateCoaAccount, deleteCoaAccount, currentUser } = useAppStore();
+  const { coaList, addCoaAccount, updateCoaAccount, deleteCoaAccount, currentUser, settings } = useAppStore();
+
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
 
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,7 +22,7 @@ export default function CoAPage() {
   const [isActive, setIsActive] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const isOwnerOrAdmin = currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN';
+  const canEditCoa = ['OWNER', 'ADMIN', 'MANAGER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '');
 
   const categories = [
     { value: 'ALL', label: 'Semua Kategori' },
@@ -97,8 +101,8 @@ export default function CoAPage() {
   // Filtered accounts
   const filteredCoa = coaList.filter(acc => {
     const matchesCategory = activeCategoryFilter === 'ALL' || acc.category === activeCategoryFilter;
-    const matchesSearch = acc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          acc.code.includes(searchQuery);
+    const matchesSearch = acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      acc.code.includes(searchQuery);
     return matchesCategory && matchesSearch;
   });
 
@@ -117,21 +121,98 @@ export default function CoAPage() {
             Manajemen Daftar Akun Perkiraan untuk memetakan pencatatan transaksi keuangan, HPP barang, modal investasi, hingga laporan neraca rugi laba koperasi syariah secara tertib.
           </p>
         </div>
-        {isOwnerOrAdmin && (
-          <button 
-            onClick={handleOpenAdd}
-            className="relative z-10 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-sm px-5 py-3 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-5 h-5"/> TAMBAH AKUN
-          </button>
-        )}
+        <div className="relative z-10 flex items-center gap-2">
+          {canEditCoa && (
+            <>
+              <button
+                onClick={handleOpenAdd}
+                className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-sm px-4 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-5 h-5" /> TAMBAH AKUN
+              </button>
+              <button onClick={() => {
+                const headers = ['Kode', 'Nama Akun', 'Kategori', 'Saldo Normal', 'Saldo Awal', 'Status', 'Aksi'];
+                const sample = ['1103', 'Bank Syariah Indonesia 7216467242', 'ASSET', 'Debit', 0, 'Aktif', ''];
+                const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Template CoA');
+                XLSX.writeFile(wb, 'template_coa_ksa_mart.xlsx');
+              }} className="ml-2 bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                <Download className="w-4 h-4" /> Unduh Template
+              </button>
+              <label className="ml-2 bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
+                <Upload className="w-4 h-4" /> Import
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  // If upload password configured, require it
+                  if (settings?.uploadPassword) {
+                    const allowedRoles: string[] = settings.uploadPasswordRoles || [];
+                    const skipPrompt = allowedRoles.includes(currentUser?.role || '') || currentUser?.role === 'OWNER';
+                    if (!skipPrompt) {
+                      const pw = prompt('Masukkan sandi import:');
+                      if (pw !== settings.uploadPassword) { alert('Sandi import salah. Proses dibatalkan.'); e.target.value = ''; return; }
+                    }
+                  }
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    try {
+                      const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+                      const workbook = XLSX.read(data, { type: 'array' });
+                      const sheetName = workbook.SheetNames[0];
+                      const worksheet = workbook.Sheets[sheetName];
+                      const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+                      if (rows.length <= 1) { alert('File kosong atau tidak memiliki data.'); e.target.value = ''; return; }
+                      setIsImporting(true);
+                      setImportProgress({ done: 0, total: rows.length - 1 });
+                      const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+                      const idxCode = headers.findIndex(h => ['code', 'kode'].includes(h));
+                      const idxName = headers.findIndex(h => ['name', 'nama akun'].includes(h));
+                      const idxCategory = headers.findIndex(h => ['category', 'kategori'].includes(h));
+                      const idxNormalBalance = headers.findIndex(h => ['saldo normal', 'normal balance'].includes(h));
+                      const idxOpeningBalance = headers.findIndex(h => ['saldo awal', 'opening balance', 'saldo awal'].includes(h));
+                      const idxStatus = headers.findIndex(h => ['status', 'isactive'].includes(h));
+                      if (idxCode === -1 || idxName === -1) { alert('Template salah. Pastikan ada kolom Kode dan Nama Akun.'); setIsImporting(false); e.target.value = ''; return; }
+                      let imported = 0;
+                      for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i]; if (!row || row.length === 0) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
+                        const codeVal = String(row[idxCode] || '').trim();
+                        const nameVal = String(row[idxName] || '').trim();
+                        if (!codeVal || !nameVal) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
+                        const catVal = idxCategory !== -1 ? String(row[idxCategory] || 'ASSET').trim().toUpperCase() : 'ASSET';
+                        let statusVal = true;
+                        if (idxStatus !== -1) {
+                          const raw = String(row[idxStatus] || '').trim().toLowerCase();
+                          statusVal = ['aktif', 'active', 'true', '1', 'ya', 'yes'].includes(raw);
+                        }
+                        addCoaAccount({ code: codeVal, name: nameVal, category: catVal as any, tenantId: currentUser?.tenantId || 'tenant_default', isActive: statusVal });
+                        imported++;
+                        setImportProgress(p => ({ ...p, done: p.done + 1 }));
+                      }
+                      alert(`Berhasil mengimpor ${imported} akun CoA.`);
+                    } catch (err: any) { console.error(err); alert('Gagal mengimpor file: ' + (err.message || err)); }
+                    setIsImporting(false);
+                    e.target.value = '';
+                  };
+                  reader.readAsArrayBuffer(file);
+                }} style={{ display: 'none' }} />
+              </label>
+            </>
+          )}
+        </div>
       </div>
+
+      {isImporting && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+          Mengimpor data CoA... Progres: {importProgress.done}/{importProgress.total}
+        </div>
+      )}
 
       {/* Filters & Search Control */}
       <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
         <div className="relative flex-1">
           <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
-          <input 
+          <input
             type="text"
             placeholder="Cari kode atau nama akun..."
             value={searchQuery}
@@ -144,11 +225,10 @@ export default function CoAPage() {
             <button
               key={cat.value}
               onClick={() => setActiveCategoryFilter(cat.value)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap border transition-all cursor-pointer ${
-                activeCategoryFilter === cat.value
+              className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap border transition-all cursor-pointer ${activeCategoryFilter === cat.value
                   ? 'bg-green-700 border-green-700 text-white shadow-xs'
                   : 'bg-slate-50 border-gray-200 text-slate-600 hover:bg-slate-100'
-              }`}
+                }`}
             >
               {cat.label}
             </button>
@@ -162,11 +242,11 @@ export default function CoAPage() {
           <table className="w-full border-collapse text-left text-xs font-medium text-slate-700">
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-extrabold text-[10px]">
               <tr>
-                <th className="px-6 py-4">Kode Akun</th>
-                <th className="px-6 py-4">Nama Akun Perkiraan</th>
-                <th className="px-6 py-4">Tipe Kategori</th>
+                <th className="px-6 py-4">Kode</th>
+                <th className="px-6 py-4">Nama Akun</th>
+                <th className="px-6 py-4">Kategori</th>
                 <th className="px-6 py-4">Status</th>
-                {isOwnerOrAdmin && <th className="px-6 py-4 text-right">Aksi</th>}
+                {canEditCoa && <th className="px-6 py-4 text-right">Aksi</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-semibold text-slate-800">
@@ -188,33 +268,31 @@ export default function CoAPage() {
                     </td>
                     <td className="px-6 py-4">
                       {acc.isActive ? (
-                        <span className="text-green-700 flex items-center gap-1"><CheckCircle className="w-4 h-4"/> Aktif</span>
+                        <span className="text-green-700 flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Aktif</span>
                       ) : (
-                        <span className="text-slate-400 flex items-center gap-1"><AlertCircle className="w-4 h-4"/> Nonaktif</span>
+                        <span className="text-slate-400 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> Nonaktif</span>
                       )}
                     </td>
-                    {isOwnerOrAdmin && (
+                    {canEditCoa && (
                       <td className="px-6 py-4 text-right space-x-1">
-                        <button 
+                        <button
                           onClick={() => handleOpenEdit(acc)}
                           className="p-1.5 hover:bg-slate-100 rounded text-slate-600 hover:text-green-700 transition cursor-pointer"
                           title="Edit Akun"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        {acc.isActive && (
-                          <button 
-                            onClick={() => {
-                              if (confirm(`Apakah Anda yakin ingin menonaktifkan akun ${acc.code} - ${acc.name}?`)) {
-                                deleteCoaAccount(acc.id);
-                              }
-                            }}
-                            className="p-1.5 hover:bg-slate-100 rounded text-slate-600 hover:text-rose-600 transition cursor-pointer"
-                            title="Nonaktifkan Akun"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`Apakah Anda yakin ingin HAPUS PERMANEN akun ${acc.code} - ${acc.name}? Aksi ini tidak dapat dikembalikan.`)) {
+                              deleteCoaAccount(acc.id);
+                            }
+                          }}
+                          className="p-1.5 hover:bg-slate-100 rounded text-slate-600 hover:text-rose-600 transition cursor-pointer"
+                          title="Hapus Permanen Akun"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     )}
                   </tr>
@@ -233,7 +311,7 @@ export default function CoAPage() {
               <h3 className="font-extrabold text-sm uppercase tracking-wider">{editingAccount ? 'Ubah Akun CoA' : 'Tambah Akun CoA Baru'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-green-100 hover:text-white font-bold text-lg animate-pulse">✕</button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {errorMsg && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-lg flex items-center gap-2">
@@ -244,7 +322,7 @@ export default function CoAPage() {
 
               <div className="space-y-1">
                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Kode Akun Perkiraan</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Contoh: 1-1005"
                   value={code}
@@ -255,7 +333,7 @@ export default function CoAPage() {
 
               <div className="space-y-1">
                 <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Nama Akun Perkiraan</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Contoh: Kas Kecil POS"
                   value={name}

@@ -2,8 +2,43 @@
 -- KSA MART SYARIAH - KSADZZIKRA
 -- Supabase Schema Lengkap (Versi Final)
 -- Jalankan SELURUH script ini di SQL Editor Supabase KSADZZIKRA
--- Project ID: stiatomaelzrptazayml
+-- Project ID: tbuyexfeehejbfyhpygg
 -- ============================================================
+
+-- ============================================================
+-- 0. STORAGE BUCKETS (Untuk Upload Gambar)
+-- ============================================================
+-- Membuat storage buckets untuk upload gambar produk dan QRIS
+-- Jalankan query ini di SQL Editor Supabase
+
+-- Buat bucket untuk gambar produk
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('product-images', 'product-images', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Buat bucket untuk aset toko (QRIS, dll)
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('store-assets', 'store-assets', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Policy untuk public read pada product-images
+DROP POLICY IF EXISTS "Public Read product-images" ON storage.objects;
+CREATE POLICY "Public Read product-images" ON storage.objects 
+FOR SELECT USING (bucket_id = 'product-images');
+
+-- Policy untuk public read pada store-assets
+DROP POLICY IF EXISTS "Public Read store-assets" ON storage.objects;
+CREATE POLICY "Public Read store-assets" ON storage.objects 
+FOR SELECT USING (bucket_id = 'store-assets');
+
+-- Policy untuk upload (authenticated users)
+DROP POLICY IF EXISTS "Auth Upload product-images" ON storage.objects;
+CREATE POLICY "Auth Upload product-images" ON storage.objects 
+FOR INSERT WITH CHECK (bucket_id = 'product-images' AND auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Auth Upload store-assets" ON storage.objects;
+CREATE POLICY "Auth Upload store-assets" ON storage.objects 
+FOR INSERT WITH CHECK (bucket_id = 'store-assets' AND auth.role() = 'authenticated');
 
 -- ============================================================
 -- 1. TABEL: products (Produk & Inventaris)
@@ -339,41 +374,6 @@ DROP POLICY IF EXISTS "attendance_all" ON public.attendance;
 CREATE POLICY "attendance_select" ON public.attendance FOR SELECT USING (true);
 CREATE POLICY "attendance_all" ON public.attendance FOR ALL USING (true) WITH CHECK (true);
 
-
--- ============================================================
--- 14. TABEL: shifts (Shift & Tutup Kasir)
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.shifts (
-    id TEXT PRIMARY KEY,
-    tenant_id TEXT,
-    cashier_name TEXT,
-    branch_id TEXT,
-    start_time TIMESTAMPTZ,
-    end_time TIMESTAMPTZ,
-    break_start TIMESTAMPTZ,
-    break_end TIMESTAMPTZ,
-    expected_cash NUMERIC,
-    actual_cash NUMERIC,
-    status TEXT,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-ALTER TABLE public.shifts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "shifts_select" ON public.shifts;
-DROP POLICY IF EXISTS "shifts_all" ON public.shifts;
-CREATE POLICY "shifts_select" ON public.shifts FOR SELECT USING (true);
-CREATE POLICY "shifts_all" ON public.shifts FOR ALL USING (true) WITH CHECK (true);
-
-
--- ============================================================
--- DATA AWAL: Produk PPOB Default
--- ============================================================
-INSERT INTO public.products (id, sku, name, category, price, cost_price, stock, min_stock, unit, is_halal, is_ppob)
-VALUES
-    ('ppob_1', 'PPOB-PLS-50', 'Pulsa Telkomsel 50.000', 'Pulsa', 51500, 50000, 9999, 0, 'Trx', true, true),
-    ('ppob_2', 'PPOB-PLN-100', 'Token PLN 100.000', 'Token Listrik', 102500, 100000, 9999, 0, 'Trx', true, true),
-    ('ppob_3', 'PPOB-PDAM', 'Tagihan PDAM (Admin)', 'PDAM', 2500, 1000, 9999, 0, 'Trx', true, true),
-    ('ppob_4', 'PPOB-BPJS', 'Bayar BPJS (Admin)', 'BPJS', 2500, 1000, 9999, 0, 'Trx', true, true)
-ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
 -- SELESAI! Semua tabel KSA Mart - KSADZZIKRA sudah siap.

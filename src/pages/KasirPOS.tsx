@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import { 
@@ -35,10 +36,15 @@ export default function KasirPOS() {
     customers,
     promos,
     settings,
-    activeBranchId
+    activeBranchId,
+    categories: savedCategories
   } = useBranchData();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchDebounceRef = useRef<number | null>(null);
+  const searchWorkerRef = useRef<Worker | null>(null);
+  const [searchMatchedIds, setSearchMatchedIds] = useState<Array<string | number> | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   
   // Checkout Modal State
@@ -101,33 +107,112 @@ export default function KasirPOS() {
   };
 
   // Categories
-  const categories = ['ALL', 'PROMO', 'Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+  const categories = React.useMemo(() => {
+    const categorySet = new Set<string>(['ALL', 'PROMO']);
+    savedCategories?.forEach((cat) => {
+      if (cat && typeof cat === 'string') categorySet.add(cat.trim());
+    });
+    products.forEach((product) => {
+      if (product.category && typeof product.category === 'string') {
+        categorySet.add(product.category.trim());
+      }
+    });
+    return Array.from(categorySet);
+  }, [products, savedCategories]);
+
+  // Init worker
+  useEffect(() => {
+    try {
+      if (!searchWorkerRef.current) {
+        const worker = new Worker(new URL('../workers/searchWorker.ts', import.meta.url), { type: 'module' });
+        worker.onmessage = (ev) => {
+          const { type, results } = (ev.data || {});
+          if (type === 'result') setSearchMatchedIds(Array.isArray(results) ? results : []);
+        };
+        searchWorkerRef.current = worker;
+      }
+    } catch (err) {
+      console.warn('Failed to init search worker in KasirPOS', err);
+    }
+    return () => { if (searchWorkerRef.current) { searchWorkerRef.current.terminate(); searchWorkerRef.current = null; } };
+  }, []);
+
+  // send docs to worker on products change
+  useEffect(() => {
+    try {
+      if (searchWorkerRef.current) {
+        const docs = (products || []).map((p: any) => ({ id: p.id, name: p.name || '', sku: p.sku || '', category: p.category || '' }));
+        searchWorkerRef.current.postMessage({ type: 'init', payload: { docs } });
+      }
+    } catch (err) { console.warn(err); }
+  }, [products]);
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => { if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current); };
+  }, [searchQuery]);
+
+  // Trigger worker search
+  useEffect(() => {
+    setSearchMatchedIds(null);
+    try {
+      if (searchWorkerRef.current) {
+        searchWorkerRef.current.postMessage({ type: 'search', payload: { q: debouncedQuery } });
+      } else {
+        setSearchMatchedIds(null);
+      }
+    } catch (err) {
+      console.warn('KasirPOS search worker error', err);
+      setSearchMatchedIds(null);
+    }
+  }, [debouncedQuery]);
 
   // Filtered Products
-  const filteredProducts = products.filter(product => {
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = product.name.toLowerCase().includes(searchLower) || 
-                          product.sku.toLowerCase().includes(searchLower) ||
-                          (product.barcode && product.barcode.toLowerCase().includes(searchLower)) ||
-                          (product.hasBoxUnit && product.boxBarcode && product.boxBarcode.toLowerCase().includes(searchLower));
-    
-    let matchesCategory = false;
-    if (selectedCategory === 'ALL') {
-      matchesCategory = true;
-    } else if (selectedCategory === 'PROMO') {
-      matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
-    } else {
-      matchesCategory = product.category === selectedCategory;
+  const filteredProducts = useMemo(() => {
+    const q = (debouncedQuery || '').toLowerCase().trim();
+    if (q && searchMatchedIds) {
+      if (searchMatchedIds.length === 0) {
+        return [];
+      }
+      const idMap = new Map(products.map((p) => [p.id, p]));
+      const matched = searchMatchedIds.map((id) => idMap.get(id)).filter(Boolean) as Product[];
+      return matched.filter(product => {
+        let matchesCategory = false;
+        if (selectedCategory === 'ALL') matchesCategory = true;
+        else if (selectedCategory === 'PROMO') matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
+        else matchesCategory = product.category === selectedCategory;
+        const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+        if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
+        if (activeTab === 'PPOB' && !product.isPPOB) return false;
+        return matchesCategory && matchesBranch;
+      });
     }
 
-    const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
-    
-    // Tab filter
-    if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
-    if (activeTab === 'PPOB' && !product.isPPOB) return false;
+    return products.filter(product => {
+      const matchesSearch = !q || product.name.toLowerCase().includes(q) ||
+                            product.sku.toLowerCase().includes(q) ||
+                            (product.barcode && product.barcode.toLowerCase().includes(q)) ||
+                            (product.hasBoxUnit && product.boxBarcode && product.boxBarcode.toLowerCase().includes(q));
 
-    return matchesSearch && matchesCategory && matchesBranch;
-  });
+      let matchesCategory = false;
+      if (selectedCategory === 'ALL') {
+        matchesCategory = true;
+      } else if (selectedCategory === 'PROMO') {
+        matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
+      } else {
+        matchesCategory = product.category === selectedCategory;
+      }
+
+      const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+
+      if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
+      if (activeTab === 'PPOB' && !product.isPPOB) return false;
+
+      return matchesSearch && matchesCategory && matchesBranch;
+    });
+  }, [products, debouncedQuery, selectedCategory, activeTab, activeBranchId, searchMatchedIds]);
 
   const ppobCategories = ['ALL', 'Pulsa', 'Token Listrik', 'PDAM', 'BPJS'];
   const displayCategories = activeTab === 'PHYSICAL' ? categories : ppobCategories;
@@ -339,98 +424,88 @@ export default function KasirPOS() {
               <p className="text-gray-500 font-medium">Produk tidak ditemukan.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map((p) => {
-                const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
-                const isOutOfStock = p.stock <= 0;
-                const isLowStock = p.stock <= p.minStock && p.stock > 0;
-
+            <List
+              height={Math.min(window.innerHeight * 0.68, 720)}
+              itemCount={Math.ceil(filteredProducts.length / (window.innerWidth >= 1280 ? 4 : window.innerWidth >= 768 ? 3 : 2))}
+              itemSize={280}
+              width={'100%'}
+            >
+              {({ index, style }) => {
+                const cols = window.innerWidth >= 1280 ? 4 : window.innerWidth >= 768 ? 3 : 2;
+                const start = index * cols;
+                const items = filteredProducts.slice(start, start + cols);
                 return (
-                  <div 
-                    key={p.id}
-                    onClick={() => {
-                      if (activeTab === 'PPOB') {
-                        handlePpobClick(p);
-                      } else if (!isOutOfStock) {
-                        addToCart(p, false);
-                      }
-                    }}
-                    className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
-                      isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
-                    }`}
-                  >
-                    {/* Halal Badge */}
-                    <div className="absolute top-2.5 right-2.5 z-10">
-                      <span className="bg-green-50 text-green-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">
-                        Halal
-                      </span>
-                    </div>
-
-                    {/* Product Image */}
-                    <div className="w-full h-32 bg-slate-100 flex-shrink-0 relative">
-                      {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                          <Package className="w-8 h-8 mb-1" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest">No Photo</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Card Content */}
-                    <div className="p-3 flex flex-col flex-1 justify-between">
-                      <div className="mb-2">
-                        <span className="text-[10px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
-                        <h3 className="font-bold text-sm text-gray-800 line-clamp-2 mt-1 leading-snug h-10">{p.name}</h3>
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase mt-1">{p.category}</p>
-                      </div>
-
-                      <div className="mt-auto pt-2 border-t border-gray-50">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="font-bold text-gray-800 text-sm">
-                          Rp {p.price.toLocaleString('id-ID')}
-                        </span>
-                        
-                        {/* Stock pill */}
-                        {!p.isPPOB ? (
-                          isOutOfStock ? (
-                            <span className="text-[10px] font-semibold text-white bg-red-500 px-2 py-0.5 rounded-full">Habis</span>
-                          ) : isLowStock ? (
-                            <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">{p.stock} {p.unit}</span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{p.stock} {p.unit}</span>
-                          )
-                        ) : (
-                           <span className="text-[10px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">Digital</span>
-                        )}
-                      </div>
-
-                      {/* Add button / active inventory controller */}
-                      {isOutOfStock && !p.isPPOB ? (
-                        <button
-                          disabled
-                          className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed"
+                  <div style={style} className={`grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 px-0`}>
+                    {items.map((p) => {
+                      const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
+                      const isOutOfStock = p.stock <= 0;
+                      const isLowStock = p.stock <= p.minStock && p.stock > 0;
+                      return (
+                        <div 
+                          key={p.id}
+                          onClick={() => {
+                            if (activeTab === 'PPOB') {
+                              handlePpobClick(p);
+                            } else if (!isOutOfStock) {
+                              addToCart(p, false);
+                            }
+                          }}
+                          className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
+                            isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
+                          }`}
                         >
-                          Stok Kosong
-                        </button>
-                      ) : (
-                        <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
-                          <Plus className="w-3.5 h-3.5 mr-0.5" />
-                          <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
-                          {cartQty > 0 && (
-                            <span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">
-                              {cartQty}
-                            </span>
-                          )}
+                          <div className="absolute top-2.5 right-2.5 z-10">
+                            <span className="bg-green-50 text-green-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">Halal</span>
+                          </div>
+                          <div className="w-full h-32 bg-slate-100 flex-shrink-0 relative">
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                                <Package className="w-8 h-8 mb-1" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">No Photo</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-3 flex flex-col flex-1 justify-between">
+                            <div className="mb-2">
+                              <span className="text-[10px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
+                              <h3 className="font-bold text-sm text-gray-800 line-clamp-2 mt-1 leading-snug h-10">{p.name}</h3>
+                              <p className="text-[10px] text-gray-400 font-semibold uppercase mt-1">{p.category}</p>
+                            </div>
+                            <div className="mt-auto pt-2 border-t border-gray-50">
+                              <div className="flex justify-between items-center mb-3">
+                                <span className="font-bold text-gray-800 text-sm">Rp {p.price.toLocaleString('id-ID')}</span>
+                                {!p.isPPOB ? (
+                                  isOutOfStock ? (
+                                    <span className="text-[10px] font-semibold text-white bg-red-500 px-2 py-0.5 rounded-full">Habis</span>
+                                  ) : isLowStock ? (
+                                    <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">{p.stock} {p.unit}</span>
+                                  ) : (
+                                    <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{p.stock} {p.unit}</span>
+                                  )
+                                ) : (
+                                  <span className="text-[10px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">Digital</span>
+                                )}
+                              </div>
+                              {isOutOfStock && !p.isPPOB ? (
+                                <button disabled className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed">Stok Kosong</button>
+                              ) : (
+                                <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
+                                  <Plus className="w-3.5 h-3.5 mr-0.5" />
+                                  <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
+                                  {cartQty > 0 && (<span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">{cartQty}</span>)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 );
-              })}
-            </div>
+              }}
+            </List>
           )}
         </div>
       </div>

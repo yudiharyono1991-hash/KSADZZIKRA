@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MapPin } from 'lucide-react';
+import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MessageCircle } from 'lucide-react';
 import { calculateDistanceKm } from '../utils/distance';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,7 +12,9 @@ export default function KatalogUmumPage() {
     updateCustomerCartQuantity, 
     removeFromCustomerCart, 
     submitOnlineOrder,
-    settings
+    settings,
+    customers,
+    addCustomer,
   } = useAppStore();
 
   const navigate = useNavigate();
@@ -98,6 +100,25 @@ export default function KatalogUmumPage() {
     
     // Generate unique payment code if not COD
     const paymentCode = paymentMethod !== 'COD' ? `PAY-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+
+    // ✅ Auto-rekam data pelanggan baru (jika nomor HP belum terdaftar)
+    if (customerPhone && customerName) {
+      const existing = customers.find(c => 
+        c.phone === customerPhone || 
+        c.phone === customerPhone.replace(/^0/, '62') ||
+        c.phone.replace(/^0/, '62') === customerPhone.replace(/^0/, '62')
+      );
+      if (!existing) {
+        // Pelanggan baru - tambahkan ke database
+        addCustomer({
+          tenantId: 'tenant_default',
+          name: customerName,
+          phone: customerPhone,
+          points: 0,
+          debtAmount: 0,
+        });
+      }
+    }
     
     submitOnlineOrder(
       customerId, 
@@ -527,6 +548,23 @@ export default function KatalogUmumPage() {
           </div>
         )}
       </main>
+
+      {/* 💬 Tombol WhatsApp Floating — Selalu Terlihat */}
+      {settings.ownerWhatsapp && (
+        <a
+          href={`https://wa.me/${settings.ownerWhatsapp.replace(/^0/, '62')}?text=${encodeURIComponent('Assalamu\'alaikum Admin KSA Mart, saya ingin bertanya tentang produk/pesanan.')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 group"
+          title="Chat WhatsApp dengan Admin KSA Mart"
+          id="wa-float-btn"
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="text-sm max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
+            Chat Admin
+          </span>
+        </a>
+      )}
     </div>
   );
 }

@@ -1,19 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
 import * as XLSX from 'xlsx';
-import html2pdf from 'html2pdf.js';
-import { 
-  FileText, 
-  TrendingUp, 
-  Scale, 
-  ShieldCheck, 
-  Lock, 
-  Unlock, 
-  Printer, 
-  FileSpreadsheet, 
-  Calendar, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  TrendingUp,
+  Scale,
+  ShieldCheck,
+  Lock,
+  Unlock,
+  Printer,
+  FileSpreadsheet,
+  Calendar,
+  AlertCircle,
+  CheckCircle2,
   Sparkles,
   RefreshCw,
   Coins,
@@ -23,6 +21,7 @@ import {
 export default function NeracaRugiPage() {
   const { transactions, products, expenses, currentUser, activeBranchId, branches, addLog, addNotification, settings } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
+  const isReadOnlyRole = currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'PENGURUS';
 
   // WIB (Asia/Jakarta) Date Initialization
   const getLocalDateString = (offsetDays = 0) => {
@@ -90,6 +89,8 @@ export default function NeracaRugiPage() {
   // Calculations for Laba Rugi (Profit & Loss) inside the filtered timeframe
   const filteredTransactions = (transactions || []).filter(tx => {
     if (!tx || !tx.timestamp) return false;
+    // Exclude voided transactions from financial reports
+    if (tx.isVoided) return false;
     const txDate = String(tx.timestamp).split('T')[0];
     return txDate >= startDate && txDate <= endDate;
   });
@@ -101,7 +102,7 @@ export default function NeracaRugiPage() {
   });
 
   const totalRevenue = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
-  const totalHPP = filteredTransactions.reduce((sum, tx) => 
+  const totalHPP = filteredTransactions.reduce((sum, tx) =>
     sum + (tx.items || []).reduce((s, it) => s + ((Number(it.costPrice) || 0) * (Number(it.quantity) || 0)), 0), 0
   );
   const grossProfit = totalRevenue - totalHPP;
@@ -114,6 +115,8 @@ export default function NeracaRugiPage() {
   const allTimeRevenue = (transactions || [])
     .filter(tx => {
       if (!tx || !tx.timestamp) return false;
+      // Exclude voided transactions from financial reports
+      if (tx.isVoided) return false;
       const txDate = String(tx.timestamp).split('T')[0];
       return txDate <= endDate;
     })
@@ -130,10 +133,12 @@ export default function NeracaRugiPage() {
   const allTimeHPP = (transactions || [])
     .filter(tx => {
       if (!tx || !tx.timestamp) return false;
+      // Exclude voided transactions from financial reports
+      if (tx.isVoided) return false;
       const txDate = String(tx.timestamp).split('T')[0];
       return txDate <= endDate;
     })
-    .reduce((sum, tx) => 
+    .reduce((sum, tx) =>
       sum + (tx.items || []).reduce((s, it) => s + ((Number(it.costPrice) || 0) * (Number(it.quantity) || 0)), 0), 0
     );
 
@@ -192,30 +197,17 @@ export default function NeracaRugiPage() {
       ["Status Audit", isBalanced ? 'SEIMBANG/BALANCE' : 'SELISIH PENYESUAIAN'],
       ["Selisih Deviasi", netDifference]
     ];
-    
+
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Neraca Laba Rugi");
     XLSX.writeFile(wb, `Neraca_Laba_Rugi_KSAMart_${startDate}_to_${endDate}.xlsx`);
   };
 
-  const handleExportPDF = () => {
-    const element = reportRef.current;
-    if (element) {
-      const opt = {
-        margin:       0.5,
-        filename:     `Neraca_Laba_Rugi_KSAMart_${startDate}_to_${endDate}.pdf`,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' as const }
-      };
-      html2pdf().set(opt).from(element).save();
-    }
-  };
 
   return (
-    <div className="space-y-6" ref={reportRef}>
-      
+    <div className="space-y-6">
+
       {/* HEADER CARD */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -237,38 +229,58 @@ export default function NeracaRugiPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center space-x-1.5 bg-slate-50 border border-gray-200 rounded-lg px-2 py-1">
             <Calendar className="w-3.5 h-3.5 text-gray-500" />
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)} 
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
               className="bg-transparent border-none text-xs focus:outline-none text-slate-700 font-medium"
             />
             <span className="text-gray-455 text-xs">s/d</span>
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={(e) => setEndDate(e.target.value)} 
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
               className="bg-transparent border-none text-xs focus:outline-none text-slate-700 font-medium"
             />
           </div>
 
-          <button
-            onClick={() => {
-              addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate} untuk persetujuan Owner.`);
-              addNotification({
-                title: 'Approval Laporan Keuangan',
-                message: `Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate} dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
-                type: 'APPROVAL',
-                targetRole: ['OWNER', 'PENGURUS'],
-                link: '/laba-rugi'
-              });
-              alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
-          >
-            <span>Kirim Laporan</span>
-          </button>
-          
+          {isReadOnlyRole ? (
+            <button
+              onClick={() => {
+                addLog('REPORT_APPROVAL', 'FINANCE', `Owner menyetujui Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate}.`);
+                addNotification({
+                  title: 'Laporan Keuangan Disetujui',
+                  message: `Owner telah menyetujui Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate}.`,
+                  type: 'INFO',
+                  targetRole: ['ADMIN', 'MANAGER'],
+                  link: '/laba-rugi'
+                });
+                alert('Laporan berhasil disetujui!');
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
+            >
+              <span>Setujui Laporan</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate} untuk persetujuan Owner.`);
+                addNotification({
+                  title: 'Approval Laporan Keuangan',
+                  message: `Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate} dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
+                  type: 'APPROVAL',
+                  targetRole: ['OWNER', 'PENGURUS'],
+                  excludeUsernames: currentUser?.username ? [currentUser.username] : [],
+                  link: '/laba-rugi'
+                });
+                alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
+            >
+              <span>Kirim Laporan</span>
+            </button>
+          )}
+
           <button
             onClick={handleExportExcel}
             className="bg-white hover:bg-slate-50 text-gray-700 border border-gray-200 font-bold text-xs py-1.5 px-3 rounded-lg flex items-center space-x-1 shadow-2xs transition-colors"
@@ -277,14 +289,6 @@ export default function NeracaRugiPage() {
             <span>Unduh Excel</span>
           </button>
 
-          <button
-            onClick={handleExportPDF}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Unduh PDF</span>
-          </button>
-          
           <button
             onClick={() => window.print()}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
@@ -296,21 +300,19 @@ export default function NeracaRugiPage() {
       </div>
 
       {/* AUTO BACK BALANCE LOCK NOTIFIER CONTAINER - "KUNCI TIDAK ADA SELISIH LAGI" */}
-      <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-200 ${
-        isAutoBalanced 
-          ? 'bg-green-50/75 border-green-100 text-green-950' 
-          : isBalanced 
-            ? 'bg-slate-50 border-slate-200 text-slate-900' 
+      <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-200 ${isAutoBalanced
+          ? 'bg-green-50/75 border-green-100 text-green-950'
+          : isBalanced
+            ? 'bg-slate-50 border-slate-200 text-slate-900'
             : 'bg-amber-50/75 border-amber-200 text-amber-950'
-      }`}>
+        }`}>
         <div className="flex items-start md:items-center space-x-3.5">
-          <div className={`p-2 rounded-xl flex-shrink-0 ${
-            isAutoBalanced 
-              ? 'bg-green-100/80 text-green-700' 
-              : isBalanced 
-                ? 'bg-slate-150 text-slate-600' 
+          <div className={`p-2 rounded-xl flex-shrink-0 ${isAutoBalanced
+              ? 'bg-green-100/80 text-green-700'
+              : isBalanced
+                ? 'bg-slate-150 text-slate-600'
                 : 'bg-amber-105 text-amber-700'
-          }`}>
+            }`}>
             {isAutoBalanced ? (
               <Lock className="w-5 h-5 text-green-700 animate-pulse" />
             ) : (
@@ -319,16 +321,16 @@ export default function NeracaRugiPage() {
           </div>
           <div>
             <h4 className="font-extrabold text-xs">
-              {isAutoBalanced 
-                ? '🛡️ Kunci Anti-Selisih Otomatis Aktif (Neraca Terkunci Seimbang)' 
-                : isBalanced 
-                  ? '✓ Neraca Seimbang Secara Manual' 
+              {isAutoBalanced
+                ? '🛡️ Kunci Anti-Selisih Otomatis Aktif (Neraca Terkunci Seimbang)'
+                : isBalanced
+                  ? '✓ Neraca Seimbang Secara Manual'
                   : '⚠️ Perhatian: Neraca Mengalami Selisih Buku'}
             </h4>
             <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
-              {isAutoBalanced 
+              {isAutoBalanced
                 ? 'Formula balancing pintar otomatis mengunci nilai Modal Sendiri agar saldo Aktiva (Aset) & Pasiva (Kewajiban) selalu seimbang Rp 0 tanpa selisih deviasi.'
-                : isBalanced 
+                : isBalanced
                   ? 'Angka saldo seimbang dengan modal manual yang Anda inputkan. Selisih adalah Rp 0.'
                   : `Terdapat ketimpangan buku sebesar Rp ${netDifference.toLocaleString('id-ID')}. Anda bisa klik tombol di samping untuk mengunci modal penyeimbang.`}
             </p>
@@ -358,7 +360,7 @@ export default function NeracaRugiPage() {
 
       {/* CORE SPLIT: LABA RUGI vs NERACA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* SECTION 1: INCOME STATEMENT (LABA RUGI) */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between">
           <div className="space-y-4">
@@ -392,7 +394,7 @@ export default function NeracaRugiPage() {
                   <span>RINCIAN BEBAN OPERASIONAL (EXPENSES)</span>
                   <span className="text-[10px] text-gray-400 font-medium">{filteredExpenses.length} transaksi</span>
                 </div>
-                
+
                 <div className="space-y-2 pl-4 max-h-44 overflow-y-auto pr-1">
                   {filteredExpenses.length === 0 ? (
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
@@ -453,17 +455,16 @@ export default function NeracaRugiPage() {
               <ShieldCheck className="w-5 h-5 text-[#307c34]" />
               <span>Neraca Posisi Keuangan (Aktiva vs Pasiva)</span>
             </h3>
-            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-              isBalanced 
-                ? 'bg-green-50 text-green-800 border-green-100' 
+            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${isBalanced
+                ? 'bg-green-50 text-green-800 border-green-100'
                 : 'bg-amber-50 text-amber-800 border-amber-100'
-            }`}>
+              }`}>
               {isBalanced ? 'Seimbang audit' : 'Ada Selisih'}
             </span>
           </div>
 
           <div className="space-y-4 text-xs text-gray-700">
-            
+
             {/* AKTIVA */}
             <div className="bg-[#fafafa] p-4 rounded-xl border border-gray-200/60 space-y-3">
               <p className="font-black text-slate-800 tracking-wider text-[11px] border-b pb-1 flex justify-between items-center">
@@ -476,7 +477,7 @@ export default function NeracaRugiPage() {
                   <span className="text-gray-500 font-medium">Kas & Setara Kas (Saldo Bersih)</span>
                   <span className="font-mono font-semibold text-slate-900">Rp {cashOnHand.toLocaleString('id-ID')}</span>
                 </div>
-                
+
                 <div className="flex justify-between">
                   <span className="text-gray-500 font-medium">Persediaan Barang Dagang</span>
                   <span className="font-mono font-semibold text-slate-900">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
@@ -486,9 +487,10 @@ export default function NeracaRugiPage() {
                   <span className="text-gray-650 font-bold">Modal Awal Toko (Seed):</span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={initialStoreCapital}
+                      disabled={isReadOnlyRole}
                       onChange={(e) => setInitialStoreCapital(Number(e.target.value))}
                       className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
                     />
@@ -499,9 +501,10 @@ export default function NeracaRugiPage() {
                   <span className="text-gray-650 font-bold">Piutang Dagang:</span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={receivablesVal}
+                      disabled={isReadOnlyRole}
                       onChange={(e) => setReceivablesVal(Number(e.target.value))}
                       className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
                     />
@@ -527,9 +530,10 @@ export default function NeracaRugiPage() {
                   <span className="text-gray-600 font-bold">Utang (Qardh/Kewajiban):</span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={accountsPayables}
+                      disabled={isReadOnlyRole}
                       onChange={(e) => setAccountsPayables(Number(e.target.value))}
                       className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
                     />
@@ -543,16 +547,15 @@ export default function NeracaRugiPage() {
                   </span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={activeEquityValue}
-                      disabled={isAutoBalanced}
+                      disabled={isReadOnlyRole || isAutoBalanced}
                       onChange={(e) => setEquityCapitalInput(Number(e.target.value))}
-                      className={`w-28 text-right border rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none ${
-                        isAutoBalanced 
-                          ? 'bg-green-50/55 border-green-100 text-green-900 cursor-not-allowed font-black' 
+                      className={`w-28 text-right border rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none ${isReadOnlyRole || isAutoBalanced
+                          ? 'bg-green-50/55 border-green-100 text-green-900 cursor-not-allowed font-black'
                           : 'bg-slate-50 hover:bg-slate-100/50 border-gray-200'
-                      }`}
+                        }`}
                     />
                   </div>
                 </div>
@@ -578,12 +581,12 @@ export default function NeracaRugiPage() {
                 <span>{isBalanced ? '100% Balanced' : 'Deviasi Mismatch'}</span>
               </div>
               <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden flex shadow-inner border">
-                <div 
+                <div
                   className="h-full bg-green-600 transition-all duration-300"
                   style={{ width: `${Math.min(100, Math.max(10, (totalAssets / (totalAssets + totalLiabilitiesAndEquity || 1)) * 100))}%` }}
                   title="Persentase Aset Aktiva"
                 />
-                <div 
+                <div
                   className="h-full bg-indigo-500 transition-all duration-300"
                   style={{ width: `${Math.min(100, Math.max(10, (totalLiabilitiesAndEquity / (totalAssets + totalLiabilitiesAndEquity || 1)) * 100))}%` }}
                   title="Persentase Kewajiban Pasiva"
@@ -599,15 +602,15 @@ export default function NeracaRugiPage() {
         </div>
 
       </div>
-      
+
       {/* Printable Area - A4 Report */}
-      <div className="printable-area printable-a4 space-y-6 bg-white p-8">
+      <div className="printable-area printable-a4 space-y-6 bg-white p-8" ref={reportRef}>
         <div className="text-center border-b-2 border-gray-800 pb-4">
           <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
           <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN NERACA & LABA RUGI (SYARIAH)</p>
           <p className="text-xs text-gray-500 mt-1">Periode: {startDate} s/d {endDate}</p>
         </div>
-        
+
         <div className="flex justify-between items-end text-xs font-semibold text-gray-700">
           <div>
             <p>Dicetak Oleh: {currentUser?.name || 'Sistem'}</p>
@@ -719,7 +722,7 @@ export default function NeracaRugiPage() {
             </p>
             <p className="text-[10px] text-gray-500 mt-1 uppercase">Admin</p>
           </div>
-          
+
           <div className="text-center w-1/3 px-2 border-l border-gray-200">
             <p className="text-xs font-semibold mb-12">Mengetahui,</p>
             <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
@@ -736,7 +739,7 @@ export default function NeracaRugiPage() {
           </div>
         </div>
       </div>
-      
+
     </div>
   );
 }

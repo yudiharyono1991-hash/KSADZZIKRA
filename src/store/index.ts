@@ -1,19 +1,78 @@
 import { create } from 'zustand';
 import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage, CoaAccount } from '../types';
-import { supabaseService, isSupabaseConfigured } from '../lib/supabase';
+import { supabaseService, isSupabaseConfigured, uploadImageToStorage } from '../lib/supabase';
+
+// Worker flag to avoid concurrent processors across calls
+let imageWorkerRunning = false;
+
+function dataUrlToFile(dataUrl: string, filename = 'image.jpg') {
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
 
 const getStorage = (key: string, tenantId?: string) => {
-  const saved = localStorage.getItem(key);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {}
-  }
+  try {
+    // Determine tenantId if not provided
+    let tid = tenantId;
+    if (!tid) {
+      const userStr = localStorage.getItem('ksa_current_user');
+      if (userStr) {
+        try { tid = JSON.parse(userStr).tenantId || 'tenant_default'; } catch (e) { tid = 'tenant_default'; }
+      }
+    }
+
+    if (!tid) {
+      tid = 'tenant_default';
+    }
+
+    // Try tenant-scoped key first
+    if (tid) {
+      const scopedKey = `${key}__${tid}`;
+      const scoped = localStorage.getItem(scopedKey);
+      if (scoped) {
+        try { return JSON.parse(scoped); } catch (e) {}
+      }
+    }
+
+    // Fallback to global key
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+  } catch (err) {}
   return null;
 };
 
 const saveStorage = (key: string, data: any, tenantId?: string) => {
   try {
+    // Determine tenantId if not provided
+    let tid = tenantId;
+    if (!tid) {
+      const userStr = localStorage.getItem('ksa_current_user');
+      if (userStr) {
+        try { tid = JSON.parse(userStr).tenantId || 'tenant_default'; } catch (e) { tid = 'tenant_default'; }
+      }
+    }
+
+    if (!tid) {
+      tid = 'tenant_default';
+    }
+
+    if (tid) {
+      const scopedKey = `${key}__${tid}`;
+      localStorage.setItem(scopedKey, JSON.stringify(data));
+      return;
+    }
+
+    // No tenant found: save to global key
     localStorage.setItem(key, JSON.stringify(data));
   } catch (e: any) {
     console.error(`Gagal menyimpan data lokal (${key}):`, e);
@@ -47,10 +106,17 @@ interface AppState {
   purchaseOrders: PurchaseOrder[];
   journalEntries: JournalEntry[];
   branches: Branch[];
+  categories: string[];
+  addCategory: (category: string) => void;
+  removeCategory: (category: string) => void;
+  setCategories: (categories: string[]) => void;
   customers: Customer[];
   suppliers: Supplier[];
   promos: Promo[];
   attendances: Attendance[];
+  imageQueue: string[];
+  enqueueImageGeneration: (productId: string) => void;
+  processImageQueue: () => Promise<void>;
   
   // Phase 2 features
   settings: StoreSettings;
@@ -143,6 +209,7 @@ interface AppState {
   addProductsBulk: (newProds: Omit<Product, 'id'>[]) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
+  clearProducts: () => void;
   adjustStock: (productId: string, amount: number) => void;
   
   // Zakat Actions
@@ -181,8 +248,8 @@ const DEFAULT_COA: CoaAccount[] = [
   { id: 'coa_5', tenantId: 'tenant_default', code: '1-1040', name: 'Persediaan Barang Dagang', category: 'ASSET', isActive: true },
   { id: 'coa_6', tenantId: 'tenant_default', code: '2-1000', name: 'Utang Dagang ke Supplier', category: 'LIABILITY', isActive: true },
   { id: 'coa_7', tenantId: 'tenant_default', code: '2-1010', name: 'Utang Zakat Niaga Terhutang', category: 'LIABILITY', isActive: true },
-  { id: 'coa_8', tenantId: 'tenant_default', code: '3-1000', name: 'Modal Awal Ketua Koperasi', category: 'EQUITY', isActive: true },
-  { id: 'coa_9', tenantId: 'tenant_default', code: '3-1010', name: 'Dana SHU Koperasi Ditahan', category: 'EQUITY', isActive: true },
+  { id: 'coa_8', tenantId: 'tenant_default', code: '3-1000', name: 'Modal Awal KSA Mart', category: 'EQUITY', isActive: true },
+  { id: 'coa_9', tenantId: 'tenant_default', code: '3-1010', name: 'Dana Laba Ditahan', category: 'EQUITY', isActive: true },
   { id: 'coa_10', tenantId: 'tenant_default', code: '4-1000', name: 'Pendapatan Penjualan Toko', category: 'REVENUE', isActive: true },
   { id: 'coa_11', tenantId: 'tenant_default', code: '4-1010', name: 'Margin Murabahah Penjualan', category: 'REVENUE', isActive: true },
   { id: 'coa_12', tenantId: 'tenant_default', code: '5-1000', name: 'Beban Harga Pokok Penjualan (HPP)', category: 'EXPENSE', isActive: true },
@@ -192,20 +259,12 @@ const DEFAULT_COA: CoaAccount[] = [
 ];
 
 const getSavedCoaList = (): CoaAccount[] => {
-  const saved = localStorage.getItem('ksa_coa_list');
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
+  const saved = getStorage('ksa_coa_list');
+  if (saved) { try { return saved as CoaAccount[]; } catch (e) {} }
   return DEFAULT_COA;
 };
 
-const DEFAULT_PRODUCTS: Product[] = [
-  // PPOB System Products
-  { id: 'ppob_1', tenantId: 'tenant_default', sku: 'PPOB-PLS-50', name: 'Pulsa Telkomsel 50.000', category: 'Pulsa', price: 51500, costPrice: 50000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true },
-  { id: 'ppob_2', tenantId: 'tenant_default', sku: 'PPOB-PLN-100', name: 'Token PLN 100.000', category: 'Token Listrik', price: 102500, costPrice: 100000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true },
-  { id: 'ppob_3', tenantId: 'tenant_default', sku: 'PPOB-PDAM', name: 'Tagihan PDAM (Admin)', category: 'PDAM', price: 2500, costPrice: 1000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true },
-  { id: 'ppob_4', tenantId: 'tenant_default', sku: 'PPOB-BPJS', name: 'Bayar BPJS (Admin)', category: 'BPJS', price: 2500, costPrice: 1000, stock: 9999, minStock: 0, unit: 'Trx', isHalal: true, isPPOB: true }
-];
+const DEFAULT_PRODUCTS: Product[] = [];
 
 const DEFAULT_TRANSACTIONS: Transaction[] = [];
 
@@ -216,11 +275,11 @@ const DEFAULT_ZAKAT_RECORDS: ZakatCalculation[] = [];
 const DEFAULT_ZAKAT_DISTRIBUTIONS: ZakatDistribution[] = [];
 
 const getSavedUsers = (): UserAccount[] => {
-  const saved = localStorage.getItem('ksa_users');
+  const saved = getStorage('ksa_users');
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      // Force update owner name and credentials for Dr. Grandis if they already have localStorage
+      const parsed = saved as any[];
+      // Force update owner name and credentials for KSA Mart Owner
       const hasOwner = parsed.some((u: any) => u.username === 'owner' || u.id === 'usr_3');
       let updatedUsers = parsed.map((u: any) => {
         if (u.username === 'owner' || u.id === 'usr_3') {
@@ -256,136 +315,140 @@ const getSavedUsers = (): UserAccount[] => {
   }
   return [
     { id: 'usr_0', tenantId: '', name: 'Platform Admin', username: 'superadmin.platform', password: 'superadmin123!', role: 'SUPERADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
-    { id: 'usr_1', tenantId: 'tenant_default', name: 'Kasir Asy', username: 'asy.23.kk', password: 'kasir123!', role: 'CASHIER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
-    { id: 'usr_2', tenantId: 'tenant_default', name: 'Superadmin KSA Mart', username: 'superadmin.23kk', password: 'admin123!', role: 'ADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
+    { id: 'usr_1', tenantId: 'tenant_default', name: 'Kasir KSA Mart', username: 'kasir.ksamart', password: 'kasir123!', role: 'CASHIER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
+    { id: 'usr_2', tenantId: 'tenant_default', name: 'Admin KSA Mart', username: 'admin.ksamart', password: 'admin123!', role: 'ADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
     { id: 'usr_3', tenantId: 'tenant_default', name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.', username: 'owner', password: 'owner123', role: 'OWNER', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
-    { id: 'usr_4', tenantId: 'tenant_default', name: 'Pelanggan Setia', username: 'pelanggan1', password: 'password123', role: 'PELANGGAN', createdAt: new Date().toISOString(), isActive: true, isApproved: true }
+    { id: 'usr_4', tenantId: 'tenant_default', name: 'Pelanggan Demo', username: 'pelanggan1', password: 'password123', role: 'PELANGGAN', createdAt: new Date().toISOString(), isActive: true, isApproved: true }
   ];
 };
 
 const getSavedPurchaseOrders = (): PurchaseOrder[] => {
-  const saved = localStorage.getItem('ksa_purchase_orders');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_purchase_orders');
+  if (saved) { try { return saved as PurchaseOrder[]; } catch (e) {} }
   return [];
 };
 
 const getSavedJournalEntries = (): JournalEntry[] => {
-  const saved = localStorage.getItem('ksa_journal_entries');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_journal_entries');
+  if (saved) { try { return saved as JournalEntry[]; } catch (e) {} }
   return [];
 };
 
 const getSavedExpenses = (): Expense[] => {
-  const saved = localStorage.getItem('ksa_expenses');
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
+  const saved = getStorage('ksa_expenses');
+  if (saved) { try { return saved as Expense[]; } catch (e) {} }
   return [];
 };
 
 const getSavedClosings = (): ClosingRecord[] => {
-  const saved = localStorage.getItem('ksa_closings');
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
+  const saved = getStorage('ksa_closings');
+  if (saved) { try { return saved as ClosingRecord[]; } catch (e) {} }
   return [];
 };
 
 const getSavedProducts = (): Product[] => {
-  const saved = localStorage.getItem('ksa_products');
+  const saved = getStorage('ksa_products');
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      const parsed = saved as any[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as Product[];
     } catch (e) {}
   }
   return DEFAULT_PRODUCTS;
 };
 
 const getSavedTransactions = (): Transaction[] => {
-  const saved = localStorage.getItem('ksa_transactions');
+  const saved = getStorage('ksa_transactions');
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
+      const parsed = saved as any[];
+      if (Array.isArray(parsed)) return parsed as Transaction[];
     } catch (e) {}
   }
   return DEFAULT_TRANSACTIONS;
 };
 
 const getSavedAuditLogs = (): AuditLog[] => {
-  const saved = localStorage.getItem('ksa_audit_logs');
+  const saved = getStorage('ksa_audit_logs');
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
+      const parsed = saved as any[];
+      if (Array.isArray(parsed)) return parsed as AuditLog[];
     } catch (e) {}
   }
   return DEFAULT_AUDIT_LOGS;
 };
 
 const getSavedZakatRecords = (): ZakatCalculation[] => {
-  const saved = localStorage.getItem('ksa_zakat_records');
+  const saved = getStorage('ksa_zakat_records');
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
+      const parsed = saved as any[];
+      if (Array.isArray(parsed)) return parsed as ZakatCalculation[];
     } catch (e) {}
   }
   return DEFAULT_ZAKAT_RECORDS;
 };
 
 const getSavedZakatDistributions = (): ZakatDistribution[] => {
-  const saved = localStorage.getItem('ksa_zakat_distributions');
+  const saved = getStorage('ksa_zakat_distributions');
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
+      const parsed = saved as any[];
+      if (Array.isArray(parsed)) return parsed as ZakatDistribution[];
     } catch (e) {}
   }
   return DEFAULT_ZAKAT_DISTRIBUTIONS;
 };
 
 const getSavedBranches = (): Branch[] => {
-  const saved = localStorage.getItem('ksa_branches');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (e) {}
-  }
+  const saved = getStorage('ksa_branches');
+  if (saved) { try { const parsed = saved as any[]; if (Array.isArray(parsed)) return parsed as Branch[]; } catch (e) {} }
   return [
-    { id: 'br_1', tenantId: 'tenant_default', name: 'KSA Mart Pusat', address: 'Koperasi Syariah ADZ-ZIKRA', phone: '08123456789', isActive: true, createdAt: new Date().toISOString() }
+    { id: 'br_1', tenantId: 'tenant_default', name: 'KSA Mart Pusat', address: 'Koperasi Syariah ADZ-ZIKRA', phone: '08123456789', whatsapp: '628123456789', isActive: true, createdAt: new Date().toISOString() }
   ];
 };
 
+const getSavedCategories = (tenantId?: string): string[] => {
+  const saved = getStorage('ksa_product_categories', tenantId);
+  if (saved) {
+    try {
+      const parsed = saved as any[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((item) => String(item).trim()).filter((item) => item.length > 0);
+      }
+    } catch (e) {}
+  }
+  return ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+};
+
 const getSavedCustomers = (): Customer[] => {
-  const saved = localStorage.getItem('ksa_customers');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_customers');
+  if (saved) { try { return saved as Customer[]; } catch (e) {} }
   return [];
 };
 
 const getSavedSuppliers = (): Supplier[] => {
-  const saved = localStorage.getItem('ksa_suppliers');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_suppliers');
+  if (saved) { try { return saved as Supplier[]; } catch (e) {} }
   return [];
 };
 
 const getSavedPromos = (): Promo[] => {
-  const saved = localStorage.getItem('ksa_promos');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_promos');
+  if (saved) { try { return saved as Promo[]; } catch (e) {} }
   return [];
 };
 
 const getSavedAttendances = (): Attendance[] => {
-  const saved = localStorage.getItem('ksa_attendances');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_attendances');
+  if (saved) { try { return saved as Attendance[]; } catch (e) {} }
   return [];
 };
 
 const getSavedSettings = (): StoreSettings => {
-  const saved = localStorage.getItem('ksa_settings');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_settings');
+  if (saved) { try { return saved as StoreSettings; } catch (e) {} }
   return { 
     tenantId: 'tenant_default',
     isTaxEnabled: false, 
@@ -400,20 +463,20 @@ const getSavedSettings = (): StoreSettings => {
 };
 
 const getSavedStockMovements = (): StockMovement[] => {
-  const saved = localStorage.getItem('ksa_stock_movements');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_stock_movements');
+  if (saved) { try { return saved as StockMovement[]; } catch (e) {} }
   return [];
 };
 
 const getSavedOnlineOrders = (): OnlineOrder[] => {
-  const saved = localStorage.getItem('ksa_online_orders');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_online_orders');
+  if (saved) { try { return saved as OnlineOrder[]; } catch (e) {} }
   return [];
 };
 
 const getSavedChatMessages = (): ChatMessage[] => {
-  const saved = localStorage.getItem('ksa_chat_messages');
-  if (saved) { try { return JSON.parse(saved); } catch (e) {} }
+  const saved = getStorage('ksa_chat_messages');
+  if (saved) { try { return saved as ChatMessage[]; } catch (e) {} }
   return [];
 };
 
@@ -460,7 +523,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentUser: (() => {
     const saved = localStorage.getItem('ksa_current_user');
     if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          tenantId: parsed.tenantId || 'tenant_default'
+        };
+      } catch(e) {}
     }
     return null;
   })(),
@@ -471,6 +540,39 @@ export const useAppStore = create<AppState>((set, get) => ({
   purchaseOrders: getSavedPurchaseOrders(),
   journalEntries: getSavedJournalEntries(),
   branches: getSavedBranches(),
+  categories: (() => {
+    const savedUser = localStorage.getItem('ksa_current_user');
+    let tenantId = 'tenant_default';
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        tenantId = parsed.tenantId || tenantId;
+      } catch (e) {}
+    }
+    return getSavedCategories(tenantId);
+  })(),
+  addCategory: (category: string) => {
+    if (!category || typeof category !== 'string') return;
+    const normalized = category.trim();
+    if (!normalized) return;
+    const currentCategories = get().categories || [];
+    const nextCategories = Array.from(new Set([...currentCategories.map((c) => c.trim()), normalized]));
+    set({ categories: nextCategories });
+    saveStorage('ksa_product_categories', nextCategories, get().currentUser?.tenantId);
+  },
+  removeCategory: (category: string) => {
+    if (!category || typeof category !== 'string') return;
+    const normalized = category.trim();
+    const currentCategories = get().categories || [];
+    const nextCategories = currentCategories.filter((c) => c !== normalized);
+    set({ categories: nextCategories });
+    saveStorage('ksa_product_categories', nextCategories, get().currentUser?.tenantId);
+  },
+  setCategories: (categories: string[]) => {
+    const nextCategories = Array.from(new Set(categories.map((c) => String(c).trim()).filter((c) => c.length > 0)));
+    set({ categories: nextCategories });
+    saveStorage('ksa_product_categories', nextCategories, get().currentUser?.tenantId);
+  },
   customers: getSavedCustomers(),
   suppliers: getSavedSuppliers(),
   promos: getSavedPromos(),
@@ -480,7 +582,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     isTaxEnabled: true,
     taxRate: 11,
     qrisEnabled: true,
-    qrisImageUrl: 'https://placehold.co/400x400/png?text=QRIS+Toko',
+    qrisImageUrl: '',
     storeName: 'KSA Mart Syariah',
     businessType: 'UMUM',
     maintenanceMode: false,
@@ -492,6 +594,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeBranchId: '', // Default to global view initially
   notifications: getStorage('ksa_notifications', undefined) || [],
   coaList: getStorage('ksa_coa_list', undefined) || [],
+
+  // Cross-tab sync: update in-memory state when localStorage changes in other tabs
+  // This allows uploads/imports in one tab to reflect in other open tabs without full reload.
+  // We attach listener once when store is created.
+  // Note: guard for browser environment
+  ...(typeof window !== 'undefined' ? (() => {
+    try {
+      window.addEventListener('storage', (e: StorageEvent) => {
+        try {
+          if (!e.key) return;
+          const tenant = get().currentUser?.tenantId;
+          const keysToSync = ['ksa_products', 'ksa_customers', 'ksa_coa_list', 'ksa_transactions', 'ksa_users', 'ksa_product_categories'];
+          for (const k of keysToSync) {
+            if (e.key === k || (tenant && e.key === `${k}__${tenant}`)) {
+              const parsed = e.newValue ? JSON.parse(e.newValue) : [];
+              if (k === 'ksa_products') set({ products: parsed });
+              if (k === 'ksa_customers') set({ customers: parsed });
+              if (k === 'ksa_coa_list') set({ coaList: parsed });
+              if (k === 'ksa_transactions') set({ transactions: parsed });
+              if (k === 'ksa_users') set({ users: parsed });
+              if (k === 'ksa_product_categories') set({ categories: parsed });
+            }
+          }
+        } catch (err) {}
+      });
+    } catch (e) {}
+    return {} as any;
+  })() : {}),
 
   // Branch implementations
   setActiveBranchId: (branchId) => set({ activeBranchId: branchId }),
@@ -528,17 +658,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteCoaAccount: (id) => {
-    const { currentUser } = get();
     const account = get().coaList.find(c => c.id === id);
     if (!account) return;
-    const updatedAccount = { ...account, isActive: false };
-    const updated = get().coaList.map(c => c.id === id ? updatedAccount : c);
+    const updated = get().coaList.filter(c => c.id !== id);
     set({ coaList: updated });
     saveStorage('ksa_coa_list', updated);
-    get().addLog('COA_DELETE', 'FINANCE', `Menonaktifkan akun CoA: ${account.code} - ${account.name}`);
+    get().addLog('COA_DELETE', 'FINANCE', `Menghapus akun CoA permanen: ${account.code} - ${account.name}`);
     
     if (isSupabaseConfigured) {
-      supabaseService.saveCoaAccount(updatedAccount);
+      supabaseService.deleteCoaAccount(id);
     }
   },
 
@@ -718,7 +846,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // CRM & Supplier
   addCustomer: (customerData) => {
-    const newCustomer: Customer = { ...customerData, id: `cust_${Date.now()}`, createdAt: new Date().toISOString() };
+    const newCustomer: Customer = {
+      ...customerData,
+      id: `cust_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      branchId: customerData.branchId || get().currentUser?.branchId
+    };
     const updated = [...get().customers, newCustomer];
     set({ customers: updated });
     saveStorage('ksa_customers', updated, get().currentUser?.tenantId);
@@ -883,26 +1016,61 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   loadTenantData: (tenantId) => {
+    // Load tenant-scoped data with sensible defaults, and persist seed if missing
+    const settingsSaved = getStorage('ksa_settings', tenantId) as StoreSettings | null;
+    const stockMovementsSaved = getStorage('ksa_stock_movements', tenantId) as StockMovement[] | null;
+    const transactionsSaved = getStorage('ksa_transactions', tenantId) as Transaction[] | null;
+    const productsSaved = getStorage('ksa_products', tenantId) as Product[] | null;
+    const categoriesSaved = getStorage('ksa_product_categories', tenantId) as string[] | null;
+    const journalSaved = getStorage('ksa_journal_entries', tenantId) as JournalEntry[] | null;
+    const branchesSaved = getStorage('ksa_branches', tenantId) as Branch[] | null;
+    const customersSaved = getStorage('ksa_customers', tenantId) as Customer[] | null;
+    const suppliersSaved = getStorage('ksa_suppliers', tenantId) as Supplier[] | null;
+    const promosSaved = getStorage('ksa_promos', tenantId) as Promo[] | null;
+    const attendancesSaved = getStorage('ksa_attendances', tenantId) as Attendance[] | null;
+    const onlineOrdersSaved = getStorage('ksa_online_orders', tenantId) as OnlineOrder[] | null;
+    const chatSaved = getStorage('ksa_chat_messages', tenantId) as ChatMessage[] | null;
+    const zakatSaved = getStorage('ksa_zakat_records', tenantId) as ZakatCalculation[] | null;
+    const zakatDistSaved = getStorage('ksa_zakat_distributions', tenantId) as ZakatDistribution[] | null;
+    const purchaseOrdersSaved = getStorage('ksa_purchase_orders', tenantId) as PurchaseOrder[] | null;
+    const expensesSaved = getStorage('ksa_expenses', tenantId) as Expense[] | null;
+    const closingsSaved = getStorage('ksa_closings', tenantId) as ClosingRecord[] | null;
+    const auditSaved = getStorage('ksa_audit_logs', tenantId) as AuditLog[] | null;
+
+    const defaultSettings: StoreSettings = settingsSaved || { tenantId, isTaxEnabled: false, taxRate: 11, businessType: 'KOPERASI', ownerWhatsapp: '', qrisEnabled: true, maxDeliveryRadiusKm: 5, storeName: '', storeAddress: '', storePhone: '' };
+
     set({
-      settings: getStorage('ksa_settings', tenantId) || { isTaxEnabled: false, taxRate: 11, businessType: 'KOPERASI', tenantId },
-      stockMovements: getStorage('ksa_stock_movements', tenantId) || [],
-      transactions: getStorage('ksa_transactions', tenantId) || [],
-      products: getStorage('ksa_products', tenantId) || [],
-      journalEntries: getStorage('ksa_journal_entries', tenantId) || [],
-      branches: getStorage('ksa_branches', tenantId) || [],
-      customers: getStorage('ksa_customers', tenantId) || [],
-      suppliers: getStorage('ksa_suppliers', tenantId) || [],
-      promos: getStorage('ksa_promos', tenantId) || [],
-      attendances: getStorage('ksa_attendances', tenantId) || [],
-      onlineOrders: getStorage('ksa_online_orders', tenantId) || [],
-      chatMessages: getStorage('ksa_chat_messages', tenantId) || [],
-      zakatRecords: getStorage('ksa_zakat_records', tenantId) || [],
-      zakatDistributions: getStorage('ksa_zakat_distributions', tenantId) || [],
-      purchaseOrders: getStorage('ksa_purchase_orders', tenantId) || [],
-      expenses: getStorage('ksa_expenses', tenantId) || [],
-      closings: getStorage('ksa_closings', tenantId) || [],
-      auditLogs: getStorage('ksa_audit_logs', tenantId) || []
+      settings: defaultSettings,
+      stockMovements: stockMovementsSaved || [],
+      transactions: transactionsSaved || [],
+      products: productsSaved || [],
+      journalEntries: journalSaved || [],
+      branches: branchesSaved || [],
+      categories: categoriesSaved || getSavedCategories(tenantId),
+      customers: customersSaved || [],
+      suppliers: suppliersSaved || [],
+      promos: promosSaved || [],
+      attendances: attendancesSaved || [],
+      onlineOrders: onlineOrdersSaved || [],
+      chatMessages: chatSaved || [],
+      zakatRecords: zakatSaved || [],
+      zakatDistributions: zakatDistSaved || [],
+      purchaseOrders: purchaseOrdersSaved || [],
+      expenses: expensesSaved || [],
+      closings: closingsSaved || [],
+      auditLogs: auditSaved || []
     });
+
+    // Persist seed defaults when nothing existed
+    if (!settingsSaved) saveStorage('ksa_settings', defaultSettings, tenantId);
+    if (!branchesSaved || (branchesSaved && branchesSaved.length === 0)) saveStorage('ksa_branches', branchesSaved && branchesSaved.length > 0 ? branchesSaved : [{ id: `br_${Date.now()}`, tenantId, name: 'Cabang Utama', address: '', phone: '', isActive: true, createdAt: new Date().toISOString() }], tenantId);
+    if (!categoriesSaved) saveStorage('ksa_product_categories', getSavedCategories(tenantId), tenantId);
+    if (!productsSaved) saveStorage('ksa_products', [], tenantId);
+    if (!transactionsSaved) saveStorage('ksa_transactions', [], tenantId);
+    if (!customersSaved) saveStorage('ksa_customers', [], tenantId);
+    if (!suppliersSaved) saveStorage('ksa_suppliers', [], tenantId);
+    if (!promosSaved) saveStorage('ksa_promos', [], tenantId);
+    if (!auditSaved) saveStorage('ksa_audit_logs', [], tenantId);
   },
 
   login: (username, password) => {
@@ -917,15 +1085,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       username: foundUser.username, 
       role: foundUser.role, 
       branchId: foundUser.branchId,
-      tenantId: foundUser.tenantId || ''
+      tenantId: foundUser.tenantId || 'tenant_default',
+      phone: foundUser.phone || ''
     };
     
     // Set user and CLEAR customerCart so it doesn't leak between sessions
     set({ currentUser: authUser, activeBranchId: foundUser.branchId || '', customerCart: [] });
 
     // If not SUPERADMIN, load tenant-specific data
-    if (foundUser.role !== 'SUPERADMIN' && foundUser.tenantId) {
-      get().loadTenantData(foundUser.tenantId);
+    const authTenantId = foundUser.tenantId || 'tenant_default';
+    if (foundUser.role !== 'SUPERADMIN') {
+      get().loadTenantData(authTenantId);
     }
     
     const log: AuditLog = {
@@ -1325,6 +1495,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     const redeemed = pointsToRedeem || 0;
+    const currentCustomer = customers.find(c => c.id === customerId);
+    if (currentCustomer && redeemed > (currentCustomer.points || 0)) {
+      return null;
+    }
     const pointsDiscount = redeemed * 10;
     let totalAmount = Math.max(0, baseTotal - discountAmount - pointsDiscount);
     let taxAmount = 0;
@@ -1344,7 +1518,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     if (paymentMethod !== 'KASBON' && actualPaid < totalAmount) return null;
     
-    const customer = customers.find(c => c.id === customerId);
     const invoiceNo = `INV-20260607-${Math.floor(100 + Math.random() * 900)}`;
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
@@ -1367,7 +1540,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       zakatContribution,
       marginContribution,
       customerId,
-      customerName: customer?.name,
+      customerName: currentCustomer?.name,
       promoId,
       discountAmount,
       taxAmount,
@@ -1409,13 +1582,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Handle KASBON customer debt logic
     if (paymentMethod === 'KASBON' && customerId) {
-      get().updateCustomer(customerId, { debtAmount: (customer?.debtAmount || 0) + totalAmount });
+      get().updateCustomer(customerId, { debtAmount: (currentCustomer?.debtAmount || 0) + totalAmount });
     }
     // Handle Customer Points (+1 point per 1.000 spent)
     if (customerId) {
       const earnedPoints = paymentMethod !== 'KASBON' ? Math.floor(totalAmount / 1000) : 0;
       get().updateCustomer(customerId, {
-        points: Math.max(0, (customer?.points || 0) - redeemed + earnedPoints)
+        points: Math.max(0, (currentCustomer?.points || 0) - redeemed + earnedPoints)
       });
     }
 
@@ -1578,6 +1751,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(product);
     }
+    // Background: generate image for product if not provided
+    (async () => {
+      try {
+        const { generateProductImage } = await import('../lib/ai');
+        if (!product.image) {
+          const img = await generateProductImage(product.name);
+          const updatedProd = { ...product, image: img };
+          // update store & persistence
+          const after = get().products.map(p => p.id === updatedProd.id ? updatedProd : p);
+          set({ products: after });
+          saveStorage('ksa_products', after, get().currentUser?.tenantId);
+          get().addLog('PRODUCT_IMAGE_GENERATED', 'INVENTORY', `Gambar di-generate otomatis untuk produk: ${product.name}`);
+          if (isSupabaseConfigured) supabaseService.saveProduct(updatedProd);
+        }
+      } catch (e) {
+        // ignore image generation errors
+      }
+    })();
   },
   
   addProductsBulk: (newProds) => {
@@ -1590,10 +1781,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ products: updated });
     saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_BULK_ADD', 'INVENTORY', `Mengimpor ${products.length} produk secara massal`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveProductsBulk(products);
     }
+
+    // Enqueue image generation for products without images and start background processor.
+    try {
+      const tenant = get().currentUser?.tenantId;
+      const queueKey = tenant ? 'ksa_image_queue' : 'ksa_image_queue';
+      const existingQueue = (getStorage(queueKey, tenant) as string[]) || [];
+      const idsToEnqueue = products.filter(p => !p.image).map(p => p.id);
+      const newQueue = Array.from(new Set([...existingQueue, ...idsToEnqueue]));
+      saveStorage(queueKey, newQueue, tenant);
+      // schedule processor shortly
+      setTimeout(() => {
+        try { get().processImageQueue(); } catch (e) {}
+      }, 200);
+    } catch (e) {}
   },
   
   updateProduct: (updatedProd) => {
@@ -1608,6 +1813,86 @@ export const useAppStore = create<AppState>((set, get) => ({
       supabaseService.saveProduct(updatedProd);
     }
   },
+
+  // Image generation queue stored per-tenant to allow gradual background processing
+  imageQueue: getStorage('ksa_image_queue', undefined) || [],
+  enqueueImageGeneration: (productId: string) => {
+    try {
+      const tenant = get().currentUser?.tenantId;
+      const qKey = 'ksa_image_queue';
+      const q = (getStorage(qKey, tenant) as string[]) || [];
+      if (!q.includes(productId)) {
+        const updatedQ = [...q, productId];
+        saveStorage(qKey, updatedQ, tenant);
+        set({ imageQueue: updatedQ });
+        setTimeout(() => { try { get().processImageQueue(); } catch (e) {} }, 200);
+      }
+    } catch (e) {}
+  },
+
+  processImageQueue: async () => {
+    if (imageWorkerRunning) return;
+    imageWorkerRunning = true;
+    try {
+      const tenant = get().currentUser?.tenantId;
+      const qKey = 'ksa_image_queue';
+      let queue = (getStorage(qKey, tenant) as string[]) || [];
+      set({ imageQueue: queue });
+
+      const { generateProductImage } = await import('../lib/ai');
+
+      const concurrency = 2;
+      const delayMs = 400;
+
+      while (queue.length > 0) {
+        // take a small batch
+        const batch = queue.slice(0, concurrency);
+        const promises = batch.map(async (prodId) => {
+          try {
+            const prod = get().products.find(p => p.id === prodId);
+            if (!prod) return;
+            const img = await generateProductImage(prod.name);
+
+            let finalImg = img;
+            if (finalImg && finalImg.startsWith('data:') && isSupabaseConfigured) {
+              // upload data URL to storage to get URL
+              try {
+                const file = dataUrlToFile(finalImg, `${prodId}.jpg`);
+                const uploadPath = `products/${prodId}_${Date.now()}.jpg`;
+                const url = await uploadImageToStorage(file, 'product-images', uploadPath, finalImg as any);
+                if (url) finalImg = url;
+              } catch (err) {
+                // fallback keep dataUrl
+              }
+            }
+
+            const updatedProd = { ...prod, image: finalImg };
+            const after = get().products.map(pp => pp.id === updatedProd.id ? updatedProd : pp);
+            set({ products: after });
+            saveStorage('ksa_products', after, tenant);
+            get().addLog('PRODUCT_IMAGE_GENERATED', 'INVENTORY', `Gambar di-generate otomatis (queue) untuk produk: ${prod.name}`);
+            if (isSupabaseConfigured) supabaseService.saveProduct(updatedProd);
+          } catch (err) {
+            // ignore per-item errors
+          }
+        });
+
+        await Promise.all(promises);
+
+        // remove processed ids from queue and persist
+        queue = queue.slice(batch.length);
+        saveStorage(qKey, queue, tenant);
+        set({ imageQueue: queue });
+
+        // small delay to yield to main thread and network
+        await new Promise(res => setTimeout(res, delayMs));
+      }
+    } catch (err) {
+      // ignore
+    } finally {
+      imageWorkerRunning = false;
+    }
+  },
   
   deleteProduct: (id) => {
     const prod = get().products.find(p => p.id === id);
@@ -1620,6 +1905,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     if (isSupabaseConfigured) {
       supabaseService.deleteProduct(id);
+    }
+  },
+
+  clearProducts: () => {
+    const tenantId = get().currentUser?.tenantId || 'tenant_default';
+    set({ products: [] });
+    saveStorage('ksa_products', [], tenantId);
+    localStorage.removeItem('ksa_products');
+    localStorage.removeItem(`ksa_products__${tenantId}`);
+    get().addLog('PRODUCTS_CLEAR', 'INVENTORY', 'Menghapus semua produk inventori untuk tenant ' + tenantId);
+
+    if (isSupabaseConfigured) {
+      supabaseService.deleteProductsByTenant(tenantId);
     }
   },
   
@@ -1726,6 +2024,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           points: 0,
           debtAmount: 0,
           createdAt: new Date().toISOString(),
+          branchId: get().currentUser?.branchId,
           isKoperasiMember: newUser.isKoperasiMember
         };
         const updatedCustomers = [...get().customers, newCustomer];
@@ -2027,6 +2326,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({ isLoading: true });
 
+    const tenantId = get().currentUser?.tenantId || supabaseService.getTenantId();
+
     // Inline timeout helper for robust cloud fetching
     const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
       return Promise.race([
@@ -2038,7 +2339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
 
     try {
-      // Parallelize fetches with a pool timeout of 1800ms
+      // Parallelize fetches with a pool timeout (increased for large catalogs)
       await withTimeout(
         Promise.all([
           supabaseService.getCustomers().then(remoteCustomers => {
@@ -2079,6 +2380,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 };
               });
               set({ products: productsMap });
+              saveStorage('ksa_products', productsMap, tenantId);
             }
           }),
           supabaseService.getUsers().then(remoteUsers => {
@@ -2247,7 +2549,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             }
           })
         ]),
-        1800
+        10000
       );
     } catch (e) {
       console.warn('Supabase initialization timed out or database tables failed to sync. Falling back to offline-first mode.', e);

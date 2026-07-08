@@ -44,13 +44,15 @@ export default function AdminManagementPage() {
     u.isApproved && 
     u.isActive && 
     u.role !== 'SUPERADMIN' &&
-    (isGlobalAdmin || u.branchId === currentUser?.branchId)
+    (isGlobalAdmin || u.branchId === currentUser?.branchId) &&
+    (isGlobalAdmin || u.role !== 'OWNER')
   );
   
   const pendingUsers = users.filter(u => 
     !u.isApproved && 
     u.role !== 'SUPERADMIN' &&
-    (isGlobalAdmin || u.branchId === currentUser?.branchId)
+    (isGlobalAdmin || u.branchId === currentUser?.branchId) &&
+    (isGlobalAdmin || u.role !== 'OWNER')
   );
 
   const handleEditClick = (id: string, currentRole: UserRole, currentName: string, currentUsername: string, currentBranchId?: string, currentJobTitle?: string, currentEmployeeId?: string) => {
@@ -95,7 +97,7 @@ export default function AdminManagementPage() {
     
     // Register user
     const { registerUser } = useAppStore.getState();
-    registerUser({
+    const success = registerUser({
       name: newName,
       username: newUsername,
       password: newPassword,
@@ -108,15 +110,25 @@ export default function AdminManagementPage() {
       isKoperasiMember: false
     });
     
-    // Find the newly registered user (usually the last one or the one with the username)
-    // Wait, since we are inside a component, the `users` array will update on next render.
-    // Instead of doing it complexly, we know `registerUser` forces it to pending for non-PELANGGAN.
-    // So we just approve them immediately!
+    if (!success) {
+      alert('Username sudah digunakan. Silakan pilih username lain.');
+      return;
+    }
+    
+    // For PELANGGAN role, they are auto-approved. For other roles, they need approval.
+    // Find the newly registered user
     setTimeout(() => {
        const latestUsers = useAppStore.getState().users;
        const newlyCreated = latestUsers.find(u => u.username === newUsername);
        if (newlyCreated) {
-         approveUser(newlyCreated.id, currentUser?.name || 'Sistem');
+         if (newRole === 'PELANGGAN') {
+           // PELANGGAN is auto-approved, no action needed
+           alert(`Pelanggan ${newUsername} berhasil ditambahkan dan aktif otomatis!`);
+         } else {
+           // Other roles need approval - approve them immediately since added by admin
+           approveUser(newlyCreated.id, currentUser?.name || 'Sistem');
+           alert(`Pengguna ${newUsername} berhasil ditambahkan dan disetujui otomatis!`);
+         }
        }
     }, 100);
 
@@ -129,7 +141,6 @@ export default function AdminManagementPage() {
     setNewBranch('');
     setNewEmployeeId('');
     setIsAddModalOpen(false);
-    alert(`Pengguna ${newUsername} berhasil ditambahkan dan disetujui otomatis!`);
   };
 
   // Role options based on current user role

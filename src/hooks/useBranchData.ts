@@ -15,6 +15,10 @@ export function useBranchData() {
     return items.filter(item => isGlobalAdmin || item.branchId === branchId);
   };
 
+  const filterCustomersByBranch = <T extends { branchId?: string }>(items: T[]) => {
+    return items.filter(item => isGlobalAdmin || item.branchId === branchId);
+  };
+
   return {
     ...store,
     isGlobalAdmin,
@@ -30,7 +34,7 @@ export function useBranchData() {
     
     // Loose filters (Belongs to branch OR is global/pusat)
     products: filterByBranch(store.products),
-    customers: filterByBranch(store.customers),
+    customers: filterCustomersByBranch(store.customers),
     suppliers: filterByBranch(store.suppliers),
     promos: filterByBranch(store.promos),
   };

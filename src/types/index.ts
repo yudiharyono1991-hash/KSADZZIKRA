@@ -16,6 +16,7 @@ export interface Branch {
   name: string;
   address: string;
   phone: string;
+  whatsapp?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -48,6 +49,10 @@ export interface StoreSettings {
   minimumCashBalance?: number;
   zakatRate?: number; // e.g. 2.5
   autoApproveTransactions?: boolean;
+  // Upload protection: optional password required for importing/uploading templates or files
+  uploadPassword?: string;
+  // Roles allowed to manage (set/clear) the upload password. Example: ['OWNER','ADMIN','MANAGER']
+  uploadPasswordRoles?: string[];
 }
 
 export interface StockMovement {
@@ -244,6 +249,7 @@ export interface CurrentUser {
   tenantId?: string; // Empty if SUPERADMIN
   branchId?: string;
   employeeId?: string;
+  phone?: string;
 }
 
 export interface Expense {
@@ -295,6 +301,7 @@ export interface AppNotification {
   tenantId: string;
   branchId?: string;
   targetRole?: UserRole | UserRole[]; // If specific roles should see this
+  excludeUsernames?: string[]; // Users who should not receive this notification
   title: string;
   message: string;
   type: 'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR' | 'APPROVAL';

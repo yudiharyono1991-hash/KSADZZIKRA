@@ -129,6 +129,9 @@ export default function OnlineOrdersPage() {
                         <button onClick={() => { if(confirm('Terima pembayaran QRIS dan Selesaikan Pesanan? Pastikan Kode Pembayaran sesuai.')) processOnlineOrderPayment(order.id, 'QRIS_SHARIAH'); }} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Bayar QRIS & Selesai</button>
                       </div>
                     )}
+                    {(order.status === 'COMPLETED' || order.status === 'CANCELLED') && (
+                      <button onClick={() => { if(confirm('Reset status pesanan ke PENDING?')) handleStatusChange(order.id, 'PENDING'); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Reset ke Pending</button>
+                    )}
                   </div>
                 </div>
 

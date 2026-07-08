@@ -29,7 +29,12 @@
     "tailwind-merge": "^3.6.0",
     "vite": "^6.2.3",
     "xlsx": "^0.18.5",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "react-window": "^1.8.7",
+    "fuse.js": "^6.6.2"
+  },
+  "overrides": {
+    "html2canvas": "npm:html2canvas-pro@latest"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

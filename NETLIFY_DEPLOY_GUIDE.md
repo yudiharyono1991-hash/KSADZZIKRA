@@ -23,8 +23,8 @@ git push origin main
 
 | Key | Value |
 |-----|-------|
-| `VITE_SUPABASE_URL` | `https://stiatomaelzrptazayml.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0` |
+| `VITE_SUPABASE_URL` | `https://tbuyexfeehejbfyhpygg.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRidXlleGZlZWhlamJmeWhweWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTc0NDUsImV4cCI6MjA5ODg3MzQ0NX0.RBk_MBcqoyYiFdDZNhn7Vlbg7M3o0Ae4vMTwlTRLMto` |
 
 6. Klik **"Deploy Site"** — tunggu ±2 menit, selesai! 🚀
 
@@ -51,4 +51,4 @@ Netlify akan otomatis redeploy dalam ±1-2 menit!
 
 ---
 
-*KSA Mart Syariah — KSADZZIKRA | Supabase: stiatomaelzrptazayml*
+*KSA Mart Syariah — KSADZZIKRA | Supabase: rxuwdnaycysgmofazjmz*

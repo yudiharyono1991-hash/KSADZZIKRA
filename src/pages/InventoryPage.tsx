@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import * as XLSX from 'xlsx';
-import { 
-  Plus, 
-  Search, 
-  Trash2, 
-  Edit, 
-  AlertTriangle, 
-  CheckCircle, 
-  Package, 
-  Tag, 
+import { uploadImageToStorage, compressImage } from '../lib/supabase';
+import {
+  Plus,
+  Search,
+  Trash2,
+  Edit,
+  AlertTriangle,
+  CheckCircle,
+  Package,
+  Tag,
   Info,
   DollarSign,
   Camera,
@@ -19,50 +21,66 @@ import {
 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { products, addProduct, addProductsBulk, updateProduct, deleteProduct, adjustStock, currentUser, activeBranchId, coaList } = useBranchData();
+  const { products, addProduct, addProductsBulk, updateProduct, deleteProduct, clearProducts, adjustStock, currentUser, activeBranchId, coaList, addNotification, addLog, categories: savedCategories, addCategory, removeCategory, setCategories } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchDebounceRef = useRef<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Compress image before saving to prevent localStorage overflow
-  const handleImageUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 300;
-        const MAX_HEIGHT = 300;
-        let width = img.width;
-        let height = img.height;
+  // Upload gambar produk ke Supabase Storage (dengan fallback base64 lokal)
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
+  const handleImageUpload = async (file: File) => {
+    setIsUploadingImage(true);
+    try {
+      // Kompres gambar terlebih dahulu (maks 600px, kualitas 0.75)
+      const { file: compressedFile, base64 } = await compressImage(file, 600, 0.75);
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        // Use high compression JPEG to save storage space
-        setImage(canvas.toDataURL('image/jpeg', 0.7));
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      // Buat nama file unik berdasarkan timestamp
+      const fileName = `products/prod_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+
+      // Upload ke Supabase Storage, fallback ke base64 jika gagal
+      const imageUrl = await uploadImageToStorage(compressedFile, 'product-images', fileName, base64);
+
+      if (imageUrl && imageUrl.startsWith('http')) {
+        setImage(imageUrl);
+        addNotification({
+          title: 'Upload Gambar Berhasil',
+          message: 'Foto produk berhasil diupload ke cloud dan akan terlihat di semua perangkat.',
+          type: 'SUCCESS'
+        });
+        addLog('UPLOAD_PRODUCT_IMAGE', 'INVENTORY', 'Upload gambar produk berhasil ke cloud storage');
+      } else {
+        // Fallback to base64 if cloud upload failed
+        setImage(base64);
+        addNotification({
+          title: 'Upload Gambar Mode Offline',
+          message: 'Foto produk disimpan lokal (hanya di perangkat ini). Pastikan koneksi internet aktif untuk upload ke cloud.',
+          type: 'WARNING'
+        });
+        addLog('UPLOAD_PRODUCT_IMAGE_OFFLINE', 'INVENTORY', 'Upload gambar produk fallback ke base64 lokal');
+      }
+    } catch (err: any) {
+      console.error('Gagal upload gambar produk:', err);
+      addNotification({
+        title: 'Upload Gambar Gagal',
+        message: `Gagal upload gambar: ${err.message || 'Unknown error'}. Silakan coba lagi.`,
+        type: 'ERROR'
+      });
+      addLog('UPLOAD_PRODUCT_IMAGE_ERROR', 'INVENTORY', `Gagal upload gambar produk: ${err.message}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
-  
+
   // Modals status
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
 
   // Form Fields State
   const [sku, setSku] = useState('');
@@ -82,7 +100,7 @@ export default function InventoryPage() {
   const [salesCoaCode, setSalesCoaCode] = useState('');
   const [cogsCoaCode, setCogsCoaCode] = useState('');
   const [isPPOB, setIsPPOB] = useState(false);
-  
+
   // Box Configuration
   const [hasBoxUnit, setHasBoxUnit] = useState(false);
   const [boxBarcode, setBoxBarcode] = useState('');
@@ -90,29 +108,162 @@ export default function InventoryPage() {
   const [boxPrice, setBoxPrice] = useState('');
   const [boxCostPrice, setBoxCostPrice] = useState('');
 
-  const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+  const defaultCategories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+  const builtInCategorySet = useMemo(() => new Set(defaultCategories.map((cat) => cat.trim())), [defaultCategories]);
 
-  // Stats Counters
-  const totalSku = products.length;
-  const outOfStock = products.filter(p => p.stock === 0).length;
-  const lowStock = products.filter(p => p.stock > 0 && p.stock <= p.minStock).length;
-  const totalValue = products.reduce((sum, p) => sum + (p.costPrice * p.stock), 0);
+  const categories = useMemo(() => {
+    const categorySet = new Set<string>();
+    defaultCategories.forEach((cat) => categorySet.add(cat.trim()));
+    // Use savedCategories + defaults only (avoid iterating full product list for performance)
+    savedCategories?.forEach((cat) => { if (cat && typeof cat === 'string') categorySet.add(cat.trim()); });
+    return Array.from(categorySet);
+  }, [defaultCategories, savedCategories, products]);
 
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    if (product.isPPOB) return false; // Hide PPOB from physical inventory
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
-    const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
-    return matchesSearch && matchesCategory && matchesBranch;
-  });
+  const customSavedCategories = useMemo(() => {
+    return (savedCategories || [])
+      .map((cat) => String(cat || '').trim())
+      .filter((cat) => cat.length > 0 && !builtInCategorySet.has(cat));
+  }, [savedCategories, builtInCategorySet]);
+
+  // Debounce search input to avoid heavy filtering on every keystroke
+  useEffect(() => {
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250);
+    return () => {
+      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchQuery]);
+
+  // Web Worker for fuzzy search (off-main-thread)
+  const searchWorkerRef = useRef<Worker | null>(null);
+  const [searchMatchedIds, setSearchMatchedIds] = useState<Array<string | number> | null>(null);
+
+  useEffect(() => {
+    // lazy init worker
+    try {
+      if (!searchWorkerRef.current) {
+        // @ts-ignore - Vite module worker URL
+        const worker = new Worker(new URL('../workers/searchWorker.ts', import.meta.url), { type: 'module' });
+        worker.onmessage = (ev) => {
+          const { type, results } = (ev.data || {});
+          if (type === 'result') {
+            setSearchMatchedIds(Array.isArray(results) ? results : []);
+          }
+          if (type === 'ready') {
+            // no-op for now
+          }
+        };
+        searchWorkerRef.current = worker;
+      }
+    } catch (err) {
+      console.warn('Failed to init search worker', err);
+    }
+    return () => {
+      if (searchWorkerRef.current) {
+        searchWorkerRef.current.terminate();
+        searchWorkerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Send minimal docs to worker when products change
+  useEffect(() => {
+    try {
+      if (searchWorkerRef.current) {
+        const docs = (products || []).map((p: any) => ({ id: p.id, name: p.name || '', sku: p.sku || '', category: p.category || '' }));
+        searchWorkerRef.current.postMessage({ type: 'init', payload: { docs } });
+      }
+    } catch (err) {
+      console.warn('Failed to post init to search worker', err);
+    }
+  }, [products]);
+
+  // Trigger search when debouncedQuery changes
+  useEffect(() => {
+    setSearchMatchedIds(null);
+    try {
+      if (searchWorkerRef.current) {
+        searchWorkerRef.current.postMessage({ type: 'search', payload: { q: debouncedQuery } });
+      } else {
+        setSearchMatchedIds(null);
+      }
+    } catch (err) {
+      console.warn('Search worker error', err);
+      setSearchMatchedIds(null);
+    }
+  }, [debouncedQuery]);
+
+  // Debugging: occasional render log (not on every keystroke thanks to debounce)
+  useEffect(() => {
+    console.log('InventoryPage render:', {
+      productsLength: products.length,
+      categories,
+      currentUser,
+      activeBranchId,
+      selectedCategory,
+      searchQuery: debouncedQuery
+    });
+  }, [products.length, categories, currentUser, activeBranchId, selectedCategory, debouncedQuery]);
+
+  // Stats Counters (memoized)
+  const totalSku = useMemo(() => products.length, [products.length]);
+  const outOfStock = useMemo(() => products.filter(p => p.stock === 0).length, [products]);
+  const lowStock = useMemo(() => products.filter(p => p.stock > 0 && p.stock <= p.minStock).length, [products]);
+  const totalValue = useMemo(() => products.reduce((sum, p) => sum + (p.costPrice * p.stock), 0), [products]);
+
+  // Filter products (memoized). If there is a search query, use worker-provided matched ids to avoid scanning full array.
+  const filteredProducts = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    const q = (debouncedQuery || '').toString().trim().toLowerCase();
+
+    // If we have a query and the worker returned matched ids, use that limited set.
+    // If the worker returned an empty array, that means there are no matches.
+    if (q && searchMatchedIds) {
+      if (searchMatchedIds.length === 0) {
+        return [];
+      }
+      const idMap = new Map(products.map((p) => [p.id, p]));
+      const matched = searchMatchedIds.map((id) => idMap.get(id)).filter(Boolean) as Product[];
+      return matched.filter((product) => {
+        if (product.isPPOB) return false;
+        const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
+        const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+        return matchesCategory && matchesBranch;
+      });
+    }
+
+    // Fallback: no query or worker results not available — do client-side filter (kept minimal)
+    return products.filter(product => {
+      if (product.isPPOB) return false; // Hide PPOB from physical inventory
+      const name = (product.name || '').toString().toLowerCase();
+      const skuStr = (product.sku || '').toString().toLowerCase();
+      const matchesSearch = !q || name.includes(q) || skuStr.includes(q);
+      const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
+      const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+      return matchesSearch && matchesCategory && matchesBranch;
+    });
+  }, [products, debouncedQuery, selectedCategory, activeBranchId, searchMatchedIds]);
+
+  // Pagination calculations
+  const totalItems = filteredProducts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (page - 1) * pageSize;
+  const endIndex = Math.min(totalItems, startIndex + pageSize);
+  const currentPageProducts = filteredProducts.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedCategory]);
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
     setSku(`SKU-${Math.floor(1000 + Math.random() * 9000)}`);
     setName('');
-    setCategory('Sembako');
+    setCategory(categories.length > 0 ? categories[0] : 'Sembako');
     setPrice('');
     setCostPrice('');
     setMarginPct('');
@@ -197,10 +348,10 @@ export default function InventoryPage() {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const sellPrice = Number(price);
     const buyPrice = Number(costPrice);
-    
+
     if (sellPrice < buyPrice) {
       alert("Syariah Alert: Harga Jual tidak boleh lebih rendah dari Harga Beli (Harga Modal) untuk menjaga akad perdagangan yang adil/halal.");
       return;
@@ -231,7 +382,17 @@ export default function InventoryPage() {
       cogsCoaCode: cogsCoaCode || undefined,
       isPPOB: false // Always false for physical inventory
     };
-
+    // Avoid persisting large base64 images into the global store/localStorage.
+    // If image is a data: URI (base64), we will not include it in saved product to keep localStorage small.
+    if (image && image.startsWith('data:')) {
+      addNotification({ title: 'Gambar tidak disimpan', message: 'Gambar dalam format base64 tidak akan disimpan ke store untuk menghindari penurunan performa. Silakan upload ulang gambar atau gunakan URL/Cloud storage.', type: 'WARNING' });
+      dataPayload.image = undefined;
+    } else {
+      dataPayload.image = image || undefined;
+    }
+    if (!defaultCategories.includes(category) && !savedCategories?.includes(category)) {
+      addCategory(category);
+    }
     if (editingProduct) {
       updateProduct({
         ...dataPayload,
@@ -240,18 +401,32 @@ export default function InventoryPage() {
     } else {
       addProduct(dataPayload);
     }
-    
+
     setIsModalOpen(false);
   };
 
   const downloadTemplate = () => {
-    const headers = ['sku', 'name', 'category', 'price', 'costPrice', 'stock', 'minStock', 'unit', 'barcode', 'expiryDate', 'isHalal', 'salesCoaCode', 'cogsCoaCode'];
-    const sampleRow = ['BRS-001', 'Beras Premium Cianjur 5kg', 'Sembako', 78000, 68000, 45, 10, 'Pack', '8991234560012', '31/12/2026', true, '410', '510'];
-    
-    const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+    // Machine-readable headers (used by importer)
+    const machineHeaders = ['sku', 'name', 'category', 'price', 'costPrice', 'stock', 'minStock', 'unit', 'barcode', 'expiryDate', 'isHalal', 'salesCoaCode', 'cogsCoaCode'];
+
+    // Friendly labels to help toko mengisi file dengan nama kolom yang mereka kenal
+    const friendlyHeaders = ['SKU (sku)', 'Nama / Name (name)', 'Kategori / Category (category)', 'Harga Jual / Price (price)', 'Harga Modal / Cost Price (costPrice)', 'Stok / Stock (stock)', 'Stok Minimum / Min Stock (minStock)', 'Satuan / Unit (unit)', 'Barcode (barcode)', 'Tanggal Kadaluarsa / Expiry Date (expiryDate)', 'Is Halal (isHalal)', 'Sales COA Code (salesCoaCode)', 'COGS COA Code (cogsCoaCode)'];
+
+    const sampleRow = ['BRS-001', 'Beras Premium Cianjur 5kg', categories.length > 0 ? categories[0] : 'Sembako', 78000, 68000, 45, 10, 'Pack', '8991234560012', '31/12/2026', true, '410', '510'];
+
+    // Build worksheet with: friendly header, machine header, sample row, empty row, then a categories list for reference
+    const rows: any[] = [];
+    rows.push(friendlyHeaders);
+    rows.push(machineHeaders);
+    rows.push(sampleRow);
+    rows.push([]);
+    rows.push(['Available Categories (use one of these exact values in the category field):']);
+    rows.push(categories.slice(0, 100));
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Template Produk');
-    
+
     XLSX.writeFile(wb, 'template_produk_ksa_mart.xlsx');
   };
 
@@ -266,7 +441,7 @@ export default function InventoryPage() {
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
+
         const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
         if (rows.length <= 1) {
           alert('File Excel kosong atau tidak memiliki data.');
@@ -275,23 +450,26 @@ export default function InventoryPage() {
 
         const newProducts: any[] = [];
         const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+        const findIndex = (aliases: string[]) => aliases
+          .map((alias) => headers.indexOf(alias.toLowerCase()))
+          .find((idx) => idx !== -1) ?? -1;
 
-        const idxSku = headers.indexOf('sku');
-        const idxName = headers.indexOf('name');
-        const idxCategory = headers.indexOf('category');
-        const idxPrice = headers.indexOf('price');
-        const idxCostPrice = headers.indexOf('costprice');
-        const idxStock = headers.indexOf('stock');
-        const idxMinStock = headers.indexOf('minstock');
-        const idxUnit = headers.indexOf('unit');
-        const idxBarcode = headers.indexOf('barcode');
-        const idxExpiry = headers.indexOf('expirydate');
-        const idxHalal = headers.indexOf('ishalal');
-        const idxSalesCoa = headers.indexOf('salescoacode');
-        const idxCogsCoa = headers.indexOf('cogscoacode');
+        const idxSku = findIndex(['sku', 'kode', 'kode barang', 'product code', 'code']);
+        const idxName = findIndex(['name', 'nama', 'nama barang', 'product name']);
+        const idxCategory = findIndex(['category', 'kategori', 'jenis', 'kelompok']);
+        const idxPrice = findIndex(['price', 'harga jual', 'harga', 'selling price']);
+        const idxCostPrice = findIndex(['costprice', 'cost price', 'harga modal', 'modal', 'harga pokok']);
+        const idxStock = findIndex(['stock', 'stok', 'jumlah', 'quantity']);
+        const idxMinStock = findIndex(['minstock', 'min stock', 'stok minimum', 'minimum stock', 'minimum stok']);
+        const idxUnit = findIndex(['unit', 'satuan']);
+        const idxBarcode = findIndex(['barcode', 'kode barcode', 'kode batang']);
+        const idxExpiry = findIndex(['expirydate', 'expiry date', 'tanggal kadaluarsa', 'tanggal kedaluwarsa', 'tanggal expired', 'expired']);
+        const idxHalal = findIndex(['ishalal', 'is halal', 'halal']);
+        const idxSalesCoa = findIndex(['salescoacode', 'sales coa code', 'salescoa', 'salescoc', 'salesco', 'coa penjualan', 'kode coa penjualan']);
+        const idxCogsCoa = findIndex(['cogscoacode', 'cogs coa code', 'cogscoa', 'coa hpp', 'kode coa hpp']);
 
         if (idxName === -1) {
-          alert('Format kolom salah. File Excel wajib memiliki kolom "name". Kolom lainnya: sku, name, category, price, costPrice, stock, minStock, unit, barcode, expiryDate, isHalal');
+          alert('Format kolom salah. File Excel wajib memiliki kolom "name" atau "nama". Kolom lainnya yang didukung: sku/kode, category/kategori, price/harga, costPrice/harga modal, stock/stok, minStock/stok minimum, unit/satuan, barcode, expiryDate/tanggal kadaluarsa, isHalal/halal.');
           return;
         }
 
@@ -300,32 +478,31 @@ export default function InventoryPage() {
           if (!row || row.length === 0) continue;
 
           const nameVal = idxName !== -1 ? String(row[idxName] || '').trim() : '';
-          if (!nameVal) continue; 
+          if (!nameVal) continue;
 
           const skuVal = idxSku !== -1 ? String(row[idxSku] || '').trim() : '';
           const categoryVal = idxCategory !== -1 ? String(row[idxCategory] || '').trim() : 'Sembako';
-          const priceVal = idxPrice !== -1 ? parseFloat(row[idxPrice]) || 0 : 0;
-          const costPriceVal = idxCostPrice !== -1 ? parseFloat(row[idxCostPrice]) || 0 : 0;
-          const stockVal = idxStock !== -1 ? parseFloat(row[idxStock]) || 0 : 0;
-          const minStockVal = idxMinStock !== -1 ? parseFloat(row[idxMinStock]) || 10 : 10;
+          const priceVal = idxPrice !== -1 ? parseFloat(String(row[idxPrice] || '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0 : 0;
+          const costPriceVal = idxCostPrice !== -1 ? parseFloat(String(row[idxCostPrice] || '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0 : 0;
+          const stockVal = idxStock !== -1 ? parseFloat(String(row[idxStock] || '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 0 : 0;
+          const minStockVal = idxMinStock !== -1 ? parseFloat(String(row[idxMinStock] || '').replace(/[^0-9.,-]/g, '').replace(',', '.')) || 10 : 10;
           const unitVal = idxUnit !== -1 ? String(row[idxUnit] || '').trim() : 'Pcs';
           const barcodeVal = idxBarcode !== -1 ? String(row[idxBarcode] || '').trim() : '';
-          
+
           let expiryDateVal = idxExpiry !== -1 ? String(row[idxExpiry] || '').trim() : '';
           if (expiryDateVal) {
             // Coba parsing format: 08072026, 08/07/2026, 08-07-2026
             const cleanDate = expiryDateVal.replace(/[\/\-]/g, ''); // jadikan 08072026
             if (cleanDate.length === 8) {
-              const d = cleanDate.substring(0,2);
-              const m = cleanDate.substring(2,4);
-              const y = cleanDate.substring(4,8);
+              const d = cleanDate.substring(0, 2);
+              const m = cleanDate.substring(2, 4);
+              const y = cleanDate.substring(4, 8);
               expiryDateVal = `${y}-${m}-${d}`;
             }
           }
-          
+
           const salesCoaVal = idxSalesCoa !== -1 ? String(row[idxSalesCoa] || '').trim() : '';
           const cogsCoaVal = idxCogsCoa !== -1 ? String(row[idxCogsCoa] || '').trim() : '';
-          
           let isHalalVal = true;
           if (idxHalal !== -1 && row[idxHalal] !== undefined) {
             const hRaw = String(row[idxHalal]).toLowerCase();
@@ -352,8 +529,32 @@ export default function InventoryPage() {
         }
 
         if (newProducts.length > 0) {
-          addProductsBulk(newProducts);
-          alert(`✅ Berhasil mengimpor ${newProducts.length} produk dari file Excel!`);
+          const importedCategoryValues = Array.from(new Set(newProducts.map((product) => String(product.category || '').trim()).filter((c) => c.length > 0)));
+          if (importedCategoryValues.length > 0) {
+            setCategories(Array.from(new Set([...(savedCategories || []), ...importedCategoryValues])));
+          }
+          // Process import in batches to avoid blocking UI
+          const batchSize = 100;
+          const batches: any[][] = [];
+          for (let i = 0; i < newProducts.length; i += batchSize) {
+            batches.push(newProducts.slice(i, i + batchSize));
+          }
+
+          setIsImporting(true);
+          setImportProgress({ done: 0, total: newProducts.length });
+
+          batches.forEach((batch, idx) => {
+            // schedule batches with small delay to keep UI responsive
+            setTimeout(() => {
+              addProductsBulk(batch);
+              setImportProgress(prev => ({ done: prev.done + batch.length, total: prev.total }));
+              // Last batch -> finish
+              if (idx === batches.length - 1) {
+                setIsImporting(false);
+                alert(`✅ Berhasil mengimpor ${newProducts.length} produk dari file Excel!`);
+              }
+            }, idx * 150);
+          });
         } else {
           alert('❌ Tidak ada produk valid yang berhasil diimpor.');
         }
@@ -364,6 +565,19 @@ export default function InventoryPage() {
       e.target.value = '';
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleClearInventory = () => {
+    if (!confirm('Yakin ingin menghapus semua produk inventori saat ini? Setelah dihapus, Anda dapat mengunggah ulang file Excel dengan produk baru.')) return;
+    clearProducts();
+    setSearchQuery('');
+    setSelectedCategory('ALL');
+    setPage(1);
+    addNotification({
+      title: 'Semua produk dihapus',
+      message: 'Inventory saat ini kosong. Silakan upload ulang file Excel produk.',
+      type: 'SUCCESS'
+    });
   };
 
   return (
@@ -428,7 +642,7 @@ export default function InventoryPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             {/* Category selection */}
             <select
               className="border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20"
@@ -442,24 +656,56 @@ export default function InventoryPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col md:flex-row md:items-center gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Tambah kategori baru"
+                className="border border-gray-200 rounded-lg py-2 px-3 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const normalized = newCategoryName.trim();
+                  if (normalized) {
+                    addCategory(normalized);
+                    setNewCategoryName('');
+                  }
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Tambah Kategori</span>
+              </button>
+            </div>
+
             <button
               onClick={downloadTemplate}
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-350 font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
             >
               <span>📥 Template Excel</span>
             </button>
-            
+
             <label className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all cursor-pointer">
               <Upload className="w-4 h-4" />
               <span>Import Excel</span>
-              <input 
-                type="file" 
-                accept=".xlsx, .xls" 
-                onChange={handleExcelImport} 
-                className="hidden" 
+              <input
+                type="file"
+                accept=".xlsx, .xls"
+                onChange={handleExcelImport}
+                className="hidden"
               />
             </label>
+
+            <button
+              onClick={handleClearInventory}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hapus Semua Produk</span>
+            </button>
 
             <button
               onClick={handleOpenAdd}
@@ -471,133 +717,71 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Master Products Listing Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-100">
-              <tr>
-                <th className="py-3 px-5">SKU / Code</th>
-                <th className="py-3 px-5">Nama Barang</th>
-                <th className="py-3 px-5">Kategori</th>
-                <th className="py-2.5 px-4 text-right">Harga Modal</th>
-                <th className="py-2.5 px-4 text-right">Harga Jual</th>
-                <th className="py-2.5 px-4 text-center">Margin Untung</th>
-                <th className="py-3 px-5 text-center">Expired Date</th>
-                <th className="py-3 px-5 text-center">Sisa Stok</th>
-                <th className="py-3 px-5 text-center">Status</th>
-                <th className="py-3 px-5 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-10 text-gray-400">
-                    Tidak ada barang inventori untuk ditampilkan.
-                  </td>
-                </tr>
-              ) : (
-                filteredProducts.map((p) => {
+        {/* Master Products Listing Table (virtualized list for performance) */}
+        <div className="overflow-hidden">
+          <div className="w-full text-left text-xs border-collapse">
+            <div className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-100 py-3 px-4 grid grid-cols-10">
+              <div className="col-span-1">SKU / Code</div>
+              <div className="col-span-2">Nama Barang</div>
+              <div className="col-span-1">Kategori</div>
+              <div className="col-span-1 text-right">Harga Modal</div>
+              <div className="col-span-1 text-right">Harga Jual</div>
+              <div className="col-span-1 text-center">Margin</div>
+              <div className="col-span-1 text-center">Expired Date</div>
+              <div className="col-span-1 text-center">Sisa Stok</div>
+              <div className="col-span-1 text-center">Status</div>
+              <div className="col-span-1 text-center">Aksi</div>
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-16 text-gray-400">Tidak ada barang inventori untuk ditampilkan.</div>
+            ) : (
+              <List
+                height={Math.min(600, Math.max(300, window.innerHeight - 300))}
+                itemCount={filteredProducts.length}
+                itemSize={64}
+                width={'100%'}
+              >
+                {({ index, style }) => {
+                  const p = filteredProducts[index];
                   const profitAmt = p.price - p.costPrice;
                   const marginPct = p.costPrice > 0 ? ((profitAmt / p.price) * 100).toFixed(1) : '0';
                   const isOutOfStock = p.stock === 0;
                   const isLowStock = p.stock > 0 && p.stock <= p.minStock;
-
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/50">
-                      <td className="py-3 px-5 font-mono text-gray-500 font-semibold">{p.sku}</td>
-                      <td className="py-3 px-5 font-bold text-gray-900">{p.name}</td>
-                      <td className="py-3 px-5">
-                        <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded border border-slate-200">
-                          {p.category}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono text-gray-600">
-                        Rp {p.costPrice.toLocaleString('id-ID')}
-                      </td>
-                      <td className="py-2.5 px-4 text-right">
-                        <p className="font-bold text-green-700">Rp {p.price.toLocaleString('id-ID')}</p>
-                        {p.wholesalePrice && p.wholesaleMinQty && (
-                          <p className="text-[10px] text-green-600 font-bold bg-green-50 inline-block px-1.5 py-0.5 rounded border border-green-100">
-                            Grosir: Rp {p.wholesalePrice.toLocaleString('id-ID')} (≥{p.wholesaleMinQty})
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4 text-center">
-                        <span className="text-green-700 font-semibold font-mono">
-                          Rp {profitAmt.toLocaleString('id-ID')} ({marginPct}%)
-                        </span>
-                      </td>
-                      <td className="py-3 px-5 text-center text-xs">
-                        {p.expiryDate ? (
-                          <span className={`${new Date(p.expiryDate) < new Date() ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                            {new Date(p.expiryDate).toLocaleDateString('id-ID')}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-5 text-center font-mono font-bold">
-                        {p.stock} <span className="text-gray-400 font-sans text-[10px] font-normal">{p.unit}</span>
-                      </td>
-                      <td className="py-3 px-5 text-center">
-                        {isOutOfStock ? (
-                          <span className="bg-red-50 text-red-700 border border-red-100 text-[10px] px-2 py-0.5 rounded font-bold">
-                            Habis
-                          </span>
-                        ) : isLowStock ? (
-                          <span className="bg-amber-50 text-amber-700 border border-amber-100 text-[10px] px-2 py-0.5 rounded font-bold flex items-center justify-center space-x-1 max-w-[100px] mx-auto">
-                            <AlertTriangle className="w-3 h-3 text-amber-500" />
-                            <span>Kritis</span>
-                          </span>
-                        ) : (
-                          <span className="bg-green-50 text-green-800 border border-green-100 text-[10px] px-2 py-0.5 rounded font-bold">
-                            Sehat
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-5 text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                          <button
-                            onClick={() => handleOpenEdit(p)}
-                            className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600 transition-colors"
-                            title="Edit SKU"
-                          >
+                    <div key={p.id} style={style} className="px-4 border-b border-gray-100 flex items-center gap-3">
+                      <div className="w-1/12 font-mono text-gray-500">{p.sku}</div>
+                      <div className="w-2/12 font-bold text-gray-900">{p.name}</div>
+                      <div className="w-1/12">
+                        <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded border border-slate-200">{p.category}</span>
+                      </div>
+                      <div className="w-1/12 text-right font-mono text-gray-600">Rp {p.costPrice.toLocaleString('id-ID')}</div>
+                      <div className="w-1/12 text-right font-bold text-green-700">Rp {p.price.toLocaleString('id-ID')}</div>
+                      <div className="w-1/12 text-center text-green-700 font-mono">Rp {profitAmt.toLocaleString('id-ID')} ({marginPct}%)</div>
+                      <div className="w-1/12 text-center text-xs">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('id-ID') : '-'}</div>
+                      <div className="w-1/12 text-center font-mono font-bold">{p.stock} <span className="text-gray-400 font-sans text-[10px] font-normal">{p.unit}</span></div>
+                      <div className="w-1/12 text-center">
+                        {isOutOfStock ? <span className="bg-red-50 text-red-700 text-[10px] px-2 py-0.5 rounded">Habis</span> : isLowStock ? <span className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5 rounded">Kritis</span> : <span className="bg-green-50 text-green-800 text-[10px] px-2 py-0.5 rounded">Sehat</span>}
+                      </div>
+                      <div className="w-1/12 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => handleOpenEdit(p)} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600">
                             <Edit className="w-3.5 h-3.5" />
                           </button>
-                          
-                          <button
-                            onClick={() => {
-                              const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`);
-                              const amount = Number(amountStr);
-                              if (!isNaN(amount) && amount !== 0) {
-                                adjustStock(p.id, amount);
-                              }
-                            }}
-                            className="p-1 rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-800 text-gray-600 text-[10px] font-bold px-1.5"
-                            title="Atur Jumlah Stok"
-                          >
+                          <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300">
                             +/- Stok
                           </button>
-
-                          <button
-                            onClick={() => {
-                              if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) {
-                                deleteProduct(p.id);
-                              }
-                            }}
-                            className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 hover:text-red-700 text-gray-400 hover:text-red-600"
-                            title="Hapus SKU"
-                          >
+                          <button onClick={() => { if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) deleteProduct(p.id); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-400">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                }}
+              </List>
+            )}
+          </div>
         </div>
       </div>
 
@@ -610,7 +794,7 @@ export default function InventoryPage() {
               <h3 className="font-extrabold text-gray-800 text-md">
                 {editingProduct ? 'Ubah SKU Inventori' : 'Tambah SKU Baru'}
               </h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 font-bold text-sm"
               >
@@ -621,11 +805,11 @@ export default function InventoryPage() {
             {/* Modal Form */}
             <form onSubmit={handleFormSubmit}>
               <div className="p-6 space-y-4 max-h-[420px] overflow-y-auto">
-                
+
                 {/* isPriceEditLockedForAdmin definition */}
                 {(() => {
                   const isPriceEditLockedForAdmin = currentUser?.role === 'CASHIER';
-                  
+
                   return (
                     <>
                       {/* Visual shariah warning */}
@@ -646,9 +830,9 @@ export default function InventoryPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="block text-sm font-bold text-slate-700 mb-1">Kode SKU</label>
-                          <input 
-                            type="text" 
-                            required 
+                          <input
+                            type="text"
+                            required
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 font-mono text-sm"
                             value={sku}
                             onChange={e => setSku(e.target.value)}
@@ -756,9 +940,8 @@ export default function InventoryPage() {
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : ''
-                              }`}
+                              className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : ''
+                                }`}
                               value={costPrice}
                               onChange={(e) => handleCostPriceChange(e.target.value)}
                               required
@@ -772,9 +955,8 @@ export default function InventoryPage() {
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-green-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50 focus:ring-2 focus:ring-green-500/20'
-                              } outline-none`}
+                              className={`w-full border border-green-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50 focus:ring-2 focus:ring-green-500/20'
+                                } outline-none`}
                               value={marginPct}
                               onChange={(e) => handleMarginChange(e.target.value)}
                               placeholder="Misal: 10"
@@ -790,9 +972,8 @@ export default function InventoryPage() {
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50/20 focus:ring-2 focus:ring-green-500/20'
-                              } outline-none`}
+                              className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50/20 focus:ring-2 focus:ring-green-500/20'
+                                } outline-none`}
                               value={price}
                               onChange={(e) => handlePriceChange(e.target.value)}
                               required
@@ -809,9 +990,8 @@ export default function InventoryPage() {
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-green-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${
-                                isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
-                              }`}
+                              className={`w-full border border-green-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
+                                }`}
                               value={wholesalePrice}
                               onChange={(e) => setWholesalePrice(e.target.value)}
                             />
@@ -823,9 +1003,8 @@ export default function InventoryPage() {
                           <input
                             type="number"
                             disabled={isPriceEditLockedForAdmin}
-                            className={`w-full border border-green-200 rounded-lg py-2 px-3 text-xs font-bold ${
-                              isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
-                            }`}
+                            className={`w-full border border-green-200 rounded-lg py-2 px-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
+                              }`}
                             value={wholesaleMinQty}
                             onChange={(e) => setWholesaleMinQty(e.target.value)}
                             placeholder="Misal: 5"
@@ -861,20 +1040,20 @@ export default function InventoryPage() {
                 <div className="border border-indigo-100 bg-indigo-50/30 rounded-xl p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-indigo-900 flex items-center gap-2">
-                      <Package className="w-5 h-5 text-indigo-600"/> 
+                      <Package className="w-5 h-5 text-indigo-600" />
                       Opsi Penjualan Box/Karton
                     </label>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
                         checked={hasBoxUnit}
                         onChange={(e) => setHasBoxUnit(e.target.checked)}
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </label>
                   </div>
-                  
+
                   {hasBoxUnit && (
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-indigo-100">
                       <div className="space-y-1">
@@ -926,40 +1105,52 @@ export default function InventoryPage() {
                 </div>
 
                 <div className="space-y-2 border border-gray-200 rounded-xl p-4 bg-white">
-                  <label className="text-xs font-bold text-gray-800 flex items-center gap-2"><Camera className="w-4 h-4 text-green-600"/> Foto Produk (Opsional)</label>
-                  
-                  {image && (
+                  <label className="text-xs font-bold text-gray-800 flex items-center gap-2"><Camera className="w-4 h-4 text-green-600" /> Foto Produk (Opsional)</label>
+
+                  {isUploadingImage && (
+                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-800">
+                      <svg className="animate-spin h-4 w-4 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      <span className="font-semibold">Mengupload foto ke cloud... Mohon tunggu.</span>
+                    </div>
+                  )}
+
+                  {image && !isUploadingImage && (
                     <div className="relative w-32 h-32 border border-gray-200 rounded-xl overflow-hidden shadow-sm mx-auto mb-3">
-                      <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                      <button 
-                        type="button" 
-                        onClick={() => setImage('')} 
+                      <img loading="lazy" src={image} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="100%" height="100%" fill="#f1f5f9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#64748b">No Image</text></svg>'); }} />
+                      <button
+                        type="button"
+                        onClick={() => setImage('')}
                         className="absolute top-1 right-1 bg-white/90 p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-red-100 shadow-xs"
                         title="Hapus Foto"
                       >
-                        <Trash2 className="w-4 h-4"/>
+                        <Trash2 className="w-4 h-4" />
                       </button>
+                      {image.startsWith('http') && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-green-600/90 text-white text-[8px] font-bold text-center py-1">
+                          ✅ Cloud Storage
+                        </div>
+                      )}
                     </div>
                   )}
 
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="cursor-pointer bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
+                    <label className={`cursor-pointer bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors ${isUploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
                       <Upload className="w-4 h-4" /> Upload Galeri
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                      <input type="file" accept="image/*" className="hidden" disabled={isUploadingImage} onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleImageUpload(file);
                       }} />
                     </label>
-                    
-                    <label className="cursor-pointer bg-green-600 text-white hover:bg-green-700 shadow-md text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors">
+
+                    <label className={`cursor-pointer bg-green-600 text-white hover:bg-green-700 shadow-md text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors ${isUploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
                       <Camera className="w-4 h-4" /> Buka Kamera
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => {
+                      <input type="file" accept="image/*" capture="environment" className="hidden" disabled={isUploadingImage} onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleImageUpload(file);
                       }} />
                     </label>
                   </div>
-                  
+
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <p className="text-[10px] text-gray-400 mb-1 font-semibold">Atau gunakan URL Gambar (Link Internet):</p>
                     <input
@@ -974,7 +1165,7 @@ export default function InventoryPage() {
 
                 <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-4">
                   <label className="text-sm font-bold text-amber-900 flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-amber-600"/> 
+                    <BookOpen className="w-5 h-5 text-amber-600" />
                     Pemetaan Akun (CoA)
                   </label>
                   <p className="text-[10px] text-amber-700 font-semibold mb-2 leading-relaxed">
@@ -1029,6 +1220,12 @@ export default function InventoryPage() {
               </div>
             </form>
           </div>
+          {isImporting && (
+            <div className="p-3 text-xs text-gray-700 bg-yellow-50 border-t border-yellow-100 flex items-center justify-between">
+              <div>Import berjalan: {importProgress.done} / {importProgress.total}</div>
+              <div className="text-[11px] text-gray-500">Proses background, halaman tetap responsif.</div>
+            </div>
+          )}
         </div>
       )}
     </div>

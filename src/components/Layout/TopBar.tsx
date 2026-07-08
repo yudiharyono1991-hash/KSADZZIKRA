@@ -84,6 +84,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   // Filter notifications for current user
   const unreadNotifications = notifications?.filter(n => {
     if (n.isRead) return false;
+    if (n.excludeUsernames && currentUser?.username && n.excludeUsernames.includes(currentUser.username)) return false;
     if (n.targetRole) {
       const roles = Array.isArray(n.targetRole) ? n.targetRole : [n.targetRole];
       if (!roles.includes(currentUser?.role as any)) return false;
@@ -319,6 +320,11 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                 <p className="text-[8px] text-gray-500 font-mono italic">
                   {currentUser.role} • {userBranchName}
                 </p>
+                {currentUser.phone && (
+                  <p className="text-[9px] text-green-700 font-bold mt-0.5">
+                    <a href={`https://wa.me/${currentUser.phone.replace(/[^0-9]/g,'')}`} target="_blank" rel="noreferrer" className="underline">Hubungi via WA</a>
+                  </p>
+                )}
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
             </button>

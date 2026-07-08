@@ -4,6 +4,7 @@ import MainLayout from './components/Layout/MainLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import { useAppStore } from './store';
+import { isSupabaseConfigured, subscribeToTable } from './lib/supabase';
 import {
   LandingPage,
   KasirPOS,
@@ -31,17 +32,12 @@ import {
   QuranPage,
   JadwalShalatPage,
   ArtikelIslamiPage,
-  KoperasiAnggotaPage,
-  KoperasiSHUPage,
-  KoperasiPembiayaanPage,
-  KoperasiKeuanganPage,
   BukuPanduanPage,
   RegisterPage,
   KatalogUmumPage,
   CoAPage,
   BeritaPusatPage,
   LoyaltyProgramPage,
-  KasirShiftPage,
   PPOBInventoryPage
 } from './pages';
 
@@ -90,6 +86,22 @@ export default function App() {
   useEffect(() => {
     // Attempt startup Supabase pull
     initializeStore();
+
+    // Register realtime subscriptions to refresh store when remote changes occur
+    if (isSupabaseConfigured) {
+      const unsubP = subscribeToTable('products', () => initializeStore());
+      const unsubS = subscribeToTable('store_settings', () => initializeStore());
+      const unsubO = subscribeToTable('online_orders', () => initializeStore());
+      const unsubC = subscribeToTable('chat_messages', () => initializeStore());
+      const unsubT = subscribeToTable('transactions', () => initializeStore());
+      return () => {
+        try { unsubP(); } catch (e) {}
+        try { unsubS(); } catch (e) {}
+        try { unsubO(); } catch (e) {}
+        try { unsubC(); } catch (e) {}
+        try { unsubT(); } catch (e) {}
+      };
+    }
   }, [initializeStore]);
 
   if (isLoading) {
@@ -119,7 +131,6 @@ export default function App() {
         
         {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
         <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
-        <Route path="/kasir-shift" element={<ProtectedRoute><KasirShiftPage /></ProtectedRoute>} />
         <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
         <Route path="/inventory-ppob" element={<ProtectedRoute><PPOBInventoryPage /></ProtectedRoute>} />

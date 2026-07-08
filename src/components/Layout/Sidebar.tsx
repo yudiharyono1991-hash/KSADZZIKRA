@@ -62,6 +62,18 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
+  const notifications = useAppStore(state => state.notifications);
+  const currentUserLocal = useAppStore(state => state.currentUser);
+  const unreadNotificationsCount = (notifications || []).filter(n => {
+    if (n.isRead) return false;
+    if (n.excludeUsernames && currentUserLocal?.username && n.excludeUsernames.includes(currentUserLocal.username)) return false;
+    if (n.targetRole) {
+      const roles = Array.isArray(n.targetRole) ? n.targetRole : [n.targetRole];
+      if (!roles.includes(currentUserLocal?.role as any)) return false;
+    }
+    if (n.branchId && currentUserLocal?.branchId && n.branchId !== currentUserLocal.branchId) return false;
+    return true;
+  }).length || 0;
 
   // Auto-expand group if current path is inside it
   useEffect(() => {
@@ -94,9 +106,15 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/neraca-rugi', label: 'Neraca Laba Rugi', icon: FileText },
           { path: '/laporan-penjualan', label: 'Laporan Penjualan', icon: TrendingUp },
           { path: '/arus-kas', label: 'Laporan Arus Kas', icon: Wallet },
+          { path: '/zakat', label: 'Zakat & ESG', icon: Calculator },
+        ]
+      },
+      {
+        label: 'Akuntansi & CoA',
+        icon: BookOpen,
+        items: [
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
           { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
-          { path: '/zakat', label: 'Zakat & ESG', icon: Calculator },
         ]
       },
       {
@@ -157,6 +175,12 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/trend', label: 'Grafik Trend', icon: LineChart },
           { path: '/laporan-penjualan', label: 'Laporan Penjualan', icon: TrendingUp },
           { path: '/arus-kas', label: 'Laporan Arus Kas', icon: Wallet },
+        ]
+      },
+      {
+        label: 'Akuntansi & CoA',
+        icon: BookOpen,
+        items: [
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
           { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
         ]
@@ -200,6 +224,20 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
+  } else if (currentUser.role === 'PELANGGAN') {
+    // Customer / Member portal - very limited menu
+    menuData = [
+      {
+        label: 'Pelanggan',
+        icon: UsersRound,
+        items: [
+          { path: '/member', label: 'Portal Pelanggan', icon: UsersRound },
+          { path: '/katalog', label: 'Katalog Produk', icon: ShoppingBag },
+          { path: '/berita', label: 'Berita & Pengumuman', icon: Newspaper },
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen }
+        ]
+      }
+    ];
   } else {
     // CASHIER
     menuData = [
@@ -262,9 +300,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'OWNER': return 'Ketua Toko Koperasi KSA Mart';
-      case 'ADMIN': return 'Admin Mode';
-      case 'CASHIER': return 'Cashier Mode';
+      case 'OWNER': return 'Pemilik Toko';
+      case 'SUPERADMIN': return 'Super Admin';
+      case 'PENGURUS': return 'Pengurus Koperasi';
+      case 'MANAGER': return 'Manager';
+      case 'ADMIN': return 'Admin';
+      case 'CASHIER': return 'Kasir';
+      case 'PELANGGAN': return 'Pelanggan/Anggota';
       default: return 'User';
     }
   };
@@ -380,9 +422,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                           >
                             <SubIcon className="w-4 h-4 flex-shrink-0 opacity-80 group-hover:scale-110 transition-transform duration-300" />
                             <span className="truncate flex-1">{subItem.label}</span>
-                            {subItem.badge && subItem.badge > 0 && !isCollapsed && (
+                            {((subItem.path === '/customers' && unreadNotificationsCount > 0) || (subItem.badge && subItem.badge > 0)) && !isCollapsed && (
                               <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-xs">
-                                {subItem.badge}
+                                {subItem.path === '/customers' ? unreadNotificationsCount : subItem.badge}
                               </span>
                             )}
                           </NavLink>
@@ -410,9 +452,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                 >
                   <Icon className="w-[18px] h-[18px] flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
                   {!isCollapsed && <span className="truncate flex-1">{menuItem.label}</span>}
-                  {menuItem.badge && menuItem.badge > 0 && !isCollapsed && (
+                  {((menuItem.path === '/berita' && unreadNotificationsCount > 0) || (menuItem.badge && menuItem.badge > 0)) && !isCollapsed && (
                     <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-xs ml-auto">
-                      {menuItem.badge}
+                      {menuItem.path === '/berita' ? unreadNotificationsCount : menuItem.badge}
                     </span>
                   )}
                   {menuItem.badge && menuItem.badge > 0 && isCollapsed && (
