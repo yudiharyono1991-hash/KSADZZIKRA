@@ -2756,13 +2756,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncTask('online orders', state.onlineOrders, async (order) => {
           await supabaseService.saveOnlineOrder(order);
         }),
-        syncTask('coa accounts', state.coaAccounts, async (coa) => {
+        syncTask('coa accounts', state.coaList, async (coa) => {
           await (supabaseService as any).saveCoaAccount(coa);
         }),
         syncTask('journal entries', state.journalEntries, async (journal) => {
           await (supabaseService as any).saveJournalEntry(journal);
         }),
-        syncTask('ksa users', state.ksaUsers, async (user) => {
+        syncTask('ksa users', state.users, async (user) => {
           await (supabaseService as any).saveUser(user);
         }),
         syncTask('zakat records', state.zakatRecords, async (record) => {
