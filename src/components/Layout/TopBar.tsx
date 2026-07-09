@@ -52,14 +52,20 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
     return () => clearInterval(timer);
   }, []);
 
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const todayDateStr = `${year}-${month}-${day}`;
+
   // Today's total sales
   const todaySales = transactions
-    .filter(tx => tx.timestamp.startsWith('2026-06-07'))
+    .filter(tx => tx.timestamp.startsWith(todayDateStr))
     .reduce((sum, tx) => sum + tx.totalAmount, 0);
 
   // Today's margin
   const todayMargin = transactions
-    .filter(tx => tx.timestamp.startsWith('2026-06-07'))
+    .filter(tx => tx.timestamp.startsWith(todayDateStr))
     .reduce((sum, tx) => sum + tx.marginContribution, 0);
 
   // Check how many items low stock

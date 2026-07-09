@@ -26,7 +26,18 @@ export default function SettingsPage() {
   // Advanced Settings
   const [maintenanceMode, setMaintenanceMode] = useState(settings.maintenanceMode ?? false);
   const [minimumCashBalance, setMinimumCashBalance] = useState(settings.minimumCashBalance?.toString() || '1000000');
-  const [zakatRate, setZakatRate] = useState(settings.zakatRate?.toString() || '2.5');
+
+  // Charity & Zakat Settings
+  const [enableCharityZakat, setEnableCharityZakat] = useState(settings.enableCharityZakat ?? false);
+  const [charityZakatPercentage, setCharityZakatPercentage] = useState(settings.charityZakatPercentage?.toString() || '2.5');
+  const [charityTitle, setCharityTitle] = useState(settings.charityTitle || 'Kewajiban Zakat Niaga');
+  const [charityDescription, setCharityDescription] = useState(settings.charityDescription || 'Zakat Kontribusi Sebesar Rp {amount} dari transaksi ini dicadangkan untuk kaum Dhuafa.');
+
+  // PPOB Integration Settings
+  const [enablePpobIntegration, setEnablePpobIntegration] = useState(settings.enablePpobIntegration ?? false);
+  const [ppobProviderUrl, setPpobProviderUrl] = useState(settings.ppobProviderUrl || '');
+  const [ppobApiKey, setPpobApiKey] = useState(settings.ppobApiKey || '');
+
   const [autoApproveTransactions, setAutoApproveTransactions] = useState(settings.autoApproveTransactions ?? false);
 
   const [storePhone, setStorePhone] = useState(settings.storePhone || '');
@@ -52,6 +63,31 @@ export default function SettingsPage() {
   useEffect(() => {
     setIsTaxEnabled(settings.isTaxEnabled);
     setTaxRate(settings.taxRate.toString());
+    setOwnerBankName(settings.ownerBankName || 'BSI (Bank Syariah Indonesia)');
+    setOwnerBankAccount(settings.ownerBankAccount || '7182938495');
+    setQrisEnabled(settings.qrisEnabled ?? true);
+    setQrisImageUrl(settings.qrisImageUrl || '');
+    setPaymentTimeoutMinutes(settings.paymentTimeoutMinutes || 0);
+    setStoreName(settings.storeName || 'KSA Mart Syariah');
+    setStoreAddress(settings.storeAddress || '');
+    setStoreLocationLat(settings.storeLocationLat?.toString() || '');
+    setStoreLocationLng(settings.storeLocationLng?.toString() || '');
+    setMaxDeliveryRadiusKm(settings.maxDeliveryRadiusKm?.toString() || '5');
+    setMaintenanceMode(settings.maintenanceMode ?? false);
+    setMinimumCashBalance(settings.minimumCashBalance?.toString() || '1000000');
+    setEnableCharityZakat(settings.enableCharityZakat ?? false);
+    setCharityZakatPercentage(settings.charityZakatPercentage?.toString() || '2.5');
+    setCharityTitle(settings.charityTitle || 'Kewajiban Zakat Niaga');
+    setCharityDescription(settings.charityDescription || 'Zakat Kontribusi Sebesar Rp {amount} dari transaksi ini dicadangkan untuk kaum Dhuafa.');
+    setEnablePpobIntegration(settings.enablePpobIntegration ?? false);
+    setPpobProviderUrl(settings.ppobProviderUrl || '');
+    setPpobApiKey(settings.ppobApiKey || '');
+    setAutoApproveTransactions(settings.autoApproveTransactions ?? false);
+    setStorePhone(settings.storePhone || '');
+    setOwnerWhatsapp(settings.ownerWhatsapp || '');
+    setBusinessType(settings.businessType || 'KOPERASI');
+    setBankTransfers(settings.paymentMethods?.bankTransfer || []);
+    setEwallets(settings.paymentMethods?.ewallet || []);
   }, [settings]);
 
   const handleSave = () => {
@@ -78,7 +114,13 @@ export default function SettingsPage() {
         maxDeliveryRadiusKm: Number(maxDeliveryRadiusKm) || 5,
         maintenanceMode,
         minimumCashBalance: Number(minimumCashBalance) || 1000000,
-        zakatRate: Number(zakatRate) || 2.5,
+        enableCharityZakat,
+        charityZakatPercentage: Number(charityZakatPercentage) || 2.5,
+        charityTitle,
+        charityDescription,
+        enablePpobIntegration,
+        ppobProviderUrl,
+        ppobApiKey,
         autoApproveTransactions,
       });
 
@@ -192,6 +234,16 @@ export default function SettingsPage() {
     reader.readAsText(file);
   };
 
+  if (currentUser?.role !== 'OWNER' && currentUser?.role !== 'SUPERADMIN') {
+    return (
+      <div className="p-6 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
+        <Lock className="w-16 h-16 text-red-500" />
+        <h2 className="text-2xl font-bold text-gray-800">Akses Ditolak</h2>
+        <p className="text-gray-500">Halaman Pengaturan Toko khusus dikelola oleh Ketua (Owner) atau Superadmin.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -214,7 +266,7 @@ export default function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {(currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN') && (
+        {(currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN') && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex items-center gap-2">
@@ -505,6 +557,62 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Misi Berkah Beramal (Zakat/Infaq) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-gray-800">Misi Berkah Beramal</h2>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={enableCharityZakat} onChange={(e) => setEnableCharityZakat(e.target.checked)} />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+          </label>
+        </div>
+        
+        {enableCharityZakat && (
+          <div className="p-6 space-y-4 bg-green-50/30">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Judul Donasi (Misal: Infaq, Sedekah, Zakat)</label>
+              <input type="text" value={charityTitle} onChange={(e) => setCharityTitle(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Persentase (%) dari Laba Bersih</label>
+              <input type="number" step="0.1" value={charityZakatPercentage} onChange={(e) => setCharityZakatPercentage(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Deskripsi (Struk)</label>
+              <textarea rows={2} value={charityDescription} onChange={(e) => setCharityDescription(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* PPOB Integration */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-indigo-600" />
+            <h2 className="font-bold text-gray-800">Integrasi PPOB (API)</h2>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={enablePpobIntegration} onChange={(e) => setEnablePpobIntegration(e.target.checked)} />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+          </label>
+        </div>
+        
+        {enablePpobIntegration && (
+          <div className="p-6 space-y-4 bg-indigo-50/30">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">URL Provider (Webhook/API Endpoint)</label>
+              <input type="text" value={ppobProviderUrl} onChange={(e) => setPpobProviderUrl(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">API Key / Secret / Token</label>
+              <input type="password" value={ppobApiKey} onChange={(e) => setPpobApiKey(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Lokasi & Pengiriman (Owner Only) */}
       {isOwner && (
@@ -616,17 +724,7 @@ export default function SettingsPage() {
                   className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
                 />
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-slate-800 mb-1">Presentase Zakat Niaga (%)</h3>
-                <p className="text-xs text-slate-500 mb-2">Sesuai Syariah standar 2.5% dari Keuntungan Bersih.</p>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={zakatRate}
-                  onChange={e => setZakatRate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
-                />
-              </div>
+              {/* Removed obsolete zakatRate UI */}
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -806,9 +904,9 @@ export default function SettingsPage() {
                 onClick={() => {
                   if (confirm('PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SEMUA DATA?\\n\\nTindakan ini TIDAK BISA dibatalkan dan akan mereset aplikasi menjadi kosong.')) {
                     const pin = prompt('Masukkan Sandi (Password) akun Anda untuk mengonfirmasi penghapusan data:');
-                    if (pin === currentUser?.password || pin === 'RESET_CONFIRM_12345') {
+                    if (pin && pin === currentUser?.password) {
                       clearAllData();
-                      alert('Berhasil! Semua data uji coba telah dihapus.');
+                      alert('Berhasil! Semua data telah dihapus permanen dan sistem direset.');
                       window.location.href = '/';
                     } else {
                       alert('Sandi salah! Proses Hapus Data dibatalkan.');

@@ -205,7 +205,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/promos', label: 'Manajemen Promo', icon: Tag },
         ]
       },
-      {
+      ...(currentUser.role === 'ADMIN' ? [{
         label: 'Tata Kelola',
         icon: Settings,
         items: [
@@ -214,7 +214,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
         ]
-      },
+      }] : []),
       {
         label: 'Pusat Bantuan',
         icon: HelpCircle,

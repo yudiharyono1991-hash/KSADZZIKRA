@@ -90,17 +90,29 @@ export default function StockOpnamePage() {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Pilih Produk untuk Opname</label>
-            <select 
-              value={selectedProductId}
-              onChange={(e) => setSelectedProductId(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">-- Silakan Pilih Produk --</option>
-              {filteredProducts.map(p => (
-                <option key={p.id} value={p.id}>{p.sku} - {p.name} (Sistem: {p.stock})</option>
-              ))}
-            </select>
+            <label className="text-xs font-bold text-gray-600 mb-1 block">Scan Barcode / Ketik SKU Produk</label>
+            <div className="relative">
+              <input 
+                type="text"
+                list="opname-products"
+                placeholder="Scan Barcode atau ketik nama produk..."
+                className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const found = products.find(p => p.sku === val || p.name === val || `${p.sku} - ${p.name}` === val);
+                  if (found) {
+                    setSelectedProductId(found.id);
+                  } else {
+                    setSelectedProductId('');
+                  }
+                }}
+              />
+              <datalist id="opname-products">
+                {filteredProducts.map(p => (
+                  <option key={p.id} value={`${p.sku} - ${p.name}`} />
+                ))}
+              </datalist>
+            </div>
           </div>
           {selectedProductId && (
             <>

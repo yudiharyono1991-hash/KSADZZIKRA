@@ -929,16 +929,42 @@ export const supabaseService = {
         tenant_id: tenantId,
         date: entry.date,
         description: entry.description,
-        reference: entry.reference,
-        amount: entry.amount,
-        type: entry.type,
-        account_id: entry.accountId,
-        created_at: entry.createdAt
+        account: entry.account,
+        debit: entry.debit,
+        credit: entry.credit,
+        reference_id: entry.referenceId,
+        reference_type: entry.referenceType,
+        created_by: entry.createdBy,
+        branch_id: entry.branchId
       });
       if (error) throw error;
       return true;
     } catch (err: any) {
       logSync(`Failed to save journal_entry: ${err.message}`, true);
+      return false;
+    }
+  },
+  async clearAllDatabase(tenantId: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const tables = [
+        'products', 'transactions', 'online_orders', 'audit_logs', 'zakat_records',
+        'zakat_distributions', 'expenses', 'closings', 'purchase_orders',
+        'journal_entries', 'customers', 'suppliers', 'promos', 'attendances',
+        'stock_movements'
+      ];
+      
+      for (const table of tables) {
+        if (tenantId === 'tenant_default' || !tenantId) {
+          await supabase.from(table).delete().or(`tenant_id.is.null,tenant_id.eq.${tenantId}`);
+        } else {
+          await supabase.from(table).delete().eq('tenant_id', tenantId);
+        }
+      }
+      logSync(`Semua data untuk tenant ${tenantId} telah dihapus permanen dari Supabase.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to clear database for tenant ${tenantId}: ${err.message}`, true);
       return false;
     }
   }

@@ -53,6 +53,22 @@ export interface StoreSettings {
   uploadPassword?: string;
   // Roles allowed to manage (set/clear) the upload password. Example: ['OWNER','ADMIN','MANAGER']
   uploadPasswordRoles?: string[];
+  
+  // Points System
+  enablePoints?: boolean;
+  pointEarningRate?: number; // Spend this much to earn 1 point (default 1000)
+  pointRedemptionValue?: number; // 1 point equals this much IDR discount (default 10)
+  
+  // Charity / Zakat Receipt
+  enableCharityZakat?: boolean;
+  charityZakatPercentage?: number; // Percentage of margin (default 2.5)
+  charityTitle?: string; // Default: MISI BERKAH BERAMAL
+  charityDescription?: string; // Contains {amount} placeholder
+
+  // PPOB Integration
+  enablePpobIntegration?: boolean;
+  ppobProviderUrl?: string;
+  ppobApiKey?: string;
 }
 
 export interface StockMovement {
@@ -73,7 +89,10 @@ export interface Customer {
   tenantId: string;
   name: string;
   phone: string;
-  points: number;
+  points: number; // This is Sisa Point
+  totalPointsEarned?: number;
+  totalPointsRedeemed?: number;
+  lastPointsUpdate?: string;
   debtAmount: number;
   createdAt: string;
   branchId?: string;

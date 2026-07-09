@@ -17,7 +17,8 @@ import {
   DollarSign,
   Camera,
   Upload,
-  BookOpen
+  BookOpen,
+  Download
 } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -568,16 +569,29 @@ export default function InventoryPage() {
   };
 
   const handleClearInventory = () => {
-    if (!confirm('Yakin ingin menghapus semua produk inventori saat ini? Setelah dihapus, Anda dapat mengunggah ulang file Excel dengan produk baru.')) return;
-    clearProducts();
-    setSearchQuery('');
-    setSelectedCategory('ALL');
-    setPage(1);
-    addNotification({
-      title: 'Semua produk dihapus',
-      message: 'Inventory saat ini kosong. Silakan upload ulang file Excel produk.',
-      type: 'SUCCESS'
-    });
+    if (confirm('Apakah Anda yakin ingin menghapus SEMUA produk dari sistem? Tindakan ini tidak dapat dibatalkan.')) {
+      clearProducts();
+      alert('Semua produk berhasil dihapus.');
+      setSearchQuery('');
+      setSelectedCategory('ALL');
+      setPage(1);
+    }
+  };
+
+  const handleExportExcel = () => {
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      "SKU,NAMA_BARANG,KATEGORI,HARGA_MODAL,HARGA_JUAL,STOK_MINIMAL,SISA_STOK,UNIT,EXPIRED_DATE\n" +
+      products.map(p => {
+        return `"${p.sku}","${p.name}","${p.category}",${p.costPrice},${p.price},${p.minStock},${p.stock},"${p.unit}","${p.expiryDate || ''}"`;
+      }).join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Data_Inventori_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -700,6 +714,14 @@ export default function InventoryPage() {
             </label>
 
             <button
+              onClick={handleExportExcel}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Excel</span>
+            </button>
+
+            <button
               onClick={handleClearInventory}
               className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
             >
@@ -720,22 +742,23 @@ export default function InventoryPage() {
         {/* Master Products Listing Table (virtualized list for performance) */}
         <div className="overflow-hidden">
           <div className="w-full text-left text-xs border-collapse">
-            <div className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-100 py-3 px-4 grid grid-cols-10">
-              <div className="col-span-1">SKU / Code</div>
+            <div className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-100 py-3 px-4 grid grid-cols-12 gap-3 items-center">
+              <div className="col-span-1 whitespace-nowrap">SKU / Code</div>
               <div className="col-span-2">Nama Barang</div>
               <div className="col-span-1">Kategori</div>
-              <div className="col-span-1 text-right">Harga Modal</div>
-              <div className="col-span-1 text-right">Harga Jual</div>
-              <div className="col-span-1 text-center">Margin</div>
-              <div className="col-span-1 text-center">Expired Date</div>
-              <div className="col-span-1 text-center">Sisa Stok</div>
+              <div className="col-span-1 text-right whitespace-nowrap">Harga Modal</div>
+              <div className="col-span-1 text-right whitespace-nowrap">Harga Jual</div>
+              <div className="col-span-1 text-center whitespace-nowrap">Margin</div>
+              <div className="col-span-1 text-center whitespace-nowrap">Expired Date</div>
+              <div className="col-span-1 text-center whitespace-nowrap">Sisa Stok</div>
               <div className="col-span-1 text-center">Status</div>
-              <div className="col-span-1 text-center">Aksi</div>
+              <div className="col-span-2 text-center">Aksi</div>
             </div>
 
             {filteredProducts.length === 0 ? (
               <div className="text-center py-16 text-gray-400">Tidak ada barang inventori untuk ditampilkan.</div>
             ) : (
+              <>
               <List
                 height={Math.min(600, Math.max(300, window.innerHeight - 300))}
                 itemCount={filteredProducts.length}
@@ -749,37 +772,53 @@ export default function InventoryPage() {
                   const isOutOfStock = p.stock === 0;
                   const isLowStock = p.stock > 0 && p.stock <= p.minStock;
                   return (
-                    <div key={p.id} style={style} className="px-4 border-b border-gray-100 flex items-center gap-3">
-                      <div className="w-1/12 font-mono text-gray-500">{p.sku}</div>
-                      <div className="w-2/12 font-bold text-gray-900">{p.name}</div>
-                      <div className="w-1/12">
+                    <div key={p.id} style={style} className="px-4 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs">
+                      <div className="col-span-1 font-mono text-gray-500 truncate" title={p.sku}>{p.sku}</div>
+                      <div className="col-span-2 font-bold text-gray-900 truncate" title={p.name}>{p.name}</div>
+                      <div className="col-span-1 truncate">
                         <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded border border-slate-200">{p.category}</span>
                       </div>
-                      <div className="w-1/12 text-right font-mono text-gray-600">Rp {p.costPrice.toLocaleString('id-ID')}</div>
-                      <div className="w-1/12 text-right font-bold text-green-700">Rp {p.price.toLocaleString('id-ID')}</div>
-                      <div className="w-1/12 text-center text-green-700 font-mono">Rp {profitAmt.toLocaleString('id-ID')} ({marginPct}%)</div>
-                      <div className="w-1/12 text-center text-xs">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('id-ID') : '-'}</div>
-                      <div className="w-1/12 text-center font-mono font-bold">{p.stock} <span className="text-gray-400 font-sans text-[10px] font-normal">{p.unit}</span></div>
-                      <div className="w-1/12 text-center">
+                      <div className="col-span-1 text-right font-mono text-gray-600 whitespace-nowrap">Rp {p.costPrice.toLocaleString('id-ID')}</div>
+                      <div className="col-span-1 text-right font-bold text-green-700 whitespace-nowrap">Rp {p.price.toLocaleString('id-ID')}</div>
+                      <div className="col-span-1 text-center text-green-700 font-mono text-[10px] whitespace-nowrap flex flex-col items-center justify-center">
+                        <span>Rp {profitAmt.toLocaleString('id-ID')}</span>
+                        <span className="text-[9px] text-slate-500">({marginPct}%)</span>
+                      </div>
+                      <div className="col-span-1 text-center text-[10px] whitespace-nowrap">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('id-ID') : '-'}</div>
+                      <div className="col-span-1 text-center font-mono font-bold whitespace-nowrap">{p.stock} <span className="text-gray-400 font-sans text-[10px] font-normal">{p.unit}</span></div>
+                      <div className="col-span-1 text-center">
                         {isOutOfStock ? <span className="bg-red-50 text-red-700 text-[10px] px-2 py-0.5 rounded">Habis</span> : isLowStock ? <span className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5 rounded">Kritis</span> : <span className="bg-green-50 text-green-800 text-[10px] px-2 py-0.5 rounded">Sehat</span>}
                       </div>
-                      <div className="w-1/12 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => handleOpenEdit(p)} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600">
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300">
-                            +/- Stok
-                          </button>
-                          <button onClick={() => { if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) deleteProduct(p.id); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-400">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      <div className="col-span-2 text-center flex items-center justify-center gap-1">
+                        <button onClick={() => handleOpenEdit(p)} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600">
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="px-2 py-1 text-[10px] font-bold rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300 whitespace-nowrap">
+                          +/- Stok
+                        </button>
+                        <button onClick={() => { if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) deleteProduct(p.id); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-400">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   );
                 }}
               </List>
+              {/* TOTAL ROW */}
+              <div className="bg-indigo-50/50 text-[11px] text-gray-800 font-extrabold border-t-2 border-indigo-100 py-4 px-4 grid grid-cols-12 gap-3 items-center shadow-inner">
+                <div className="col-span-4 text-right pr-4 uppercase tracking-widest text-indigo-700 flex items-center justify-end gap-2">
+                  <span>TOTAL KESELURUHAN</span>
+                  <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[9px]">{filteredProducts.length} Jenis (SKU)</span>
+                </div>
+                <div className="col-span-1 text-right whitespace-nowrap text-indigo-700">Rp {filteredProducts.reduce((sum, p) => sum + (p.costPrice * p.stock), 0).toLocaleString('id-ID')}</div>
+                <div className="col-span-1 text-right whitespace-nowrap text-green-700">Rp {filteredProducts.reduce((sum, p) => sum + (p.price * p.stock), 0).toLocaleString('id-ID')}</div>
+                <div className="col-span-1"></div>
+                <div className="col-span-1"></div>
+                <div className="col-span-1 text-center whitespace-nowrap text-indigo-700">{filteredProducts.reduce((sum, p) => sum + p.stock, 0).toLocaleString('id-ID')} Pcs</div>
+                <div className="col-span-1"></div>
+                <div className="col-span-2"></div>
+              </div>
+            </>
             )}
           </div>
         </div>
@@ -1024,6 +1063,7 @@ export default function InventoryPage() {
                       placeholder="Masukkan Barcode..."
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1064,6 +1104,7 @@ export default function InventoryPage() {
                           placeholder="Scan Barcode Box"
                           value={boxBarcode}
                           onChange={(e) => setBoxBarcode(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                         />
                       </div>
                       <div className="space-y-1">

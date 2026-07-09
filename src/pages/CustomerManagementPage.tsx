@@ -9,10 +9,14 @@ export default function CustomerManagementPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [customId, setCustomId] = useState('');
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [totalPointsEarned, setTotalPointsEarned] = useState(0);
+  const [totalPointsRedeemed, setTotalPointsRedeemed] = useState(0);
   const [points, setPoints] = useState(0);
+  const [lastPointsUpdate, setLastPointsUpdate] = useState(new Date().toISOString().split('T')[0]);
   const [debtAmount, setDebtAmount] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,29 +27,43 @@ export default function CustomerManagementPage() {
 
   const filtered = customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  const totalPointsEarnedSum = filtered.reduce((sum, c) => sum + (c.totalPointsEarned || c.points), 0);
+  const totalPointsRedeemedSum = filtered.reduce((sum, c) => sum + (c.totalPointsRedeemed || 0), 0);
+  const totalRemainingPointsSum = filtered.reduce((sum, c) => sum + (c.points || 0), 0);
+  const totalValueSum = filtered.reduce((sum, c) => sum + ((c.points || 0) * (settings?.pointRedemptionValue || 10)), 0);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      updateCustomer(editingId, { name, phone, points, debtAmount });
+      updateCustomer(editingId, { id: customId || editingId, name, phone, points, totalPointsEarned, totalPointsRedeemed, lastPointsUpdate, debtAmount });
+      if (customId && customId !== editingId) setEditingId(customId);
     } else {
-      addCustomer({ tenantId: currentUser?.tenantId || 'tenant_default', name, phone, points, debtAmount, branchId: currentUser?.branchId });
+      addCustomer({ id: customId || undefined, tenantId: currentUser?.tenantId || 'tenant_default', name, phone, points, totalPointsEarned, totalPointsRedeemed, lastPointsUpdate, debtAmount, branchId: currentUser?.branchId });
     }
     resetForm();
   };
 
   const resetForm = () => {
+    setCustomId('');
     setName('');
     setPhone('');
+    setTotalPointsEarned(0);
+    setTotalPointsRedeemed(0);
     setPoints(0);
+    setLastPointsUpdate(new Date().toISOString().split('T')[0]);
     setDebtAmount(0);
     setIsAdding(false);
     setEditingId(null);
   };
 
   const handleEdit = (c: any) => {
+    setCustomId(c.id);
     setName(c.name);
     setPhone(c.phone);
+    setTotalPointsEarned(c.totalPointsEarned || c.points || 0);
+    setTotalPointsRedeemed(c.totalPointsRedeemed || 0);
     setPoints(c.points || 0);
+    setLastPointsUpdate(c.lastPointsUpdate || (c.createdAt ? c.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]));
     setDebtAmount(c.debtAmount || 0);
     setEditingId(c.id);
     setIsAdding(true);
@@ -200,22 +218,50 @@ export default function CustomerManagementPage() {
           <h2 className="text-lg font-bold mb-4">{editingId ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}</h2>
           <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Nama Lengkap</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <label className="block text-xs font-bold text-gray-600 mb-1">id</label>
+              <input type="text" value={customId} onChange={e => setCustomId(e.target.value)} placeholder="(Otomatis)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Nomor WhatsApp</label>
+              <label className="block text-xs font-bold text-gray-600 mb-1">phone</label>
               <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Total Point</label>
-              <input type="number" min={0} value={points} onChange={e => setPoints(Number(e.target.value) || 0)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <label className="block text-xs font-bold text-gray-600 mb-1">name</label>
+              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Piutang / Kasbon (Rp)</label>
-              <input type="number" min={0} value={debtAmount} onChange={e => setDebtAmount(Number(e.target.value) || 0)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Total Point</label>
+                <input type="number" min={0} value={totalPointsEarned} onChange={e => {
+                  const val = Number(e.target.value) || 0;
+                  setTotalPointsEarned(val);
+                  setPoints(Math.max(0, val - totalPointsRedeemed));
+                }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">point terpakai</label>
+                <input type="number" min={0} value={totalPointsRedeemed} onChange={e => {
+                  const val = Number(e.target.value) || 0;
+                  setTotalPointsRedeemed(val);
+                  setPoints(Math.max(0, totalPointsEarned - val));
+                }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
             </div>
-            <button type="submit" className="w-full bg-green-600 text-white font-bold py-2 rounded-lg">Simpan Data</button>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Sisa Point</label>
+                <input type="number" min={0} value={points} onChange={e => setPoints(Number(e.target.value) || 0)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">tanggal update</label>
+                <input type="date" required value={lastPointsUpdate} onChange={e => setLastPointsUpdate(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Nilai (Rp)</label>
+                <input type="number" min={0} value={points * (settings?.pointRedemptionValue || 10)} onChange={e => setPoints(Math.floor((Number(e.target.value) || 0) / (settings?.pointRedemptionValue || 10)))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-right font-bold text-green-700" />
+              </div>
+            </div>
+            <button type="submit" className="w-full bg-green-600 text-white font-bold py-2 rounded-lg mt-2">Simpan Data</button>
           </form>
         </div>
       )}
@@ -230,54 +276,72 @@ export default function CustomerManagementPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50/50 text-gray-500 font-medium">
+            <thead className="bg-gray-50/50 text-gray-500 font-medium whitespace-nowrap">
               <tr>
-                <th className="px-6 py-4">Nama Pelanggan</th>
-                <th className="px-6 py-4">No. WhatsApp</th>
-                <th className="px-6 py-4 text-center">Poin Loyalitas</th>
-                <th className="px-6 py-4 text-right">Piutang (Kasbon)</th>
-                <th className="px-6 py-4 text-center">Aksi</th>
+                <th className="px-4 py-4 align-middle">No</th>
+                <th className="px-4 py-4 align-middle">id</th>
+                <th className="px-4 py-4 align-middle">phone</th>
+                <th className="px-4 py-4 align-middle">name</th>
+                <th className="px-4 py-4 text-center align-middle">Total Point</th>
+                <th className="px-4 py-4 text-center align-middle">point terpakai</th>
+                <th className="px-4 py-4 text-center align-middle">Sisa Point</th>
+                <th className="px-4 py-4 align-middle">tanggal update</th>
+                <th className="px-4 py-4 text-right align-middle">Nilai (Rp)</th>
+                <th className="px-4 py-4 text-center align-middle">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-bold text-gray-800">{c.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{c.phone}</td>
-                  <td className="px-6 py-4 text-center">
-                    <button onClick={() => {
-                      const val = prompt(`Ubah poin untuk ${c.name}:`, String(c.points));
-                      if (val === null) return;
-                      const n = Number(val);
-                      if (isNaN(n)) { alert('Masukkan angka valid'); return; }
-                      updateCustomer(c.id, { points: n });
-                    }} className="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-xs hover:opacity-80">
-                      {c.points} Pts
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold">
-                    {c.debtAmount > 0 ? (
-                      <span className="text-red-600">Rp {c.debtAmount.toLocaleString('id-ID')}</span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-center space-x-2">
-                    {c.debtAmount > 0 && (
-                      <button onClick={() => handlePayDebt(c)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Bayar Piutang">
-                        <CreditCard className="w-4 h-4" />
+            <tbody className="divide-y divide-gray-100 whitespace-nowrap">
+              {filtered.map((c, index) => {
+                const totalPoint = c.totalPointsEarned || c.points;
+                const pointTerpakai = c.totalPointsRedeemed || 0;
+                const sisaPoint = c.points;
+                const updateDate = c.lastPointsUpdate || c.createdAt.split('T')[0];
+                const nilaiRp = sisaPoint * (settings?.pointRedemptionValue || 10);
+
+                return (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4 text-gray-600 align-middle">{index + 1}</td>
+                    <td className="px-4 py-4 text-gray-500 font-mono text-xs align-middle">{c.id.substring(0, 8)}</td>
+                    <td className="px-4 py-4 text-gray-600 align-middle">{c.phone}</td>
+                    <td className="px-4 py-4 font-bold text-gray-800 align-middle whitespace-normal min-w-[200px]">{c.name}</td>
+                    <td className="px-4 py-4 text-center align-middle">{totalPoint}</td>
+                    <td className="px-4 py-4 text-center align-middle">{pointTerpakai}</td>
+                    <td className="px-4 py-4 text-center align-middle">
+                      <button onClick={() => {
+                        const val = prompt(`Ubah poin untuk ${c.name}:`, String(c.points));
+                        if (val === null) return;
+                        const n = Number(val);
+                        if (isNaN(n)) { alert('Masukkan angka valid'); return; }
+                        updateCustomer(c.id, { points: n });
+                      }} className="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-xs hover:opacity-80">
+                        {sisaPoint}
                       </button>
-                    )}
-                    <button onClick={() => handleEdit(c)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg" title="Edit">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => deleteCustomer(c.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Hapus">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-4 text-gray-500 text-xs align-middle">{updateDate}</td>
+                    <td className="px-4 py-4 text-right font-bold text-green-700 align-middle">Rp {nilaiRp.toLocaleString('id-ID')}</td>
+                    <td className="px-4 py-4 text-center space-x-2 align-middle">
+                      <button onClick={() => handleEdit(c)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg" title="Edit">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteCustomer(c.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Hapus">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
+            <tfoot className="bg-gray-100 font-bold text-gray-800 border-t border-gray-200 whitespace-nowrap">
+              <tr>
+                <td colSpan={4} className="px-4 py-4 text-right align-middle">TOTAL</td>
+                <td className="px-4 py-4 text-center align-middle">{totalPointsEarnedSum}</td>
+                <td className="px-4 py-4 text-center align-middle">{totalPointsRedeemedSum}</td>
+                <td className="px-4 py-4 text-center align-middle">{totalRemainingPointsSum}</td>
+                <td className="px-4 py-4 align-middle"></td>
+                <td className="px-4 py-4 text-right text-green-700 align-middle">Rp {totalValueSum.toLocaleString('id-ID')}</td>
+                <td className="px-4 py-4 align-middle"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

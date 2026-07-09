@@ -313,33 +313,31 @@ export default function KatalogUmumPage() {
                     const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
                     return (
                       <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
-                        <div className="h-32 bg-slate-100 relative">
+                        <div className="h-20 bg-slate-100 relative">
                           {p.image ? (
                             <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-300">
-                              <Package className="w-12 h-12" />
-                            </div>
+                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`} alt={p.name} className="w-full h-full object-cover" />
                           )}
-                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2 py-1 rounded text-slate-600 shadow-sm">{p.category}</div>
+                          <div className="absolute top-1 left-1 bg-white/90 backdrop-blur-sm text-[8px] font-bold px-1.5 py-0.5 rounded text-slate-600 shadow-sm">{p.category}</div>
                         </div>
-                        <div className="p-3 flex-1 flex flex-col">
-                          <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
-                          <p className="text-green-700 font-black text-lg">Rp {p.price.toLocaleString('id-ID')}</p>
-                          <p className="text-xs text-slate-500 mb-3">Stok: {p.stock} {p.unit}</p>
+                        <div className="p-2 flex-1 flex flex-col">
+                          <h3 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
+                          <p className="text-green-700 font-black text-base">Rp {p.price.toLocaleString('id-ID')}</p>
+                          <p className="text-[11px] text-slate-500 mb-2">Stok: {p.stock} {p.unit}</p>
                           
                           {inCart > 0 ? (
-                            <div className="flex items-center justify-between bg-green-50 rounded-lg p-1 border border-green-100">
-                              <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm">-</button>
-                              <span className="font-bold text-green-800">{inCart}</span>
-                              <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50">+</button>
+                           <div className="flex items-center justify-between bg-green-50 rounded-lg p-0.5 border border-green-100">
+                             <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm text-xs">-</button>
+                             <span className="font-bold text-green-800 text-xs">{inCart}</span>
+                             <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50 text-xs">+</button>
                             </div>
                       ) : (
                         <button 
                           onClick={() => addToCustomerCart(p)}
-                          className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
+                          className="w-full py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
                         >
-                          <ShoppingBag className="w-4 h-4"/> Tambah
+                          <ShoppingBag className="w-3 h-3"/> Tambah
                         </button>
                       )}
                     </div>
@@ -390,9 +388,7 @@ export default function KatalogUmumPage() {
                         {item.product.image ? (
                           <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-300">
-                            <Package className="w-8 h-8" />
-                          </div>
+                          <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(item.product.name)}&background=random&color=fff&size=200&bold=true`} alt={item.product.name} className="w-full h-full object-cover" />
                         )}
                        </div>
                        <div className="flex-1">

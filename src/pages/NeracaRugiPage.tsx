@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function NeracaRugiPage() {
-  const { transactions, products, expenses, currentUser, activeBranchId, branches, addLog, addNotification, settings } = useBranchData();
+  const { transactions, products, expenses, journalEntries, currentUser, activeBranchId, branches, addLog, addNotification, settings } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
   const isReadOnlyRole = currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'PENGURUS';
 
@@ -101,28 +101,49 @@ export default function NeracaRugiPage() {
     return expDate >= startDate && expDate <= endDate;
   });
 
-  const totalRevenue = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
-  const totalHPP = filteredTransactions.reduce((sum, tx) =>
+  const periodTransactionsRevenue = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+  const periodTransactionsHPP = filteredTransactions.reduce((sum, tx) =>
     sum + (tx.items || []).reduce((s, it) => s + ((Number(it.costPrice) || 0) * (Number(it.quantity) || 0)), 0), 0
   );
+  const periodTransactionsExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+
+  // Manual Journals
+  const manualJournals = (journalEntries || []).filter(j => j.referenceType === 'MANUAL');
+  
+  const periodManualJournals = manualJournals.filter(j => {
+    const jd = j.date.split('T')[0];
+    return jd >= startDate && jd <= endDate;
+  });
+
+  let periodManualRevenue = 0;
+  let periodManualHPP = 0;
+  let periodManualExpenses = 0;
+
+  periodManualJournals.forEach(j => {
+    if (j.account.startsWith('4-')) periodManualRevenue += (j.credit - j.debit);
+    else if (j.account.startsWith('5-')) periodManualHPP += (j.debit - j.credit);
+    else if (j.account.startsWith('6-')) periodManualExpenses += (j.debit - j.credit);
+  });
+
+  const totalRevenue = periodTransactionsRevenue + periodManualRevenue;
+  const totalHPP = periodTransactionsHPP + periodManualHPP;
   const grossProfit = totalRevenue - totalHPP;
-  const totalExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  const totalExpenses = periodTransactionsExpenses + periodManualExpenses;
   const netProfit = grossProfit - totalExpenses;
-  const zakatRateDecimal = (settings.zakatRate || 2.5) / 100;
+  const zakatRateDecimal = (settings.charityZakatPercentage || 2.5) / 100;
   const zakatReserve = Math.max(0, netProfit) * zakatRateDecimal; // Zakat Niaga berdasarkan Keuntungan Bersih
 
   // Cumulative all-time balances supporting position (Balance Sheet)
-  const allTimeRevenue = (transactions || [])
+  const allTimeTransactionsRevenue = (transactions || [])
     .filter(tx => {
       if (!tx || !tx.timestamp) return false;
-      // Exclude voided transactions from financial reports
       if (tx.isVoided) return false;
       const txDate = String(tx.timestamp).split('T')[0];
       return txDate <= endDate;
     })
     .reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
 
-  const allTimeExpenses = (expenses || [])
+  const allTimeTransactionsExpenses = (expenses || [])
     .filter(exp => {
       if (!exp || !exp.date) return false;
       const expDate = String(exp.date).split('T')[0];
@@ -130,10 +151,9 @@ export default function NeracaRugiPage() {
     })
     .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-  const allTimeHPP = (transactions || [])
+  const allTimeTransactionsHPP = (transactions || [])
     .filter(tx => {
       if (!tx || !tx.timestamp) return false;
-      // Exclude voided transactions from financial reports
       if (tx.isVoided) return false;
       const txDate = String(tx.timestamp).split('T')[0];
       return txDate <= endDate;
@@ -142,10 +162,31 @@ export default function NeracaRugiPage() {
       sum + (tx.items || []).reduce((s, it) => s + ((Number(it.costPrice) || 0) * (Number(it.quantity) || 0)), 0), 0
     );
 
+  const cumulativeManualJournals = manualJournals.filter(j => {
+    const jd = j.date.split('T')[0];
+    return jd <= endDate;
+  });
+
+  let allTimeManualRevenue = 0;
+  let allTimeManualHPP = 0;
+  let allTimeManualExpenses = 0;
+  let allTimeManualCash = 0;
+
+  cumulativeManualJournals.forEach(j => {
+    if (j.account.startsWith('4-')) allTimeManualRevenue += (j.credit - j.debit);
+    else if (j.account.startsWith('5-')) allTimeManualHPP += (j.debit - j.credit);
+    else if (j.account.startsWith('6-')) allTimeManualExpenses += (j.debit - j.credit);
+    else if (j.account.startsWith('1-100') || j.account.startsWith('1-101')) allTimeManualCash += (j.debit - j.credit);
+  });
+
+  const allTimeRevenue = allTimeTransactionsRevenue + allTimeManualRevenue;
+  const allTimeExpenses = allTimeTransactionsExpenses + allTimeManualExpenses;
+  const allTimeHPP = allTimeTransactionsHPP + allTimeManualHPP;
+
   const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses;
 
-  // Sound liquid capital: initial seed + revenues cumulative - expenses cumulative
-  const cashOnHand = initialStoreCapital + allTimeRevenue - allTimeExpenses;
+  // Sound liquid capital: initial seed + POS revenues cumulative - POS expenses cumulative + manual cash movements
+  const cashOnHand = initialStoreCapital + allTimeTransactionsRevenue - allTimeTransactionsExpenses + allTimeManualCash;
 
   // Unsold merchandise stock valuation (asset)
   const valueOfInventory = (products || []).reduce((sum, p) => sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
@@ -185,7 +226,7 @@ export default function NeracaRugiPage() {
       ["LABA KOTOR PERNIAGAAN", grossProfit],
       ["Total Beban Operasional", -totalExpenses],
       ["LABA BERSIH OPERASIONAL", netProfit],
-      ["Cadangan Zakat Usaha (2.5%)", zakatReserve],
+      [`Cadangan ${settings.charityTitle || 'Zakat Usaha'} (${settings.charityZakatPercentage || 2.5}%)`, zakatReserve],
       [],
       ["--- NERACA POSISI KEUANGAN (PSAK 101) ---"],
       ["POS AKTIVA (ASET)", "Jumlah", "POS PASIVA (LIABILITAS / MODAL)", "Jumlah"],
@@ -418,7 +459,7 @@ export default function NeracaRugiPage() {
 
           <div className="mt-6 space-y-3 pt-3 border-t border-gray-100">
             <div className="flex justify-between font-extrabold text-slate-900 text-sm py-3 bg-slate-50 px-3.5 rounded-lg border">
-              <span>{netProfit >= 0 ? 'LABA BERSIH (SEBELUM ZAKAT)' : 'RUGI BERSIH BERJALAN'}</span>
+              <span>{netProfit >= 0 ? 'LABA BERSIH (SEBELUM DIBAGI HASIL)' : 'RUGI BERSIH BERJALAN'}</span>
               <span className={`${netProfit >= 0 ? 'text-green-800' : 'text-red-600'} font-mono`}>
                 {netProfit < 0 ? '-' : ''}Rp {Math.abs(netProfit).toLocaleString('id-ID')}
               </span>
@@ -428,23 +469,14 @@ export default function NeracaRugiPage() {
               <div className="flex justify-between items-center font-bold mb-1">
                 <span className="flex items-center space-x-1">
                   <Coins className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Kewajiban Zakat Niaga ({settings.zakatRate || 2.5}%)</span>
+                  <span>Informasi Cadangan {settings.charityTitle || 'Amal/Zakat'} ({settings.charityZakatPercentage || 2.5}%)</span>
                 </span>
                 <span className="font-mono font-black text-amber-700">Rp {zakatReserve.toLocaleString('id-ID')}</span>
               </div>
               <p className="text-[10px] text-green-800 font-medium">
-                Sesuai Fatwa Syariah, kewajiban zakat ditarik otomatis dari surplus laba bersih.
+                Ini adalah informasi pencadangan dana dari surplus laba. Jika Anda ingin menyalurkan dana ini, silakan input manual di menu <b>Jurnal / Pengeluaran</b> agar mengurangi saldo kas aktual.
               </p>
             </div>
-
-            {netProfit >= 0 && (
-              <div className="flex justify-between font-extrabold text-white text-sm py-3 bg-green-700 px-3.5 rounded-lg border border-green-800 shadow-sm">
-                <span>SHU BERSIH (SIAP BAGI HASIL MUDHARABAH)</span>
-                <span className="font-mono">
-                  Rp {(netProfit - zakatReserve).toLocaleString('id-ID')}
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
@@ -646,7 +678,7 @@ export default function NeracaRugiPage() {
                 <td className="p-2 border border-gray-300 text-right text-green-800">Rp {netProfit.toLocaleString('id-ID')}</td>
               </tr>
               <tr>
-                <td className="p-2 border border-gray-300 italic">Cadangan Zakat Usaha (2.5% dari Laba Bersih)</td>
+                <td className="p-2 border border-gray-300 italic">Cadangan {settings.charityTitle || 'Amal/Zakat'} ({settings.charityZakatPercentage || 2.5}% dari Laba Bersih)</td>
                 <td className="p-2 border border-gray-300 text-right italic text-amber-700">Rp {zakatReserve.toLocaleString('id-ID')}</td>
               </tr>
             </tbody>

@@ -132,7 +132,7 @@ export default function CoAPage() {
               </button>
               <button onClick={() => {
                 const headers = ['Kode', 'Nama Akun', 'Kategori', 'Saldo Normal', 'Saldo Awal', 'Status', 'Aksi'];
-                const sample = ['1103', 'Bank Syariah Indonesia 7216467242', 'ASSET', 'Debit', 0, 'Aktif', ''];
+                const sample = ['1101', 'Kas', 'Aset', 'Debit', 0, 'Aktif', ''];
                 const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, 'Template CoA');
@@ -179,7 +179,15 @@ export default function CoAPage() {
                         const codeVal = String(row[idxCode] || '').trim();
                         const nameVal = String(row[idxName] || '').trim();
                         if (!codeVal || !nameVal) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
-                        const catVal = idxCategory !== -1 ? String(row[idxCategory] || 'ASSET').trim().toUpperCase() : 'ASSET';
+                        
+                        let rawCat = idxCategory !== -1 ? String(row[idxCategory] || '').trim().toUpperCase() : '';
+                        let catVal = 'ASSET';
+                        if (['ASET', 'ASSET'].includes(rawCat)) catVal = 'ASSET';
+                        else if (['LIABILITAS', 'LIABILITY', 'KEWAJIBAN'].includes(rawCat)) catVal = 'LIABILITY';
+                        else if (['EKUITAS', 'EQUITY', 'MODAL'].includes(rawCat)) catVal = 'EQUITY';
+                        else if (['PENDAPATAN', 'REVENUE'].includes(rawCat)) catVal = 'REVENUE';
+                        else if (['BEBAN', 'EXPENSE', 'BIAYA'].includes(rawCat)) catVal = 'EXPENSE';
+                        
                         let statusVal = true;
                         if (idxStatus !== -1) {
                           const raw = String(row[idxStatus] || '').trim().toLowerCase();

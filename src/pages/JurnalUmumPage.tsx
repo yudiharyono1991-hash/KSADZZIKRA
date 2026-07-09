@@ -140,6 +140,7 @@ export default function JurnalUmumPage() {
   }, [journalEntries]);
 
   const getAccountName = (code: string) => {
+    if (!code || !code.trim()) return "Tidak Diketahui / Kosong";
     const coa = coaList.find(c => c.code === code);
     return coa ? `${coa.code} - ${coa.name}` : code;
   };
@@ -197,11 +198,24 @@ export default function JurnalUmumPage() {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-green-50/50 p-4 rounded-xl border border-green-100">
               <div className="md:col-span-2 space-y-1">
                 <label className="text-[10px] uppercase font-bold text-green-700">Akun Debit (Tujuan)</label>
-                <select value={debitAccount} onChange={(e) => setDebitAccount(e.target.value)} className="w-full border border-green-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-800 bg-white">
+                <input 
+                  list="coa-list-debit" 
+                  value={debitAccount} 
+                  onChange={(e) => {
+                    setDebitAccount(e.target.value);
+                    const selected = coaList.find(c => c.code === e.target.value);
+                    if (selected && !description) {
+                      setDescription(`Jurnal Manual: ${selected.name}`);
+                    }
+                  }} 
+                  className="w-full border border-green-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-800 bg-white"
+                  placeholder="Ketik Kode atau Nama Akun..."
+                />
+                <datalist id="coa-list-debit">
                   {coaList.filter(c => c.isActive).map(c => (
                     <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div className="hidden md:flex justify-center">
@@ -212,11 +226,18 @@ export default function JurnalUmumPage() {
 
               <div className="md:col-span-2 space-y-1">
                 <label className="text-[10px] uppercase font-bold text-orange-700">Akun Kredit / Jurnal Lawan (Sumber)</label>
-                <select value={creditAccount} onChange={(e) => setCreditAccount(e.target.value)} className="w-full border border-orange-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-800 bg-white">
+                <input 
+                  list="coa-list-credit" 
+                  value={creditAccount} 
+                  onChange={(e) => setCreditAccount(e.target.value)} 
+                  className="w-full border border-orange-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-800 bg-white"
+                  placeholder="Ketik Kode atau Nama Akun..."
+                />
+                <datalist id="coa-list-credit">
                   {coaList.filter(c => c.isActive).map(c => (
                     <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
                   ))}
-                </select>
+                </datalist>
               </div>
             </div>
 

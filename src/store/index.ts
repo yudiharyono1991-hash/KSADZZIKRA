@@ -180,7 +180,7 @@ interface AppState {
   deleteBranch: (id: string) => void;
 
   // CRM & Supplier
-  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => void;
+  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'> & { id?: string }) => void;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
   addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => void;
@@ -448,11 +448,15 @@ const getSavedCategories = (tenantId?: string): string[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item) => String(item).trim()).filter((item) => item.length > 0);
+        const dummyList = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+        const filtered = parsed
+          .map((item) => String(item).trim())
+          .filter((item) => item.length > 0 && !dummyList.includes(item));
+        return filtered;
       }
     } catch (e) {}
   }
-  return ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+  return [];
 };
 
 const getSavedCustomers = (): Customer[] => {
@@ -881,7 +885,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addCustomer: (customerData) => {
     const newCustomer: Customer = {
       ...customerData,
-      id: `cust_${Date.now()}`,
+      id: customerData.id || `cust_${Date.now()}`,
       createdAt: new Date().toISOString(),
       branchId: customerData.branchId || get().currentUser?.branchId
     };
@@ -1379,12 +1383,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // Journal Entry
     const now = new Date().toISOString();
+    const resolveCoa = (keyword: string, fallback: string) => {
+      const coas = get().coaList;
+      const exact = coas.find(c => c.code === fallback || c.code.includes(fallback.split(' ')[0]));
+      if (exact) return exact.code;
+      const fuzzy = coas.find(c => c.name.toLowerCase().includes(keyword.toLowerCase()));
+      return fuzzy ? fuzzy.code : fallback;
+    };
+
+    const kasCode = paymentMethod === 'TRANSFER_BSI' ? resolveCoa('bank', '1-1002 Kas di Bank') : resolveCoa('kas', '1-1001 Kas Tunai');
+
     const newJournals: JournalEntry[] = [
       {
         id: `je_1_${Date.now()}`,
         tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
-        account: paymentMethod === 'TRANSFER_BSI' ? '1-1002 Kas di Bank' : '1-1001 Kas Tunai',
+        account: kasCode,
         description: `Penerimaan Online ${invoiceNo}`,
         debit: totalAmount,
         credit: 0,
@@ -1400,8 +1414,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     order.items.forEach(item => {
       const prod = products.find(p => p.id === item.productId);
-      const sCoa = prod?.salesCoaCode || '4-1001 Pendapatan Penjualan';
-      const cCoa = prod?.cogsCoaCode || '5-1000 Beban Pokok Penjualan (HPP)';
+      const sCoa = prod?.salesCoaCode || resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan');
+      const cCoa = prod?.cogsCoaCode || resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)');
       
       const rev = item.price * item.quantity;
       const cogs = (prod?.costPrice || 0) * item.quantity;
@@ -1447,7 +1461,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: `je_inv_${Date.now()}_${index}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
-          account: '1-1040 Persediaan Barang Dagang',
+          account: resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang'),
           description: `Keluar Persediaan ${invoiceNo}`,
           debit: 0,
           credit: amount,
@@ -1461,6 +1475,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const updatedTxs = [newTx, ...transactions];
     const updatedJournals = [...newJournals, ...journalEntries];
+
+    // Handle Customer Points for Online Orders
+    if (order.customerId) {
+      const currentCustomer = get().customers.find(c => c.id === order.customerId);
+      if (currentCustomer) {
+        const earnedPoints = Math.floor(totalAmount / 1000);
+        get().updateCustomer(order.customerId, {
+          points: (currentCustomer.points || 0) + earnedPoints,
+          totalPointsEarned: (currentCustomer.totalPointsEarned || 0) + earnedPoints,
+          lastPointsUpdate: new Date().toISOString().split('T')[0]
+        });
+      }
+    }
+
     set({ 
       products: updatedProducts, 
       transactions: updatedTxs,
@@ -1532,7 +1560,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (currentCustomer && redeemed > (currentCustomer.points || 0)) {
       return null;
     }
-    const pointsDiscount = redeemed * 10;
+    const pointsDiscount = (settings.enablePoints !== false) ? (redeemed * (settings.pointRedemptionValue || 10)) : 0;
     let totalAmount = Math.max(0, baseTotal - discountAmount - pointsDiscount);
     let taxAmount = 0;
     if (settings.isTaxEnabled) {
@@ -1541,7 +1569,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     const marginContribution = totalAmount - taxAmount - totalCost; // Tax is not profit
-    const zakatContribution = marginContribution > 0 ? marginContribution * 0.025 : 0; // 2.5% shariah margin zakat
+    
+    let zakatContribution = 0;
+    if (settings.enableCharityZakat !== false) {
+      const zakatPct = (settings.charityZakatPercentage ?? 2.5) / 100;
+      zakatContribution = marginContribution > 0 ? marginContribution * zakatPct : 0;
+    }
     
     let actualPaid = splitPayments ? splitPayments.reduce((s, p) => s + p.amount, 0) : amountPaid;
     if (paymentMethod === 'KASBON') {
@@ -1579,7 +1612,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       taxAmount,
       splitPayments,
       branchId: currentUser.branchId,
-      pointsEarned: paymentMethod !== 'KASBON' ? Math.floor(totalAmount / 1000) : 0,
+      pointsEarned: (paymentMethod !== 'KASBON' && settings.enablePoints !== false) ? Math.floor(totalAmount / (settings.pointEarningRate || 1000)) : 0,
       pointsRedeemed: redeemed,
       pointsDiscount: pointsDiscount
     };
@@ -1621,7 +1654,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (customerId) {
       const earnedPoints = paymentMethod !== 'KASBON' ? Math.floor(totalAmount / 1000) : 0;
       get().updateCustomer(customerId, {
-        points: Math.max(0, (currentCustomer?.points || 0) - redeemed + earnedPoints)
+        points: Math.max(0, (currentCustomer?.points || 0) - redeemed + earnedPoints),
+        totalPointsEarned: (currentCustomer?.totalPointsEarned || 0) + earnedPoints,
+        totalPointsRedeemed: (currentCustomer?.totalPointsRedeemed || 0) + redeemed,
+        lastPointsUpdate: new Date().toISOString().split('T')[0]
       });
     }
 
@@ -1632,9 +1668,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     let autoJournals: JournalEntry[] = [];
     
+    const resolveCoa = (keyword: string, fallback: string) => {
+      const coas = get().coaList;
+      const exact = coas.find(c => c.code === fallback || c.code.includes(fallback.split(' ')[0]));
+      if (exact) return exact.code;
+      const fuzzy = coas.find(c => c.name.toLowerCase().includes(keyword.toLowerCase()));
+      return fuzzy ? fuzzy.code : fallback;
+    };
+
     if (splitPayments && splitPayments.length > 0) {
       splitPayments.forEach((sp, i) => {
-        const akunKas = sp.method === 'CASH' ? 'KAS' : sp.method === 'QRIS_SHARIAH' ? 'QRIS_SYARIAH' : 'BANK_BSI';
+        const akunKas = sp.method === 'CASH' ? resolveCoa('kas', 'KAS') : sp.method === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : resolveCoa('bank', 'BANK_BSI');
         autoJournals.push({
           id: `${jId}_${i+1}`,
           tenantId: currentUser.tenantId || 'tenant_default',
@@ -1650,7 +1694,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       });
     } else {
-      const akunKas = paymentMethod === 'CASH' ? 'KAS' : paymentMethod === 'QRIS_SHARIAH' ? 'QRIS_SYARIAH' : paymentMethod === 'KASBON' ? 'PIUTANG_DAGANG' : 'BANK_BSI';
+      const akunKas = paymentMethod === 'CASH' ? resolveCoa('kas', 'KAS') : paymentMethod === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : paymentMethod === 'KASBON' ? resolveCoa('piutang', 'PIUTANG_DAGANG') : resolveCoa('bank', 'BANK_BSI');
       autoJournals.push({
         id: `${jId}_1`,
         tenantId: currentUser.tenantId || 'tenant_default',
@@ -1672,8 +1716,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     cart.forEach(item => {
       const prod = productList.find(p => p.id === item.product.id) || item.product;
-      const sCoa = prod.salesCoaCode || '4-1001 Pendapatan Penjualan';
-      const cCoa = prod.cogsCoaCode || '5-1000 Beban Pokok Penjualan (HPP)';
+      const sCoa = prod.salesCoaCode || resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan');
+      const cCoa = prod.cogsCoaCode || resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)');
       
       const rev = getDynamicPrice(item) * item.quantity;
       const cogs = (item.isBox ? (prod.boxCostPrice || 0) : prod.costPrice) * item.quantity;
@@ -1729,7 +1773,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: `${jId}_inv_${index}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
-          account: '1-1040 Persediaan Barang Dagang',
+          account: resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang'),
           description: `[Auto] Keluar Persediaan ${invoiceNo}`,
           debit: 0,
           credit: amount,
@@ -1746,7 +1790,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: `${jId}_tax`,
         tenantId: currentUser.tenantId || 'tenant_default',
         date: now,
-        account: 'HUTANG_PAJAK',
+        account: resolveCoa('pajak', 'HUTANG_PAJAK'),
         description: `[Auto] Pajak dari ${invoiceNo}`,
         debit: 0,
         credit: taxAmount,
@@ -1971,11 +2015,65 @@ export const useAppStore = create<AppState>((set, get) => ({
       productId,
       type: amount > 0 ? 'IN' : 'OUT',
       qty: Math.abs(amount),
-      reason: 'Penyesuaian Manual (Adjustment)',
+      reason: 'Penyesuaian Manual / Opname',
       branchId: prod.branchId
     });
 
     get().addLog('STOCK_ADJUST', 'INVENTORY', `Penyesuaian stok ${prod.name} sejumlah ${amount > 0 ? '+' : ''}${amount}`);
+
+    // Generate Journal Entries for Financial Report
+    const totalValue = Math.abs(amount) * (prod.costPrice || 0);
+    if (totalValue > 0) {
+      const now = new Date().toISOString();
+      const currentUser = get().currentUser;
+      const refId = `opname_${Date.now()}`;
+      
+      if (amount < 0) {
+        // Stock reduced (loss/shrinkage)
+        get().addJournalEntry({
+          date: now,
+          account: 'BEBAN POKOK PENDAPATAN',
+          description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
+          debit: totalValue,
+          credit: 0,
+          referenceId: refId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name || 'System'
+        });
+        get().addJournalEntry({
+          date: now,
+          account: 'PERSEDIAAN BARANG DAGANG',
+          description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
+          debit: 0,
+          credit: totalValue,
+          referenceId: refId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name || 'System'
+        });
+      } else {
+        // Stock increased (gain)
+        get().addJournalEntry({
+          date: now,
+          account: 'PERSEDIAAN BARANG DAGANG',
+          description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
+          debit: totalValue,
+          credit: 0,
+          referenceId: refId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name || 'System'
+        });
+        get().addJournalEntry({
+          date: now,
+          account: 'PENDAPATAN LAINNYA',
+          description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
+          debit: 0,
+          credit: totalValue,
+          referenceId: refId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name || 'System'
+        });
+      }
+    }
     
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(updated);
@@ -2326,6 +2424,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     get().addLog('SYSTEM_RESET', 'SYSTEM', 'Seluruh data uji coba telah dihapus');
+
+    if (isSupabaseConfigured && tenantId) {
+      supabaseService.clearAllDatabase(tenantId);
+    }
   },
   
   // Add Log implementation
