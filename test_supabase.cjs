@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = "https://wzfwiuolqzxbovpcpbli.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6ZndpdW9scXp4Ym92cGNwYmxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5NjA3NjgsImV4cCI6MjA3NzUzNjc2OH0.gpe9qIamqwXIUUqe8ui5pVBbq14xS0CXOfxyJDyWqMw";
+const SUPABASE_URL = "https://tbuyexfeehejbfyhpygg.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRidXlleGZlZWhlamJmeWhweWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTc0NDUsImV4cCI6MjA5ODg3MzQ0NX0.RBk_MBcqoyYiFdDZNhn7Vlbg7M3o0Ae4vMTwlTRLMto";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -14,7 +14,7 @@ const defaultUsers = [
 async function seedDefaultUsers() {
   console.log("Seeding default users to Supabase...");
   const { data, error } = await supabase.from('ksa_users').upsert(defaultUsers);
-  
+
   if (error) {
     console.error("Error seeding users:", error);
   } else {

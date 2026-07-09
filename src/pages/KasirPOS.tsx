@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import { 
@@ -20,8 +21,10 @@ import {
   Smartphone,
   Store,
   ChevronDown,
-  XOctagon
+  XOctagon,
+  Bluetooth
 } from 'lucide-react';
+import { printToBluetooth, openCashDrawerBluetooth } from '../lib/bluetoothPrinter';
 
 export default function KasirPOS() {
   const { 
@@ -35,10 +38,15 @@ export default function KasirPOS() {
     customers,
     promos,
     settings,
-    activeBranchId
+    activeBranchId,
+    categories: savedCategories
   } = useBranchData();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchDebounceRef = useRef<number | null>(null);
+  const searchWorkerRef = useRef<Worker | null>(null);
+  const [searchMatchedIds, setSearchMatchedIds] = useState<Array<string | number> | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   
   // Checkout Modal State
@@ -68,8 +76,31 @@ export default function KasirPOS() {
   const [scannedCustomerToken, setScannedCustomerToken] = useState('');
   
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const customerDropdownRef = React.useRef<HTMLDivElement>(null);
+
   const [selectedPromoId, setSelectedPromoId] = useState<string>('');
   const [pointsToRedeemInput, setPointsToRedeemInput] = useState('');
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target as Node)) {
+        setIsCustomerDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCustomers = React.useMemo(() => {
+    if (!customerSearchTerm) return customers;
+    const term = customerSearchTerm.toLowerCase();
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(term) || 
+      (c.phone && c.phone.includes(term))
+    );
+  }, [customers, customerSearchTerm]);
 
   // Countdown Timer
   const [timeLeft, setTimeLeft] = useState(0);
@@ -101,35 +132,123 @@ export default function KasirPOS() {
   };
 
   // Categories
-  const categories = ['ALL', 'PROMO', 'Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+  const categories = React.useMemo(() => {
+    const categorySet = new Set<string>(['ALL', 'PROMO']);
+    savedCategories?.forEach((cat) => {
+      if (cat && typeof cat === 'string') categorySet.add(cat.trim());
+    });
+    products.forEach((product) => {
+      if (product.category && typeof product.category === 'string') {
+        categorySet.add(product.category.trim());
+      }
+    });
+    return Array.from(categorySet);
+  }, [products, savedCategories]);
+
+  const ppobCategories = React.useMemo(() => {
+    const categorySet = new Set<string>(['ALL']);
+    products.forEach((product) => {
+      if (product.isPPOB && product.category && typeof product.category === 'string') {
+        categorySet.add(product.category.trim());
+      }
+    });
+    return Array.from(categorySet);
+  }, [products]);
+
+  // Init worker
+  useEffect(() => {
+    try {
+      if (!searchWorkerRef.current) {
+        const worker = new Worker(new URL('../workers/searchWorker.ts', import.meta.url), { type: 'module' });
+        worker.onmessage = (ev) => {
+          const { type, results } = (ev.data || {});
+          if (type === 'result') setSearchMatchedIds(Array.isArray(results) ? results : []);
+        };
+        searchWorkerRef.current = worker;
+      }
+    } catch (err) {
+      console.warn('Failed to init search worker in KasirPOS', err);
+    }
+    return () => { if (searchWorkerRef.current) { searchWorkerRef.current.terminate(); searchWorkerRef.current = null; } };
+  }, []);
+
+  // send docs to worker on products change
+  useEffect(() => {
+    try {
+      if (searchWorkerRef.current) {
+        const docs = (products || []).map((p: any) => ({ id: p.id, name: p.name || '', sku: p.sku || '', category: p.category || '' }));
+        searchWorkerRef.current.postMessage({ type: 'init', payload: { docs } });
+      }
+    } catch (err) { console.warn(err); }
+  }, [products]);
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => { if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current); };
+  }, [searchQuery]);
+
+  // Trigger worker search
+  useEffect(() => {
+    setSearchMatchedIds(null);
+    try {
+      if (searchWorkerRef.current) {
+        searchWorkerRef.current.postMessage({ type: 'search', payload: { q: debouncedQuery } });
+      } else {
+        setSearchMatchedIds(null);
+      }
+    } catch (err) {
+      console.warn('KasirPOS search worker error', err);
+      setSearchMatchedIds(null);
+    }
+  }, [debouncedQuery]);
 
   // Filtered Products
-  const filteredProducts = products.filter(product => {
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = product.name.toLowerCase().includes(searchLower) || 
-                          product.sku.toLowerCase().includes(searchLower) ||
-                          (product.barcode && product.barcode.toLowerCase().includes(searchLower)) ||
-                          (product.hasBoxUnit && product.boxBarcode && product.boxBarcode.toLowerCase().includes(searchLower));
-    
-    let matchesCategory = false;
-    if (selectedCategory === 'ALL') {
-      matchesCategory = true;
-    } else if (selectedCategory === 'PROMO') {
-      matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
-    } else {
-      matchesCategory = product.category === selectedCategory;
+  const filteredProducts = useMemo(() => {
+    const q = (debouncedQuery || '').toLowerCase().trim();
+    if (q && searchMatchedIds) {
+      if (searchMatchedIds.length === 0) {
+        return [];
+      }
+      const idMap = new Map(products.map((p) => [p.id, p]));
+      const matched = searchMatchedIds.map((id) => idMap.get(id)).filter(Boolean) as Product[];
+      return matched.filter(product => {
+        let matchesCategory = false;
+        if (selectedCategory === 'ALL') matchesCategory = true;
+        else if (selectedCategory === 'PROMO') matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
+        else matchesCategory = product.category === selectedCategory;
+        const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+        if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
+        if (activeTab === 'PPOB' && !product.isPPOB) return false;
+        return matchesCategory && matchesBranch;
+      });
     }
 
-    const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
-    
-    // Tab filter
-    if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
-    if (activeTab === 'PPOB' && !product.isPPOB) return false;
+    return products.filter(product => {
+      const matchesSearch = !q || product.name.toLowerCase().includes(q) ||
+                            product.sku.toLowerCase().includes(q) ||
+                            (product.barcode && product.barcode.toLowerCase().includes(q)) ||
+                            (product.hasBoxUnit && product.boxBarcode && product.boxBarcode.toLowerCase().includes(q));
 
-    return matchesSearch && matchesCategory && matchesBranch;
-  });
+      let matchesCategory = false;
+      if (selectedCategory === 'ALL') {
+        matchesCategory = true;
+      } else if (selectedCategory === 'PROMO') {
+        matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
+      } else {
+        matchesCategory = product.category === selectedCategory;
+      }
 
-  const ppobCategories = ['ALL', 'Pulsa', 'Token Listrik', 'PDAM', 'BPJS'];
+      const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
+
+      if (activeTab === 'PHYSICAL' && product.isPPOB) return false;
+      if (activeTab === 'PPOB' && !product.isPPOB) return false;
+
+      return matchesSearch && matchesCategory && matchesBranch;
+    });
+  }, [products, debouncedQuery, selectedCategory, activeTab, activeBranchId, searchMatchedIds]);
+
   const displayCategories = activeTab === 'PHYSICAL' ? categories : ppobCategories;
 
   const handlePpobClick = (product: Product) => {
@@ -214,6 +333,18 @@ export default function KasirPOS() {
     window.print();
   };
 
+  const handleBluetoothPrint = async () => {
+    if (!receiptTx) return;
+    try {
+      const address = `${activeBranchId ? `CABANG ${activeBranchId}` : 'KANTOR PUSAT'}, INDONESIA`;
+      const zakatTitle = settings.charityTitle || 'MISI BERKAH BERAMAL';
+      const zakatDesc = settings.charityDescription ? settings.charityDescription : 'Zakat Kontribusi Sebesar Rp {amount} dari transaksi ini\ndicadangkan untuk kaum Dhuafa.';
+      await printToBluetooth(receiptTx, 'Toko KSA Mart', address, 'Telp: 082210027952', zakatTitle, zakatDesc);
+    } catch (err: any) {
+      alert(err.message || 'Gagal terhubung ke printer Bluetooth.');
+    }
+  };
+
   const handleSendWhatsApp = () => {
     if (!receiptTx) return;
     if (!customerPhone) {
@@ -259,9 +390,9 @@ export default function KasirPOS() {
   };
 
   return (
-    <div className="flex flex-col xl:flex-row gap-4 md:gap-6 flex-1 min-h-[500px]">
+    <div className="flex flex-col md:flex-row gap-2 md:gap-4 flex-1 min-h-[500px] w-full min-w-0 overflow-hidden">
       {/* Product Catalog Grid - Left */}
-      <div className="flex-1 flex flex-col h-[60vh] xl:h-full space-y-4">
+      <div className="flex-1 flex flex-col min-w-0 h-[60vh] md:h-[calc(100vh-100px)] space-y-3">
         
         {/* Type Tabs */}
         <div className="flex gap-2">
@@ -286,13 +417,14 @@ export default function KasirPOS() {
         </div>
 
         {/* Search & Filter Header */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1">
+        <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-xs flex flex-col gap-4">
+          <div className="relative w-full">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Search className="w-5 h-5 text-gray-400" />
             </span>
             <input
               type="text"
+              autoFocus
               className="w-full pl-10 pr-4 py-2 bg-white text-slate-800 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/25 focus:border-green-600"
               placeholder="Cari item berdasar nama produk / SKU / No Barcode..."
               value={searchQuery}
@@ -314,7 +446,7 @@ export default function KasirPOS() {
             />
           </div>
 
-          <div className="flex overflow-x-auto hide-scrollbar gap-2 py-1">
+          <div className="flex overflow-x-auto hide-scrollbar gap-2 py-1 w-full">
             {displayCategories.map(cat => (
               <button
                 key={cat}
@@ -339,104 +471,95 @@ export default function KasirPOS() {
               <p className="text-gray-500 font-medium">Produk tidak ditemukan.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map((p) => {
-                const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
-                const isOutOfStock = p.stock <= 0;
-                const isLowStock = p.stock <= p.minStock && p.stock > 0;
-
+            <List
+              height={Math.min(window.innerHeight * 0.72, 780)}
+              itemCount={Math.ceil(filteredProducts.length / (window.innerWidth >= 1536 ? 6 : window.innerWidth >= 1280 ? 5 : window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 4 : 3))}
+              itemSize={260}
+              width={'100%'}
+            >
+              {({ index, style }) => {
+                const cols = window.innerWidth >= 1536 ? 6 : window.innerWidth >= 1280 ? 5 : window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 4 : 3;
+                const start = index * cols;
+                const items = filteredProducts.slice(start, start + cols);
                 return (
-                  <div 
-                    key={p.id}
-                    onClick={() => {
-                      if (activeTab === 'PPOB') {
-                        handlePpobClick(p);
-                      } else if (!isOutOfStock) {
-                        addToCart(p, false);
-                      }
-                    }}
-                    className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
-                      isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
-                    }`}
-                  >
-                    {/* Halal Badge */}
-                    <div className="absolute top-2.5 right-2.5 z-10">
-                      <span className="bg-green-50 text-green-700 text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">
-                        Halal
-                      </span>
-                    </div>
-
-                    {/* Product Image */}
-                    <div className="w-full h-32 bg-slate-100 flex-shrink-0 relative">
-                      {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                          <Package className="w-8 h-8 mb-1" />
-                          <span className="text-[10px] font-bold uppercase tracking-widest">No Photo</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Card Content */}
-                    <div className="p-3 flex flex-col flex-1 justify-between">
-                      <div className="mb-2">
-                        <span className="text-[10px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
-                        <h3 className="font-bold text-sm text-gray-800 line-clamp-2 mt-1 leading-snug h-10">{p.name}</h3>
-                        <p className="text-[10px] text-gray-400 font-semibold uppercase mt-1">{p.category}</p>
-                      </div>
-
-                      <div className="mt-auto pt-2 border-t border-gray-50">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="font-bold text-gray-800 text-sm">
-                          Rp {p.price.toLocaleString('id-ID')}
-                        </span>
-                        
-                        {/* Stock pill */}
-                        {!p.isPPOB ? (
-                          isOutOfStock ? (
-                            <span className="text-[10px] font-semibold text-white bg-red-500 px-2 py-0.5 rounded-full">Habis</span>
-                          ) : isLowStock ? (
-                            <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">{p.stock} {p.unit}</span>
-                          ) : (
-                            <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{p.stock} {p.unit}</span>
-                          )
-                        ) : (
-                           <span className="text-[10px] font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">Digital</span>
-                        )}
-                      </div>
-
-                      {/* Add button / active inventory controller */}
-                      {isOutOfStock && !p.isPPOB ? (
-                        <button
-                          disabled
-                          className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed"
+                  <div style={style} className={`grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 px-1`}>
+                    {items.map((p) => {
+                      const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
+                      const isOutOfStock = p.stock <= 0;
+                      const isLowStock = p.stock <= p.minStock && p.stock > 0;
+                      return (
+                        <div 
+                          key={p.id}
+                          onClick={() => {
+                            if (activeTab === 'PPOB') {
+                              handlePpobClick(p);
+                            } else if (!isOutOfStock) {
+                              addToCart(p, false);
+                            }
+                          }}
+                          className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
+                            isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
+                          }`}
                         >
-                          Stok Kosong
-                        </button>
-                      ) : (
-                        <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
-                          <Plus className="w-3.5 h-3.5 mr-0.5" />
-                          <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
-                          {cartQty > 0 && (
-                            <span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">
-                              {cartQty}
-                            </span>
-                          )}
+                          <div className="absolute top-2 right-2 z-10">
+                            <span className="bg-green-50 text-green-700 text-[8px] font-bold px-1 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">Halal</span>
+                          </div>
+                          <div className="w-full h-20 bg-slate-100 flex-shrink-0 relative">
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <img 
+                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`}
+                                alt={p.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                          </div>
+                          <div className="p-2.5 pb-3 flex flex-col flex-1 justify-between">
+                            <div className="mb-1">
+                              <span className="text-[9px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
+                              <h3 className="font-bold text-xs text-gray-800 line-clamp-2 mt-0.5 leading-snug h-8">{p.name}</h3>
+                              <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">{p.category}</p>
+                            </div>
+                            <div className="mt-auto pt-1.5 border-t border-gray-50">
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="font-bold text-gray-800 text-xs">Rp {p.price.toLocaleString('id-ID')}</span>
+                                {!p.isPPOB ? (
+                                  isOutOfStock ? (
+                                    <span className="text-[9px] font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded-full">Habis</span>
+                                  ) : isLowStock ? (
+                                    <span className="text-[9px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full border border-amber-200">{p.stock}</span>
+                                  ) : (
+                                    <span className="text-[9px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded-full">{p.stock}</span>
+                                  )
+                                ) : (
+                                  <span className="text-[9px] font-semibold text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded-full">Digital</span>
+                                )}
+                              </div>
+                              {isOutOfStock && !p.isPPOB ? (
+                                <button disabled className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed">Stok Kosong</button>
+                              ) : (
+                                <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
+                                  <Plus className="w-3.5 h-3.5 mr-0.5" />
+                                  <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
+                                  {cartQty > 0 && (<span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">{cartQty}</span>)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
                 );
-              })}
-            </div>
+              }}
+            </List>
           )}
         </div>
       </div>
 
       {/* Shopping Cart Section - Right */}
-      <div className="xl:w-[400px] 2xl:w-[450px] shrink-0 h-auto xl:h-full flex flex-col bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden mt-4 md:mt-0">
+      <div id="cart-section" className="w-full md:w-[300px] lg:w-[320px] xl:w-[400px] 2xl:w-[450px] shrink-0 h-auto md:max-h-[calc(100vh-100px)] flex flex-col bg-white rounded-xl border border-gray-200 shadow-xs overflow-hidden mt-4 md:mt-0">
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -513,16 +636,62 @@ export default function KasirPOS() {
 
         {/* Customer & Promo Selection */}
         <div className="px-4 pb-2 pt-1 border-t border-gray-100 bg-white grid grid-cols-1 md:grid-cols-2 gap-2">
-          <div>
+          <div ref={customerDropdownRef} className="relative">
             <label className="text-[10px] font-bold text-gray-500 uppercase">Pelanggan</label>
-            <select 
-              className="w-full text-xs border border-gray-200 rounded p-1 outline-none focus:border-green-500"
-              value={selectedCustomerId}
-              onChange={e => setSelectedCustomerId(e.target.value)}
+            <div 
+              className="w-full text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-green-500 bg-white cursor-pointer flex justify-between items-center"
+              onClick={() => setIsCustomerDropdownOpen(!isCustomerDropdownOpen)}
             >
-              <option value="">-- Umum --</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              <span className="truncate">
+                {selectedCustomerId ? customers.find(c => c.id === selectedCustomerId)?.name || 'Umum' : '-- Umum --'}
+              </span>
+              <span className="text-gray-400">▼</span>
+            </div>
+
+            {isCustomerDropdownOpen && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg">
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    placeholder="Cari nama atau no telepon..."
+                    className="w-full text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-green-500"
+                    value={customerSearchTerm}
+                    onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-40 overflow-y-auto">
+                  <div 
+                    className="p-2 text-xs hover:bg-gray-50 cursor-pointer"
+                    onClick={() => {
+                      setSelectedCustomerId('');
+                      setIsCustomerDropdownOpen(false);
+                      setCustomerSearchTerm('');
+                    }}
+                  >
+                    -- Umum --
+                  </div>
+                  {filteredCustomers.map(c => (
+                    <div 
+                      key={c.id} 
+                      className="p-2 text-xs hover:bg-gray-50 cursor-pointer border-t border-gray-50"
+                      onClick={() => {
+                        setSelectedCustomerId(c.id);
+                        setIsCustomerDropdownOpen(false);
+                        setCustomerSearchTerm('');
+                      }}
+                    >
+                      <div className="font-bold text-gray-700">{c.name}</div>
+                      {c.phone && <div className="text-[10px] text-gray-500">{c.phone}</div>}
+                    </div>
+                  ))}
+                  {filteredCustomers.length === 0 && (
+                    <div className="p-2 text-xs text-gray-400 text-center">Pelanggan tidak ditemukan</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase">Promo</label>
@@ -537,6 +706,40 @@ export default function KasirPOS() {
           </div>
         </div>
 
+        {/* Loyalitas Poin Pelanggan UI */}
+        {selectedCustomer && selectedCustomer.points > 0 && settings.enablePoints !== false && (
+          <div className="px-4 pb-4 bg-white">
+            <div className="bg-fuchsia-50/50 border border-fuchsia-100 rounded-xl p-3.5 space-y-2 animate-in fade-in zoom-in-95">
+              <div className="flex justify-between items-center text-xs font-bold text-fuchsia-800">
+                <span>Poin Pelanggan</span>
+                <span>Tersedia: {selectedCustomer.points} Pts</span>
+              </div>
+              <p className="text-[10px] text-fuchsia-700">Nilai Tukar: Rp {settings.pointRedemptionValue || 10}/poin. Maks: {maxRedeemablePoints} poin.</p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={maxRedeemablePoints}
+                  value={pointsToRedeemInput}
+                  onChange={(e) => {
+                    const val = Math.max(0, Math.min(maxRedeemablePoints, Number(e.target.value) || 0));
+                    setPointsToRedeemInput(val > 0 ? val.toString() : '');
+                  }}
+                  placeholder="Masukkan poin..."
+                  className="flex-1 bg-white border border-fuchsia-200 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPointsToRedeemInput(maxRedeemablePoints.toString())}
+                  className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  Tukar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Checkout Summaries Section */}
         <div className="p-4 border-t border-gray-100 bg-slate-50">
           <div className="space-y-1 mb-4">
@@ -550,19 +753,27 @@ export default function KasirPOS() {
                 <span>- Rp {discountAmount.toLocaleString('id-ID')}</span>
               </div>
             )}
+            {pointsDiscountVal > 0 && (
+              <div className="flex justify-between items-center text-xs text-fuchsia-600 font-medium">
+                <span>Diskon Poin ({pointsToRedeemInput} Pts)</span>
+                <span>- Rp {pointsDiscountVal.toLocaleString('id-ID')}</span>
+              </div>
+            )}
             {settings.isTaxEnabled && (
               <div className="flex justify-between items-center text-xs text-amber-600 font-medium">
                 <span>Pajak PPN ({settings.taxRate}%)</span>
                 <span>Rp {taxAmount.toLocaleString('id-ID')}</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-xs text-gray-500 font-medium pb-2 border-b border-gray-200 mt-1">
-              <span>Zakat Kontribusi (Est.)</span>
-              <span className="text-green-700">Rp {((cartTotal - taxAmount - cart.reduce((s, i) => s + (i.product.costPrice || 0) * i.quantity, 0)) * 0.025 > 0 ? (cartTotal - taxAmount - cart.reduce((s, i) => s + (i.product.costPrice || 0) * i.quantity, 0)) * 0.025 : 0).toLocaleString('id-ID')}</span>
-            </div>
+            {settings.enableCharityZakat !== false && (
+              <div className="flex justify-between items-center text-xs text-gray-500 font-medium pb-2 border-b border-gray-200 mt-1">
+                <span>Zakat Kontribusi (Est.)</span>
+                <span className="text-green-700">Rp {((finalTotalWithPoints - taxAmount - cart.reduce((s, i) => s + (i.product.costPrice || 0) * i.quantity, 0)) * ((settings.charityZakatPercentage ?? 2.5) / 100) > 0 ? (finalTotalWithPoints - taxAmount - cart.reduce((s, i) => s + (i.product.costPrice || 0) * i.quantity, 0)) * ((settings.charityZakatPercentage ?? 2.5) / 100) : 0).toLocaleString('id-ID')}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center mt-2 pt-1">
               <span className="font-bold text-gray-800 text-sm">Total Pembayaran</span>
-              <span className="font-extrabold text-gray-900 text-lg">Rp {cartTotal.toLocaleString('id-ID')}</span>
+              <span className="font-extrabold text-gray-900 text-lg">Rp {finalTotalWithPoints.toLocaleString('id-ID')}</span>
             </div>
           </div>
 
@@ -637,40 +848,9 @@ export default function KasirPOS() {
               </div>
 
               {/* Points Redemption block */}
-              {!isExpired && selectedCustomer && selectedCustomer.points > 0 && (
-                <div className="bg-fuchsia-50/50 border border-fuchsia-100 rounded-xl p-3.5 space-y-2 animate-in fade-in zoom-in-95">
-                  <div className="flex justify-between items-center text-xs font-bold text-fuchsia-800">
-                    <span>Loyalitas Poin Pelanggan</span>
-                    <span>Tersedia: {selectedCustomer.points} Poin</span>
-                  </div>
-                  <p className="text-[10px] text-fuchsia-700">100 poin = Rp 1.000 diskon belanja. Maksimal tukar: {maxRedeemablePoints} poin (senilai Rp {maxRedeemablePoints * 10}).</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max={maxRedeemablePoints}
-                      value={pointsToRedeemInput}
-                      onChange={(e) => {
-                        const val = Math.max(0, Math.min(maxRedeemablePoints, Number(e.target.value) || 0));
-                        setPointsToRedeemInput(val > 0 ? val.toString() : '');
-                      }}
-                      placeholder="Masukkan poin..."
-                      className="flex-1 bg-white border border-fuchsia-200 rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setPointsToRedeemInput(maxRedeemablePoints.toString())}
-                      className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Tukarkan Semua
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Payment Method selectors */}
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Metode Pembayaran Syariah</p>
-              <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                 <button onClick={() => { setPaymentMethod('CASH'); setTimeLeft((settings.paymentTimeoutMinutes || 0) * 60); setIsExpired(false); }} className={`flex flex-col items-center justify-center p-2 rounded-xl border ${paymentMethod === 'CASH' ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-500/20' : 'border-gray-200 text-gray-500 hover:bg-slate-50'} transition-all`}>
                   <Coins className="w-5 h-5 mb-1" />
                   <span className="text-[10px] font-bold">Tunai</span>
@@ -709,7 +889,7 @@ export default function KasirPOS() {
                         className="w-full pl-4 pr-4 py-2 bg-white text-slate-800 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/25 focus:border-green-600 font-bold"
                         placeholder="Masukkan jumlah yang diserahkan pelanggan..."
                       />
-                      <div className="flex gap-1.5 mt-1">
+                      <div className="flex flex-wrap gap-1.5 mt-1">
                         {[finalTotalWithPoints, Math.ceil(finalTotalWithPoints / 10000) * 10000, Math.ceil(finalTotalWithPoints / 50000) * 50000, 100000, 200000].map((val) => (
                           <button key={val} onClick={() => setAmountPaidInput(val.toString())} className="bg-slate-100 hover:bg-slate-200 text-gray-600 text-[10px] px-2 py-1 rounded cursor-pointer">
                             Rp {val.toLocaleString('id-ID')}
@@ -1044,10 +1224,15 @@ export default function KasirPOS() {
                 )}
               </div>
 
-              <div className="border-t border-green-900/20 pt-3 text-center text-[10px] text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 leading-normal">
-                <p className="font-bold uppercase tracking-wider mb-1">Misi Berkah Beramal</p>
-                <p>Zakat Kontribusi Sebesar <b>Rp {receiptTx.zakatContribution.toLocaleString('id-ID')}</b> dari transaksi ini dicadangkan untuk kaum Dhuafa.</p>
-              </div>
+              {receiptTx.zakatContribution > 0 && settings.enableCharityZakat !== false && (
+                <div className="border-t border-green-900/20 pt-3 text-center text-[10px] text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 leading-normal">
+                  <p className="font-bold uppercase tracking-wider mb-1">{settings.charityTitle || 'MISI BERKAH BERAMAL'}</p>
+                  <p>{settings.charityDescription 
+                    ? settings.charityDescription.replace('{amount}', `Rp ${receiptTx.zakatContribution.toLocaleString('id-ID')}`)
+                    : `Zakat Kontribusi Sebesar Rp ${receiptTx.zakatContribution.toLocaleString('id-ID')} dari transaksi ini dicadangkan untuk kaum Dhuafa.`}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Kirim WhatsApp Struk */}
@@ -1105,15 +1290,22 @@ export default function KasirPOS() {
             <div className="p-4 bg-slate-50 flex gap-2">
               <button
                 onClick={() => setReceiptTx(null)}
-                className="flex-1 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 font-semibold text-xs text-center"
+                className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-gray-700 font-semibold text-xs text-center"
               >
                 Tutup
               </button>
               <button
                 onClick={handlePrintReceipt}
-                className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs"
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg text-center shadow-xs"
               >
-                Cetak Struk
+                Cetak PDF / Biasa
+              </button>
+              <button
+                onClick={handleBluetoothPrint}
+                className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+              >
+                <Bluetooth className="w-4 h-4" />
+                Cetak Bluetooth
               </button>
             </div>
           </div>
@@ -1162,6 +1354,21 @@ export default function KasirPOS() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Floating Cart Button */}
+      {cart.length > 0 && (
+        <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-5">
+          <button 
+            onClick={() => {
+              document.getElementById('cart-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 border-[3px] border-white/50 backdrop-blur-md"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            Keranjang ({cart.reduce((s, c) => s + c.quantity, 0)}) - Rp {cartTotal.toLocaleString('id-ID')}
+          </button>
         </div>
       )}
 

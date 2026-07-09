@@ -2,7 +2,7 @@
 
 > Platform Kasir Terintegrasi dengan Akuntansi Syariah, Manajemen Inventori, dan Kalkulasi Zakat Otomatis untuk Koperasi Syariah ADZ-ZIKRA
 
-**Project:** KSADZZIKRA | **Supabase ID:** stiatomaelzrptazayml | **GitHub:** yudiharyono1991-hash/KSADZZIKRA
+**Project:** KSADZZIKRA | **Supabase ID:** rxuwdnaycysgmofazjmz | **GitHub:** yudiharyono1991-hash/KSADZZIKRA
 
 ---
 
@@ -125,7 +125,7 @@ KSAMart/
 ## ⚙️ Environment Variables
 
 ```env
-VITE_SUPABASE_URL=https://stiatomaelzrptazayml.supabase.co
+VITE_SUPABASE_URL=https://rxuwdnaycysgmofazjmz.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0
 VITE_APP_PREFIX=ksa_
 VITE_DB_PREFIX=ksa_

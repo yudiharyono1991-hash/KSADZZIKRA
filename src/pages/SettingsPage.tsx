@@ -4,7 +4,7 @@ import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, C
 import * as XLSX from 'xlsx';
 
 export default function SettingsPage() {
-  const { 
+  const {
     settings, updateSettings, currentUser, users, updateUser, clearAllData,
     products, transactions, onlineOrders, attendances, expenses, closings, branches, customers, suppliers
   } = useAppStore();
@@ -22,11 +22,22 @@ export default function SettingsPage() {
   const [storeLocationLat, setStoreLocationLat] = useState(settings.storeLocationLat?.toString() || '');
   const [storeLocationLng, setStoreLocationLng] = useState(settings.storeLocationLng?.toString() || '');
   const [maxDeliveryRadiusKm, setMaxDeliveryRadiusKm] = useState(settings.maxDeliveryRadiusKm?.toString() || '5');
-  
+
   // Advanced Settings
   const [maintenanceMode, setMaintenanceMode] = useState(settings.maintenanceMode ?? false);
   const [minimumCashBalance, setMinimumCashBalance] = useState(settings.minimumCashBalance?.toString() || '1000000');
-  const [zakatRate, setZakatRate] = useState(settings.zakatRate?.toString() || '2.5');
+
+  // Charity & Zakat Settings
+  const [enableCharityZakat, setEnableCharityZakat] = useState(settings.enableCharityZakat ?? false);
+  const [charityZakatPercentage, setCharityZakatPercentage] = useState(settings.charityZakatPercentage?.toString() || '2.5');
+  const [charityTitle, setCharityTitle] = useState(settings.charityTitle || 'Kewajiban Zakat Niaga');
+  const [charityDescription, setCharityDescription] = useState(settings.charityDescription || 'Zakat Kontribusi Sebesar Rp {amount} dari transaksi ini dicadangkan untuk kaum Dhuafa.');
+
+  // PPOB Integration Settings
+  const [enablePpobIntegration, setEnablePpobIntegration] = useState(settings.enablePpobIntegration ?? false);
+  const [ppobProviderUrl, setPpobProviderUrl] = useState(settings.ppobProviderUrl || '');
+  const [ppobApiKey, setPpobApiKey] = useState(settings.ppobApiKey || '');
+
   const [autoApproveTransactions, setAutoApproveTransactions] = useState(settings.autoApproveTransactions ?? false);
 
   const [storePhone, setStorePhone] = useState(settings.storePhone || '');
@@ -52,6 +63,31 @@ export default function SettingsPage() {
   useEffect(() => {
     setIsTaxEnabled(settings.isTaxEnabled);
     setTaxRate(settings.taxRate.toString());
+    setOwnerBankName(settings.ownerBankName || 'BSI (Bank Syariah Indonesia)');
+    setOwnerBankAccount(settings.ownerBankAccount || '7182938495');
+    setQrisEnabled(settings.qrisEnabled ?? true);
+    setQrisImageUrl(settings.qrisImageUrl || '');
+    setPaymentTimeoutMinutes(settings.paymentTimeoutMinutes || 0);
+    setStoreName(settings.storeName || 'KSA Mart Syariah');
+    setStoreAddress(settings.storeAddress || '');
+    setStoreLocationLat(settings.storeLocationLat?.toString() || '');
+    setStoreLocationLng(settings.storeLocationLng?.toString() || '');
+    setMaxDeliveryRadiusKm(settings.maxDeliveryRadiusKm?.toString() || '5');
+    setMaintenanceMode(settings.maintenanceMode ?? false);
+    setMinimumCashBalance(settings.minimumCashBalance?.toString() || '1000000');
+    setEnableCharityZakat(settings.enableCharityZakat ?? false);
+    setCharityZakatPercentage(settings.charityZakatPercentage?.toString() || '2.5');
+    setCharityTitle(settings.charityTitle || 'Kewajiban Zakat Niaga');
+    setCharityDescription(settings.charityDescription || 'Zakat Kontribusi Sebesar Rp {amount} dari transaksi ini dicadangkan untuk kaum Dhuafa.');
+    setEnablePpobIntegration(settings.enablePpobIntegration ?? false);
+    setPpobProviderUrl(settings.ppobProviderUrl || '');
+    setPpobApiKey(settings.ppobApiKey || '');
+    setAutoApproveTransactions(settings.autoApproveTransactions ?? false);
+    setStorePhone(settings.storePhone || '');
+    setOwnerWhatsapp(settings.ownerWhatsapp || '');
+    setBusinessType(settings.businessType || 'KOPERASI');
+    setBankTransfers(settings.paymentMethods?.bankTransfer || []);
+    setEwallets(settings.paymentMethods?.ewallet || []);
   }, [settings]);
 
   const handleSave = () => {
@@ -78,7 +114,13 @@ export default function SettingsPage() {
         maxDeliveryRadiusKm: Number(maxDeliveryRadiusKm) || 5,
         maintenanceMode,
         minimumCashBalance: Number(minimumCashBalance) || 1000000,
-        zakatRate: Number(zakatRate) || 2.5,
+        enableCharityZakat,
+        charityZakatPercentage: Number(charityZakatPercentage) || 2.5,
+        charityTitle,
+        charityDescription,
+        enablePpobIntegration,
+        ppobProviderUrl,
+        ppobApiKey,
         autoApproveTransactions,
       });
 
@@ -106,7 +148,7 @@ export default function SettingsPage() {
   const handleExportDatabase = () => {
     try {
       const wb = XLSX.utils.book_new();
-      
+
       const addSheet = (data: any[], name: string) => {
         if (data.length > 0) {
           const ws = XLSX.utils.json_to_sheet(data);
@@ -139,12 +181,12 @@ export default function SettingsPage() {
   const handleExportRawJson = () => {
     try {
       const dbDump = {
-        products, transactions, onlineOrders, users, attendances, 
+        products, transactions, onlineOrders, users, attendances,
         expenses, closings, branches, customers, suppliers, settings
       };
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbDump, null, 2));
       const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href",     dataStr);
+      downloadAnchorNode.setAttribute("href", dataStr);
       downloadAnchorNode.setAttribute("download", `Full_Backup_KSAMart_${new Date().toISOString().split('T')[0]}.json`);
       document.body.appendChild(downloadAnchorNode);
       downloadAnchorNode.click();
@@ -179,7 +221,7 @@ export default function SettingsPage() {
           if (data.customers) localStorage.setItem('ksa_customers', JSON.stringify(data.customers));
           if (data.suppliers) localStorage.setItem('ksa_suppliers', JSON.stringify(data.suppliers));
           if (data.settings) localStorage.setItem('ksa_settings', JSON.stringify(data.settings));
-          
+
           alert('Database berhasil dipulihkan! Halaman akan dimuat ulang.');
           window.location.reload();
         } else {
@@ -191,6 +233,16 @@ export default function SettingsPage() {
     };
     reader.readAsText(file);
   };
+
+  if (currentUser?.role !== 'OWNER' && currentUser?.role !== 'SUPERADMIN') {
+    return (
+      <div className="p-6 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
+        <Lock className="w-16 h-16 text-red-500" />
+        <h2 className="text-2xl font-bold text-gray-800">Akses Ditolak</h2>
+        <p className="text-gray-500">Halaman Pengaturan Toko khusus dikelola oleh Ketua (Owner) atau Superadmin.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -214,7 +266,7 @@ export default function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {(currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN') && (
+        {(currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN') && (
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-4 border-b border-gray-100 flex items-center gap-2">
@@ -228,8 +280,8 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-500 mt-1">Pajak akan ditambahkan ke total belanja secara otomatis di Kasir.</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="sr-only peer"
                       checked={isTaxEnabled}
                       onChange={(e) => setIsTaxEnabled(e.target.checked)}
@@ -274,7 +326,7 @@ export default function SettingsPage() {
                     className={`w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${!isOwner ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
                   />
                 </div>
-                
+
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Nomor Rekening</label>
                   <input
@@ -293,8 +345,8 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-500 mt-1">Izinkan pelanggan membayar via scan QRIS.</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="sr-only peer"
                       checked={qrisEnabled}
                       onChange={(e) => setQrisEnabled(e.target.checked)}
@@ -341,7 +393,7 @@ export default function SettingsPage() {
                     <p className="text-[10px] text-gray-400 mt-1">Upload barcode QRIS toko Anda agar pelanggan bisa menscan langsung saat checkout.</p>
                   </div>
                 )}
-                
+
                 <div className="space-y-1 animate-in fade-in slide-in-from-top-2 pt-2 border-t border-gray-100">
                   <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Batas Waktu Tunggu Pembayaran POS (Menit)</label>
                   <div className="flex items-center gap-2">
@@ -358,7 +410,7 @@ export default function SettingsPage() {
                 </div>
 
                 {isOwner ? (
-                  <button 
+                  <button
                     onClick={handleSave}
                     className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
                   >
@@ -468,13 +520,13 @@ export default function SettingsPage() {
             <div className="pt-4 border-t border-gray-100">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 block mb-2">Portal Pelanggan (Online Order)</label>
               <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  readOnly 
+                <input
+                  type="text"
+                  readOnly
                   value={`${window.location.origin}/#/member`}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-sm text-slate-500"
                 />
-                <button 
+                <button
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/#/member`);
                     alert("Tautan berhasil disalin!");
@@ -488,7 +540,7 @@ export default function SettingsPage() {
             </div>
 
             {isOwner ? (
-              <button 
+              <button
                 onClick={handleSave}
                 className="mt-4 w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
               >
@@ -505,167 +557,213 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      
-        {/* Lokasi & Pengiriman (Owner Only) */}
-        {isOwner && (
-          <div className="mt-2 space-y-4">
-            <div className="flex items-center gap-2 border-b pb-3 mt-8">
-              <MapPin className="w-5 h-5 text-rose-600" />
-              <h2 className="font-bold text-gray-800">Lokasi & Jarak Pengiriman Maksimal</h2>
+      {/* Misi Berkah Beramal (Zakat/Infaq) */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-gray-800">Misi Berkah Beramal</h2>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={enableCharityZakat} onChange={(e) => setEnableCharityZakat(e.target.checked)} />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+          </label>
+        </div>
+        
+        {enableCharityZakat && (
+          <div className="p-6 space-y-4 bg-green-50/30">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Judul Donasi (Misal: Infaq, Sedekah, Zakat)</label>
+              <input type="text" value={charityTitle} onChange={(e) => setCharityTitle(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
             </div>
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 space-y-4">
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm mb-4">
-                  Fitur ini digunakan untuk mengunci batas maksimal jarak pelanggan yang bisa melakukan pemesanan (Checkout). Sistem akan menghitung jarak otomatis menggunakan GPS.
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Latitude (Garis Lintang)</label>
-                    <input 
-                      type="text" 
-                      value={storeLocationLat}
-                      onChange={(e) => setStoreLocationLat(e.target.value)}
-                      placeholder="-6.200000"
-                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Longitude (Garis Bujur)</label>
-                    <input 
-                      type="text" 
-                      value={storeLocationLng}
-                      onChange={(e) => setStoreLocationLng(e.target.value)}
-                      placeholder="106.816666"
-                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 items-end">
-                  <button
-                    onClick={() => {
-                      if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition((position) => {
-                          setStoreLocationLat(position.coords.latitude.toString());
-                          setStoreLocationLng(position.coords.longitude.toString());
-                          alert("Titik koordinat berhasil didapatkan dari GPS perangkat Anda!");
-                        }, (error) => {
-                          alert("Gagal mendapatkan lokasi. Pastikan izin GPS / Lokasi di browser Anda diaktifkan. " + error.message);
-                        });
-                      } else {
-                        alert("Geolocation tidak didukung oleh browser Anda.");
-                      }
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition-colors border border-slate-300 cursor-pointer"
-                  >
-                    <MapPin className="w-4 h-4" /> Deteksi Lokasi Saat Ini Otomatis
-                  </button>
-                  
-                  <div className="w-full sm:w-1/3 space-y-1">
-                    <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Maks Jarak (KM)</label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        value={maxDeliveryRadiusKm}
-                        disabled={true}
-                        className="w-full border border-gray-200 bg-gray-50 cursor-not-allowed rounded-lg py-2 px-3 pr-8 text-sm outline-none font-bold text-gray-700"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">KM</span>
-                    </div>
-                  </div>
-                </div>
-
-                <button onClick={handleSave} className="mt-4 w-full flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer">
-                  <Save className="w-4 h-4" /> Simpan Pengaturan Lokasi
-                </button>
-              </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Persentase (%) dari Laba Bersih</label>
+              <input type="number" step="0.1" value={charityZakatPercentage} onChange={(e) => setCharityZakatPercentage(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Deskripsi (Struk)</label>
+              <textarea rows={2} value={charityDescription} onChange={(e) => setCharityDescription(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none" />
             </div>
           </div>
         )}
+      </div>
 
-        {/* Advanced Settings (Owner Only) */}
-        {isOwner && (
-          <div className="mt-6 mb-6">
-            <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
-              <Database className="w-5 h-5 text-indigo-600" />
-              Konfigurasi Sistem Tingkat Lanjut (Advanced)
-            </h2>
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
-              
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div>
-                  <h3 className="font-bold text-slate-800">Mode Pemeliharaan (Maintenance Mode)</h3>
-                  <p className="text-sm text-slate-500 mt-1">Aktifkan untuk memblokir login pengguna standar saat ada perbaikan sistem.</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={maintenanceMode} onChange={e => setMaintenanceMode(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
-                </label>
+      {/* PPOB Integration */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-indigo-600" />
+            <h2 className="font-bold text-gray-800">Integrasi PPOB (API)</h2>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={enablePpobIntegration} onChange={(e) => setEnablePpobIntegration(e.target.checked)} />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+          </label>
+        </div>
+        
+        {enablePpobIntegration && (
+          <div className="p-6 space-y-4 bg-indigo-50/30">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">URL Provider (Webhook/API Endpoint)</label>
+              <input type="text" value={ppobProviderUrl} onChange={(e) => setPpobProviderUrl(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">API Key / Secret / Token</label>
+              <input type="password" value={ppobApiKey} onChange={(e) => setPpobApiKey(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Lokasi & Pengiriman (Owner Only) */}
+      {isOwner && (
+        <div className="mt-2 space-y-4">
+          <div className="flex items-center gap-2 border-b pb-3 mt-8">
+            <MapPin className="w-5 h-5 text-rose-600" />
+            <h2 className="font-bold text-gray-800">Lokasi & Jarak Pengiriman Maksimal</h2>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm mb-4">
+                Fitur ini digunakan untuk mengunci batas maksimal jarak pelanggan yang bisa melakukan pemesanan (Checkout). Sistem akan menghitung jarak otomatis menggunakan GPS.
               </div>
 
-              <div className="flex flex-col md:flex-row gap-4 border-b border-slate-100 pb-4">
-                <div className="flex-1">
-                  <h3 className="font-bold text-slate-800 mb-1">Batas Minimum Saldo Kas (Rp)</h3>
-                  <p className="text-xs text-slate-500 mb-2">Batas peringatan jika kas tunai/bank terlalu rendah.</p>
-                  <input 
-                    type="number" 
-                    value={minimumCashBalance}
-                    onChange={e => setMinimumCashBalance(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Latitude (Garis Lintang)</label>
+                  <input
+                    type="text"
+                    value={storeLocationLat}
+                    onChange={(e) => setStoreLocationLat(e.target.value)}
+                    placeholder="-6.200000"
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-slate-800 mb-1">Presentase Zakat Niaga (%)</h3>
-                  <p className="text-xs text-slate-500 mb-2">Sesuai Syariah standar 2.5% dari Keuntungan Bersih.</p>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    value={zakatRate}
-                    onChange={e => setZakatRate(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Longitude (Garis Bujur)</label>
+                  <input
+                    type="text"
+                    value={storeLocationLng}
+                    onChange={(e) => setStoreLocationLng(e.target.value)}
+                    placeholder="106.816666"
+                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div>
-                  <h3 className="font-bold text-slate-800">Sinkronisasi Penuh ke Cloud</h3>
-                  <p className="text-sm text-slate-500 mt-1">Unggah (Paksa) seluruh data lokal aplikasi saat ini ke database Supabase secara massal.</p>
-                </div>
-                <button 
-                  onClick={async () => {
-                    const store = useAppStore.getState();
-                    if(confirm('Proses ini akan mengunggah seluruh data lokal Anda (Produk, Pelanggan, Transaksi) ke Cloud. Lanjutkan?')) {
-                      await store.forceSyncAllToCloud();
+              <div className="flex flex-col sm:flex-row gap-3 items-end">
+                <button
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition((position) => {
+                        setStoreLocationLat(position.coords.latitude.toString());
+                        setStoreLocationLng(position.coords.longitude.toString());
+                        alert("Titik koordinat berhasil didapatkan dari GPS perangkat Anda!");
+                      }, (error) => {
+                        alert("Gagal mendapatkan lokasi. Pastikan izin GPS / Lokasi di browser Anda diaktifkan. " + error.message);
+                      });
+                    } else {
+                      alert("Geolocation tidak didukung oleh browser Anda.");
                     }
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors cursor-pointer flex items-center gap-2"
+                  className="flex-1 flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition-colors border border-slate-300 cursor-pointer"
                 >
-                  <RefreshCw className="w-4 h-4" /> Unggah Sekarang
+                  <MapPin className="w-4 h-4" /> Deteksi Lokasi Saat Ini Otomatis
                 </button>
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-slate-800">Auto-Approval Transaksi/Laporan</h3>
-                  <p className="text-sm text-slate-500 mt-1">Mengizinkan proses persetujuan otomatis (Tidak Direkomendasikan untuk keamanan berlapis).</p>
+                <div className="w-full sm:w-1/3 space-y-1">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Maks Jarak (KM)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={maxDeliveryRadiusKm}
+                      disabled={true}
+                      className="w-full border border-gray-200 bg-gray-50 cursor-not-allowed rounded-lg py-2 px-3 pr-8 text-sm outline-none font-bold text-gray-700"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">KM</span>
+                  </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={autoApproveTransactions} onChange={e => setAutoApproveTransactions(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                </label>
               </div>
 
-              <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer mt-4">
-                <Save className="w-4 h-4" /> Simpan Konfigurasi Tingkat Lanjut
+              <button onClick={handleSave} className="mt-4 w-full flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer">
+                <Save className="w-4 h-4" /> Simpan Pengaturan Lokasi
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Metode Pembayaran (Owner Only) */}
+      {/* Advanced Settings (Owner Only) */}
+      {isOwner && (
+        <div className="mt-6 mb-6">
+          <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+            <Database className="w-5 h-5 text-indigo-600" />
+            Konfigurasi Sistem Tingkat Lanjut (Advanced)
+          </h2>
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="font-bold text-slate-800">Mode Pemeliharaan (Maintenance Mode)</h3>
+                <p className="text-sm text-slate-500 mt-1">Aktifkan untuk memblokir login pengguna standar saat ada perbaikan sistem.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={maintenanceMode} onChange={e => setMaintenanceMode(e.target.checked)} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+              </label>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-4 border-b border-slate-100 pb-4">
+              <div className="flex-1">
+                <h3 className="font-bold text-slate-800 mb-1">Batas Minimum Saldo Kas (Rp)</h3>
+                <p className="text-xs text-slate-500 mb-2">Batas peringatan jika kas tunai/bank terlalu rendah.</p>
+                <input
+                  type="number"
+                  value={minimumCashBalance}
+                  onChange={e => setMinimumCashBalance(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                />
+              </div>
+              {/* Removed obsolete zakatRate UI */}
+            </div>
+
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="font-bold text-slate-800">Sinkronisasi Penuh ke Cloud</h3>
+                <p className="text-sm text-slate-500 mt-1">Unggah (Paksa) seluruh data lokal aplikasi saat ini ke database Supabase secara massal.</p>
+              </div>
+              <button
+                onClick={async () => {
+                  const store = useAppStore.getState();
+                  if (confirm('Proses ini akan mengunggah seluruh data lokal Anda (Produk, Pelanggan, Transaksi) ke Cloud. Lanjutkan?')) {
+                    await store.forceSyncAllToCloud();
+                  }
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition-colors cursor-pointer flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Unggah Sekarang
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800">Auto-Approval Transaksi/Laporan</h3>
+                <p className="text-sm text-slate-500 mt-1">Mengizinkan proses persetujuan otomatis (Tidak Direkomendasikan untuk keamanan berlapis).</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={autoApproveTransactions} onChange={e => setAutoApproveTransactions(e.target.checked)} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+              </label>
+            </div>
+
+            <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer mt-4">
+              <Save className="w-4 h-4" /> Simpan Konfigurasi Tingkat Lanjut
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Metode Pembayaran (Owner Only) */}
       {isOwner && (
         <div className="mt-2 space-y-4">
           <div className="flex items-center gap-2 border-b pb-3">
@@ -676,7 +774,7 @@ export default function SettingsPage() {
           {/* Bank Transfer */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-700 flex items-center gap-2"><Building2 className="w-4 h-4 text-blue-500"/>Transfer Bank</h3>
+              <h3 className="font-bold text-gray-700 flex items-center gap-2"><Building2 className="w-4 h-4 text-blue-500" />Transfer Bank</h3>
               <button
                 onClick={() => setBankTransfers(prev => [...prev, { enabled: true, bankName: 'BSI (Bank Syariah Indonesia)', accountNumber: '', accountName: '' }])}
                 className="flex items-center gap-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors"
@@ -688,11 +786,11 @@ export default function SettingsPage() {
               {bankTransfers.length === 0 && <p className="text-sm text-gray-400 text-center py-2">Belum ada rekening bank yang ditambahkan.</p>}
               {bankTransfers.map((b, i) => (
                 <div key={i} className="border border-gray-200 rounded-xl p-3 space-y-2 relative">
-                  <button onClick={() => setBankTransfers(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button>
+                  <button onClick={() => setBankTransfers(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pr-6">
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Bank</label>
-                      <select value={b.bankName} onChange={e => setBankTransfers(prev => prev.map((x,idx) => idx===i ? {...x, bankName: e.target.value} : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5">
+                      <select value={b.bankName} onChange={e => setBankTransfers(prev => prev.map((x, idx) => idx === i ? { ...x, bankName: e.target.value } : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5">
                         <option>BSI (Bank Syariah Indonesia)</option>
                         <option>Bank BRI</option>
                         <option>Bank BCA</option>
@@ -706,11 +804,11 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">No. Rekening</label>
-                      <input type="text" value={b.accountNumber} onChange={e => setBankTransfers(prev => prev.map((x,idx) => idx===i ? {...x, accountNumber: e.target.value} : x))} placeholder="contoh: 7182938495" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5"/>
+                      <input type="text" value={b.accountNumber} onChange={e => setBankTransfers(prev => prev.map((x, idx) => idx === i ? { ...x, accountNumber: e.target.value } : x))} placeholder="contoh: 7182938495" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5" />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Pemilik Rekening</label>
-                      <input type="text" value={b.accountName} onChange={e => setBankTransfers(prev => prev.map((x,idx) => idx===i ? {...x, accountName: e.target.value} : x))} placeholder="contoh: Yudi Haryono" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5"/>
+                      <input type="text" value={b.accountName} onChange={e => setBankTransfers(prev => prev.map((x, idx) => idx === i ? { ...x, accountName: e.target.value } : x))} placeholder="contoh: Yudi Haryono" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5" />
                     </div>
                   </div>
                 </div>
@@ -721,7 +819,7 @@ export default function SettingsPage() {
           {/* E-Wallet */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="font-bold text-gray-700 flex items-center gap-2"><Smartphone className="w-4 h-4 text-purple-500"/>E-Wallet / QRIS</h3>
+              <h3 className="font-bold text-gray-700 flex items-center gap-2"><Smartphone className="w-4 h-4 text-purple-500" />E-Wallet / QRIS</h3>
               <button
                 onClick={() => setEwallets(prev => [...prev, { enabled: true, provider: 'GoPay', number: '', accountName: '' }])}
                 className="flex items-center gap-1 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-3 py-1.5 rounded-lg border border-purple-200 transition-colors"
@@ -733,11 +831,11 @@ export default function SettingsPage() {
               {ewallets.length === 0 && <p className="text-sm text-gray-400 text-center py-2">Belum ada e-wallet yang ditambahkan.</p>}
               {ewallets.map((w, i) => (
                 <div key={i} className="border border-gray-200 rounded-xl p-3 space-y-2 relative">
-                  <button onClick={() => setEwallets(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5"/></button>
+                  <button onClick={() => setEwallets(prev => prev.filter((_, idx) => idx !== i))} className="absolute top-2 right-2 p-1 hover:bg-red-50 rounded text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pr-6">
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Provider</label>
-                      <select value={w.provider} onChange={e => setEwallets(prev => prev.map((x,idx) => idx===i ? {...x, provider: e.target.value} : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5">
+                      <select value={w.provider} onChange={e => setEwallets(prev => prev.map((x, idx) => idx === i ? { ...x, provider: e.target.value } : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5">
                         <option>GoPay</option>
                         <option>OVO</option>
                         <option>DANA</option>
@@ -748,11 +846,11 @@ export default function SettingsPage() {
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">No. / ID E-Wallet</label>
-                      <input type="text" value={w.number} onChange={e => setEwallets(prev => prev.map((x,idx) => idx===i ? {...x, number: e.target.value} : x))} placeholder="contoh: 08123456789" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5"/>
+                      <input type="text" value={w.number} onChange={e => setEwallets(prev => prev.map((x, idx) => idx === i ? { ...x, number: e.target.value } : x))} placeholder="contoh: 08123456789" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5" />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Akun</label>
-                      <input type="text" value={w.accountName} onChange={e => setEwallets(prev => prev.map((x,idx) => idx===i ? {...x, accountName: e.target.value} : x))} placeholder="contoh: Yudi Haryono" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5"/>
+                      <input type="text" value={w.accountName} onChange={e => setEwallets(prev => prev.map((x, idx) => idx === i ? { ...x, accountName: e.target.value } : x))} placeholder="contoh: Yudi Haryono" className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5" />
                     </div>
                   </div>
                 </div>
@@ -779,17 +877,17 @@ export default function SettingsPage() {
                   onClick={handleExportDatabase}
                   className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-sm transition flex items-center gap-2 justify-center"
                 >
-                  <Download className="w-4 h-4"/> Unduh Laporan (Excel)
+                  <Download className="w-4 h-4" /> Unduh Laporan (Excel)
                 </button>
                 <button
                   onClick={handleExportRawJson}
                   className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-sm transition flex items-center gap-2 justify-center"
                 >
-                  <Database className="w-4 h-4"/> Backup Penuh (.json)
+                  <Database className="w-4 h-4" /> Backup Penuh (.json)
                 </button>
-                
+
                 <label className="px-6 py-2.5 bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 text-sm font-bold rounded-xl shadow-sm transition flex items-center gap-2 justify-center cursor-pointer">
-                  <RefreshCw className="w-4 h-4"/> Restore Data (.json)
+                  <RefreshCw className="w-4 h-4" /> Restore Data (.json)
                   <input type="file" accept=".json" className="hidden" onChange={handleImportRawJson} />
                 </label>
               </div>
@@ -806,9 +904,9 @@ export default function SettingsPage() {
                 onClick={() => {
                   if (confirm('PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SEMUA DATA?\\n\\nTindakan ini TIDAK BISA dibatalkan dan akan mereset aplikasi menjadi kosong.')) {
                     const pin = prompt('Masukkan Sandi (Password) akun Anda untuk mengonfirmasi penghapusan data:');
-                    if (pin === currentUser?.password) {
+                    if (pin && pin === currentUser?.password) {
                       clearAllData();
-                      alert('Berhasil! Semua data uji coba telah dihapus.');
+                      alert('Berhasil! Semua data telah dihapus permanen dan sistem direset.');
                       window.location.href = '/';
                     } else {
                       alert('Sandi salah! Proses Hapus Data dibatalkan.');

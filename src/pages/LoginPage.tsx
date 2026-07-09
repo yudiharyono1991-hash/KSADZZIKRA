@@ -212,8 +212,9 @@ export default function LoginPage() {
         {/* Store Illustration */}
         <div className="relative flex justify-center mb-2 drop-shadow-2xl opacity-95 animate-in fade-in zoom-in duration-1000 delay-300">
           <img 
-            src="/ksa_mart_new_esg.png" 
+            src={typeof window !== 'undefined' ? (window as any).__ksaIllustrationFallback || '/ksa_mart_new_esg.png' : '/ksa_mart_new_esg.png'}
             alt="Ilustrasi KSA Mart Syariah Baru" 
+            onError={(e) => { const el = e.currentTarget as HTMLImageElement; if (el.src && !el.src.includes('ksa_mart_logo.png')) el.src = '/ksa_mart_logo.png'; }}
             className="w-72 md:w-80 lg:w-96 xl:w-[420px] max-w-full h-auto object-contain rounded-2xl drop-shadow-xl"
           />
           

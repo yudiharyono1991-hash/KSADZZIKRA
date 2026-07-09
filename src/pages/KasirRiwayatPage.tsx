@@ -9,21 +9,39 @@ export default function KasirRiwayatPage() {
   const [txToVoid, setTxToVoid] = useState<any>(null);
   const [voidReason, setVoidReason] = useState('');
 
-  // Ambil transaksi HARI INI dan KASIR INI saja
-  const today = new Date().toISOString().split('T')[0];
+  const [dateFilter, setDateFilter] = useState('TODAY');
+
+  // Ambil transaksi berdasarkan filter
+  const availableMonths = Array.from(new Set(transactions.map(t => t.timestamp.substring(0, 7)))).sort().reverse();
+
   const myTransactions = transactions.filter(tx => {
-    // Check if tx is today and by this cashier
-    // If Admin/Owner, maybe they can see all, but for now we filter by current user's name
-    // unless they want to see all. Let's show all for Admin/Owner, and filter for Cashier.
-    const isToday = tx.timestamp.startsWith(today);
+    let isDateMatch = false;
+    if (dateFilter === 'TODAY') {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const localToday = `${year}-${month}-${day}`;
+      isDateMatch = tx.timestamp.startsWith(localToday);
+    } else {
+      isDateMatch = tx.timestamp.startsWith(dateFilter);
+    }
+
     const isMyTx = currentUser?.role === 'CASHIER' ? tx.cashierName === currentUser?.name : true;
     const matchesBranch = !activeBranchId || tx.branchId === activeBranchId || !tx.branchId;
-    return isToday && isMyTx && matchesBranch;
+    return isDateMatch && isMyTx && matchesBranch;
   });
 
   const filteredTx = myTransactions.filter(tx => 
     tx.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalOmset = filteredTx.reduce((sum, tx) => sum + (tx.isVoided ? 0 : tx.totalAmount), 0);
+  const totalMargin = filteredTx.reduce((sum, tx) => sum + (tx.isVoided ? 0 : tx.marginContribution || 0), 0);
+  const totalBarang = filteredTx.reduce((sum, tx) => {
+    if (tx.isVoided) return sum;
+    return sum + (tx.items?.reduce((itemSum: number, item: any) => itemSum + item.quantity, 0) || 0);
+  }, 0);
 
   const handleReprint = (tx: any) => {
     setSelectedTx(tx);
@@ -56,8 +74,8 @@ export default function KasirRiwayatPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -66,6 +84,20 @@ export default function KasirRiwayatPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
             />
+          </div>
+          <div className="w-full md:w-auto">
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="w-full md:w-48 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-gray-700"
+            >
+              <option value="TODAY">Shift Hari Ini</option>
+              {availableMonths.map(m => {
+                const dateObj = new Date(m + '-01');
+                const monthName = dateObj.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                return <option key={m} value={m}>{monthName}</option>;
+              })}
+            </select>
           </div>
         </div>
 
@@ -149,6 +181,25 @@ export default function KasirRiwayatPage() {
                 </tr>
               )}
             </tbody>
+            {filteredTx.length > 0 && (
+              <tfoot className="bg-green-50/80 border-t border-green-100 font-bold sticky bottom-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <tr>
+                  <td colSpan={4} className="px-6 py-4 text-right text-green-900 uppercase text-xs tracking-wider whitespace-nowrap">
+                    <div className="flex flex-col items-end">
+                      <span>Total Transaksi ({filteredTx.filter(t => !t.isVoided).length} Struk)</span>
+                      <span className="text-[10px] text-green-700 font-normal capitalize mt-0.5">{totalBarang} barang terjual</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                    <div className="flex flex-col items-end">
+                      <span className="text-green-800 text-lg font-extrabold tracking-tight whitespace-nowrap">Rp {totalOmset.toLocaleString('id-ID')}</span>
+                      <span className="text-[10px] text-amber-600 font-normal mt-0.5 whitespace-nowrap">Margin: Rp {totalMargin.toLocaleString('id-ID')}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4"></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>

@@ -5,14 +5,16 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 export default defineConfig(() => {
   return {
     plugins: [
       react(), 
       tailwindcss(),
-      VitePWA({
+      !isDev && VitePWA({
         registerType: 'autoUpdate',
-        devOptions: { enabled: true },
+        devOptions: { enabled: false }, // disable service worker in dev to avoid reload/cache issues during local browser testing
         manifest: {
           name: 'Toko KSA Mart',
           short_name: 'Toko KSA Mart',
@@ -33,11 +35,26 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 5000000
         }
       })
-    ],
-    resolve: {
-      alias: {
+    ].filter(Boolean),
+    resolve: {      alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-charts': ['recharts'],
+            'vendor-utils': ['date-fns', 'fuse.js', 'clsx', 'tailwind-merge'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-other': ['lucide-react', 'xlsx', 'html2pdf.js', 'motion', 'react-window']
+          }
+        }
+      },
+      chunkSizeWarningLimit: 1000
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

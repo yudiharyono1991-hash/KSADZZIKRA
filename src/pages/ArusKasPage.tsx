@@ -8,6 +8,9 @@ export default function ArusKasPage() {
   const cashMovements: any[] = [];
   
   transactions.forEach(t => {
+    // Exclude voided transactions from cash flow report
+    if (t.isVoided) return;
+    
     if (t.splitPayments && t.splitPayments.length > 0) {
       t.splitPayments.forEach((sp: any, i: number) => {
         cashMovements.push({
@@ -79,6 +82,7 @@ export default function ArusKasPage() {
                 message: `Laporan Arus Kas dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
                 type: 'APPROVAL',
                 targetRole: ['OWNER', 'PENGURUS'],
+                excludeUsernames: currentUser?.username ? [currentUser.username] : [],
                 link: '/arus-kas'
               });
               alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');

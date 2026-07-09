@@ -137,7 +137,7 @@ export default function SalesReportPage() {
   };
 
   return (
-    <div className="space-y-6" ref={reportRef}>
+    <div className="space-y-6">
       {/* Search and Filters Header */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -187,6 +187,7 @@ export default function SalesReportPage() {
                   message: `Laporan Penjualan periode ${startDate} sd ${endDate} dari Cabang ${activeBranchId || 'Pusat'} menunggu persetujuan.`,
                   type: 'APPROVAL',
                   targetRole: ['OWNER', 'PENGURUS'],
+                  excludeUsernames: currentUser?.username ? [currentUser.username] : [],
                   link: '/laporan-penjualan'
                 });
                 alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
@@ -320,7 +321,7 @@ export default function SalesReportPage() {
       </div>
 
       {/* Printable Area - A4 Report */}
-      <div className="printable-area printable-a4 space-y-6">
+      <div className="printable-area printable-a4 space-y-6" ref={reportRef}>
         <div className="text-center border-b-2 border-gray-800 pb-4">
           <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
           <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN PENJUALAN DAN KEUANGAN (BERDASARKAN AKAD SYARIAH)</p>

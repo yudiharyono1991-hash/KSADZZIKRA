@@ -22,14 +22,16 @@ export default function BukuPanduanPage() {
     const adminGuide = [
       { id: 'a1', title: 'Manajemen Data Barang', content: 'Masuk ke menu Inventory & Stok. Anda dapat menambah, mengedit, atau menghapus barang. Pastikan Barcode dan SKU unik. Anda juga bisa mengatur jumlah minimum stok untuk notifikasi.' },
       { id: 'a2', title: 'Stock Opname Dasar', content: 'Masuk ke Stock Opname, lalu masukkan jumlah fisik barang yang ada di rak. Sistem akan otomatis menghitung selisih dan mencatatnya.' },
-      { id: 'a3', title: 'Pembatalan Transaksi (Void)', content: 'Jika terjadi kesalahan, Anda dapat menekan tombol Void pada Riwayat Transaksi. Pembatalan ini akan berstatus Pending dan dikirim ke notifikasi Manager untuk disetujui.' }
+      { id: 'a3', title: 'Manajemen Pelanggan & Poin', content: 'Gunakan menu Master Pelanggan untuk mengelola data member cabang Anda. Anda bisa menambah pelanggan, mengubah Total Point, dan mencatat piutang/ kasbon secara manual.' },
+      { id: 'a4', title: 'Pembatalan Transaksi (Void)', content: 'Jika terjadi kesalahan, Anda dapat menekan tombol Void pada Riwayat Transaksi. Pengajuan akan dikirim ke notifikasi Manager untuk disetujui.' }
     ];
 
     const managerGuide = [
-      { id: 'm1', title: 'Laporan Keuangan', content: 'Masuk ke Dashboard & Laporan. Anda bisa melihat Jurnal Umum, Laporan Penjualan, dan Arus Kas. Anda bisa mencetak laporan ke PDF atau Excel dengan blok tanda tangan 3 tingkat (Admin, Manager, Ketua). Anda juga bisa mengirim permohonan persetujuan.' },
-      { id: 'm2', title: 'Persetujuan Akses Staf', content: 'Bisa menyetujui akun Kasir atau Admin baru yang mendaftar via menu Manajemen Akun untuk cabang Anda.' },
-      { id: 'm3', title: 'Manajemen Cabang', content: 'Mengelola dan memantau stok serta aktivitas di setiap cabang yang ada.' },
-      { id: 'm4', title: 'Approval Pembatalan (Void)', content: 'Setiap pengajuan pembatalan (Void) dari Kasir/Admin akan masuk ke ikon Lonceng (Notifikasi). Anda bisa langsung menuju Riwayat untuk Approve atau Reject.' }
+      { id: 'm1', title: 'Laporan Keuangan', content: 'Masuk ke Dashboard & Laporan. Anda bisa melihat Jurnal Umum, Laporan Penjualan, dan Arus Kas. Anda bisa mencetak laporan ke PDF atau Excel dengan blok tanda tangan 3 tingkat (Admin, Manager, Ketua).' },
+      { id: 'm2', title: 'Manajemen CoA & Akun', content: 'Gunakan menu Daftar Akun (CoA) untuk menyesuaikan akun cabang dan struktur akuntansi syariah. Manager dapat menambah atau memperbarui akun yang terkait cabangnya.' },
+      { id: 'm3', title: 'Manajemen Pelanggan Cabang', content: 'Gunakan menu Master Pelanggan untuk melihat dan mengubah Total Point, memantau penggunaan poin, serta mencatat piutang kasbon untuk cabang Anda.' },
+      { id: 'm4', title: 'Approval Pembatalan (Void)', content: 'Setiap pengajuan pembatalan (Void) dari Kasir/Admin akan masuk ke ikon Lonceng (Notifikasi). Anda bisa langsung menuju Riwayat untuk Approve atau Reject.' },
+      { id: 'm5', title: 'Kasbon & Piutang Pelanggan', content: 'Saat pelanggan membayar dengan Kasbon, sistem mencatat Piutang dan menambah Piutang Pelanggan. Piutang ini bisa dilunasi di Master Pelanggan atau pada transaksi berikutnya.' }
     ];
 
     const ownerGuide = [

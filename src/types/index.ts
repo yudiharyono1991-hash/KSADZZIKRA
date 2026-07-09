@@ -16,6 +16,7 @@ export interface Branch {
   name: string;
   address: string;
   phone: string;
+  whatsapp?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -48,6 +49,26 @@ export interface StoreSettings {
   minimumCashBalance?: number;
   zakatRate?: number; // e.g. 2.5
   autoApproveTransactions?: boolean;
+  // Upload protection: optional password required for importing/uploading templates or files
+  uploadPassword?: string;
+  // Roles allowed to manage (set/clear) the upload password. Example: ['OWNER','ADMIN','MANAGER']
+  uploadPasswordRoles?: string[];
+  
+  // Points System
+  enablePoints?: boolean;
+  pointEarningRate?: number; // Spend this much to earn 1 point (default 1000)
+  pointRedemptionValue?: number; // 1 point equals this much IDR discount (default 10)
+  
+  // Charity / Zakat Receipt
+  enableCharityZakat?: boolean;
+  charityZakatPercentage?: number; // Percentage of margin (default 2.5)
+  charityTitle?: string; // Default: MISI BERKAH BERAMAL
+  charityDescription?: string; // Contains {amount} placeholder
+
+  // PPOB Integration
+  enablePpobIntegration?: boolean;
+  ppobProviderUrl?: string;
+  ppobApiKey?: string;
 }
 
 export interface StockMovement {
@@ -68,7 +89,10 @@ export interface Customer {
   tenantId: string;
   name: string;
   phone: string;
-  points: number;
+  points: number; // This is Sisa Point
+  totalPointsEarned?: number;
+  totalPointsRedeemed?: number;
+  lastPointsUpdate?: string;
   debtAmount: number;
   createdAt: string;
   branchId?: string;
@@ -244,6 +268,7 @@ export interface CurrentUser {
   tenantId?: string; // Empty if SUPERADMIN
   branchId?: string;
   employeeId?: string;
+  phone?: string;
 }
 
 export interface Expense {
@@ -295,6 +320,7 @@ export interface AppNotification {
   tenantId: string;
   branchId?: string;
   targetRole?: UserRole | UserRole[]; // If specific roles should see this
+  excludeUsernames?: string[]; // Users who should not receive this notification
   title: string;
   message: string;
   type: 'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR' | 'APPROVAL';

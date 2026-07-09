@@ -143,6 +143,13 @@ export default function CustomerPortal() {
     const handleCheckout = () => {
     if (customerCart.length === 0) return;
     
+    // Validasi radius pengiriman maksimal 5KM
+    const maxRadius = settings.maxDeliveryRadiusKm || 5;
+    if (customerDistanceKm !== null && customerDistanceKm > maxRadius) {
+      alert(`Mohon maaf, lokasi Anda berjarak ${customerDistanceKm.toFixed(2)} km dari toko. Maksimal radius pengiriman adalah ${maxRadius} km. Silakan pilih opsi ambil sendiri di toko.`);
+      return;
+    }
+    
     // Asumsikan semua pesanan di portal pelanggan menggunakan transfer/QRIS untuk simplicity mock
     const paymentCode = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
     
@@ -427,9 +434,7 @@ export default function CustomerPortal() {
                           {p.image ? (
                             <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-300">
-                              <Package className="w-12 h-12" />
-                            </div>
+                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`} alt={p.name} className="w-full h-full object-cover" />
                           )}
                         </div>
                         <div className="p-3 flex-1 flex flex-col">
@@ -481,8 +486,12 @@ export default function CustomerPortal() {
                 <div className="space-y-4">
                   {customerCart.map(item => (
                     <div key={item.product.id} className="flex items-center gap-4 py-4 border-b border-slate-100">
-                      <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
-                         {item.product.image ? <img src={item.product.image} className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-slate-300 m-auto mt-4" />}
+                      <div className="w-20 h-20 bg-slate-100 rounded-xl flex-shrink-0 border border-slate-200 overflow-hidden relative">
+                         {item.product.image ? (
+                           <img src={item.product.image} className="w-full h-full object-cover" />
+                         ) : (
+                           <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(item.product.name)}&background=random&color=fff&size=200&bold=true`} className="w-full h-full object-cover" />
+                         )}
                       </div>
                       <div className="flex-1">
                         <h4 className="font-bold text-slate-800">{item.product.name}</h4>

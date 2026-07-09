@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve Supabase environment variables from Vite env config.
-const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || 'https://stiatomaelzrptazayml.supabase.co';
-const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0';
+const SUPABASE_URL = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || 'https://tbuyexfeehejbfyhpygg.supabase.co';
+const SUPABASE_ANON_KEY = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRidXlleGZlZWhlamJmeWhweWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyOTc0NDUsImV4cCI6MjA5ODg3MzQ0NX0.RBk_MBcqoyYiFdDZNhn7Vlbg7M3o0Ae4vMTwlTRLMto';
 
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'https://your-project.supabase.co');
@@ -20,20 +20,173 @@ const logSync = (message: string, isError = false) => {
   }
 };
 
+// Realtime subscription helper (best-effort: supports v1 and v2 APIs)
+export function subscribeToTable(table: string, onEvent: (payload: any) => void) {
+  if (!supabase) return () => {};
+
+  try {
+    // Try v1 style
+    // @ts-ignore
+    const sub = (supabase as any).from(`${table}`).on('*', (payload: any) => {
+      try { onEvent(payload); } catch (e) {}
+    }).subscribe();
+    return () => { try { (supabase as any).removeSubscription(sub); } catch (e) {} };
+  } catch (e) {
+    try {
+      // Try v2 channel style
+      // @ts-ignore
+      const channel = (supabase as any).channel(`${table}-changes`).on('postgres_changes', { event: '*', schema: 'public', table }, (payload: any) => {
+        try { onEvent(payload); } catch (err) {}
+      }).subscribe();
+      return () => { try { (supabase as any).removeChannel(channel); } catch (err) {} };
+    } catch (err) {
+      return () => {};
+    }
+  }
+}
+
+/**
+ * Upload gambar ke Supabase Storage.
+ * Mengembalikan public URL jika berhasil, atau base64 string sebagai fallback.
+ * 
+ * @param file - File gambar yang akan diupload
+ * @param bucket - Nama bucket ('product-images' atau 'store-assets')
+ * @param path - Path/nama file di dalam bucket (misal: 'qris/qris_toko.jpg')
+ * @param fallbackBase64 - Base64 string fallback jika upload gagal
+ */
+export async function uploadImageToStorage(
+  file: File,
+  bucket: 'product-images' | 'store-assets',
+  path: string,
+  fallbackBase64?: string
+): Promise<string> {
+  if (!supabase) {
+    // Tidak ada koneksi Supabase, gunakan base64 lokal
+    return fallbackBase64 || '';
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: true, // Overwrite jika sudah ada
+        contentType: file.type,
+      });
+
+    if (error) {
+      logSync(`Storage upload gagal (${bucket}/${path}): ${error.message}`, true);
+      return fallbackBase64 || '';
+    }
+
+    // Ambil public URL
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(data.path);
+
+    logSync(`Gambar berhasil diupload: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (err: any) {
+    logSync(`Upload error: ${err.message}`, true);
+    return fallbackBase64 || '';
+  }
+}
+
+/**
+ * Kompres gambar menggunakan Canvas sebelum upload.
+ * Mengembalikan File yang sudah dikompres.
+ */
+export function compressImage(file: File, maxWidth = 800, quality = 0.75): Promise<{ file: File; base64: string }> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const base64 = canvas.toDataURL('image/jpeg', quality);
+
+        // Convert base64 to File
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+                type: 'image/jpeg',
+              });
+              resolve({ file: compressedFile, base64 });
+            } else {
+              resolve({ file, base64 });
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * Robust DB helpers with automatic local fallback when offline/unconfigured.
  */
 export const supabaseService = {
+  // Helper untuk mendapatkan tenant ID dari localStorage
+  getTenantId(): string {
+    try {
+      const userStr = localStorage.getItem('ksa_current_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.tenantId || 'tenant_default';
+      }
+    } catch (e) {}
+    return 'tenant_default';
+  },
+
   // Products API
   async getProducts(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('sku', { ascending: true });
-      if (error) throw error;
-      return data;
+      const tenantId = this.getTenantId();
+      const pageSize = 1000;
+      let offset = 0;
+      const fetched: any[] = [];
+
+      while (true) {
+        let query = supabase
+          .from('products')
+          .select('*')
+          .order('sku', { ascending: true });
+
+        query = tenantId === 'tenant_default'
+          ? query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+          : query.eq('tenant_id', tenantId);
+
+        const { data, error } = await query.range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        fetched.push(...data);
+        if (data.length < pageSize) break;
+
+        offset += pageSize;
+      }
+
+      try { console.log(`[Supabase] getProducts() tenantId=${tenantId} returned ${fetched.length} rows after pagination`); } catch (e) {}
+      return fetched;
     } catch (err: any) {
       logSync(`Failed to fetch products: ${err.message}`, true);
       return null;
@@ -43,9 +196,10 @@ export const supabaseService = {
   async saveProduct(product: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const payload: any = {
         id: product.id,
-        tenant_id: product.tenantId || 'tenant_default',
+        tenant_id: product.tenantId || tenantId,
         sku: product.sku,
         name: product.name,
         category: product.category,
@@ -109,8 +263,10 @@ export const supabaseService = {
   async saveProductsBulk(products: any[]): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const payloads = products.map(p => ({
         id: p.id,
+        tenant_id: p.tenantId || tenantId,
         sku: p.sku,
         name: p.name,
         category: p.category,
@@ -121,17 +277,30 @@ export const supabaseService = {
         unit: p.unit,
         barcode: p.barcode || null,
         is_halal: p.isHalal ?? true,
-        image: p.image || null
+        image: p.image || null,
+        wholesale_price: p.wholesalePrice || null,
+        wholesale_min_qty: p.wholesaleMinQty || null,
+        has_box_unit: p.hasBoxUnit || false,
+        box_barcode: p.boxBarcode || null,
+        pcs_per_box: p.pcsPerBox || null,
+        box_price: p.boxPrice || null,
+        box_cost_price: p.boxCostPrice || null,
+        sales_coa_code: p.salesCoaCode || null,
+        cogs_coa_code: p.cogsCoaCode || null
       }));
 
       const { error } = await supabase
         .from('products')
         .upsert(payloads);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase bulk save error payloads:', payloads.slice(0, 5));
+        throw error;
+      }
       logSync(`Bulk saved ${products.length} products successfully.`);
       return true;
     } catch (err: any) {
+      console.error('Failed to bulk save products:', err);
       logSync(`Failed to bulk save products: ${err.message}`, true);
       return false;
     }
@@ -153,19 +322,38 @@ export const supabaseService = {
     }
   },
 
+  async deleteProductsByTenant(tenantId: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const query = tenantId === 'tenant_default'
+        ? supabase.from('products').delete().or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+        : supabase.from('products').delete().eq('tenant_id', tenantId);
+      const { error } = await query;
+      if (error) throw error;
+      logSync(`Deleted all products for tenant ${tenantId}.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete products for tenant ${tenantId}: ${err.message}`, true);
+      return false;
+    }
+  },
+
   // Transactions API
   async getTransactions(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
+      const tenantId = this.getTenantId();
       const { data, error } = await supabase
         .from('transactions')
         .select('*')
+        .eq('tenant_id', tenantId)
         .order('timestamp', { ascending: false });
       if (error) {
         // Fallback: If 'timestamp' column is missing or query fails, try ordering by id or created_at
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('transactions')
           .select('*')
+          .eq('tenant_id', tenantId)
           .order('id', { ascending: false });
         if (fallbackError) throw error; // If fallback also fails, throw original
         return fallbackData;
@@ -180,9 +368,10 @@ export const supabaseService = {
   async saveTransaction(tx: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const payload: any = {
         id: tx.id,
-        tenant_id: tx.tenantId || 'tenant_default',
+        tenant_id: tenantId,
         invoice_no: tx.invoiceNo,
         timestamp: tx.timestamp,
         cashier_name: tx.cashierName,
@@ -269,8 +458,10 @@ export const supabaseService = {
   async saveAuditLog(log: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const payload: any = {
         id: log.id,
+        tenant_id: tenantId,
         timestamp: log.timestamp,
         username: log.user,
         action: log.action,
@@ -593,8 +784,14 @@ export const supabaseService = {
   async getCoaAccounts(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase.from('coa_accounts').select('*');
+      const tenantId = this.getTenantId();
+      const query = supabase.from('coa_accounts').select('*');
+      const accountQuery = tenantId === 'tenant_default'
+        ? query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+        : query.eq('tenant_id', tenantId);
+      const { data, error } = await accountQuery;
       if (error) throw error;
+      try { console.log(`[Supabase] getCoaAccounts() tenantId=${tenantId} returned ${Array.isArray(data) ? data.length : 0} rows`); } catch (e) {}
       return data;
     } catch (err: any) {
       logSync(`Failed to fetch coa_accounts: ${err.message}`, true);
@@ -604,7 +801,9 @@ export const supabaseService = {
   async saveCoaAccount(coa: any): Promise<boolean> {
     if (!supabase) return false;
     try {
-      const { error } = await supabase.from('coa_accounts').upsert(coa);
+      const tenantId = this.getTenantId();
+      const payload = { ...coa, tenant_id: tenantId };
+      const { error } = await supabase.from('coa_accounts').upsert(payload);
       if (error) throw error;
       return true;
     } catch (err: any) {
@@ -612,10 +811,22 @@ export const supabaseService = {
       return false;
     }
   },
+  async deleteCoaAccount(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('coa_accounts').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete coa_account ${id}: ${err.message}`, true);
+      return false;
+    }
+  },
   async getStoreSettings(): Promise<any | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase.from('store_settings').select('*').limit(1).single();
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase.from('store_settings').select('*').eq('tenant_id', tenantId).limit(1).single();
       if (error && error.code !== 'PGRST116') throw error; // ignore no rows
       return data;
     } catch (err: any) {
@@ -626,9 +837,10 @@ export const supabaseService = {
   async saveStoreSettings(settings: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const mapped = {
         id: 'settings_1',
-        tenant_id: settings.tenantId || 'tenant_default',
+        tenant_id: tenantId,
         store_name: settings.storeName || '',
         store_address: settings.storeAddress || '',
         store_phone: settings.storePhone || '',
@@ -672,9 +884,10 @@ export const supabaseService = {
   async saveOnlineOrder(order: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const { error } = await supabase.from('online_orders').upsert({
         id: order.id,
-        tenant_id: order.tenantId,
+        tenant_id: tenantId,
         order_no: order.orderNo,
         customer_id: order.customerId,
         customer_name: order.customerName,
@@ -710,21 +923,48 @@ export const supabaseService = {
   async saveJournalEntry(entry: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const { error } = await supabase.from('journal_entries').upsert({
         id: entry.id,
-        tenant_id: entry.tenantId,
+        tenant_id: tenantId,
         date: entry.date,
         description: entry.description,
-        reference: entry.reference,
-        amount: entry.amount,
-        type: entry.type,
-        account_id: entry.accountId,
-        created_at: entry.createdAt
+        account: entry.account,
+        debit: entry.debit,
+        credit: entry.credit,
+        reference_id: entry.referenceId,
+        reference_type: entry.referenceType,
+        created_by: entry.createdBy,
+        branch_id: entry.branchId
       });
       if (error) throw error;
       return true;
     } catch (err: any) {
       logSync(`Failed to save journal_entry: ${err.message}`, true);
+      return false;
+    }
+  },
+  async clearAllDatabase(tenantId: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const tables = [
+        'products', 'transactions', 'online_orders', 'audit_logs', 'zakat_records',
+        'zakat_distributions', 'expenses', 'closings', 'purchase_orders',
+        'journal_entries', 'customers', 'suppliers', 'promos', 'attendances',
+        'stock_movements'
+      ];
+      
+      for (const table of tables) {
+        if (tenantId === 'tenant_default' || !tenantId) {
+          await supabase.from(table).delete().or(`tenant_id.is.null,tenant_id.eq.${tenantId}`);
+        } else {
+          await supabase.from(table).delete().eq('tenant_id', tenantId);
+        }
+      }
+      logSync(`Semua data untuk tenant ${tenantId} telah dihapus permanen dari Supabase.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to clear database for tenant ${tenantId}: ${err.message}`, true);
       return false;
     }
   }

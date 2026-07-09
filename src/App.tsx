@@ -4,6 +4,7 @@ import MainLayout from './components/Layout/MainLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import { useAppStore } from './store';
+import { isSupabaseConfigured, subscribeToTable } from './lib/supabase';
 import {
   LandingPage,
   KasirPOS,
@@ -31,17 +32,12 @@ import {
   QuranPage,
   JadwalShalatPage,
   ArtikelIslamiPage,
-  KoperasiAnggotaPage,
-  KoperasiSHUPage,
-  KoperasiPembiayaanPage,
-  KoperasiKeuanganPage,
   BukuPanduanPage,
   RegisterPage,
   KatalogUmumPage,
   CoAPage,
   BeritaPusatPage,
   LoyaltyProgramPage,
-  KasirShiftPage,
   PPOBInventoryPage
 } from './pages';
 
@@ -88,8 +84,47 @@ export default function App() {
   const { initializeStore, isLoading } = useAppStore();
 
   useEffect(() => {
-    // Attempt startup Supabase pull
-    initializeStore();
+    const initApp = async () => {
+      try {
+        // Attempt startup Supabase pull with retry logic
+        await initializeStore();
+
+        // Avoid triggering a full bulk background sync immediately on every page load.
+        // Background sync is still available manually from settings when the user wants to
+        // push offline changes to Supabase without blocking startup.
+      } catch (err) {
+        console.error('App initialization error:', err);
+      }
+    };
+
+    initApp();
+
+    // Register realtime subscriptions to refresh store when remote changes occur
+    let unsubscribers: Array<() => void> = [];
+    if (isSupabaseConfigured) {
+      try {
+        unsubscribers.push(subscribeToTable('products', () => {
+          console.log('[Realtime] Products updated');
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }));
+        unsubscribers.push(subscribeToTable('store_settings', () => {
+          console.log('[Realtime] Settings updated');
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }));
+        unsubscribers.push(subscribeToTable('online_orders', () => {
+          console.log('[Realtime] Orders updated');
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }));
+      } catch (e) {
+        console.warn('Realtime subscription setup failed:', e);
+      }
+    }
+
+    return () => {
+      unsubscribers.forEach(unsub => {
+        try { unsub(); } catch (e) {}
+      });
+    };
   }, [initializeStore]);
 
   if (isLoading) {
@@ -119,7 +154,6 @@ export default function App() {
         
         {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
         <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
-        <Route path="/kasir-shift" element={<ProtectedRoute><KasirShiftPage /></ProtectedRoute>} />
         <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
         <Route path="/inventory-ppob" element={<ProtectedRoute><PPOBInventoryPage /></ProtectedRoute>} />
