@@ -84,24 +84,47 @@ export default function App() {
   const { initializeStore, isLoading } = useAppStore();
 
   useEffect(() => {
-    // Attempt startup Supabase pull
-    initializeStore();
+    const initApp = async () => {
+      try {
+        // Attempt startup Supabase pull with retry logic
+        await initializeStore();
+
+        // Avoid triggering a full bulk background sync immediately on every page load.
+        // Background sync is still available manually from settings when the user wants to
+        // push offline changes to Supabase without blocking startup.
+      } catch (err) {
+        console.error('App initialization error:', err);
+      }
+    };
+
+    initApp();
 
     // Register realtime subscriptions to refresh store when remote changes occur
+    let unsubscribers: Array<() => void> = [];
     if (isSupabaseConfigured) {
-      const unsubP = subscribeToTable('products', () => initializeStore());
-      const unsubS = subscribeToTable('store_settings', () => initializeStore());
-      const unsubO = subscribeToTable('online_orders', () => initializeStore());
-      const unsubC = subscribeToTable('chat_messages', () => initializeStore());
-      const unsubT = subscribeToTable('transactions', () => initializeStore());
-      return () => {
-        try { unsubP(); } catch (e) {}
-        try { unsubS(); } catch (e) {}
-        try { unsubO(); } catch (e) {}
-        try { unsubC(); } catch (e) {}
-        try { unsubT(); } catch (e) {}
-      };
+      try {
+        unsubscribers.push(subscribeToTable('products', () => {
+          console.log('[Realtime] Products updated');
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }));
+        unsubscribers.push(subscribeToTable('store_settings', () => {
+          console.log('[Realtime] Settings updated');
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }));
+        unsubscribers.push(subscribeToTable('online_orders', () => {
+          console.log('[Realtime] Orders updated');
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }));
+      } catch (e) {
+        console.warn('Realtime subscription setup failed:', e);
+      }
     }
+
+    return () => {
+      unsubscribers.forEach(unsub => {
+        try { unsub(); } catch (e) {}
+      });
+    };
   }, [initializeStore]);
 
   if (isLoading) {

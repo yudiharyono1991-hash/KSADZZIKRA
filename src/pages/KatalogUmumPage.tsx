@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MessageCircle, Loader } from 'lucide-react';
 import { calculateDistanceKm } from '../utils/distance';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,12 +15,16 @@ export default function KatalogUmumPage() {
     settings,
     customers,
     addCustomer,
+    initializeStore,
+    isLoading
   } = useAppStore();
 
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'CATALOG' | 'CART' | 'GUIDE'>('CATALOG');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDataSyncing, setIsDataSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   
   // Checkout Form State
   const [customerName, setCustomerName] = useState('');
@@ -28,6 +32,29 @@ export default function KatalogUmumPage() {
   const [customerAddress, setCustomerAddress] = useState('');
 
   const [isOutsideHours, setIsOutsideHours] = useState(false);
+
+  // Ensure data is synced on component mount and periodically refresh
+  React.useEffect(() => {
+    const syncData = async () => {
+      setIsDataSyncing(true);
+      setSyncError(null);
+      try {
+        await initializeStore();
+        setSyncError(null);
+      } catch (err: any) {
+        console.error('Failed to sync catalog data:', err);
+        setSyncError('Gagal memuat data produk dari server. Data ditampilkan dari cache lokal.');
+      } finally {
+        setIsDataSyncing(false);
+      }
+    };
+
+    syncData();
+    
+    // Refresh data every 30 seconds for real-time updates
+    const interval = setInterval(syncData, 30000);
+    return () => clearInterval(interval);
+  }, [initializeStore]);
 
   React.useEffect(() => {
     const checkHours = () => {
@@ -235,6 +262,29 @@ export default function KatalogUmumPage() {
         {/* Tab: Catalog */}
         {activeTab === 'CATALOG' && (
           <div className="space-y-4 animate-in fade-in duration-200">
+            {/* Sync Status Messages */}
+            {isDataSyncing && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-2xl shadow-sm flex items-center gap-3">
+                <Loader className="w-5 h-5 animate-spin" />
+                <p className="text-sm font-medium">Menyinkronkan data produk...</p>
+              </div>
+            )}
+            
+            {syncError && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl shadow-sm flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{syncError}</p>
+                  <button 
+                    onClick={() => initializeStore().then(() => setSyncError(null)).catch(e => setSyncError('Retry gagal'))}
+                    className="text-xs mt-1 underline hover:no-underline"
+                  >
+                    Coba lagi
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="relative">
               <input 
                 type="text" 
@@ -245,32 +295,45 @@ export default function KatalogUmumPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map(p => {
-                const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
-                return (
-                  <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
-                    <div className="h-32 bg-slate-100 relative">
-                      {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <Package className="w-12 h-12" />
+            {/* Loading State */}
+            {isDataSyncing && products.length === 0 && (
+              <div className="text-center py-12">
+                <div className="inline-block">
+                  <Loader className="w-8 h-8 animate-spin text-green-600 mx-auto mb-4" />
+                  <p className="text-slate-600 text-sm">Memuat produk...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Products Grid */}
+            {!isDataSyncing && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {filteredProducts.map(p => {
+                    const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
+                    return (
+                      <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
+                        <div className="h-32 bg-slate-100 relative">
+                          {p.image ? (
+                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-300">
+                              <Package className="w-12 h-12" />
+                            </div>
+                          )}
+                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2 py-1 rounded text-slate-600 shadow-sm">{p.category}</div>
                         </div>
-                      )}
-                      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2 py-1 rounded text-slate-600 shadow-sm">{p.category}</div>
-                    </div>
-                    <div className="p-3 flex-1 flex flex-col">
-                      <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
-                      <p className="text-green-700 font-black text-lg">Rp {p.price.toLocaleString('id-ID')}</p>
-                      <p className="text-xs text-slate-500 mb-3">Stok: {p.stock} {p.unit}</p>
-                      
-                      {inCart > 0 ? (
-                        <div className="flex items-center justify-between bg-green-50 rounded-lg p-1 border border-green-100">
-                          <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm">-</button>
-                          <span className="font-bold text-green-800">{inCart}</span>
-                          <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50">+</button>
-                        </div>
+                        <div className="p-3 flex-1 flex flex-col">
+                          <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
+                          <p className="text-green-700 font-black text-lg">Rp {p.price.toLocaleString('id-ID')}</p>
+                          <p className="text-xs text-slate-500 mb-3">Stok: {p.stock} {p.unit}</p>
+                          
+                          {inCart > 0 ? (
+                            <div className="flex items-center justify-between bg-green-50 rounded-lg p-1 border border-green-100">
+                              <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm">-</button>
+                              <span className="font-bold text-green-800">{inCart}</span>
+                              <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50">+</button>
+                            </div>
                       ) : (
                         <button 
                           onClick={() => addToCustomerCart(p)}
@@ -284,11 +347,26 @@ export default function KatalogUmumPage() {
                 );
               })}
             </div>
-            {filteredProducts.length === 0 && (
+            {filteredProducts.length === 0 && products.length === 0 && (
+              <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-sm">
+                <Package className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                <p className="text-slate-600 font-bold text-lg mb-2">Belum Ada Produk</p>
+                <p className="text-slate-500 text-sm mb-4 px-6">Data produk sedang dimuat dari server. Jika terus kosong, silakan hubungi admin KSA Mart.</p>
+                <button 
+                  onClick={() => initializeStore().then(() => setSyncError(null)).catch(e => setSyncError('Retry gagal'))}
+                  className="text-sm text-green-600 hover:text-green-700 font-bold underline"
+                >
+                  Refresh Halaman
+                </button>
+              </div>
+            )}
+            {filteredProducts.length === 0 && products.length > 0 && (
               <div className="text-center py-12 text-slate-500">
                 <Package className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                <p>Tidak ada produk yang sesuai pencarian.</p>
+                <p>Tidak ada produk yang sesuai dengan pencarian "{searchQuery}".</p>
               </div>
+            )}
+              </>
             )}
           </div>
         )}

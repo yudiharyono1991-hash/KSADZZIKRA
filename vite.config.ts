@@ -5,14 +5,16 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 export default defineConfig(() => {
   return {
     plugins: [
       react(), 
       tailwindcss(),
-      VitePWA({
+      !isDev && VitePWA({
         registerType: 'autoUpdate',
-        devOptions: { enabled: true },
+        devOptions: { enabled: false }, // disable service worker in dev to avoid reload/cache issues during local browser testing
         manifest: {
           name: 'Toko KSA Mart',
           short_name: 'Toko KSA Mart',
@@ -33,9 +35,8 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 5000000
         }
       })
-    ],
-    resolve: {
-      alias: {
+    ].filter(Boolean),
+    resolve: {      alias: {
         '@': path.resolve(__dirname, '.'),
       },
     },

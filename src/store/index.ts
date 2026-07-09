@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage, CoaAccount } from '../types';
 import { supabaseService, isSupabaseConfigured, uploadImageToStorage } from '../lib/supabase';
 
-// Worker flag to avoid concurrent processors across calls
+// Worker flags to avoid concurrent processors across calls
 let imageWorkerRunning = false;
+let forceSyncRunning = false;
 
 function dataUrlToFile(dataUrl: string, filename = 'image.jpg') {
   const arr = dataUrl.split(',');
@@ -81,6 +82,38 @@ const saveStorage = (key: string, data: any, tenantId?: string) => {
     }
   }
 };
+
+const chunkArray = <T,>(array: T[], chunkSize: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
+const runSupabaseTask = async <T>(label: string, task: () => Promise<T>, onSuccess: (result: T) => void, timeoutMs = 30000) => {
+  try {
+    const result = await new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      task()
+        .then((value) => {
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+
+    if (result !== undefined && result !== null) {
+      onSuccess(result);
+    }
+  } catch (err) {
+    console.warn(`[Supabase] ${label} failed:`, err);
+  }
+};
+
 interface AppState {
   tenants: import('../types').Tenant[];
   registerTenant: (tenant: Omit<import('../types').Tenant, 'id' | 'status' | 'createdAt'>) => void;
@@ -230,7 +263,7 @@ interface AppState {
   addLog: (action: string, category: AuditLog['category'], details: string) => void;
   
   // Supabase Initial Sync
-  initializeStore: () => Promise<void>;
+  initializeStore: (options?: { showLoading?: boolean }) => Promise<void>;
   forceSyncAllToCloud: () => Promise<void>;
 
   // CoA Actions
@@ -2318,266 +2351,326 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Supabase Syncing on startup
-  initializeStore: async () => {
+  initializeStore: async (options?: { showLoading?: boolean }) => {
+    const shouldShowLoading = options?.showLoading ?? true;
     if (!isSupabaseConfigured) {
-      set({ isLoading: false });
+      if (shouldShowLoading) {
+        set({ isLoading: false });
+      }
       return;
     }
 
-    set({ isLoading: true });
+    if (shouldShowLoading) {
+      set({ isLoading: true });
+    }
 
     const tenantId = get().currentUser?.tenantId || supabaseService.getTenantId();
 
-    // Inline timeout helper for robust cloud fetching
-    const withTimeout = <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), timeoutMs)
-        )
-      ]);
-    };
-
     try {
-      // Parallelize fetches with a pool timeout (increased for large catalogs)
-      await withTimeout(
-        Promise.all([
-          supabaseService.getCustomers().then(remoteCustomers => {
-            if (remoteCustomers && remoteCustomers.length > 0) {
-              const mapped = remoteCustomers.map(c => ({
-                id: c.id,
-                tenantId: c.tenant_id,
-                name: c.name,
-                phone: c.phone,
-                points: Number(c.points || 0),
-                debtAmount: Number(c.debt_amount || 0),
-                branchId: c.branch_id,
-                isKoperasiMember: Boolean(c.is_koperasi_member),
-                createdAt: c.created_at || new Date().toISOString()
-              }));
-              set({ customers: mapped });
+      const tasks: Promise<void>[] = [];
+      
+      tasks.push(runSupabaseTask('getCustomers', async () => {
+        return await supabaseService.getCustomers();
+      }, (remoteCustomers) => {
+        if (remoteCustomers && remoteCustomers.length > 0) {
+          const mapped = remoteCustomers.map(c => ({
+            id: c.id,
+            tenantId: c.tenant_id,
+            name: c.name,
+            phone: c.phone,
+            points: Number(c.points || 0),
+            debtAmount: Number(c.debt_amount || 0),
+            branchId: c.branch_id,
+            isKoperasiMember: Boolean(c.is_koperasi_member),
+            createdAt: c.created_at || new Date().toISOString()
+          }));
+          set({ customers: mapped });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getProducts', async () => {
+        return await supabaseService.getProducts();
+      }, (remoteProducts) => {
+        if (remoteProducts && remoteProducts.length > 0) {
+          const localProducts = JSON.parse(localStorage.getItem('ksa_products') || '[]');
+          const productsMap = remoteProducts.map(p => {
+            const localP = localProducts.find((lp: any) => lp.id === p.id);
+            return {
+              id: p.id,
+              tenantId: p.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+              sku: p.sku,
+              name: p.name,
+              category: p.category,
+              price: Number(p.price),
+              costPrice: Number(p.cost_price),
+              stock: Number(p.stock),
+              minStock: Number(p.min_stock),
+              unit: p.unit,
+              barcode: p.barcode || undefined,
+              isHalal: p.is_halal,
+              image: p.image || localP?.image || undefined
+            };
+          });
+          set({ products: productsMap });
+          saveStorage('ksa_products', productsMap, tenantId);
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getUsers', async () => {
+        return await supabaseService.getUsers();
+      }, (remoteUsers) => {
+        if (remoteUsers) {
+          const defaultUsers = getSavedUsers();
+          const merged = [...remoteUsers];
+          defaultUsers.forEach(du => {
+            if (!merged.some(ru => ru.username === du.username)) {
+              merged.push(du);
+              supabaseService.saveUser(du);
             }
-          }),
-          supabaseService.getProducts().then(remoteProducts => {
-            if (remoteProducts && remoteProducts.length > 0) {
-              const localProducts = JSON.parse(localStorage.getItem('ksa_products') || '[]');
-              const productsMap = remoteProducts.map(p => {
-                const localP = localProducts.find((lp: any) => lp.id === p.id);
-                return {
-                  id: p.id,
-                  tenantId: p.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-                  sku: p.sku,
-                  name: p.name,
-                  category: p.category,
-                  price: Number(p.price),
-                  costPrice: Number(p.cost_price),
-                  stock: Number(p.stock),
-                  minStock: Number(p.min_stock),
-                  unit: p.unit,
-                  barcode: p.barcode || undefined,
-                  isHalal: p.is_halal,
-                  image: p.image || localP?.image || undefined
-                };
-              });
-              set({ products: productsMap });
-              saveStorage('ksa_products', productsMap, tenantId);
+          });
+          set({ users: merged });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getTransactions', async () => {
+        return await supabaseService.getTransactions();
+      }, (remoteTxs) => {
+        if (remoteTxs && remoteTxs.length > 0) {
+          const transactionsMap = remoteTxs.map(t => ({
+            id: t.id,
+            tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+            invoiceNo: t.invoice_no,
+            timestamp: t.timestamp || t.created_at || new Date().toISOString(),
+            cashierName: t.cashier_name,
+            items: t.items,
+            totalAmount: Number(t.total_amount),
+            paymentMethod: t.payment_method,
+            amountPaid: Number(t.amount_paid),
+            changeAmount: Number(t.change_amount),
+            zakatContribution: Number(t.zakat_contribution),
+            marginContribution: Number(t.margin_contribution)
+          }));
+          set({ transactions: transactionsMap });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getAuditLogs', async () => {
+        return await supabaseService.getAuditLogs();
+      }, (remoteLogs) => {
+        if (remoteLogs && remoteLogs.length > 0) {
+          const logsMap = remoteLogs.map(l => ({
+            id: l.id,
+            tenantId: l.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+            timestamp: l.timestamp || l.created_at || new Date().toISOString(),
+            user: l.username,
+            action: l.action,
+            category: l.category || 'SYSTEM',
+            details: l.details,
+            ipAddress: l.ip_address
+          }));
+          set({ auditLogs: logsMap });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getZakatRecords', async () => {
+        return await supabaseService.getZakatRecords();
+      }, (remoteZk) => {
+        if (remoteZk && remoteZk.length > 0) {
+          const zkMap = remoteZk.map(zk => ({
+            id: zk.id,
+            tenantId: zk.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+            timestamp: zk.timestamp || zk.created_at || new Date().toISOString(),
+            goldPricePerGram: Number(zk.gold_price),
+            nisabValue: Number(zk.nisab_value),
+            liquidAssets: Number(zk.liquid_assets),
+            inventoryValue: Number(zk.inventory_value),
+            receivables: Number(zk.receivables),
+            liabilities: Number(zk.liabilities),
+            netWealth: Number(zk.net_wealth),
+            isZakatRequired: zk.is_eligible,
+            zakatDue: Number(zk.zakat_due),
+            notes: zk.notes
+          }));
+          set({ zakatRecords: zkMap });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getZakatDistributions', async () => {
+        return await supabaseService.getZakatDistributions();
+      }, (remoteZkd) => {
+        if (remoteZkd && remoteZkd.length > 0) {
+          const zkdMap = remoteZkd.map(zkd => ({
+            id: zkd.id,
+            tenantId: zkd.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+            timestamp: zkd.timestamp || zkd.created_at || new Date().toISOString(),
+            amount: Number(zkd.amount),
+            recipient: zkd.recipient,
+            esgCategory: zkd.esg_category,
+            description: zkd.description
+          }));
+          set({ zakatDistributions: zkdMap });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getCoaAccounts', async () => {
+        return await supabaseService.getCoaAccounts();
+      }, (remoteCoa) => {
+        if (remoteCoa && remoteCoa.length > 0) {
+          const mapped = remoteCoa.map(c => ({
+            id: c.id,
+            tenantId: c.tenant_id,
+            code: c.code,
+            name: c.name,
+            category: c.category,
+            normalBalance: c.normal_balance,
+            isActive: c.is_active
+          }));
+          set({ coaList: mapped });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getJournalEntries', async () => {
+        return await supabaseService.getJournalEntries();
+      }, (remoteJournals) => {
+        if (remoteJournals && remoteJournals.length > 0) {
+          const mapped = remoteJournals.map(j => ({
+            id: j.id,
+            tenantId: j.tenant_id,
+            date: j.date,
+            account: j.account,
+            description: j.description,
+            debit: Number(j.debit),
+            credit: Number(j.credit),
+            referenceId: j.reference_id,
+            referenceType: j.reference_type,
+            createdBy: j.created_by,
+            branchId: j.branch_id
+          }));
+          set({ journalEntries: mapped });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getOnlineOrders', async () => {
+        return await supabaseService.getOnlineOrders();
+      }, (remoteOrders) => {
+        if (remoteOrders && remoteOrders.length > 0) {
+          const mapped = remoteOrders.map(o => ({
+            id: o.id,
+            orderNo: o.order_no,
+            tenantId: o.tenant_id,
+            customerId: o.customer_id,
+            customerName: o.customer_name,
+            customerPhone: o.customer_phone,
+            customerAddress: o.customer_address,
+            items: o.items,
+            totalAmount: Number(o.total_amount),
+            status: o.status,
+            notes: o.notes,
+            createdAt: o.created_at,
+            updatedAt: o.updated_at,
+            paymentMethod: o.payment_method,
+            paymentCode: o.payment_code,
+            branchId: o.branch_id
+          }));
+          set({ onlineOrders: mapped });
+        }
+      }));
+
+      tasks.push(runSupabaseTask('getStoreSettings', async () => {
+        return await supabaseService.getStoreSettings();
+      }, (remoteSettings) => {
+        if (remoteSettings) {
+          set({
+            settings: {
+              tenantId: remoteSettings.tenant_id,
+              isTaxEnabled: remoteSettings.is_tax_enabled,
+              taxRate: Number(remoteSettings.tax_rate),
+              ownerBankName: remoteSettings.owner_bank_name,
+              ownerBankAccount: remoteSettings.owner_bank_account,
+              qrisEnabled: remoteSettings.qris_enabled,
+              qrisImageUrl: remoteSettings.qris_image_url,
+              businessType: remoteSettings.business_type,
+              ownerWhatsapp: remoteSettings.owner_whatsapp,
+              maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
+              maintenanceMode: remoteSettings.maintenance_mode,
+              minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
+              zakatRate: Number(remoteSettings.zakat_rate),
+              autoApproveTransactions: remoteSettings.auto_approve_transactions,
+              storeName: remoteSettings.store_name || 'KSA Mart Syariah',
+              storeAddress: remoteSettings.store_address || '',
+              storePhone: remoteSettings.store_phone || '',
+              paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes) || 60,
+              storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
+              storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
+              paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
             }
-          }),
-          supabaseService.getUsers().then(remoteUsers => {
-            if (remoteUsers) {
-              const defaultUsers = getSavedUsers();
-              const merged = [...remoteUsers];
-              defaultUsers.forEach(du => {
-                if (!merged.some(ru => ru.username === du.username)) {
-                  merged.push(du);
-                  supabaseService.saveUser(du);
-                }
-              });
-              set({ users: merged });
-            }
-          }),
-          supabaseService.getTransactions().then(remoteTxs => {
-            if (remoteTxs && remoteTxs.length > 0) {
-              const transactionsMap = remoteTxs.map(t => ({
-                id: t.id,
-                tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-                invoiceNo: t.invoice_no,
-                timestamp: t.timestamp || t.created_at || new Date().toISOString(),
-                cashierName: t.cashier_name,
-                items: t.items,
-                totalAmount: Number(t.total_amount),
-                paymentMethod: t.payment_method,
-                amountPaid: Number(t.amount_paid),
-                changeAmount: Number(t.change_amount),
-                zakatContribution: Number(t.zakat_contribution),
-                marginContribution: Number(t.margin_contribution)
-              }));
-              set({ transactions: transactionsMap });
-            }
-          }),
-          supabaseService.getAuditLogs().then(remoteLogs => {
-            if (remoteLogs && remoteLogs.length > 0) {
-              const logsMap = remoteLogs.map(l => ({
-                id: l.id,
-                tenantId: l.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-                timestamp: l.timestamp || l.created_at || new Date().toISOString(),
-                user: l.username,
-                action: l.action,
-                category: l.category || 'SYSTEM',
-                details: l.details,
-                ipAddress: l.ip_address
-              }));
-              set({ auditLogs: logsMap });
-            }
-          }),
-          supabaseService.getZakatRecords().then(remoteZk => {
-            if (remoteZk && remoteZk.length > 0) {
-              const zkMap = remoteZk.map(zk => ({
-                id: zk.id,
-                tenantId: zk.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-                timestamp: zk.timestamp || zk.created_at || new Date().toISOString(),
-                goldPricePerGram: Number(zk.gold_price),
-                nisabValue: Number(zk.nisab_value),
-                liquidAssets: Number(zk.liquid_assets),
-                inventoryValue: Number(zk.inventory_value),
-                receivables: Number(zk.receivables),
-                liabilities: Number(zk.liabilities),
-                netWealth: Number(zk.net_wealth),
-                isZakatRequired: zk.is_eligible,
-                zakatDue: Number(zk.zakat_due),
-                notes: zk.notes
-              }));
-              set({ zakatRecords: zkMap });
-            }
-          }),
-          supabaseService.getZakatDistributions().then(remoteZkd => {
-            if (remoteZkd && remoteZkd.length > 0) {
-              const zkdMap = remoteZkd.map(zkd => ({
-                id: zkd.id,
-                tenantId: zkd.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-                timestamp: zkd.timestamp || zkd.created_at || new Date().toISOString(),
-                amount: Number(zkd.amount),
-                recipient: zkd.recipient,
-                esgCategory: zkd.esg_category,
-                description: zkd.description
-              }));
-              set({ zakatDistributions: zkdMap });
-            }
-          }),
-          supabaseService.getCoaAccounts().then(remoteCoa => {
-            if (remoteCoa && remoteCoa.length > 0) {
-              const mapped = remoteCoa.map(c => ({
-                id: c.id,
-                tenantId: c.tenant_id,
-                code: c.code,
-                name: c.name,
-                category: c.category,
-                normalBalance: c.normal_balance,
-                isActive: c.is_active
-              }));
-              set({ coaList: mapped });
-            }
-          }),
-          supabaseService.getJournalEntries().then(remoteJournals => {
-            if (remoteJournals && remoteJournals.length > 0) {
-              const mapped = remoteJournals.map(j => ({
-                id: j.id,
-                tenantId: j.tenant_id,
-                date: j.date,
-                account: j.account,
-                description: j.description,
-                debit: Number(j.debit),
-                credit: Number(j.credit),
-                referenceId: j.reference_id,
-                referenceType: j.reference_type,
-                createdBy: j.created_by,
-                branchId: j.branch_id
-              }));
-              set({ journalEntries: mapped });
-            }
-          }),
-          supabaseService.getOnlineOrders().then(remoteOrders => {
-            if (remoteOrders && remoteOrders.length > 0) {
-              const mapped = remoteOrders.map(o => ({
-                id: o.id,
-                orderNo: o.order_no,
-                tenantId: o.tenant_id,
-                customerId: o.customer_id,
-                customerName: o.customer_name,
-                customerPhone: o.customer_phone,
-                customerAddress: o.customer_address,
-                items: o.items,
-                totalAmount: Number(o.total_amount),
-                status: o.status,
-                notes: o.notes,
-                createdAt: o.created_at,
-                updatedAt: o.updated_at,
-                paymentMethod: o.payment_method,
-                paymentCode: o.payment_code,
-                branchId: o.branch_id
-              }));
-              set({ onlineOrders: mapped });
-            }
-          }),
-          supabaseService.getStoreSettings().then(remoteSettings => {
-            if (remoteSettings) {
-              set({
-                settings: {
-                  tenantId: remoteSettings.tenant_id,
-                  isTaxEnabled: remoteSettings.is_tax_enabled,
-                  taxRate: Number(remoteSettings.tax_rate),
-                  ownerBankName: remoteSettings.owner_bank_name,
-                  ownerBankAccount: remoteSettings.owner_bank_account,
-                  qrisEnabled: remoteSettings.qris_enabled,
-                  qrisImageUrl: remoteSettings.qris_image_url,
-                  businessType: remoteSettings.business_type,
-                  ownerWhatsapp: remoteSettings.owner_whatsapp,
-                  maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
-                  maintenanceMode: remoteSettings.maintenance_mode,
-                  minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
-                  zakatRate: Number(remoteSettings.zakat_rate),
-                  autoApproveTransactions: remoteSettings.auto_approve_transactions,
-                  storeName: remoteSettings.store_name || 'KSA Mart Syariah',
-                  storeAddress: remoteSettings.store_address || '',
-                  storePhone: remoteSettings.store_phone || '',
-                  paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes) || 60,
-                  storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
-                  storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
-                  paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
-                }
-              });
-            }
-          })
-        ]),
-        10000
-      );
+          });
+        }
+      }));
+
+      await Promise.allSettled(tasks);
     } catch (e) {
-      console.warn('Supabase initialization timed out or database tables failed to sync. Falling back to offline-first mode.', e);
+      console.warn('Supabase initialization encountered an unexpected error. Proceeding in offline-first mode.', e);
     } finally {
-      set({ isLoading: false });
+      if (shouldShowLoading) {
+        set({ isLoading: false });
+      }
     }
   },
 
   forceSyncAllToCloud: async () => {
     if (!isSupabaseConfigured) return;
-    set({ isLoading: true });
+
+    const state = get();
+    const tenantId = state.currentUser?.tenantId || 'tenant_default';
+
+    console.log('[Force Sync] Starting cloud sync for tenant:', tenantId);
+
+    const syncTask = async (name: string, items: any[], callback: (item: any) => Promise<void>) => {
+      if (!items || items.length === 0) {
+        console.log(`[Force Sync] No ${name} to sync.`);
+        return;
+      }
+
+      console.log(`[Force Sync] Syncing ${items.length} ${name}...`);
+      const results = await Promise.allSettled(items.map(item => callback(item)));
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        console.warn(`[Force Sync] ${failed.length} / ${items.length} ${name} failed to sync.`);
+      }
+    };
+
     try {
-      const state = get();
-      // Sync products
-      for (const p of state.products) { await supabaseService.saveProduct(p); }
-      // Sync customers
-      for (const c of state.customers) { await supabaseService.saveCustomer(c); }
-      // Sync transactions
-      for (const t of state.transactions) { await (supabaseService as any).saveTransaction(t); }
-      // Sync settings
-      await supabaseService.saveStoreSettings(state.settings);
-      
-      alert("Semua data lokal berhasil diunggah ke Supabase Cloud!");
+      await Promise.allSettled([
+        syncTask('products', state.products, async (product) => {
+          await supabaseService.saveProduct(product);
+        }),
+        syncTask('customers', state.customers, async (customer) => {
+          await supabaseService.saveCustomer(customer);
+        }),
+        syncTask('transactions', state.transactions, async (transaction) => {
+          await (supabaseService as any).saveTransaction(transaction);
+        }),
+        syncTask('online orders', state.onlineOrders, async (order) => {
+          await supabaseService.saveOnlineOrder(order);
+        }),
+      ]);
+
+      try {
+        console.log('[Force Sync] Syncing settings...');
+        await supabaseService.saveStoreSettings(state.settings);
+      } catch (e) {
+        console.warn('Failed to sync settings:', e);
+      }
+
+      const recentLogs = state.auditLogs.slice(0, 100);
+      await syncTask('audit logs', recentLogs, async (log) => {
+        await supabaseService.saveAuditLog(log);
+      });
+
+      console.log('[Force Sync] Cloud sync completed successfully.');
     } catch (e) {
-      console.error(e);
-      alert("Gagal mengunggah beberapa data ke Cloud.");
-    } finally {
-      set({ isLoading: false });
+      console.error('[Force Sync] Error:', e);
     }
   }
 }));

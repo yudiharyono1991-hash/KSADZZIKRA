@@ -1,6 +1,6 @@
 export async function generateProductImage(prompt: string): Promise<string> {
   // If an AI image API is configured, call it. Expecting env var `VITE_AI_IMAGE_API`.
-  const apiUrl = (import.meta as any).env?.VITE_AI_IMAGE_API || (process.env && (process.env.REACT_APP_AI_IMAGE_API || process.env.VITE_AI_IMAGE_API));
+  const apiUrl = (import.meta as any).env?.VITE_AI_IMAGE_API || (typeof process !== 'undefined' ? (process.env.REACT_APP_AI_IMAGE_API || process.env.VITE_AI_IMAGE_API) : undefined);
   if (apiUrl) {
     try {
       const res = await fetch(apiUrl, {
