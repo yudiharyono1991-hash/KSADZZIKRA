@@ -101,19 +101,38 @@ export default function App() {
 
     // Register realtime subscriptions to refresh store when remote changes occur
     let unsubscribers: Array<() => void> = [];
+    let syncTimeoutId: any = null;
+    let lastSyncTime = 0;
+
+    const throttledSync = () => {
+      const now = Date.now();
+      if (now - lastSyncTime > 10000) {
+        // Run immediately if more than 10s have passed
+        lastSyncTime = now;
+        initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+      } else {
+        // Otherwise wait for things to settle
+        if (syncTimeoutId) clearTimeout(syncTimeoutId);
+        syncTimeoutId = setTimeout(() => {
+          lastSyncTime = Date.now();
+          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+        }, 3000);
+      }
+    };
+
     if (isSupabaseConfigured) {
       try {
         unsubscribers.push(subscribeToTable('products', () => {
           console.log('[Realtime] Products updated');
-          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+          throttledSync();
         }));
         unsubscribers.push(subscribeToTable('store_settings', () => {
           console.log('[Realtime] Settings updated');
-          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+          throttledSync();
         }));
         unsubscribers.push(subscribeToTable('online_orders', () => {
           console.log('[Realtime] Orders updated');
-          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
+          throttledSync();
         }));
       } catch (e) {
         console.warn('Realtime subscription setup failed:', e);
