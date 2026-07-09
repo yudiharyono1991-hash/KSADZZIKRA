@@ -42,7 +42,19 @@ export default defineConfig(() => {
     },
     build: {
       outDir: 'dist',
-      emptyOutDir: true
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-charts': ['recharts'],
+            'vendor-utils': ['date-fns', 'fuse.js', 'clsx', 'tailwind-merge'],
+            'vendor-supabase': ['@supabase/supabase-js'],
+            'vendor-other': ['lucide-react', 'xlsx', 'html2pdf.js', 'motion', 'react-window']
+          }
+        }
+      },
+      chunkSizeWarningLimit: 1000
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
