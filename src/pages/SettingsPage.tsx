@@ -790,17 +790,24 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pr-6">
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Nama Bank</label>
-                      <select value={b.bankName} onChange={e => setBankTransfers(prev => prev.map((x, idx) => idx === i ? { ...x, bankName: e.target.value } : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5">
-                        <option>BSI (Bank Syariah Indonesia)</option>
-                        <option>Bank BRI</option>
-                        <option>Bank BCA</option>
-                        <option>Bank Mandiri</option>
-                        <option>Bank BNI</option>
-                        <option>Bank Muamalat</option>
-                        <option>Bank MEGA Syariah</option>
-                        <option>Bank Permata Syariah</option>
-                        <option>Lainnya</option>
-                      </select>
+                      <input 
+                        type="text" 
+                        list={`bank-options-${i}`}
+                        value={b.bankName} 
+                        onChange={e => setBankTransfers(prev => prev.map((x, idx) => idx === i ? { ...x, bankName: e.target.value } : x))} 
+                        placeholder="Pilih atau ketik bank..."
+                        className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none mt-0.5" 
+                      />
+                      <datalist id={`bank-options-${i}`}>
+                        <option value="BSI (Bank Syariah Indonesia)" />
+                        <option value="Bank BRI" />
+                        <option value="Bank BCA" />
+                        <option value="Bank Mandiri" />
+                        <option value="Bank BNI" />
+                        <option value="Bank Muamalat" />
+                        <option value="Bank MEGA Syariah" />
+                        <option value="Bank Permata Syariah" />
+                      </datalist>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">No. Rekening</label>
@@ -835,14 +842,22 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pr-6">
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Provider</label>
-                      <select value={w.provider} onChange={e => setEwallets(prev => prev.map((x, idx) => idx === i ? { ...x, provider: e.target.value } : x))} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5">
-                        <option>GoPay</option>
-                        <option>OVO</option>
-                        <option>DANA</option>
-                        <option>ShopeePay</option>
-                        <option>LinkAja</option>
-                        <option>QRIS (Semua)</option>
-                      </select>
+                      <input 
+                        type="text" 
+                        list={`ewallet-options-${i}`}
+                        value={w.provider} 
+                        onChange={e => setEwallets(prev => prev.map((x, idx) => idx === i ? { ...x, provider: e.target.value } : x))} 
+                        placeholder="Pilih atau ketik provider..."
+                        className="w-full border border-gray-200 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-purple-500 outline-none mt-0.5" 
+                      />
+                      <datalist id={`ewallet-options-${i}`}>
+                        <option value="GoPay" />
+                        <option value="OVO" />
+                        <option value="DANA" />
+                        <option value="ShopeePay" />
+                        <option value="LinkAja" />
+                        <option value="QRIS (Semua)" />
+                      </datalist>
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-500 uppercase">No. / ID E-Wallet</label>

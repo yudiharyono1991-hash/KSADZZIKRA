@@ -220,10 +220,10 @@ export default function TrendPage() {
 
   const averageTxValue = totals.count > 0 ? totals.omset / totals.count : 0;
 
-  const renderGrowth = (value: number) => {
-    if (value > 0) return <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded border border-green-100">+{value.toFixed(1)}%</span>;
-    if (value < 0) return <span className="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded border border-red-100">{value.toFixed(1)}%</span>;
-    return <span className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200">0%</span>;
+  const renderGrowth = (value: number, isDark = false) => {
+    if (value > 0) return <span className={`${isDark ? 'text-green-200' : 'bg-green-50 text-green-700 border border-green-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>+{value.toFixed(1)}%</span>;
+    if (value < 0) return <span className={`${isDark ? 'text-red-200' : 'bg-red-50 text-red-700 border border-red-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>{value.toFixed(1)}%</span>;
+    return <span className={`${isDark ? 'text-white/70' : 'bg-slate-50 text-slate-500 border border-slate-200'} text-[11px] font-bold px-2 py-0.5 rounded`}>0%</span>;
   };
 
   return (
@@ -252,45 +252,75 @@ export default function TrendPage() {
         </div>
       </div>
 
-      {/* Visual Analytics Quick Stats */}
+      {/* Visual Analytics Quick Stats - Vibrant Gradients */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Omset {totals.label}</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-gray-800">Rp {totals.omset.toLocaleString('id-ID')}</h3>
-            {renderGrowth(comparisons.omset)}
+        
+        {/* Omset - Blue Gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <LineChartIcon className="w-32 h-32" />
           </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Berdasar periode kalender berjalan</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Sirkulasi Profit Bersih (Margin)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-gray-800">Rp {totals.margin.toLocaleString('id-ID')}</h3>
-            <div className="flex flex-col items-end gap-1">
-              {renderGrowth(comparisons.margin)}
-              <span className="text-green-700 text-[10px] font-bold font-mono">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
+          <div className="relative z-10">
+            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Omset {totals.label}</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-extrabold">Rp {totals.omset.toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              {renderGrowth(comparisons.omset, true)}
+              <span className="text-white/70 text-[10px] font-medium">Berdasar periode</span>
             </div>
           </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Margin berdasar transaksi rill kasir</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Himpunan Zakat (Est. Penjualan)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-green-800">Rp {totals.zakat.toLocaleString('id-ID')}</h3>
-            {renderGrowth(comparisons.zakat)}
+        {/* Margin - Orange Gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <PieChartIcon className="w-32 h-32" />
           </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Potensi Zakat perniagaan yang terkumpul</p>
+          <div className="relative z-10">
+            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Sirkulasi Profit (Margin)</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-extrabold">Rp {totals.margin.toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-white bg-white/20 px-2 py-0.5 rounded text-[11px] font-bold">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
+              {renderGrowth(comparisons.margin, true)}
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Rata-rata Transaksi Pembeli</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-gray-800">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
-            <span className="text-gray-400 text-xs font-medium font-mono">{totals.count} Struk</span>
+        {/* Zakat - Green Gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <AlertTriangle className="w-32 h-32" />
           </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Rata-rata nilai per belanja struk</p>
+          <div className="relative z-10">
+            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Himpunan Zakat (Est.)</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-extrabold">Rp {totals.zakat.toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              {renderGrowth(comparisons.zakat, true)}
+              <span className="text-white/70 text-[10px] font-medium">Potensi Zakat</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Average Tx - Purple Gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 to-indigo-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <Users className="w-32 h-32" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Rata-rata Transaksi</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-extrabold">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-white bg-white/20 px-2 py-0.5 rounded text-[11px] font-bold">{totals.count} Struk</span>
+              <span className="text-white/70 text-[10px] font-medium">Per struk</span>
+            </div>
+          </div>
         </div>
       </div>
 
