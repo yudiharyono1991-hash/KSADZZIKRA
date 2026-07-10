@@ -401,6 +401,9 @@ export const supabaseService = {
         .insert(payload);
 
       if (error) {
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
+          return true;
+        }
         const errorMessage = error.message.toLowerCase();
         if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
           const basicPayload = {
@@ -419,7 +422,12 @@ export const supabaseService = {
           const { error: retryError } = await supabase
             .from('transactions')
             .insert(basicPayload);
-          if (retryError) throw retryError;
+          if (retryError) {
+            if (retryError.code === '23505' || retryError.message?.toLowerCase().includes('duplicate')) {
+              return true;
+            }
+            throw retryError;
+          }
           return true;
         }
         throw error;
@@ -475,6 +483,9 @@ export const supabaseService = {
         .insert(payload);
 
       if (error) {
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
+          return true;
+        }
         // Deteksi dinamis jika ada kolom yang tidak ditemukan dalam skema cache Supabase
         const errorMessage = error.message.toLowerCase();
         if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
@@ -499,6 +510,9 @@ export const supabaseService = {
             .insert(saferPayload);
 
           if (retryError) {
+            if (retryError.code === '23505' || retryError.message?.toLowerCase().includes('duplicate')) {
+              return true;
+            }
             // Jika masih gagal, kirim payload paling minimal (id, action, username) agar tidak memicu error di UI
             const barePayload = {
               id: payload.id,
@@ -509,6 +523,9 @@ export const supabaseService = {
               .from('audit_logs')
               .insert(barePayload);
             if (bareError) {
+              if (bareError.code === '23505' || bareError.message?.toLowerCase().includes('duplicate')) {
+                return true;
+              }
               logSync(`Failed dynamic audit log retry: ${bareError.message}`, true);
               return false; // Jangan lempar exception agar UI tidak crash
             }
@@ -570,13 +587,21 @@ export const supabaseService = {
         .insert(payload);
 
       if (error) {
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
+          return true;
+        }
         if (error.message.includes('column') && error.message.includes('timestamp')) {
           const saferPayload = { ...payload };
           delete saferPayload.timestamp;
           const { error: retryError } = await supabase
             .from('zakat_records')
             .insert(saferPayload);
-          if (retryError) throw retryError;
+          if (retryError) {
+            if (retryError.code === '23505' || retryError.message?.toLowerCase().includes('duplicate')) {
+              return true;
+            }
+            throw retryError;
+          }
           return true;
         }
         throw error;
@@ -628,13 +653,21 @@ export const supabaseService = {
         .insert(payload);
 
       if (error) {
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
+          return true;
+        }
         if (error.message.includes('column') && error.message.includes('timestamp')) {
           const saferPayload = { ...payload };
           delete saferPayload.timestamp;
           const { error: retryError } = await supabase
             .from('zakat_distributions')
             .insert(saferPayload);
-          if (retryError) throw retryError;
+          if (retryError) {
+            if (retryError.code === '23505' || retryError.message?.toLowerCase().includes('duplicate')) {
+              return true;
+            }
+            throw retryError;
+          }
           return true;
         }
         throw error;
