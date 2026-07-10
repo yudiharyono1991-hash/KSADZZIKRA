@@ -104,7 +104,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   };
 
   return (
-    <header id="app-topbar" className="h-16 bg-white border-b border-gray-200/80 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none">
+    <header id="app-topbar" className="h-16 bg-gradient-to-r from-emerald-50 via-white to-green-50 border-b-2 border-green-700 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none">
       
       {/* Brand Context */}
       <div className="flex items-center space-x-1.5 md:space-x-2 text-gray-500 font-semibold text-xs">

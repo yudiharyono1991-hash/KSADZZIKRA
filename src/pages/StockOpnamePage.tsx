@@ -8,7 +8,9 @@ export default function StockOpnamePage() {
   const [physicalCount, setPhysicalCount] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const categories = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah'];
+  
+  // Get unique categories dynamically from products
+  const categories = Array.from(new Set(products.map(p => p.category))).sort();
   
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500 font-bold">Akses ditolak.</div>;
@@ -99,7 +101,7 @@ export default function StockOpnamePage() {
                 className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
                 onChange={(e) => {
                   const val = e.target.value;
-                  const found = products.find(p => p.sku === val || p.name === val || `${p.sku} - ${p.name}` === val);
+                  const found = products.find(p => p.sku.toLowerCase() === val.toLowerCase() || p.name.toLowerCase() === val.toLowerCase() || `${p.sku} - ${p.name}`.toLowerCase() === val.toLowerCase());
                   if (found) {
                     setSelectedProductId(found.id);
                   } else {
