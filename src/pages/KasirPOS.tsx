@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { FixedSizeList as List } from 'react-window';
 import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import { 
@@ -28,6 +27,7 @@ import { printToBluetooth, openCashDrawerBluetooth } from '../lib/bluetoothPrint
 
 export default function KasirPOS() {
   const { 
+    initializeStore,
     products, 
     cart, 
     addToCart, 
@@ -43,6 +43,8 @@ export default function KasirPOS() {
   } = useBranchData();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 24;
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchDebounceRef = useRef<number | null>(null);
   const searchWorkerRef = useRef<Worker | null>(null);
@@ -51,6 +53,12 @@ export default function KasirPOS() {
   
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+
+  useEffect(() => {
+    // Ensure store is initialized specifically when visiting Kasir
+    // We pass catalogOnly false because this is an admin page.
+    initializeStore({ catalogOnly: false, showLoading: false });
+  }, []);
 
   useEffect(() => {
     if (!listContainerRef.current) return;
@@ -481,95 +489,105 @@ export default function KasirPOS() {
         </div>
 
         {/* Catalog List scrollable area */}
-        <div ref={listContainerRef} className="flex-1 overflow-hidden pr-1">
+        <div ref={listContainerRef} className="flex-1 overflow-y-auto pr-1 pb-20">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
               <AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-3" />
               <p className="text-gray-500 font-medium">Produk tidak ditemukan.</p>
             </div>
           ) : (
-            <List
-              height={Math.min(window.innerHeight * 0.72, 780)}
-              itemCount={Math.ceil(filteredProducts.length / cols)}
-              itemSize={260}
-              width={containerWidth}
-            >
-              {({ index, style }) => {
-                const start = index * cols;
-                const items = filteredProducts.slice(start, start + cols);
-                return (
-                  <div style={style} className={`grid ${gridColsClass} gap-2 px-1`}>
-                    {items.map((p) => {
-                      const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
-                      const isOutOfStock = p.stock <= 0;
-                      const isLowStock = p.stock <= p.minStock && p.stock > 0;
-                      return (
-                        <div 
-                          key={p.id}
-                          onClick={() => {
-                            if (activeTab === 'PPOB') {
-                              handlePpobClick(p);
-                            } else if (!isOutOfStock) {
-                              addToCart(p, false);
-                            }
-                          }}
-                          className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative ${
-                            isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
-                          }`}
-                        >
-                          <div className="absolute top-2 right-2 z-10">
-                            <span className="bg-green-50 text-green-700 text-[8px] font-bold px-1 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">Halal</span>
+            <>
+              <div className={`grid ${gridColsClass} gap-2 px-1 pb-4`}>
+                {filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((p) => {
+                  const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
+                  const isOutOfStock = p.stock <= 0;
+                  const isLowStock = p.stock <= p.minStock && p.stock > 0;
+                  return (
+                    <div 
+                      key={p.id}
+                      onClick={() => {
+                        if (activeTab === 'PPOB') {
+                          handlePpobClick(p);
+                        } else if (!isOutOfStock) {
+                          addToCart(p, false);
+                        }
+                      }}
+                      className={`bg-white rounded-xl border flex flex-col overflow-hidden transition-all relative cursor-pointer ${
+                        isOutOfStock ? 'opacity-65 border-gray-200' : 'border-gray-200 hover:shadow-md hover:border-green-300'
+                      }`}
+                    >
+                      <div className="absolute top-2 right-2 z-10">
+                        <span className="bg-green-50 text-green-700 text-[8px] font-bold px-1 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">Halal</span>
+                      </div>
+                      <div className="w-full h-20 bg-slate-100 flex-shrink-0 relative">
+                        {p.image ? (
+                          <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-100 to-emerald-50">
+                            <span className="text-2xl font-black text-green-800 opacity-40 uppercase">{p.name.substring(0,2)}</span>
                           </div>
-                          <div className="w-full h-20 bg-slate-100 flex-shrink-0 relative">
-                            {p.image ? (
-                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      <div className="p-2.5 pb-3 flex flex-col flex-1 justify-between">
+                        <div className="mb-1">
+                          <span className="text-[9px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
+                          <h3 className="font-bold text-xs text-gray-800 line-clamp-2 mt-0.5 leading-snug h-8">{p.name}</h3>
+                          <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">{p.category}</p>
+                        </div>
+                        <div className="mt-auto pt-1.5 border-t border-gray-50">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-bold text-gray-800 text-xs">Rp {p.price.toLocaleString('id-ID')}</span>
+                            {!p.isPPOB ? (
+                              isOutOfStock ? (
+                                <span className="text-[9px] font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded-full">Habis</span>
+                              ) : isLowStock ? (
+                                <span className="text-[9px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full border border-amber-200">{p.stock}</span>
+                              ) : (
+                                <span className="text-[9px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded-full">{p.stock}</span>
+                              )
                             ) : (
-                              <img 
-                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`}
-                                alt={p.name} 
-                                className="w-full h-full object-cover"
-                              />
+                              <span className="text-[9px] font-semibold text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded-full">Digital</span>
                             )}
                           </div>
-                          <div className="p-2.5 pb-3 flex flex-col flex-1 justify-between">
-                            <div className="mb-1">
-                              <span className="text-[9px] text-gray-400 font-mono font-semibold block">{p.sku}</span>
-                              <h3 className="font-bold text-xs text-gray-800 line-clamp-2 mt-0.5 leading-snug h-8">{p.name}</h3>
-                              <p className="text-[9px] text-gray-400 font-semibold uppercase mt-0.5">{p.category}</p>
+                          {isOutOfStock && !p.isPPOB ? (
+                            <button disabled className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed">Stok Kosong</button>
+                          ) : (
+                            <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
+                              <Plus className="w-3.5 h-3.5 mr-0.5" />
+                              <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
+                              {cartQty > 0 && (<span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">{cartQty}</span>)}
                             </div>
-                            <div className="mt-auto pt-1.5 border-t border-gray-50">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="font-bold text-gray-800 text-xs">Rp {p.price.toLocaleString('id-ID')}</span>
-                                {!p.isPPOB ? (
-                                  isOutOfStock ? (
-                                    <span className="text-[9px] font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded-full">Habis</span>
-                                  ) : isLowStock ? (
-                                    <span className="text-[9px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-full border border-amber-200">{p.stock}</span>
-                                  ) : (
-                                    <span className="text-[9px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded-full">{p.stock}</span>
-                                  )
-                                ) : (
-                                  <span className="text-[9px] font-semibold text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded-full">Digital</span>
-                                )}
-                              </div>
-                              {isOutOfStock && !p.isPPOB ? (
-                                <button disabled className="w-full bg-slate-100 text-gray-400 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed">Stok Kosong</button>
-                              ) : (
-                                <div className="w-full bg-green-700 text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 shadow-xs active:scale-98 transition-all">
-                                  <Plus className="w-3.5 h-3.5 mr-0.5" />
-                                  <span>{activeTab === 'PPOB' ? 'Pilih Layanan' : 'Pilih Produk'}</span>
-                                  {cartQty > 0 && (<span className="bg-amber-400 text-green-950 font-bold ml-1 px-1.5 py-0.1 rounded-full text-[10px]">{cartQty}</span>)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              }}
-            </List>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination Controls */}
+              {Math.ceil(filteredProducts.length / itemsPerPage) > 1 && (
+                <div className="flex justify-center items-center py-4 space-x-2 border-t border-gray-100 mt-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 text-xs font-bold"
+                  >
+                    Sebelumnya
+                  </button>
+                  <span className="text-xs font-bold text-gray-600">
+                    Hal {currentPage} dari {Math.ceil(filteredProducts.length / itemsPerPage)}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredProducts.length / itemsPerPage), p + 1))}
+                    disabled={currentPage === Math.ceil(filteredProducts.length / itemsPerPage)}
+                    className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 text-xs font-bold"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

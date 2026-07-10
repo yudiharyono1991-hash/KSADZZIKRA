@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { FixedSizeList as List } from 'react-window';
 import { useBranchData } from '../hooks/useBranchData';
 import { Product } from '../types';
 import * as XLSX from 'xlsx';
@@ -22,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function InventoryPage() {
-  const { products, addProduct, addProductsBulk, updateProduct, deleteProduct, clearProducts, adjustStock, currentUser, activeBranchId, coaList, addNotification, addLog, categories: savedCategories, addCategory, removeCategory, setCategories } = useBranchData();
+  const { initializeStore, products, addProduct, addProductsBulk, updateProduct, deleteProduct, clearProducts, adjustStock, currentUser, activeBranchId, coaList, addNotification, addLog, categories: savedCategories, addCategory, removeCategory, setCategories } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchDebounceRef = useRef<number | null>(null);
@@ -139,6 +138,12 @@ export default function InventoryPage() {
 
   // Web Worker for fuzzy search (off-main-thread)
   const searchWorkerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    // Ensure data is synced when opening Inventory
+    initializeStore({ catalogOnly: false, showLoading: false });
+  }, []);
+
   const [searchMatchedIds, setSearchMatchedIds] = useState<Array<string | number> | null>(null);
 
   useEffect(() => {
@@ -759,41 +764,35 @@ export default function InventoryPage() {
               <div className="text-center py-16 text-gray-400">Tidak ada barang inventori untuk ditampilkan.</div>
             ) : (
               <>
-              <List
-                height={Math.min(600, Math.max(300, window.innerHeight - 300))}
-                itemCount={filteredProducts.length}
-                itemSize={64}
-                width={1000}
-              >
-                {({ index, style }) => {
-                  const p = filteredProducts[index];
+              <div className="flex flex-col">
+                {filteredProducts.slice((page - 1) * pageSize, page * pageSize).map((p) => {
                   const profitAmt = p.price - p.costPrice;
                   const marginPct = p.costPrice > 0 ? ((profitAmt / p.price) * 100).toFixed(1) : '0';
                   const isOutOfStock = p.stock === 0;
                   const isLowStock = p.stock > 0 && p.stock <= p.minStock;
                   return (
-                    <div key={p.id} style={style} className="px-4 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs">
+                    <div key={p.id} className="px-4 py-2 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs hover:bg-slate-50 transition-colors">
                       <div className="col-span-1 font-mono text-gray-500 truncate" title={p.sku}>{p.sku}</div>
                       <div className="col-span-2 font-bold text-gray-900 truncate" title={p.name}>{p.name}</div>
                       <div className="col-span-1 truncate">
-                        <span className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded border border-slate-200">{p.category}</span>
+                        <span className="bg-slate-100 text-slate-700 text-[9px] px-2 py-0.5 rounded border border-slate-200">{p.category}</span>
                       </div>
                       <div className="col-span-1 text-right font-mono text-gray-600 whitespace-nowrap">Rp {p.costPrice.toLocaleString('id-ID')}</div>
                       <div className="col-span-1 text-right font-bold text-green-700 whitespace-nowrap">Rp {p.price.toLocaleString('id-ID')}</div>
-                      <div className="col-span-1 text-center text-green-700 font-mono text-[10px] whitespace-nowrap flex flex-col items-center justify-center">
+                      <div className="col-span-1 text-center text-green-700 font-mono text-[9px] whitespace-nowrap flex flex-col items-center justify-center">
                         <span>Rp {profitAmt.toLocaleString('id-ID')}</span>
-                        <span className="text-[9px] text-slate-500">({marginPct}%)</span>
+                        <span className="text-[8px] text-slate-500">({marginPct}%)</span>
                       </div>
-                      <div className="col-span-1 text-center text-[10px] whitespace-nowrap">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('id-ID') : '-'}</div>
-                      <div className="col-span-1 text-center font-mono font-bold whitespace-nowrap">{p.stock} <span className="text-gray-400 font-sans text-[10px] font-normal">{p.unit}</span></div>
+                      <div className="col-span-1 text-center text-[9px] whitespace-nowrap">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('id-ID') : '-'}</div>
+                      <div className="col-span-1 text-center font-mono font-bold whitespace-nowrap">{p.stock} <span className="text-gray-400 font-sans text-[9px] font-normal">{p.unit}</span></div>
                       <div className="col-span-1 text-center">
-                        {isOutOfStock ? <span className="bg-red-50 text-red-700 text-[10px] px-2 py-0.5 rounded">Habis</span> : isLowStock ? <span className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5 rounded">Kritis</span> : <span className="bg-green-50 text-green-800 text-[10px] px-2 py-0.5 rounded">Sehat</span>}
+                        {isOutOfStock ? <span className="bg-red-50 text-red-700 text-[9px] px-2 py-0.5 rounded">Habis</span> : isLowStock ? <span className="bg-amber-50 text-amber-700 text-[9px] px-2 py-0.5 rounded">Kritis</span> : <span className="bg-green-50 text-green-800 text-[9px] px-2 py-0.5 rounded">Sehat</span>}
                       </div>
                       <div className="col-span-2 text-center flex items-center justify-center gap-1">
                         <button onClick={() => handleOpenEdit(p)} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600">
                           <Edit className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="px-2 py-1 text-[10px] font-bold rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300 whitespace-nowrap">
+                        <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="px-2 py-1 text-[9px] font-bold rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300 whitespace-nowrap">
                           +/- Stok
                         </button>
                         <button onClick={() => { if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) deleteProduct(p.id); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-400">
@@ -802,10 +801,10 @@ export default function InventoryPage() {
                       </div>
                     </div>
                   );
-                }}
-              </List>
+                })}
+              </div>
               {/* TOTAL ROW */}
-              <div className="bg-indigo-50/50 text-[11px] text-gray-800 font-extrabold border-t-2 border-indigo-100 py-4 px-4 grid grid-cols-12 gap-3 items-center shadow-inner">
+              <div className="bg-indigo-50/50 text-[11px] text-gray-800 font-extrabold border-t-2 border-indigo-100 py-4 px-4 grid grid-cols-12 gap-3 items-center shadow-inner mt-4">
                 <div className="col-span-4 text-right pr-4 uppercase tracking-widest text-indigo-700 flex items-center justify-end gap-2">
                   <span>TOTAL KESELURUHAN</span>
                   <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[9px]">{filteredProducts.length} Jenis (SKU)</span>
@@ -818,6 +817,31 @@ export default function InventoryPage() {
                 <div className="col-span-1"></div>
                 <div className="col-span-2"></div>
               </div>
+
+              {/* Pagination Controls */}
+              {Math.ceil(filteredProducts.length / pageSize) > 1 && (
+                <div className="flex justify-between items-center py-4 px-4 border-t border-gray-100 bg-white sticky bottom-0">
+                  <span className="text-xs text-gray-500 font-medium">
+                    Menampilkan {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, filteredProducts.length)} dari {filteredProducts.length} produk
+                  </span>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 text-xs font-bold shadow-sm"
+                    >
+                      Sebelumnya
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.min(Math.ceil(filteredProducts.length / pageSize), p + 1))}
+                      disabled={page === Math.ceil(filteredProducts.length / pageSize)}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 text-xs font-bold shadow-sm"
+                    >
+                      Selanjutnya
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
             )}
           </div>
