@@ -263,7 +263,7 @@ interface AppState {
   addLog: (action: string, category: AuditLog['category'], details: string) => void;
   
   // Supabase Initial Sync
-  initializeStore: (options?: { showLoading?: boolean }) => Promise<void>;
+  initializeStore: (options?: { showLoading?: boolean; catalogOnly?: boolean }) => Promise<void>;
   fetchProducts: () => Promise<void>;
   fetchStoreSettings: () => Promise<void>;
   fetchOnlineOrders: () => Promise<void>;
@@ -2481,8 +2481,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Supabase Syncing on startup
-  initializeStore: async (options?: { showLoading?: boolean }) => {
+  initializeStore: async (options?: { showLoading?: boolean; catalogOnly?: boolean }) => {
     const shouldShowLoading = options?.showLoading ?? true;
+    const isCatalogOnly = options?.catalogOnly ?? false;
     if (!isSupabaseConfigured) {
       if (shouldShowLoading) {
         set({ isLoading: false });
@@ -2499,164 +2500,176 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const tasks: Promise<void>[] = [];
       
-      tasks.push(runSupabaseTask('getCustomers', async () => {
-        return await supabaseService.getCustomers();
-      }, (remoteCustomers) => {
-        if (remoteCustomers && remoteCustomers.length > 0) {
-          const mapped = remoteCustomers.map(c => ({
-            id: c.id,
-            tenantId: c.tenant_id,
-            name: c.name,
-            phone: c.phone,
-            points: Number(c.points || 0),
-            debtAmount: Number(c.debt_amount || 0),
-            branchId: c.branch_id,
-            isKoperasiMember: Boolean(c.is_koperasi_member),
-            createdAt: c.created_at || new Date().toISOString()
-          }));
-          set({ customers: mapped });
-        }
-      }));
+      if (!isCatalogOnly) {
+        tasks.push(runSupabaseTask('getCustomers', async () => {
+          return await supabaseService.getCustomers();
+        }, (remoteCustomers) => {
+          if (remoteCustomers && remoteCustomers.length > 0) {
+            const mapped = remoteCustomers.map(c => ({
+              id: c.id,
+              tenantId: c.tenant_id,
+              name: c.name,
+              phone: c.phone,
+              points: Number(c.points || 0),
+              debtAmount: Number(c.debt_amount || 0),
+              branchId: c.branch_id,
+              isKoperasiMember: Boolean(c.is_koperasi_member),
+              createdAt: c.created_at || new Date().toISOString()
+            }));
+            set({ customers: mapped });
+          }
+        }));
+      }
 
-      tasks.push(get().fetchProducts());
+      tasks.push(runSupabaseTask('fetchProducts', async () => {
+        await get().fetchProducts();
+      }, () => {}));
 
-      tasks.push(runSupabaseTask('getUsers', async () => {
-        return await supabaseService.getUsers();
-      }, (remoteUsers) => {
-        if (remoteUsers) {
-          const defaultUsers = getSavedUsers();
-          const merged = [...remoteUsers];
-          defaultUsers.forEach(du => {
-            if (!merged.some(ru => ru.username === du.username)) {
-              merged.push(du);
-              supabaseService.saveUser(du);
-            }
-          });
-          set({ users: merged });
-        }
-      }));
+      if (!isCatalogOnly) {
+        tasks.push(runSupabaseTask('getUsers', async () => {
+          return await supabaseService.getUsers();
+        }, (remoteUsers) => {
+          if (remoteUsers) {
+            const defaultUsers = getSavedUsers();
+            const merged = [...remoteUsers];
+            defaultUsers.forEach(du => {
+              if (!merged.some(ru => ru.username === du.username)) {
+                merged.push(du);
+                supabaseService.saveUser(du);
+              }
+            });
+            set({ users: merged });
+          }
+        }));
 
-      tasks.push(runSupabaseTask('getTransactions', async () => {
-        return await supabaseService.getTransactions();
-      }, (remoteTxs) => {
-        if (remoteTxs && remoteTxs.length > 0) {
-          const transactionsMap = remoteTxs.map(t => ({
-            id: t.id,
-            tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-            invoiceNo: t.invoice_no,
-            timestamp: t.timestamp || t.created_at || new Date().toISOString(),
-            cashierName: t.cashier_name,
-            items: t.items,
-            totalAmount: Number(t.total_amount),
-            paymentMethod: t.payment_method,
-            amountPaid: Number(t.amount_paid),
-            changeAmount: Number(t.change_amount),
-            zakatContribution: Number(t.zakat_contribution),
-            marginContribution: Number(t.margin_contribution)
-          }));
-          set({ transactions: transactionsMap });
-        }
-      }));
+        tasks.push(runSupabaseTask('getTransactions', async () => {
+          return await supabaseService.getTransactions();
+        }, (remoteTxs) => {
+          if (remoteTxs && remoteTxs.length > 0) {
+            const transactionsMap = remoteTxs.map(t => ({
+              id: t.id,
+              tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+              invoiceNo: t.invoice_no,
+              timestamp: t.timestamp || t.created_at || new Date().toISOString(),
+              cashierName: t.cashier_name,
+              items: t.items,
+              totalAmount: Number(t.total_amount),
+              paymentMethod: t.payment_method,
+              amountPaid: Number(t.amount_paid),
+              changeAmount: Number(t.change_amount),
+              zakatContribution: Number(t.zakat_contribution),
+              marginContribution: Number(t.margin_contribution)
+            }));
+            set({ transactions: transactionsMap });
+          }
+        }));
 
-      tasks.push(runSupabaseTask('getAuditLogs', async () => {
-        return await supabaseService.getAuditLogs();
-      }, (remoteLogs) => {
-        if (remoteLogs && remoteLogs.length > 0) {
-          const logsMap = remoteLogs.map(l => ({
-            id: l.id,
-            tenantId: l.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-            timestamp: l.timestamp || l.created_at || new Date().toISOString(),
-            user: l.username,
-            action: l.action,
-            category: l.category || 'SYSTEM',
-            details: l.details,
-            ipAddress: l.ip_address
-          }));
-          set({ auditLogs: logsMap });
-        }
-      }));
+        tasks.push(runSupabaseTask('getAuditLogs', async () => {
+          return await supabaseService.getAuditLogs();
+        }, (remoteLogs) => {
+          if (remoteLogs && remoteLogs.length > 0) {
+            const logsMap = remoteLogs.map(l => ({
+              id: l.id,
+              tenantId: l.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+              timestamp: l.timestamp || l.created_at || new Date().toISOString(),
+              user: l.username,
+              action: l.action,
+              category: l.category || 'SYSTEM',
+              details: l.details,
+              ipAddress: l.ip_address
+            }));
+            set({ auditLogs: logsMap });
+          }
+        }));
 
-      tasks.push(runSupabaseTask('getZakatRecords', async () => {
-        return await supabaseService.getZakatRecords();
-      }, (remoteZk) => {
-        if (remoteZk && remoteZk.length > 0) {
-          const zkMap = remoteZk.map(zk => ({
-            id: zk.id,
-            tenantId: zk.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-            timestamp: zk.timestamp || zk.created_at || new Date().toISOString(),
-            goldPricePerGram: Number(zk.gold_price),
-            nisabValue: Number(zk.nisab_value),
-            liquidAssets: Number(zk.liquid_assets),
-            inventoryValue: Number(zk.inventory_value),
-            receivables: Number(zk.receivables),
-            liabilities: Number(zk.liabilities),
-            netWealth: Number(zk.net_wealth),
-            isZakatRequired: zk.is_eligible,
-            zakatDue: Number(zk.zakat_due),
-            notes: zk.notes
-          }));
-          set({ zakatRecords: zkMap });
-        }
-      }));
+        tasks.push(runSupabaseTask('getZakatRecords', async () => {
+          return await supabaseService.getZakatRecords();
+        }, (remoteZk) => {
+          if (remoteZk && remoteZk.length > 0) {
+            const zkMap = remoteZk.map(zk => ({
+              id: zk.id,
+              tenantId: zk.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+              timestamp: zk.timestamp || zk.created_at || new Date().toISOString(),
+              goldPricePerGram: Number(zk.gold_price),
+              nisabValue: Number(zk.nisab_value),
+              liquidAssets: Number(zk.liquid_assets),
+              inventoryValue: Number(zk.inventory_value),
+              receivables: Number(zk.receivables),
+              liabilities: Number(zk.liabilities),
+              netWealth: Number(zk.net_wealth),
+              isZakatRequired: zk.is_eligible,
+              zakatDue: Number(zk.zakat_due),
+              notes: zk.notes
+            }));
+            set({ zakatRecords: zkMap });
+          }
+        }));
 
-      tasks.push(runSupabaseTask('getZakatDistributions', async () => {
-        return await supabaseService.getZakatDistributions();
-      }, (remoteZkd) => {
-        if (remoteZkd && remoteZkd.length > 0) {
-          const zkdMap = remoteZkd.map(zkd => ({
-            id: zkd.id,
-            tenantId: zkd.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-            timestamp: zkd.timestamp || zkd.created_at || new Date().toISOString(),
-            amount: Number(zkd.amount),
-            recipient: zkd.recipient,
-            esgCategory: zkd.esg_category,
-            description: zkd.description
-          }));
-          set({ zakatDistributions: zkdMap });
-        }
-      }));
+        tasks.push(runSupabaseTask('getZakatDistributions', async () => {
+          return await supabaseService.getZakatDistributions();
+        }, (remoteZkd) => {
+          if (remoteZkd && remoteZkd.length > 0) {
+            const zkdMap = remoteZkd.map(zkd => ({
+              id: zkd.id,
+              tenantId: zkd.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+              timestamp: zkd.timestamp || zkd.created_at || new Date().toISOString(),
+              amount: Number(zkd.amount),
+              recipient: zkd.recipient,
+              esgCategory: zkd.esg_category,
+              description: zkd.description
+            }));
+            set({ zakatDistributions: zkdMap });
+          }
+        }));
 
-      tasks.push(runSupabaseTask('getCoaAccounts', async () => {
-        return await supabaseService.getCoaAccounts();
-      }, (remoteCoa) => {
-        if (remoteCoa && remoteCoa.length > 0) {
-          const mapped = remoteCoa.map(c => ({
-            id: c.id,
-            tenantId: c.tenant_id,
-            code: c.code,
-            name: c.name,
-            category: c.category,
-            normalBalance: c.normal_balance,
-            isActive: c.is_active
-          }));
-          set({ coaList: mapped });
-        }
-      }));
+        tasks.push(runSupabaseTask('getCoaAccounts', async () => {
+          return await supabaseService.getCoaAccounts();
+        }, (remoteCoa) => {
+          if (remoteCoa && remoteCoa.length > 0) {
+            const mapped = remoteCoa.map(c => ({
+              id: c.id,
+              tenantId: c.tenant_id,
+              code: c.code,
+              name: c.name,
+              category: c.category,
+              normalBalance: c.normal_balance,
+              isActive: c.is_active
+            }));
+            set({ coaList: mapped });
+          }
+        }));
+      }
 
-      tasks.push(get().fetchStoreSettings());
+      tasks.push(runSupabaseTask('fetchStoreSettings', async () => {
+        await get().fetchStoreSettings();
+      }, () => {}));
 
-      tasks.push(runSupabaseTask('getJournalEntries', async () => {
-        return await supabaseService.getJournalEntries();
-      }, (remoteJournals) => {
-        if (remoteJournals && remoteJournals.length > 0) {
-          const mapped = remoteJournals.map(j => ({
-            id: j.id,
-            tenantId: j.tenant_id,
-            date: j.date,
-            account: j.account,
-            description: j.description,
-            debit: Number(j.debit),
-            credit: Number(j.credit),
-            referenceId: j.reference_id,
-            referenceType: j.reference_type,
-            createdBy: j.created_by,
-            branchId: j.branch_id
-          }));
-          set({ journalEntries: mapped });
-        }
-      }));
+      if (!isCatalogOnly) {
+        tasks.push(runSupabaseTask('getJournalEntries', async () => {
+          return await supabaseService.getJournalEntries();
+        }, (remoteJournals) => {
+          if (remoteJournals && remoteJournals.length > 0) {
+            const mapped = remoteJournals.map(j => ({
+              id: j.id,
+              tenantId: j.tenant_id,
+              date: j.date,
+              account: j.account,
+              description: j.description,
+              debit: Number(j.debit),
+              credit: Number(j.credit),
+              referenceId: j.reference_id,
+              referenceType: j.reference_type,
+              createdBy: j.created_by,
+              branchId: j.branch_id
+            }));
+            set({ journalEntries: mapped });
+          }
+        }));
 
-      tasks.push(get().fetchOnlineOrders());
+        tasks.push(runSupabaseTask('fetchOnlineOrders', async () => {
+          await get().fetchOnlineOrders();
+        }, () => {}));
+      }
 
       await Promise.allSettled(tasks);
     } catch (e) {

@@ -86,8 +86,8 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Attempt startup Supabase pull with retry logic
-        await initializeStore();
+        const isCatalogOnly = window.location.hash.includes('/katalog') || !localStorage.getItem('ksa_current_user');
+        await initializeStore({ catalogOnly: isCatalogOnly, showLoading: !isCatalogOnly });
 
         // Avoid triggering a full bulk background sync immediately on every page load.
         // Background sync is still available manually from settings when the user wants to
