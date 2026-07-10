@@ -116,7 +116,11 @@ export default function InventoryPage() {
     defaultCategories.forEach((cat) => categorySet.add(cat.trim()));
     // Use savedCategories + defaults only (avoid iterating full product list for performance)
     savedCategories?.forEach((cat) => { if (cat && typeof cat === 'string') categorySet.add(cat.trim()); });
-    return Array.from(categorySet);
+    
+    // Extrack existing categories from products to ensure no orphans
+    products.forEach((p) => { if (p.category && typeof p.category === 'string') categorySet.add(p.category.trim()); });
+    
+    return Array.from(categorySet).sort();
   }, [defaultCategories, savedCategories, products]);
 
   const customSavedCategories = useMemo(() => {
@@ -691,6 +695,7 @@ export default function InventoryPage() {
                   if (normalized) {
                     addCategory(normalized);
                     setNewCategoryName('');
+                    alert(`Kategori "${normalized}" berhasil ditambahkan! Silakan cek di daftar pilihan Kategori.`);
                   }
                 }}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
