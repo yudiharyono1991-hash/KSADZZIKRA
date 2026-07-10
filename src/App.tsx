@@ -81,7 +81,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
-  const { initializeStore, isLoading } = useAppStore();
+  const { initializeStore, fetchProducts, fetchStoreSettings, fetchOnlineOrders, isLoading } = useAppStore();
 
   useEffect(() => {
     const initApp = async () => {
@@ -101,38 +101,32 @@ export default function App() {
 
     // Register realtime subscriptions to refresh store when remote changes occur
     let unsubscribers: Array<() => void> = [];
-    let syncTimeoutId: any = null;
-    let lastSyncTime = 0;
-
-    const throttledSync = () => {
-      const now = Date.now();
-      if (now - lastSyncTime > 10000) {
-        // Run immediately if more than 10s have passed
-        lastSyncTime = now;
-        initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
-      } else {
-        // Otherwise wait for things to settle
-        if (syncTimeoutId) clearTimeout(syncTimeoutId);
-        syncTimeoutId = setTimeout(() => {
-          lastSyncTime = Date.now();
-          initializeStore({ showLoading: false }).catch(e => console.warn('Realtime sync error:', e));
-        }, 3000);
-      }
-    };
+    let productsTimeoutId: any = null;
+    let settingsTimeoutId: any = null;
+    let ordersTimeoutId: any = null;
 
     if (isSupabaseConfigured) {
       try {
         unsubscribers.push(subscribeToTable('products', () => {
           console.log('[Realtime] Products updated');
-          throttledSync();
+          if (productsTimeoutId) clearTimeout(productsTimeoutId);
+          productsTimeoutId = setTimeout(() => {
+            fetchProducts().catch(e => console.warn('Realtime products sync error:', e));
+          }, 3000);
         }));
         unsubscribers.push(subscribeToTable('store_settings', () => {
           console.log('[Realtime] Settings updated');
-          throttledSync();
+          if (settingsTimeoutId) clearTimeout(settingsTimeoutId);
+          settingsTimeoutId = setTimeout(() => {
+            fetchStoreSettings().catch(e => console.warn('Realtime settings sync error:', e));
+          }, 3000);
         }));
         unsubscribers.push(subscribeToTable('online_orders', () => {
           console.log('[Realtime] Orders updated');
-          throttledSync();
+          if (ordersTimeoutId) clearTimeout(ordersTimeoutId);
+          ordersTimeoutId = setTimeout(() => {
+            fetchOnlineOrders().catch(e => console.warn('Realtime orders sync error:', e));
+          }, 3000);
         }));
       } catch (e) {
         console.warn('Realtime subscription setup failed:', e);
@@ -143,8 +137,11 @@ export default function App() {
       unsubscribers.forEach(unsub => {
         try { unsub(); } catch (e) {}
       });
+      if (productsTimeoutId) clearTimeout(productsTimeoutId);
+      if (settingsTimeoutId) clearTimeout(settingsTimeoutId);
+      if (ordersTimeoutId) clearTimeout(ordersTimeoutId);
     };
-  }, [initializeStore]);
+  }, [initializeStore, fetchProducts, fetchStoreSettings, fetchOnlineOrders]);
 
   if (isLoading) {
     return (

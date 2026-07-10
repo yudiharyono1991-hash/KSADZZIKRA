@@ -264,6 +264,9 @@ interface AppState {
   
   // Supabase Initial Sync
   initializeStore: (options?: { showLoading?: boolean }) => Promise<void>;
+  fetchProducts: () => Promise<void>;
+  fetchStoreSettings: () => Promise<void>;
+  fetchOnlineOrders: () => Promise<void>;
   forceSyncAllToCloud: () => Promise<void>;
 
   // CoA Actions
@@ -2048,9 +2051,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const currentUser = get().currentUser;
       const refId = `opname_${Date.now()}`;
       
+      const tenantId = prod.tenantId || currentUser?.tenantId || 'tenant_default';
       if (amount < 0) {
         // Stock reduced (loss/shrinkage)
         get().addJournalEntry({
+          tenantId,
           date: now,
           account: 'BEBAN POKOK PENDAPATAN',
           description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
@@ -2061,6 +2066,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           createdBy: currentUser?.name || 'System'
         });
         get().addJournalEntry({
+          tenantId,
           date: now,
           account: 'PERSEDIAAN BARANG DAGANG',
           description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
@@ -2073,6 +2079,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       } else {
         // Stock increased (gain)
         get().addJournalEntry({
+          tenantId,
           date: now,
           account: 'PERSEDIAAN BARANG DAGANG',
           description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
@@ -2083,6 +2090,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           createdBy: currentUser?.name || 'System'
         });
         get().addJournalEntry({
+          tenantId,
           date: now,
           account: 'PENDAPATAN LAINNYA',
           description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
@@ -2510,33 +2518,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      tasks.push(runSupabaseTask('getProducts', async () => {
-        return await supabaseService.getProducts();
-      }, (remoteProducts) => {
-        if (remoteProducts && remoteProducts.length > 0) {
-          const localProducts = JSON.parse(localStorage.getItem('ksa_products') || '[]');
-          const productsMap = remoteProducts.map(p => {
-            const localP = localProducts.find((lp: any) => lp.id === p.id);
-            return {
-              id: p.id,
-              tenantId: p.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-              sku: p.sku,
-              name: p.name,
-              category: p.category,
-              price: Number(p.price),
-              costPrice: Number(p.cost_price),
-              stock: Number(p.stock),
-              minStock: Number(p.min_stock),
-              unit: p.unit,
-              barcode: p.barcode || undefined,
-              isHalal: p.is_halal,
-              image: p.image || localP?.image || undefined
-            };
-          });
-          set({ products: productsMap });
-          saveStorage('ksa_products', productsMap, tenantId);
-        }
-      }));
+      tasks.push(get().fetchProducts());
 
       tasks.push(runSupabaseTask('getUsers', async () => {
         return await supabaseService.getUsers();
@@ -2651,36 +2633,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      tasks.push(runSupabaseTask('getStoreSettings', async () => {
-        return await supabaseService.getStoreSettings();
-      }, (remoteSettings) => {
-        if (remoteSettings) {
-          const mapped = {
-            tenantId: remoteSettings.tenant_id,
-            storeName: remoteSettings.store_name,
-            storeAddress: remoteSettings.store_address,
-            storePhone: remoteSettings.store_phone,
-            businessType: remoteSettings.business_type,
-            ownerWhatsapp: remoteSettings.owner_whatsapp,
-            isTaxEnabled: Boolean(remoteSettings.is_tax_enabled),
-            taxRate: Number(remoteSettings.tax_rate),
-            paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes),
-            storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
-            storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
-            maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
-            qrisEnabled: Boolean(remoteSettings.qris_enabled),
-            qrisImageUrl: remoteSettings.qris_image_url || '',
-            maintenanceMode: Boolean(remoteSettings.maintenance_mode),
-            minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
-            zakatRate: Number(remoteSettings.zakat_rate),
-            autoApproveTransactions: Boolean(remoteSettings.auto_approve_transactions),
-            ownerBankName: remoteSettings.owner_bank_name || '',
-            ownerBankAccount: remoteSettings.owner_bank_account || '',
-            paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
-          };
-          set({ settings: mapped });
-        }
-      }));
+      tasks.push(get().fetchStoreSettings());
 
       tasks.push(runSupabaseTask('getJournalEntries', async () => {
         return await supabaseService.getJournalEntries();
@@ -2703,63 +2656,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      tasks.push(runSupabaseTask('getOnlineOrders', async () => {
-        return await supabaseService.getOnlineOrders();
-      }, (remoteOrders) => {
-        if (remoteOrders && remoteOrders.length > 0) {
-          const mapped = remoteOrders.map(o => ({
-            id: o.id,
-            orderNo: o.order_no,
-            tenantId: o.tenant_id,
-            customerId: o.customer_id,
-            customerName: o.customer_name,
-            customerPhone: o.customer_phone,
-            customerAddress: o.customer_address,
-            items: o.items,
-            totalAmount: Number(o.total_amount),
-            status: o.status,
-            notes: o.notes,
-            createdAt: o.created_at,
-            updatedAt: o.updated_at,
-            paymentMethod: o.payment_method,
-            paymentCode: o.payment_code,
-            branchId: o.branch_id
-          }));
-          set({ onlineOrders: mapped });
-        }
-      }));
-
-      tasks.push(runSupabaseTask('getStoreSettings', async () => {
-        return await supabaseService.getStoreSettings();
-      }, (remoteSettings) => {
-        if (remoteSettings) {
-          set({
-            settings: {
-              tenantId: remoteSettings.tenant_id,
-              isTaxEnabled: remoteSettings.is_tax_enabled,
-              taxRate: Number(remoteSettings.tax_rate),
-              ownerBankName: remoteSettings.owner_bank_name,
-              ownerBankAccount: remoteSettings.owner_bank_account,
-              qrisEnabled: remoteSettings.qris_enabled,
-              qrisImageUrl: remoteSettings.qris_image_url,
-              businessType: remoteSettings.business_type,
-              ownerWhatsapp: remoteSettings.owner_whatsapp,
-              maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
-              maintenanceMode: remoteSettings.maintenance_mode,
-              minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
-              zakatRate: Number(remoteSettings.zakat_rate),
-              autoApproveTransactions: remoteSettings.auto_approve_transactions,
-              storeName: remoteSettings.store_name || 'KSA Mart Syariah',
-              storeAddress: remoteSettings.store_address || '',
-              storePhone: remoteSettings.store_phone || '',
-              paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes) || 60,
-              storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
-              storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
-              paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
-            }
-          });
-        }
-      }));
+      tasks.push(get().fetchOnlineOrders());
 
       await Promise.allSettled(tasks);
     } catch (e) {
@@ -2768,6 +2665,105 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (shouldShowLoading) {
         set({ isLoading: false });
       }
+    }
+  },
+
+  fetchProducts: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const tenantId = get().currentUser?.tenantId || supabaseService.getTenantId();
+      const remoteProducts = await supabaseService.getProducts();
+      if (remoteProducts && remoteProducts.length > 0) {
+        const localProducts = JSON.parse(localStorage.getItem('ksa_products') || '[]');
+        const productsMap = remoteProducts.map(p => {
+          const localP = localProducts.find((lp: any) => lp.id === p.id);
+          return {
+            id: p.id,
+            tenantId: p.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+            sku: p.sku,
+            name: p.name,
+            category: p.category,
+            price: Number(p.price),
+            costPrice: Number(p.cost_price),
+            stock: Number(p.stock),
+            minStock: Number(p.min_stock),
+            unit: p.unit,
+            barcode: p.barcode || undefined,
+            isHalal: p.is_halal,
+            image: p.image || localP?.image || undefined
+          };
+        });
+        set({ products: productsMap });
+        saveStorage('ksa_products', productsMap, tenantId);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch products from Supabase:', e);
+    }
+  },
+
+  fetchStoreSettings: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const remoteSettings = await supabaseService.getStoreSettings();
+      if (remoteSettings) {
+        set({
+          settings: {
+            tenantId: remoteSettings.tenant_id,
+            storeName: remoteSettings.store_name,
+            storeAddress: remoteSettings.store_address,
+            storePhone: remoteSettings.store_phone,
+            businessType: remoteSettings.business_type,
+            ownerWhatsapp: remoteSettings.owner_whatsapp,
+            isTaxEnabled: Boolean(remoteSettings.is_tax_enabled),
+            taxRate: Number(remoteSettings.tax_rate),
+            paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes),
+            storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
+            storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
+            maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
+            qrisEnabled: Boolean(remoteSettings.qris_enabled),
+            qrisImageUrl: remoteSettings.qris_image_url || '',
+            maintenanceMode: Boolean(remoteSettings.maintenance_mode),
+            minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
+            zakatRate: Number(remoteSettings.zakat_rate),
+            autoApproveTransactions: Boolean(remoteSettings.auto_approve_transactions),
+            ownerBankName: remoteSettings.owner_bank_name || '',
+            ownerBankAccount: remoteSettings.owner_bank_account || '',
+            paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to fetch settings from Supabase:', e);
+    }
+  },
+
+  fetchOnlineOrders: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const remoteOrders = await supabaseService.getOnlineOrders();
+      if (remoteOrders && remoteOrders.length > 0) {
+        const mapped = remoteOrders.map(o => ({
+          id: o.id,
+          orderNo: o.order_no,
+          tenantId: o.tenant_id,
+          customerId: o.customer_id,
+          customerName: o.customer_name,
+          customerPhone: o.customer_phone,
+          customerAddress: o.customer_address,
+          items: o.items,
+          totalAmount: Number(o.total_amount),
+          status: o.status,
+          notes: o.notes,
+          createdAt: o.created_at,
+          updatedAt: o.updated_at,
+          paymentMethod: o.payment_method,
+          paymentCode: o.payment_code,
+          branchId: o.branch_id
+        }));
+        set({ onlineOrders: mapped });
+      }
+    } catch (e) {
+      console.warn('Failed to fetch online orders from Supabase:', e);
     }
   },
 
