@@ -383,14 +383,7 @@ export const supabaseService = {
         zakat_contribution: Number(tx.zakatContribution),
         margin_contribution: Number(tx.marginContribution),
         customer_id: tx.customerId || null,
-        customer_name: tx.customerName || null,
-        promo_id: tx.promoId || null,
-        discount_amount: Number(tx.discountAmount || 0),
         branch_id: tx.branchId || null,
-        is_voided: Boolean(tx.isVoided),
-        void_reason: tx.voidReason || null,
-        tax_amount: Number(tx.taxAmount || 0),
-        split_payments: tx.splitPayments || [],
         points_earned: Number(tx.pointsEarned || 0),
         points_redeemed: Number(tx.pointsRedeemed || 0),
         points_discount: Number(tx.pointsDiscount || 0)
@@ -402,32 +395,6 @@ export const supabaseService = {
 
       if (error) {
         if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
-          return true;
-        }
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
-          const basicPayload = {
-            id: tx.id,
-            invoice_no: tx.invoiceNo,
-            timestamp: tx.timestamp,
-            cashier_name: tx.cashierName,
-            items: tx.items,
-            total_amount: Number(tx.totalAmount),
-            payment_method: tx.paymentMethod,
-            amount_paid: Number(tx.amountPaid),
-            change_amount: Number(tx.changeAmount),
-            zakat_contribution: Number(tx.zakatContribution),
-            margin_contribution: Number(tx.marginContribution)
-          };
-          const { error: retryError } = await supabase
-            .from('transactions')
-            .insert(basicPayload);
-          if (retryError) {
-            if (retryError.code === '23505' || retryError.message?.toLowerCase().includes('duplicate')) {
-              return true;
-            }
-            throw retryError;
-          }
           return true;
         }
         throw error;
@@ -713,8 +680,10 @@ export const supabaseService = {
   async saveUser(user: any): Promise<boolean> {
     if (!supabase) return false;
     try {
+      const tenantId = this.getTenantId();
       const payload: any = {
         id: user.id,
+        tenant_id: user.tenantId || tenantId,
         name: user.name,
         username: user.username,
         password: user.password,
@@ -835,7 +804,15 @@ export const supabaseService = {
     if (!supabase) return false;
     try {
       const tenantId = this.getTenantId();
-      const payload = { ...coa, tenant_id: tenantId };
+      const payload = {
+        id: coa.id,
+        tenant_id: coa.tenantId || tenantId,
+        code: coa.code,
+        name: coa.name,
+        category: coa.category,
+        normal_balance: coa.normalBalance || null,
+        is_active: coa.isActive ?? true
+      };
       const { error } = await supabase.from('coa_accounts').upsert(payload);
       if (error) throw error;
       return true;
