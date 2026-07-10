@@ -159,16 +159,13 @@ export default function KasirPOS() {
   // Categories
   const categories = React.useMemo(() => {
     const categorySet = new Set<string>(['ALL', 'PROMO']);
-    savedCategories?.forEach((cat) => {
-      if (cat && typeof cat === 'string') categorySet.add(cat.trim());
-    });
     products.forEach((product) => {
       if (product.category && typeof product.category === 'string') {
         categorySet.add(product.category.trim());
       }
     });
     return Array.from(categorySet);
-  }, [products, savedCategories]);
+  }, [products]);
 
   const ppobCategories = React.useMemo(() => {
     const categorySet = new Set<string>(['ALL']);
