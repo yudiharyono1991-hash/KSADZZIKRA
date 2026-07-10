@@ -307,12 +307,16 @@ export default function TrendPage() {
             
             <div className="flex items-center space-x-4 text-xs font-semibold">
               <span className="flex items-center space-x-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-green-600"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                 <span className="text-gray-500">Omset</span>
               </span>
               <span className="flex items-center space-x-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span className="text-gray-500">Margin</span>
+              </span>
+              <span className="flex items-center space-x-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                <span className="text-gray-500">Zakat</span>
               </span>
             </div>
           </div>
@@ -322,23 +326,28 @@ export default function TrendPage() {
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOmset" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#047857" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#047857" stopOpacity={0.01}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
                   </linearGradient>
                   <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.01}/>
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05}/>
+                  </linearGradient>
+                  <linearGradient id="colorZakat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px' }}
+                  contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
                 />
-                <Area type="monotone" dataKey="omset" stroke="#047857" strokeWidth={2.5} fillOpacity={1} fill="url(#colorOmset)" name="Omset Dagang" />
-                <Area type="monotone" dataKey="margin" stroke="#fbbf24" strokeWidth={2.5} fillOpacity={1} fill="url(#colorMargin)" name="Margin Keuntungan" />
+                <Area type="monotone" dataKey="omset" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorOmset)" name="Omset Dagang" />
+                <Area type="monotone" dataKey="margin" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorMargin)" name="Margin Keuntungan" />
+                <Area type="monotone" dataKey="zakat" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorZakat)" name="Zakat Terkumpul" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
