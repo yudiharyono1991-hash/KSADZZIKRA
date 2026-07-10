@@ -116,21 +116,6 @@ export default function SalesReportPage() {
     XLSX.writeFile(wb, `Laporan_Penjualan_${startDate}_sd_${endDate}.xlsx`);
   };
 
-  const handleExportPDF = () => {
-    addLog('EXPORT_PDF', 'SYSTEM', `Export PDF Laporan Penjualan periode ${startDate} sd ${endDate}`);
-    const element = reportRef.current;
-    if (element) {
-      const opt = {
-        margin:       0.5,
-        filename:     `Laporan_Penjualan_${startDate}_sd_${endDate}.pdf`,
-        image:        { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' as const }
-      };
-      html2pdf().set(opt).from(element).save();
-    }
-  };
-
   const handlePrintReport = () => {
     addLog('PRINT_REPORT', 'SYSTEM', `Mencetak Laporan Penjualan periode ${startDate} sd ${endDate}`);
     window.print();
@@ -203,13 +188,7 @@ export default function SalesReportPage() {
               <Download className="w-5 h-5" />
               <span>Excel</span>
             </button>
-            <button
-              onClick={handleExportPDF}
-              className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition font-semibold"
-            >
-              <FileText className="w-5 h-5" />
-              <span>PDF</span>
-            </button>
+
             <button
               onClick={handlePrintReport}
               className="flex items-center space-x-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition font-semibold"
