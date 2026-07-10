@@ -269,6 +269,7 @@ interface AppState {
   // CoA Actions
   coaList: CoaAccount[];
   addCoaAccount: (account: Omit<CoaAccount, 'id'>) => void;
+  addCoaAccountsBulk: (accounts: Omit<CoaAccount, 'id'>[]) => void;
   updateCoaAccount: (account: CoaAccount) => void;
   deleteCoaAccount: (id: string) => void;
 }
@@ -679,6 +680,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     if (isSupabaseConfigured) {
       supabaseService.saveCoaAccount(newAccount);
+    }
+  },
+
+  addCoaAccountsBulk: (accounts) => {
+    const { currentUser } = get();
+    const startId = Date.now();
+    const newAccounts = accounts.map((acc, idx) => ({
+      ...acc,
+      id: `coa_${startId}_${idx}`,
+      tenantId: currentUser?.tenantId || 'tenant_default',
+      isActive: acc.isActive ?? true
+    }));
+    const updated = [...get().coaList, ...newAccounts];
+    set({ coaList: updated });
+    saveStorage('ksa_coa_list', updated);
+    get().addLog('COA_IMPORT', 'FINANCE', `Mengimpor ${newAccounts.length} akun CoA baru`);
+    
+    if (isSupabaseConfigured) {
+      (supabaseService as any).saveCoaAccountsBulk(newAccounts);
     }
   },
 

@@ -5,7 +5,7 @@ import { BookOpen, Plus, Edit, Trash2, CheckCircle, Search, Filter, AlertCircle,
 import * as XLSX from 'xlsx';
 
 export default function CoAPage() {
-  const { coaList, addCoaAccount, updateCoaAccount, deleteCoaAccount, currentUser, settings } = useAppStore();
+  const { coaList, addCoaAccount, addCoaAccountsBulk, updateCoaAccount, deleteCoaAccount, currentUser, settings } = useAppStore();
 
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
@@ -173,12 +173,12 @@ export default function CoAPage() {
                       const idxOpeningBalance = headers.findIndex(h => ['saldo awal', 'opening balance', 'saldo awal'].includes(h));
                       const idxStatus = headers.findIndex(h => ['status', 'isactive'].includes(h));
                       if (idxCode === -1 || idxName === -1) { alert('Template salah. Pastikan ada kolom Kode dan Nama Akun.'); setIsImporting(false); e.target.value = ''; return; }
-                      let imported = 0;
+                      const coasToImport: any[] = [];
                       for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i]; if (!row || row.length === 0) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
+                        const row = rows[i]; if (!row || row.length === 0) { continue; }
                         const codeVal = String(row[idxCode] || '').trim();
                         const nameVal = String(row[idxName] || '').trim();
-                        if (!codeVal || !nameVal) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
+                        if (!codeVal || !nameVal) { continue; }
                         
                         let rawCat = idxCategory !== -1 ? String(row[idxCategory] || '').trim().toUpperCase() : '';
                         let catVal = 'ASSET';
@@ -193,11 +193,14 @@ export default function CoAPage() {
                           const raw = String(row[idxStatus] || '').trim().toLowerCase();
                           statusVal = ['aktif', 'active', 'true', '1', 'ya', 'yes'].includes(raw);
                         }
-                        addCoaAccount({ code: codeVal, name: nameVal, category: catVal as any, tenantId: currentUser?.tenantId || 'tenant_default', isActive: statusVal });
-                        imported++;
-                        setImportProgress(p => ({ ...p, done: p.done + 1 }));
+                        coasToImport.push({ code: codeVal, name: nameVal, category: catVal as any, tenantId: currentUser?.tenantId || 'tenant_default', isActive: statusVal });
                       }
-                      alert(`Berhasil mengimpor ${imported} akun CoA.`);
+                      if (coasToImport.length > 0) {
+                        addCoaAccountsBulk(coasToImport);
+                        alert(`Berhasil mengimpor ${coasToImport.length} akun CoA.`);
+                      } else {
+                        alert('Tidak ada CoA valid yang ditemukan untuk diimpor.');
+                      }
                     } catch (err: any) { console.error(err); alert('Gagal mengimpor file: ' + (err.message || err)); }
                     setIsImporting(false);
                     e.target.value = '';

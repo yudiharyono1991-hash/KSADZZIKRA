@@ -811,6 +811,27 @@ export const supabaseService = {
       return false;
     }
   },
+  async saveCoaAccountsBulk(coas: any[]): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const tenantId = this.getTenantId();
+      const payloads = coas.map(c => ({
+        id: c.id,
+        tenant_id: c.tenantId || tenantId,
+        code: c.code,
+        name: c.name,
+        category: c.category,
+        normal_balance: c.normalBalance || null,
+        is_active: c.isActive ?? true
+      }));
+      const { error } = await supabase.from('coa_accounts').upsert(payloads);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to bulk save coa_accounts: ${err.message}`, true);
+      return false;
+    }
+  },
   async deleteCoaAccount(id: string): Promise<boolean> {
     if (!supabase) return false;
     try {
