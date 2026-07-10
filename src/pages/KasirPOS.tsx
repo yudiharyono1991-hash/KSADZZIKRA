@@ -49,6 +49,23 @@ export default function KasirPOS() {
   const [searchMatchedIds, setSearchMatchedIds] = useState<Array<string | number> | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
+
+  useEffect(() => {
+    if (!listContainerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerWidth(entry.contentRect.width || 800);
+      }
+    });
+    observer.observe(listContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const cols = containerWidth >= 1536 ? 6 : containerWidth >= 1280 ? 5 : containerWidth >= 1024 ? 4 : containerWidth >= 768 ? 4 : containerWidth >= 480 ? 3 : 2;
+  const gridColsClass = cols === 6 ? 'grid-cols-6' : cols === 5 ? 'grid-cols-5' : cols === 4 ? 'grid-cols-4' : cols === 3 ? 'grid-cols-3' : 'grid-cols-2';
+
   // Checkout Modal State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON'>('CASH');
@@ -464,7 +481,7 @@ export default function KasirPOS() {
         </div>
 
         {/* Catalog List scrollable area */}
-        <div className="flex-1 overflow-y-auto pr-1">
+        <div ref={listContainerRef} className="flex-1 overflow-hidden pr-1">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
               <AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-3" />
@@ -473,16 +490,15 @@ export default function KasirPOS() {
           ) : (
             <List
               height={Math.min(window.innerHeight * 0.72, 780)}
-              itemCount={Math.ceil(filteredProducts.length / (window.innerWidth >= 1536 ? 6 : window.innerWidth >= 1280 ? 5 : window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 4 : 3))}
+              itemCount={Math.ceil(filteredProducts.length / cols)}
               itemSize={260}
-              width={'100%'}
+              width={containerWidth}
             >
               {({ index, style }) => {
-                const cols = window.innerWidth >= 1536 ? 6 : window.innerWidth >= 1280 ? 5 : window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 4 : 3;
                 const start = index * cols;
                 const items = filteredProducts.slice(start, start + cols);
                 return (
-                  <div style={style} className={`grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 px-1`}>
+                  <div style={style} className={`grid ${gridColsClass} gap-2 px-1`}>
                     {items.map((p) => {
                       const cartQty = cart.find(c => c.product.id === p.id)?.quantity || 0;
                       const isOutOfStock = p.stock <= 0;

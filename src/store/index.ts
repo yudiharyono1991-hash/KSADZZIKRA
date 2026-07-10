@@ -2631,6 +2631,37 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
+      tasks.push(runSupabaseTask('getStoreSettings', async () => {
+        return await supabaseService.getStoreSettings();
+      }, (remoteSettings) => {
+        if (remoteSettings) {
+          const mapped = {
+            tenantId: remoteSettings.tenant_id,
+            storeName: remoteSettings.store_name,
+            storeAddress: remoteSettings.store_address,
+            storePhone: remoteSettings.store_phone,
+            businessType: remoteSettings.business_type,
+            ownerWhatsapp: remoteSettings.owner_whatsapp,
+            isTaxEnabled: Boolean(remoteSettings.is_tax_enabled),
+            taxRate: Number(remoteSettings.tax_rate),
+            paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes),
+            storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
+            storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
+            maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
+            qrisEnabled: Boolean(remoteSettings.qris_enabled),
+            qrisImageUrl: remoteSettings.qris_image_url || '',
+            maintenanceMode: Boolean(remoteSettings.maintenance_mode),
+            minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
+            zakatRate: Number(remoteSettings.zakat_rate),
+            autoApproveTransactions: Boolean(remoteSettings.auto_approve_transactions),
+            ownerBankName: remoteSettings.owner_bank_name || '',
+            ownerBankAccount: remoteSettings.owner_bank_account || '',
+            paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
+          };
+          set({ settings: mapped });
+        }
+      }));
+
       tasks.push(runSupabaseTask('getJournalEntries', async () => {
         return await supabaseService.getJournalEntries();
       }, (remoteJournals) => {
@@ -2735,18 +2766,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       console.log(`[Force Sync] Syncing ${items.length} ${name}...`);
-      const results = await Promise.allSettled(items.map(item => callback(item)));
-      const failed = results.filter(r => r.status === 'rejected');
-      if (failed.length > 0) {
-        console.warn(`[Force Sync] ${failed.length} / ${items.length} ${name} failed to sync.`);
+      // Process in batches of 20 to prevent browser request timeout
+      const batchSize = 20;
+      for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        await Promise.allSettled(batch.map(item => callback(item)));
       }
     };
 
     try {
-      await Promise.allSettled([
-        syncTask('products', state.products, async (product) => {
+      // Products can be bulk upserted in a single request for speed
+      try {
+        console.log(`[Force Sync] Bulk syncing ${state.products.length} products...`);
+        await supabaseService.saveProductsBulk(state.products);
+      } catch (err) {
+        console.warn('Failed to bulk sync products, falling back to batch sync:', err);
+        await syncTask('products', state.products, async (product) => {
           await supabaseService.saveProduct(product);
-        }),
+        });
+      }
+
+      await Promise.allSettled([
         syncTask('customers', state.customers, async (customer) => {
           await supabaseService.saveCustomer(customer);
         }),

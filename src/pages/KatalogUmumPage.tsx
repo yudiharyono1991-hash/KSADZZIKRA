@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MessageCircle, Loader } from 'lucide-react';
 import { calculateDistanceKm } from '../utils/distance';
 import { useNavigate } from 'react-router-dom';
+import { FixedSizeList as List } from 'react-window';
 
 export default function KatalogUmumPage() {
   const { 
@@ -23,6 +24,24 @@ export default function KatalogUmumPage() {
 
   const [activeTab, setActiveTab] = useState<'CATALOG' | 'CART' | 'GUIDE'>('CATALOG');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(800);
+
+  useEffect(() => {
+    if (!listContainerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setContainerWidth(entry.contentRect.width || 800);
+      }
+    });
+    observer.observe(listContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const cols = containerWidth >= 1024 ? 5 : containerWidth >= 768 ? 4 : containerWidth >= 480 ? 3 : 2;
+  const gridColsClass = cols === 5 ? 'grid-cols-5' : cols === 4 ? 'grid-cols-4' : cols === 3 ? 'grid-cols-3' : 'grid-cols-2';
+
   const [isDataSyncing, setIsDataSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   
@@ -308,43 +327,61 @@ export default function KatalogUmumPage() {
             {/* Products Grid */}
             {!isDataSyncing && (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {filteredProducts.map(p => {
-                    const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
-                    return (
-                      <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
-                        <div className="h-20 bg-slate-100 relative">
-                          {p.image ? (
-                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`} alt={p.name} className="w-full h-full object-cover" />
-                          )}
-                          <div className="absolute top-1 left-1 bg-white/90 backdrop-blur-sm text-[8px] font-bold px-1.5 py-0.5 rounded text-slate-600 shadow-sm">{p.category}</div>
+                <div ref={listContainerRef} className="w-full overflow-hidden">
+                  <List
+                    height={Math.min(window.innerHeight * 0.72, 780)}
+                    itemCount={Math.ceil(filteredProducts.length / cols)}
+                    itemSize={260}
+                    width={containerWidth}
+                  >
+                    {({ index, style }) => {
+                      const start = index * cols;
+                      const items = filteredProducts.slice(start, start + cols);
+                      return (
+                        <div style={style} className={`grid ${gridColsClass} gap-4 px-1`}>
+                          {items.map(p => {
+                            const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
+                            return (
+                              <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow h-[245px]">
+                                <div className="h-20 bg-slate-100 relative flex-shrink-0">
+                                  {p.image ? (
+                                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`} alt={p.name} className="w-full h-full object-cover" />
+                                  )}
+                                  <div className="absolute top-1 left-1 bg-white/90 backdrop-blur-sm text-[8px] font-bold px-1.5 py-0.5 rounded text-slate-600 shadow-sm">{p.category}</div>
+                                </div>
+                                <div className="p-2 flex-1 flex flex-col justify-between overflow-hidden">
+                                  <div>
+                                    <h3 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight mb-1 h-8">{p.name}</h3>
+                                    <p className="text-green-700 font-black text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
+                                    <p className="text-[10px] text-slate-500 mb-2">Stok: {p.stock} {p.unit}</p>
+                                  </div>
+                                  
+                                  {inCart > 0 ? (
+                                   <div className="flex items-center justify-between bg-green-50 rounded-lg p-0.5 border border-green-100 mt-auto">
+                                     <button type="button" onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm text-xs">-</button>
+                                     <span className="font-bold text-green-800 text-xs">{inCart}</span>
+                                     <button type="button" onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50 text-xs">+</button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      type="button"
+                                      onClick={() => addToCustomerCart(p)}
+                                      className="w-full py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1 mt-auto"
+                                    >
+                                      <ShoppingBag className="w-3 h-3"/> Tambah
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div className="p-2 flex-1 flex flex-col">
-                          <h3 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
-                          <p className="text-green-700 font-black text-base">Rp {p.price.toLocaleString('id-ID')}</p>
-                          <p className="text-[11px] text-slate-500 mb-2">Stok: {p.stock} {p.unit}</p>
-                          
-                          {inCart > 0 ? (
-                           <div className="flex items-center justify-between bg-green-50 rounded-lg p-0.5 border border-green-100">
-                             <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm text-xs">-</button>
-                             <span className="font-bold text-green-800 text-xs">{inCart}</span>
-                             <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-6 h-6 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50 text-xs">+</button>
-                            </div>
-                      ) : (
-                        <button 
-                          onClick={() => addToCustomerCart(p)}
-                          className="w-full py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
-                        >
-                          <ShoppingBag className="w-3 h-3"/> Tambah
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      );
+                    }}
+                  </List>
+                </div>
             {filteredProducts.length === 0 && products.length === 0 && (
               <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-slate-200 shadow-sm">
                 <Package className="w-16 h-16 mx-auto mb-4 opacity-20" />

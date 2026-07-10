@@ -205,7 +205,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
         {/* Live Counters */}
         {currentUser && (currentUser.role === 'OWNER' || currentUser.role === 'ADMIN' || currentUser.role === 'CASHIER') && (
-          <div className="flex items-center space-x-4 text-[10px] font-bold uppercase tracking-wider border-l border-r border-gray-100 px-5">
+          <div className="hidden lg:flex items-center space-x-4 text-[10px] font-bold uppercase tracking-wider border-l border-r border-gray-100 px-5">
             <div>
               <p className="text-gray-400">Total Omset Hari Ini</p>
               <p className="font-extrabold text-gray-900 text-xs font-mono mt-0.5">Rp {todaySales.toLocaleString('id-ID')}</p>

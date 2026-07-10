@@ -740,8 +740,8 @@ export default function InventoryPage() {
         </div>
 
         {/* Master Products Listing Table (virtualized list for performance) */}
-        <div className="overflow-hidden">
-          <div className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto">
+          <div className="min-w-[1000px] text-left text-xs border-collapse">
             <div className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-100 py-3 px-4 grid grid-cols-12 gap-3 items-center">
               <div className="col-span-1 whitespace-nowrap">SKU / Code</div>
               <div className="col-span-2">Nama Barang</div>
@@ -763,7 +763,7 @@ export default function InventoryPage() {
                 height={Math.min(600, Math.max(300, window.innerHeight - 300))}
                 itemCount={filteredProducts.length}
                 itemSize={64}
-                width={'100%'}
+                width={1000}
               >
                 {({ index, style }) => {
                   const p = filteredProducts[index];
