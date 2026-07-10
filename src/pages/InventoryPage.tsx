@@ -1198,8 +1198,8 @@ export default function InventoryPage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className={`cursor-pointer bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors ${isUploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className={`cursor-pointer bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 text-[10px] font-bold py-2.5 px-1 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-colors ${isUploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
                       <Upload className="w-4 h-4" /> Upload Galeri
                       <input type="file" accept="image/*" className="hidden" disabled={isUploadingImage} onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -1207,13 +1207,33 @@ export default function InventoryPage() {
                       }} />
                     </label>
 
-                    <label className={`cursor-pointer bg-green-600 text-white hover:bg-green-700 shadow-md text-xs font-bold py-2.5 px-3 rounded-xl text-center flex items-center justify-center gap-1.5 transition-colors ${isUploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <label className={`cursor-pointer bg-green-600 text-white hover:bg-green-700 shadow-md text-[10px] font-bold py-2.5 px-1 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-colors ${isUploadingImage ? 'opacity-50 pointer-events-none' : ''}`}>
                       <Camera className="w-4 h-4" /> Buka Kamera
                       <input type="file" accept="image/*" capture="environment" className="hidden" disabled={isUploadingImage} onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleImageUpload(file);
                       }} />
                     </label>
+
+                    <button
+                      type="button"
+                      disabled={isUploadingImage || !name}
+                      onClick={() => {
+                        setIsUploadingImage(true);
+                        // Simulate AI processing delay
+                        setTimeout(() => {
+                          const keyword = category.split(' ')[0] || 'product';
+                          // Use a semantic image placeholder service
+                          setImage(`https://loremflickr.com/400/400/${encodeURIComponent(keyword)},retail,product/all?lock=${Math.floor(Math.random() * 1000)}`);
+                          setIsUploadingImage(false);
+                        }, 1500);
+                      }}
+                      className={`bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 shadow-sm text-[10px] font-bold py-2.5 px-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors ${(isUploadingImage || !name) ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                      </svg> Auto AI (Internet)
+                    </button>
                   </div>
 
                   <div className="mt-3 pt-3 border-t border-gray-100">

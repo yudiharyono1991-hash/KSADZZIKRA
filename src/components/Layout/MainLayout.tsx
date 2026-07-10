@@ -80,7 +80,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         
         {/* ─── GLOBAL FOOTER ─────────────────────────────────────── */}
         <footer className="bg-[#1e3a2b] text-white py-1.5 px-4 text-[10px] md:text-xs flex justify-between items-center z-40 hidden md:flex border-t border-[#0e441b] shrink-0">
-          <span>Copyright &copy; ITDB KSA Mart 2026. All rights reserved.</span>
+          <span>Copyright &copy; Team Development KSA Mart 2026. All rights reserved.</span>
           <span>ver 1.0</span>
         </footer>
       </div>
