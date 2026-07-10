@@ -445,61 +445,16 @@ export const supabaseService = {
         ip_address: log.ipAddress
       };
 
+      // Use upsert (INSERT ... ON CONFLICT DO UPDATE) to avoid 409 Conflict spam
+      // This completely eliminates the duplicate key error when the same log is resent
       const { error } = await supabase
         .from('audit_logs')
-        .insert(payload);
+        .upsert(payload, { onConflict: 'id', ignoreDuplicates: true });
 
       if (error) {
-        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) {
-          return true;
-        }
-        // Deteksi dinamis jika ada kolom yang tidak ditemukan dalam skema cache Supabase
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes('column') || errorMessage.includes('field') || errorMessage.includes('cache')) {
-          const saferPayload = { ...payload };
-          
-          // Hapus kolom bermasalah yang terdeteksi dari pesan error
-          if (errorMessage.includes('details')) {
-            delete saferPayload.details;
-          }
-          if (errorMessage.includes('category')) {
-            delete saferPayload.category;
-          }
-          if (errorMessage.includes('timestamp')) {
-            delete saferPayload.timestamp;
-          }
-          if (errorMessage.includes('ip_address') || errorMessage.includes('ipaddress') || errorMessage.includes('ip')) {
-            delete saferPayload.ip_address;
-          }
-          
-          const { error: retryError } = await supabase
-            .from('audit_logs')
-            .insert(saferPayload);
-
-          if (retryError) {
-            if (retryError.code === '23505' || retryError.message?.toLowerCase().includes('duplicate')) {
-              return true;
-            }
-            // Jika masih gagal, kirim payload paling minimal (id, action, username) agar tidak memicu error di UI
-            const barePayload = {
-              id: payload.id,
-              action: payload.action,
-              username: payload.username
-            };
-            const { error: bareError } = await supabase
-              .from('audit_logs')
-              .insert(barePayload);
-            if (bareError) {
-              if (bareError.code === '23505' || bareError.message?.toLowerCase().includes('duplicate')) {
-                return true;
-              }
-              logSync(`Failed dynamic audit log retry: ${bareError.message}`, true);
-              return false; // Jangan lempar exception agar UI tidak crash
-            }
-          }
-          return true;
-        }
-        throw error;
+        // Silent fail for audit logs — they should never crash the UI
+        logSync(`Failed to save audit log (non-critical): ${error.message}`, true);
+        return false;
       }
       return true;
     } catch (err: any) {

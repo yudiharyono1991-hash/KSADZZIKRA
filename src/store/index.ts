@@ -2683,7 +2683,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   fetchProducts: async () => {
     if (!isSupabaseConfigured) return;
-    try {
+    const doFetch = async (): Promise<void> => {
       const tenantId = get().currentUser?.tenantId || supabaseService.getTenantId();
       const remoteProducts = await supabaseService.getProducts();
       if (remoteProducts && remoteProducts.length > 0) {
@@ -2708,6 +2708,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
         set({ products: productsMap });
         saveStorage('ksa_products', productsMap, tenantId);
+      }
+      return;
+    };
+    try {
+      await doFetch();
+      // If products still empty after first fetch, auto-retry after 5 seconds
+      // This handles slow network conditions on mobile/external devices
+      if (get().products.length === 0) {
+        setTimeout(async () => {
+          try {
+            await doFetch();
+            console.log('[Supabase] fetchProducts retry completed, total:', get().products.length);
+          } catch (e) {
+            console.warn('[Supabase] fetchProducts retry failed:', e);
+          }
+        }, 5000);
       }
     } catch (e) {
       console.warn('Failed to fetch products from Supabase:', e);
