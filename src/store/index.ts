@@ -630,7 +630,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   stockMovements: getStorage('ksa_stock_movements', undefined) || [],
   activeBranchId: '', // Default to global view initially
   notifications: getStorage('ksa_notifications', undefined) || [],
-  coaList: getStorage('ksa_coa_list', undefined) || [],
+  coaList: getSavedCoaList(),
 
   // Cross-tab sync: update in-memory state when localStorage changes in other tabs
   // This allows uploads/imports in one tab to reflect in other open tabs without full reload.
