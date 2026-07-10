@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { RefreshCcw } from 'lucide-react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import BottomNavBar from './BottomNavBar';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop
   const location = useLocation();
 
+  // Scroll to top on route change
   useEffect(() => {
     const mainContainer = document.getElementById('main-scroll-container');
     if (mainContainer) {
@@ -20,22 +22,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
     }
   }, [location.pathname]);
 
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
+
   const [hasUpdate, setHasUpdate] = useState(false);
 
   useEffect(() => {
-    // Detect Service Worker Updates
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         setHasUpdate(true);
       });
-      
-      // Also poll every 1 hour just in case
       const interval = setInterval(() => {
         navigator.serviceWorker.ready.then(reg => {
           reg.update();
         });
       }, 60 * 60 * 1000);
-      
       return () => clearInterval(interval);
     }
   }, []);
@@ -45,40 +48,53 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div id="shariahpos-root" className="flex bg-slate-50 h-screen text-slate-800 antialiased overflow-hidden">
-      {/* Structural Sidebar wrapper */}
-      <Sidebar 
-        isOpen={isSidebarOpen} 
+    <div id="shariahpos-root" className="flex bg-slate-50 h-[100dvh] text-slate-800 antialiased overflow-hidden">
+      {/* Sidebar — slides over content on mobile, static on desktop */}
+      <Sidebar
+        isOpen={isSidebarOpen}
         isCollapsed={isSidebarCollapsed}
-        onClose={() => setIsSidebarOpen(false)} 
+        onClose={() => setIsSidebarOpen(false)}
         onExpand={() => setIsSidebarCollapsed(false)}
       />
-      
-      {/* Content wrapper panel */}
-      <div className="flex-1 flex flex-col min-w-0 w-full h-screen overflow-hidden transition-all duration-300">
-        {/* Top bar header */}
-        <TopBar 
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+
+      {/* Main content panel */}
+      <div className="flex-1 flex flex-col min-w-0 w-full h-[100dvh] overflow-hidden transition-all duration-300">
+
+        {/* ─── STICKY HEADER ─────────────────────────────────────── */}
+        <TopBar
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           onToggleDesktopSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
-        
-        {/* Nested route space container */}
-        <main id="main-scroll-container" className="flex-1 p-3 md:p-6 overflow-y-auto flex flex-col relative">
+
+        {/* ─── SCROLLABLE CENTER ─────────────────────────────────── */}
+        {/* 
+          overflow-auto: scroll both x and y as needed
+          pb-16 md:pb-0: bottom padding on mobile for BottomNavBar space
+        */}
+        <main
+          id="main-scroll-container"
+          className="flex-1 p-3 md:p-6 overflow-auto flex flex-col relative pb-20 md:pb-6"
+        >
           {children}
         </main>
       </div>
 
+      {/* ─── MOBILE BOTTOM NAV BAR (STICKY FOOTER) ─────────────── */}
+      <BottomNavBar onOpenMenu={() => setIsSidebarOpen(true)} />
+
+      {/* Update notification banner */}
       {hasUpdate && (
-        <div className="fixed bottom-6 right-6 bg-slate-800 text-white p-4 rounded-xl shadow-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-5">
+        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 bg-slate-800 text-white p-4 rounded-xl shadow-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-5 max-w-xs">
           <div>
-            <p className="font-bold">Versi Sistem Baru Tersedia!</p>
-            <p className="text-xs text-slate-300">Harap muat ulang untuk menerapkan pembaruan stabilitas.</p>
+            <p className="font-bold text-sm">Versi Sistem Baru Tersedia!</p>
+            <p className="text-xs text-slate-300 mt-0.5">Harap muat ulang untuk menerapkan pembaruan stabilitas.</p>
           </div>
-          <button onClick={handleUpdate} className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2">
-            <RefreshCcw className="w-4 h-4"/> Muat Ulang
+          <button onClick={handleUpdate} className="bg-indigo-500 hover:bg-indigo-600 px-3 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 shrink-0">
+            <RefreshCcw className="w-4 h-4" /> Reload
           </button>
         </div>
       )}
     </div>
   );
 }
+

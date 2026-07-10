@@ -58,7 +58,7 @@ export default function KatalogUmumPage() {
       setIsDataSyncing(true);
       setSyncError(null);
       try {
-        await initializeStore();
+        await initializeStore({ catalogOnly: true, showLoading: false });
         setSyncError(null);
       } catch (err: any) {
         console.error('Failed to sync catalog data:', err);
@@ -295,7 +295,7 @@ export default function KatalogUmumPage() {
                 <div className="flex-1">
                   <p className="text-sm font-medium">{syncError}</p>
                   <button 
-                    onClick={() => initializeStore().then(() => setSyncError(null)).catch(e => setSyncError('Retry gagal'))}
+                    onClick={() => initializeStore({ catalogOnly: true, showLoading: false }).then(() => setSyncError(null)).catch(e => setSyncError('Retry gagal'))}
                     className="text-xs mt-1 underline hover:no-underline"
                   >
                     Coba lagi
@@ -388,7 +388,7 @@ export default function KatalogUmumPage() {
                 <p className="text-slate-600 font-bold text-lg mb-2">Belum Ada Produk</p>
                 <p className="text-slate-500 text-sm mb-4 px-6">Data produk sedang dimuat dari server. Jika terus kosong, silakan hubungi admin KSA Mart.</p>
                 <button 
-                  onClick={() => initializeStore().then(() => setSyncError(null)).catch(e => setSyncError('Retry gagal'))}
+                  onClick={() => initializeStore({ catalogOnly: true, showLoading: false }).then(() => setSyncError(null)).catch(e => setSyncError('Retry gagal'))}
                   className="text-sm text-green-600 hover:text-green-700 font-bold underline"
                 >
                   Refresh Halaman
