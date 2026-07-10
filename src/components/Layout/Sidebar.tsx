@@ -481,12 +481,6 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
             {!isCollapsed && <span>Keluar</span>}
           </button>
 
-          {!isCollapsed && (
-            <p className="text-[10px] text-gray-200/50 text-center font-bold font-sans tracking-wide">
-              v1.0 © 2026 IT Development<br/>
-              KSA Mart Syariah POS
-            </p>
-          )}
         </div>
       </aside>
     </>
