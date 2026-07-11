@@ -5,21 +5,18 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const defaultUsers = [
-  { id: 'usr_1', name: 'Kasir Asy', username: 'asy.23.kk', password: 'kasir123!', role: 'CASHIER', created_at: new Date().toISOString(), is_active: true, is_approved: true },
-  { id: 'usr_2', name: 'Superadmin BA', username: 'superadmin.23kk', password: 'admin123!', role: 'ADMIN', created_at: new Date().toISOString(), is_active: true, is_approved: true },
-  { id: 'usr_3', name: 'Owner BA', username: 'owner.23kk', password: 'owner123!', role: 'OWNER', created_at: new Date().toISOString(), is_active: true, is_approved: true }
-];
-
-async function seedDefaultUsers() {
-  console.log("Seeding default users to Supabase...");
-  const { data, error } = await supabase.from('ksa_users').upsert(defaultUsers);
+async function checkProducts() {
+  console.log("Fetching products from Supabase...");
+  const { data, error } = await supabase.from('products').select('*');
 
   if (error) {
-    console.error("Error seeding users:", error);
+    console.error("Error fetching products:", error);
   } else {
-    console.log("Successfully seeded default users.");
+    console.log(`Found ${data ? data.length : 0} products.`);
+    if (data && data.length > 0) {
+      console.log(data[0]);
+    }
   }
 }
 
-seedDefaultUsers();
+checkProducts();

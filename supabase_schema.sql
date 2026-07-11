@@ -122,6 +122,8 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     points_redeemed NUMERIC DEFAULT 0,
     points_discount NUMERIC DEFAULT 0,
     branch_id TEXT,
+    customer_rating TEXT,
+    customer_feedback TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
@@ -186,6 +188,7 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     owner_bank_name TEXT,
     owner_bank_account TEXT,
     payment_methods JSONB DEFAULT '{"bankTransfer": [], "ewallet": []}'::jsonb,
+    landing_page_config JSONB DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
@@ -341,6 +344,8 @@ CREATE TABLE IF NOT EXISTS public.ksa_branches (
     address TEXT,
     phone TEXT,
     is_active BOOLEAN DEFAULT true,
+    qris_image_url TEXT,
+    payment_methods JSONB,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.ksa_branches ENABLE ROW LEVEL SECURITY;

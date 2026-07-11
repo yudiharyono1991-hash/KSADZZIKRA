@@ -1,9 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve Supabase environment variables or use hardcoded fallbacks
-const SUPABASE_URL = 'https://stiatomaelzrptazayml.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0';
+let SUPABASE_URL = 'https://stiatomaelzrptazayml.supabase.co';
+let SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0';
 
+// Try to override with User Settings if available
+try {
+  const savedSettings = localStorage.getItem('ksa_settings');
+  if (savedSettings) {
+    const parsed = JSON.parse(savedSettings);
+    if (parsed.supabaseUrl) SUPABASE_URL = parsed.supabaseUrl;
+    if (parsed.supabaseAnonKey) SUPABASE_ANON_KEY = parsed.supabaseAnonKey;
+  }
+} catch (e) {}
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'https://your-project.supabase.co');
 

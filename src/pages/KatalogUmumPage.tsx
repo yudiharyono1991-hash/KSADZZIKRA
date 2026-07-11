@@ -41,7 +41,8 @@ export default function KatalogUmumPage() {
     customers,
     addCustomer,
     initializeStore,
-    isLoading
+    isLoading,
+    branches
   } = useAppStore();
 
   const navigate = useNavigate();
@@ -58,6 +59,7 @@ export default function KatalogUmumPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [selectedCheckoutBranch, setSelectedCheckoutBranch] = useState('');
   const [isOutsideHours, setIsOutsideHours] = useState(false);
   const [checkoutNotes, setCheckoutNotes] = useState('');
   const [deliveryPeriod, setDeliveryPeriod] = useState('Periode 1 (08.00-09.00)');
@@ -65,6 +67,11 @@ export default function KatalogUmumPage() {
   const [isCheckingLocation, setIsCheckingLocation] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'TRANSFER' | 'QRIS' | 'EWALLET'>('COD');
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
+  const [showQrisZoom, setShowQrisZoom] = useState(false);
+
+  // Compute effective payment methods based on selected branch or global settings
+  const selectedBranchData = branches.find(b => b.id === selectedCheckoutBranch);
+  const effectiveQrisUrl = selectedBranchData?.qrisImageUrl || settings.qrisImageUrl;
 
   // Sync data on mount
   useEffect(() => {
@@ -160,6 +167,10 @@ export default function KatalogUmumPage() {
       alert("Mohon lengkapi Nama, No WhatsApp, dan Alamat Pengiriman!");
       return;
     }
+    if (!selectedCheckoutBranch) {
+      alert("Silakan pilih Cabang Tujuan untuk pesanan ini.");
+      return;
+    }
     if (paymentMethod !== 'COD' && !isPaymentConfirmed) {
       alert("Mohon centang konfirmasi bahwa Anda sudah melakukan transfer/pembayaran.");
       return;
@@ -178,7 +189,7 @@ export default function KatalogUmumPage() {
         addCustomer({ tenantId: 'tenant_default', name: customerName, phone: customerPhone, points: 0, debtAmount: 0 });
       }
     }
-    submitOnlineOrder(customerId, customerName, customerPhone, finalNotes, customerAddress, paymentCode);
+    submitOnlineOrder(customerId, customerName, customerPhone, finalNotes, customerAddress, paymentCode, customerDistanceKm || undefined, selectedCheckoutBranch);
 
     const storeWa = (settings.ownerWhatsapp || '085881893650').replace(/^0/, '62');
     const itemList = customerCart.map(c => `▪ ${c.quantity}x ${c.product.name}`).join('\n');
@@ -558,6 +569,16 @@ export default function KatalogUmumPage() {
                         className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none h-20 resize-none" placeholder="Alamat lengkap pengiriman..." />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Cabang Tujuan *</label>
+                      <select required value={selectedCheckoutBranch} onChange={e => setSelectedCheckoutBranch(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white">
+                        <option value="" disabled>-- Pilih Cabang --</option>
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">Periode Pengiriman *</label>
                       <select value={deliveryPeriod} onChange={e => setDeliveryPeriod(e.target.value)}
                         className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white">
@@ -593,14 +614,14 @@ export default function KatalogUmumPage() {
 
                     {/* Payment Instructions */}
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-3">
-                      <p className="font-bold text-slate-800 border-b pb-2">💳 Instruksi Pembayaran</p>
+                      <p className="font-bold text-slate-800 border-b pb-2">💳 Instruksi Pembayaran {selectedBranchData ? `(${selectedBranchData.name})` : ''}</p>
                       {paymentMethod === 'COD' && (
                         <p className="text-slate-600">Siapkan uang tunai sebesar <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b> saat kurir tiba.</p>
                       )}
                       {paymentMethod === 'TRANSFER' && (
                         <div className="space-y-2">
                           <p className="text-slate-600">Transfer <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b> ke:</p>
-                          {(settings.paymentMethods?.bankTransfer?.length ? settings.paymentMethods.bankTransfer : [{ bankName: 'BSI (Bank Syariah Indonesia)', accountNumber: '7182938495', accountName: 'KSA Mart Syariah' }]).map((b, i) => (
+                          {((selectedBranchData?.paymentMethods?.bankTransfer?.length) ? selectedBranchData.paymentMethods.bankTransfer : (settings.paymentMethods?.bankTransfer?.length ? settings.paymentMethods.bankTransfer : [{ bankName: 'BSI (Bank Syariah Indonesia)', accountNumber: '7182938495', accountName: 'KSA Mart Syariah' }])).map((b, i) => (
                             <div key={i} className="bg-white p-3 rounded-lg border border-blue-200">
                               <p className="font-bold text-blue-800">{b.bankName}</p>
                               <p className="font-mono text-base mt-0.5">{b.accountNumber}</p>
@@ -612,7 +633,7 @@ export default function KatalogUmumPage() {
                       {paymentMethod === 'EWALLET' && (
                         <div className="space-y-2">
                           <p className="text-slate-600">Transfer <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b> via e-wallet:</p>
-                          {(settings.paymentMethods?.ewallet?.length ? settings.paymentMethods.ewallet : [{ provider: 'DANA / OVO', number: 'Belum diatur', accountName: '' }]).map((w, i) => (
+                          {((selectedBranchData?.paymentMethods?.ewallet?.length) ? selectedBranchData.paymentMethods.ewallet : (settings.paymentMethods?.ewallet?.length ? settings.paymentMethods.ewallet : [{ provider: 'DANA / OVO', number: 'Belum diatur', accountName: '' }])).map((w, i) => (
                             <div key={i} className="bg-white p-3 rounded-lg border border-purple-200">
                               <p className="font-bold text-purple-800">{w.provider}</p>
                               <p className="font-mono text-base mt-0.5">{w.number}</p>
@@ -624,8 +645,20 @@ export default function KatalogUmumPage() {
                       {paymentMethod === 'QRIS' && (
                         <div className="flex flex-col items-center gap-2">
                           <p className="text-slate-600 text-center">Scan QRIS dengan nominal <b className="text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</b>:</p>
-                          {settings.qrisImageUrl
-                            ? <img src={settings.qrisImageUrl} alt="QRIS" className="w-40 h-auto rounded-xl border-2 border-fuchsia-200 p-1 bg-white shadow-sm" />
+                          {effectiveQrisUrl
+                            ? (
+                              <div className="flex flex-col items-center">
+                                <img 
+                                  src={effectiveQrisUrl} 
+                                  alt="QRIS" 
+                                  className="w-40 h-auto rounded-xl border-2 border-fuchsia-200 p-1 bg-white shadow-sm cursor-pointer hover:opacity-90 transition-opacity" 
+                                  onClick={() => setShowQrisZoom(true)}
+                                />
+                                <p className="text-[10px] text-fuchsia-600 mt-2 font-bold bg-fuchsia-50 px-2 py-1 rounded-full">
+                                  Ketuk untuk memperbesar & mengunduh
+                                </p>
+                              </div>
+                            )
                             : <div className="p-3 bg-rose-50 text-rose-700 rounded-lg text-center w-full">Toko belum mengunggah QRIS. Pilih metode lain.</div>
                           }
                         </div>
@@ -720,6 +753,35 @@ export default function KatalogUmumPage() {
           <span className="text-sm max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">Chat Admin</span>
         </a>
       )}
+
+      {/* Modal Zoom QRIS */}
+      {showQrisZoom && effectiveQrisUrl && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4" onClick={() => setShowQrisZoom(false)}>
+          <div className="bg-white p-4 rounded-3xl max-w-sm w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setShowQrisZoom(false)}
+              className="absolute -top-4 -right-4 bg-white text-slate-800 p-2 rounded-full shadow-lg hover:bg-slate-100"
+            >
+              <X className="w-5 h-5"/>
+            </button>
+            <h3 className="text-center font-bold text-slate-800 mb-1">Scan QRIS KSA Mart</h3>
+            {selectedBranchData && (
+              <p className="text-center text-xs text-fuchsia-600 font-bold mb-3">Cabang: {selectedBranchData.name}</p>
+            )}
+            <div className="bg-slate-50 rounded-2xl p-4 border-2 border-dashed border-slate-200 mb-4 flex justify-center">
+              <img src={effectiveQrisUrl} alt="QRIS KSA Mart Besar" className="w-full h-auto object-contain" />
+            </div>
+            <a 
+              href={effectiveQrisUrl} 
+              download="QRIS_KSA_Mart.jpg"
+              className="w-full block text-center py-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl font-bold shadow-md transition-colors"
+            >
+              Unduh QRIS
+            </a>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

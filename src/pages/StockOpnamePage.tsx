@@ -7,7 +7,9 @@ export default function StockOpnamePage() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [physicalCount, setPhysicalCount] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [opnameSearch, setOpnameSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   // Get unique categories dynamically from products
   const categories = Array.from(new Set(products.map(p => p.category))).sort();
@@ -39,7 +41,7 @@ export default function StockOpnamePage() {
   const filteredProducts = products.filter(p => {
     const matchBranch = !activeBranchId || p.branchId === activeBranchId || !p.branchId;
     const matchCat = selectedCategory === 'ALL' || p.category === selectedCategory;
-    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = p.name.toLowerCase().includes(opnameSearch.toLowerCase()) || p.sku.toLowerCase().includes(opnameSearch.toLowerCase());
     return matchBranch && matchCat && matchSearch;
   });
 
@@ -69,16 +71,6 @@ export default function StockOpnamePage() {
           
           <div className="space-y-3 pb-3 border-b border-gray-100">
             <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Cari SKU / nama produk..."
-                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="relative">
               <Filter className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
               <select 
                 value={selectedCategory}
@@ -91,30 +83,64 @@ export default function StockOpnamePage() {
             </div>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Scan Barcode / Ketik SKU Produk</label>
+          <div className="relative">
+            <label className="text-xs font-bold text-gray-600 mb-1 block">Scan Barcode / Cari Produk</label>
             <div className="relative">
+              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
               <input 
                 type="text"
-                list="opname-products"
                 placeholder="Scan Barcode atau ketik nama produk..."
-                className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
+                className="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
+                value={opnameSearch}
+                onFocus={() => setIsDropdownOpen(true)}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const found = products.find(p => p.sku.toLowerCase() === val.toLowerCase() || p.name.toLowerCase() === val.toLowerCase() || `${p.sku} - ${p.name}`.toLowerCase() === val.toLowerCase());
-                  if (found) {
-                    setSelectedProductId(found.id);
-                  } else {
-                    setSelectedProductId('');
+                  setOpnameSearch(val);
+                  setIsDropdownOpen(true);
+                  setSelectedProductId('');
+                  
+                  // Auto-select if exact SKU match (for barcode scanners)
+                  const exactMatch = products.find(p => p.sku.toLowerCase() === val.toLowerCase());
+                  if (exactMatch) {
+                    setSelectedProductId(exactMatch.id);
+                    setOpnameSearch(`${exactMatch.sku} - ${exactMatch.name}`);
+                    setSelectedCategory(exactMatch.category);
+                    setIsDropdownOpen(false);
                   }
                 }}
               />
-              <datalist id="opname-products">
-                {filteredProducts.map(p => (
-                  <option key={p.id} value={`${p.sku} - ${p.name}`} />
-                ))}
-              </datalist>
             </div>
+            
+            {/* Custom Dropdown */}
+            {isDropdownOpen && !selectedProductId && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                {filteredProducts.length > 0 ? (
+                  filteredProducts.map(p => (
+                    <div 
+                      key={p.id} 
+                      className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-50 last:border-0 flex justify-between items-center"
+                      onClick={() => {
+                        setSelectedProductId(p.id);
+                        setOpnameSearch(`${p.sku} - ${p.name}`);
+                        setSelectedCategory(p.category);
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      <div>
+                        <div className="font-bold text-sm text-gray-800">{p.name}</div>
+                        <div className="text-xs text-gray-500">SKU: {p.sku}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-gray-500 font-semibold uppercase">Stok Inventory</div>
+                        <div className="font-bold text-indigo-600 text-sm">{p.stock || 0}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-sm text-gray-500 text-center font-medium">Produk tidak ditemukan</div>
+                )}
+              </div>
+            )}
           </div>
           {selectedProductId && (
             <>

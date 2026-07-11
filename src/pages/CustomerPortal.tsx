@@ -1,7 +1,32 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { ShoppingBag, CreditCard, History, Search, MessageSquare, Send, CheckCircle, Package, ArrowLeft, LogOut, HelpCircle, Tag, AlertTriangle, MapPin } from 'lucide-react';
+import { ShoppingBag, CreditCard, History, Search, MessageSquare, Send, CheckCircle, Package, ArrowLeft, LogOut, HelpCircle, Tag, AlertTriangle, MapPin, Plus, ShoppingCart, ChevronLeft, ChevronRight, X, Home, Grid, ClipboardList, Award } from 'lucide-react';
 import { calculateDistanceKm } from '../utils/distance';
+
+const PAGE_SIZE = 24;
+
+// Lightweight local placeholder
+function ProductPlaceholder({ name, category }: { name: string; category: string }) {
+  const colors = [
+    ['#16a34a', '#bbf7d0'], // green
+    ['#0ea5e9', '#bae6fd'], // blue
+    ['#f59e0b', '#fde68a'], // amber
+    ['#8b5cf6', '#ddd6fe'], // violet
+    ['#ef4444', '#fecaca'], // red
+    ['#06b6d4', '#cffafe'], // cyan
+    ['#ec4899', '#fbcfe8'], // pink
+    ['#14b8a6', '#99f6e4'], // teal
+  ];
+  const idx = name.charCodeAt(0) % colors.length;
+  const [bg, fg] = colors[idx];
+  const initial = name.charAt(0).toUpperCase();
+  return (
+    <div style={{ backgroundColor: fg, color: bg }} className="w-full h-full flex flex-col items-center justify-center gap-1">
+      <span style={{ color: bg }} className="text-2xl font-black">{initial}</span>
+      <span style={{ color: bg, opacity: 0.75 }} className="text-[9px] font-semibold text-center px-1 leading-tight line-clamp-1">{category}</span>
+    </div>
+  );
+}
 
 export default function CustomerPortal() {
   const { 
@@ -16,20 +41,30 @@ export default function CustomerPortal() {
     onlineOrders,
     chatMessages,
     sendChatMessage,
-    settings
+    settings,
+    branches
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CATALOG' | 'PROMO' | 'CART' | 'ORDERS' | 'POINTS' | 'GUIDE'>('DASHBOARD');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [checkoutNotes, setCheckoutNotes] = useState('');
   const [deliveryPeriod, setDeliveryPeriod] = useState('Periode 1 (08.00-09.00)');
+  const [selectedCheckoutBranch, setSelectedCheckoutBranch] = useState<string>('');
   const [customerDistanceKm, setCustomerDistanceKm] = useState<number | null>(null);
     const [isCheckingLocation, setIsCheckingLocation] = useState(false);
   
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [chatText, setChatText] = useState('');
+  const [showQrisZoom, setShowQrisZoom] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
   const [isOutsideHours, setIsOutsideHours] = useState(false);
+
+  // Compute effective payment methods based on selected branch or global settings
+  const selectedBranchData = branches.find(b => b.id === selectedCheckoutBranch);
+  const effectivePaymentMethods = selectedBranchData?.paymentMethods || settings.paymentMethods;
+  const effectiveQrisUrl = selectedBranchData?.qrisImageUrl || settings.qrisImageUrl;
 
   React.useEffect(() => {
     const checkHours = () => {
@@ -47,6 +82,20 @@ export default function CustomerPortal() {
   }, []);
 
   const { customers, promos } = useAppStore();
+
+  const filteredProducts = React.useMemo(() => {
+    return products.filter(p => {
+      if (p.stock <= 0) return false;
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchQuery, selectedCategory]);
+
+  const paginatedProducts = React.useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredProducts.slice(start, start + PAGE_SIZE);
+  }, [filteredProducts, currentPage]);
 
   // Protect route loosely
   if (!currentUser || currentUser.role !== 'PELANGGAN') {
@@ -108,8 +157,12 @@ export default function CustomerPortal() {
   });
 
   const cartTotal = customerCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const cartCount = customerCart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const filteredProducts = products.filter(p => p.stock > 0 && p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const categories = ['Semua', ...Array.from(new Set(products.map(p => p.category)))].sort();
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+
   const promoProducts = products.filter(p => p.stock > 0 && (p.wholesalePrice !== undefined && p.wholesalePrice < p.price));
 
   
@@ -150,11 +203,16 @@ export default function CustomerPortal() {
       return;
     }
     
+    if (!selectedCheckoutBranch) {
+      alert("Silakan pilih Cabang Tujuan untuk pesanan ini.");
+      return;
+    }
+    
     // Asumsikan semua pesanan di portal pelanggan menggunakan transfer/QRIS untuk simplicity mock
     const paymentCode = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
     
     const finalNotes = `[WAKTU PENGIRIMAN: ${deliveryPeriod}] ${checkoutNotes ? checkoutNotes : ''}`;
-    submitOnlineOrder(currentUser.username, currentUser.name, currentUser.username || "08xxxx", finalNotes, undefined, paymentCode, customerDistanceKm || undefined);
+    submitOnlineOrder(currentUser.username, currentUser.name, currentUser.username || "08xxxx", finalNotes, undefined, paymentCode, customerDistanceKm || undefined, selectedCheckoutBranch);
     
     let savedAmount = 0;
     customerCart.forEach(item => {
@@ -190,25 +248,52 @@ export default function CustomerPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-green-700 text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <img src="/ksa_mart_logo.png" alt="KSA Mart" className="h-10 w-auto rounded-md" />
-          <div>
-            <h1 className="font-bold text-lg leading-tight">Member Portal</h1>
-            <p className="text-green-100 text-xs">KSA Mart</p>
+    <div className="min-h-[100dvh] bg-slate-50 flex flex-col">
+      {/* ── STICKY HEADER ──────────────────────────────────────── */}
+      <header className="bg-gradient-to-r from-green-700 to-green-600 text-white shadow-lg sticky top-0 z-30">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <img src="/ksa_mart_logo.png" alt="KSA Mart" className="h-9 w-auto rounded-md shadow-sm" />
+            <div>
+              <h1 className="font-black text-base leading-tight">Member Portal</h1>
+              <p className="text-green-200 text-[11px] font-medium">KSA Mart Syariah</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-[11px] font-medium hidden sm:block">Ahlan wa Sahlan, {currentUser.name}</span>
+            <button onClick={() => {
+              if (window.confirm("Apakah Anda yakin ingin keluar dari Member Portal? Anda harus login kembali setelah ini.")) {
+                logout();
+              }
+            }} className="p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors" title="Keluar">
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium hidden sm:block">Ahlan wa Sahlan, {currentUser.name}</span>
-          <button onClick={() => {
-            if (window.confirm("Apakah Anda yakin ingin keluar dari Member Portal? Anda harus login kembali setelah ini.")) {
-              logout();
-            }
-          }} className="p-2 bg-green-800 hover:bg-green-900 rounded-lg transition-colors" title="Keluar">
-            <LogOut className="w-5 h-5" />
-          </button>
+
+        {/* Tab Navigation (Desktop Only) */}
+        <div className="hidden md:flex overflow-x-auto hide-scrollbar border-t border-green-600">
+          {([['DASHBOARD', 'Dshboard'], ['CATALOG', 'Katalog'], ['PROMO', 'Promo'], ['CART', 'Keranjang'], ['ORDERS', 'Pesanan'], ['POINTS', 'Poin'], ['GUIDE', 'Panduan']] as const).map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`flex-1 min-w-[80px] py-2 text-xs font-bold transition-colors relative flex items-center justify-center gap-1 ${
+                activeTab === tab
+                  ? 'text-white bg-white/20'
+                  : 'text-green-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              {label}
+              {tab === 'CART' && customerCart.length > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full px-0.5">
+                  {customerCart.length}
+                </span>
+              )}
+              {activeTab === tab && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t-full" />
+              )}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -227,60 +312,12 @@ export default function CustomerPortal() {
           </div>
         )}
 
-        {/* Navigation Tabs */}
-        <div className="flex overflow-x-auto gap-2 mb-6 pb-2 no-scrollbar">
-          <button 
-            onClick={() => setActiveTab('DASHBOARD')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'DASHBOARD' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <CreditCard className="w-4 h-4"/> Dashboard
-          </button>
-          <button 
-            onClick={() => setActiveTab('CATALOG')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'CATALOG' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <Package className="w-4 h-4"/> Katalog Belanja
-          </button>
-          <button 
-            onClick={() => setActiveTab('PROMO')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'PROMO' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <Tag className="w-4 h-4"/> Promo Spesial
-          </button>
-          <button 
-            onClick={() => setActiveTab('CART')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors relative ${activeTab === 'CART' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <ShoppingBag className="w-4 h-4"/> Keranjang
-            {customerCart.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] flex items-center justify-center font-black border-2 border-white">{customerCart.length}</span>
-            )}
-          </button>
-          <button 
-            onClick={() => setActiveTab('ORDERS')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'ORDERS' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <History className="w-4 h-4"/> Pesanan Saya
-          </button>
-          <button 
-            onClick={() => setActiveTab('POINTS')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'POINTS' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <Tag className="w-4 h-4"/> Riwayat Poin
-          </button>
-          <button 
-            onClick={() => setActiveTab('GUIDE')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${activeTab === 'GUIDE' ? 'bg-green-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 border border-slate-300 hover:bg-slate-300'}`}
-          >
-            <HelpCircle className="w-4 h-4"/> Panduan & Info
-          </button>
-        </div>
 
         {/* Tab: Dashboard */}
         {activeTab === 'DASHBOARD' && (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-br from-green-600 to-teal-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="bg-teal-700 bg-gradient-to-br from-green-600 to-teal-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><ShoppingBag className="w-24 h-24"/></div>
                 <p className="text-green-100 font-medium mb-1">Total Belanja</p>
                 <h3 className="text-3xl font-black">Rp {totalBelanja.toLocaleString('id-ID')}</h3>
@@ -288,19 +325,19 @@ export default function CustomerPortal() {
                   {myCustomerProfile?.isKoperasiMember ? 'Anggota Koperasi Syariah' : 'Pelanggan Umum'}
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="bg-blue-700 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><Tag className="w-24 h-24"/></div>
                 <p className="text-blue-100 font-medium mb-1">Total Hemat & Diskon</p>
                 <h3 className="text-3xl font-black">Rp {totalHemat.toLocaleString('id-ID')}</h3>
                 <p className="text-[10px] text-blue-200 mt-4 bg-black/20 inline-block px-2 py-1 rounded-full">Akumulasi dari Promo & Grosir</p>
               </div>
-              <div className="bg-gradient-to-br from-fuchsia-600 to-purple-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="bg-purple-700 bg-gradient-to-br from-fuchsia-600 to-purple-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><Tag className="w-24 h-24"/></div>
                 <p className="text-fuchsia-100 font-medium mb-1">Loyalitas Poin</p>
                 <h3 className="text-3xl font-black">{points} Poin</h3>
                 <p className="text-xs text-fuchsia-200 mt-4 bg-black/20 inline-block px-3 py-1 rounded-full">Senilai Rp {(points * 10).toLocaleString('id-ID')}</p>
               </div>
-              <div className="bg-gradient-to-br from-rose-500 to-red-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="bg-red-600 bg-gradient-to-br from-rose-500 to-red-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 opacity-10"><CreditCard className="w-24 h-24"/></div>
                 <p className="text-rose-100 font-medium mb-1">Tagihan/Utang Koperasi</p>
                 <h3 className="text-3xl font-black">Rp {totalUtang.toLocaleString('id-ID')}</h3>
@@ -347,49 +384,137 @@ export default function CustomerPortal() {
                 placeholder="Cari barang kebutuhan Anda..." 
                 className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-2 focus:ring-green-500 outline-none"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               />
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map(p => {
-                const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
-                return (
-                  <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow">
-                    <div className="h-32 bg-slate-100 relative">
-                      {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <Package className="w-12 h-12" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm text-[10px] font-bold px-2 py-1 rounded text-slate-600 shadow-sm">{p.category}</div>
-                    </div>
-                    <div className="p-3 flex-1 flex flex-col">
-                      <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
-                      <p className="text-green-700 font-black text-lg">Rp {p.price.toLocaleString('id-ID')}</p>
-                      <p className="text-xs text-slate-500 mb-3">Stok: {p.stock} {p.unit}</p>
-                      
-                      {inCart > 0 ? (
-                        <div className="flex items-center justify-between bg-green-50 rounded-lg p-1 border border-green-100">
-                          <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm">-</button>
-                          <span className="font-bold text-green-800">{inCart}</span>
-                          <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50">+</button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => addToCustomerCart(p)}
-                          className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
-                        >
-                          <Plus className="w-4 h-4"/> Tambah
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Category Filter */}
+            <div className="flex overflow-x-auto gap-2 pb-2 hide-scrollbar">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => { setSelectedCategory(cat); setCurrentPage(1); }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${
+                    selectedCategory === cat
+                      ? 'bg-green-600 border-green-600 text-white shadow-md'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
+
+            <div className="flex justify-between items-center text-xs font-medium text-slate-500 bg-white/50 py-1.5 px-3 rounded-lg border border-slate-200">
+              <p>Menampilkan <b className="text-slate-700">{filteredProducts.length.toLocaleString('id-ID')}</b> produk</p>
+              <p>Hal {currentPage} / {totalPages}</p>
+            </div>
+
+            {/* Product Grid */}
+            {paginatedProducts.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {paginatedProducts.map(p => {
+                  const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
+                  return (
+                    <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md hover:-translate-y-0.5 transition-all duration-150">
+                      {/* Product Image */}
+                      <div className="aspect-square w-full overflow-hidden relative flex-shrink-0">
+                        {p.image ? (
+                          <img src={p.image} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <ProductPlaceholder name={p.name} category={p.category} />
+                        )}
+                        {/* Category Badge */}
+                        <div className="absolute top-1.5 left-1.5">
+                          <span className="bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+                            {p.category}
+                          </span>
+                        </div>
+                        {inCart > 0 && (
+                          <div className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 shadow">
+                            {inCart}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Product Info */}
+                      <div className="p-2 flex flex-col flex-1 gap-1.5">
+                        <h3 className="font-semibold text-slate-800 text-xs leading-tight line-clamp-2 flex-1">{p.name}</h3>
+                        <p className="text-green-700 font-black text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
+                        <p className="text-[10px] text-slate-400">Stok: {p.stock} {p.unit}</p>
+
+                        {/* Add to Cart */}
+                        {inCart > 0 ? (
+                          <div className="flex items-center justify-between bg-green-50 rounded-lg p-0.5 border border-green-200">
+                            <button
+                              onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)}
+                              className="w-7 h-7 flex items-center justify-center bg-white rounded-md text-green-700 font-black hover:bg-green-100 shadow-sm text-sm"
+                            >-</button>
+                            <span className="font-black text-green-800 text-sm min-w-[1.5rem] text-center">{inCart}</span>
+                            <button
+                              onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)}
+                              disabled={inCart >= p.stock}
+                              className="w-7 h-7 flex items-center justify-center bg-white rounded-md text-green-700 font-black hover:bg-green-100 shadow-sm disabled:opacity-40 text-sm"
+                            >+</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => addToCustomerCart(p)}
+                            className="w-full py-1.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-1"
+                          >
+                            <ShoppingBag className="w-3 h-3" /> Tambah
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 py-6">
+                <button
+                  onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0 }); }}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Sebelumnya
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let page: number;
+                    if (totalPages <= 5) page = i + 1;
+                    else if (currentPage <= 3) page = i + 1;
+                    else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                    else page = currentPage - 2 + i;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0 }); }}
+                        className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
+                          page === currentPage
+                            ? 'bg-green-600 text-white shadow-md'
+                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0 }); }}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors"
+                >
+                  Selanjutnya <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -428,36 +553,48 @@ export default function CustomerPortal() {
                   {promoProducts.map(p => {
                     const inCart = customerCart.find(c => c.product.id === p.id)?.quantity || 0;
                     return (
-                      <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-md transition-shadow relative">
-                        <div className="absolute top-2 right-2 bg-rose-600 text-white text-[9px] font-black px-2 py-1 rounded-full shadow-sm z-10">GROSIR</div>
-                        <div className="h-32 bg-slate-100 relative">
-                          {p.image ? (
-                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=random&color=fff&size=200&bold=true`} alt={p.name} className="w-full h-full object-cover" />
-                          )}
-                        </div>
-                        <div className="p-3 flex-1 flex flex-col">
-                          <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight mb-1 flex-1">{p.name}</h3>
-                          <div className="mb-2">
-                            <p className="text-[10px] text-slate-400 line-through">Rp {p.price.toLocaleString('id-ID')}</p>
-                            <p className="text-green-700 font-black text-base">Rp {p.wholesalePrice?.toLocaleString('id-ID')} <span className="text-[9px] font-normal text-slate-500">/ {p.unit}</span></p>
-                            <p className="text-[9px] text-amber-700 font-bold">Min. Beli: {p.wholesaleMinQty} {p.unit}</p>
+                      <div key={p.id} className="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden flex flex-col group hover:shadow-lg hover:border-rose-300 transition-all relative">
+                        <div className="absolute top-2 right-2 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[9px] font-black px-2 py-1 rounded-lg shadow-md z-10 uppercase tracking-widest border border-white/20">GROSIR</div>
+                        <div className="h-32 bg-slate-50 relative p-2">
+                          <div className="w-full h-full bg-white rounded-xl shadow-xs border border-rose-50 overflow-hidden relative">
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-rose-50 to-red-50 flex items-center justify-center">
+                                <span className="text-3xl font-black text-rose-800 opacity-20 uppercase">{p.name.substring(0,2)}</span>
+                              </div>
+                            )}
+                            <div className="absolute top-1 left-1 bg-white/90 backdrop-blur-sm text-[8px] font-bold px-1.5 py-0.5 rounded text-rose-700 shadow-sm uppercase tracking-widest">{p.category}</div>
                           </div>
-                          {inCart > 0 ? (
-                            <div className="flex items-center justify-between bg-green-50 rounded-lg p-1 border border-green-100">
-                              <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm">-</button>
-                              <span className="font-bold text-green-800">{inCart}</span>
-                              <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-8 h-8 flex items-center justify-center bg-white rounded-md text-green-700 font-bold hover:bg-green-100 shadow-sm disabled:opacity-50">+</button>
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col bg-white">
+                          <h3 className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight mb-2 flex-1">{p.name}</h3>
+                          <div className="mt-auto pt-2 border-t border-rose-50 border-dashed">
+                            <div className="flex items-end justify-between mb-2">
+                              <div>
+                                <p className="text-[10px] text-slate-400 line-through">Rp {p.price.toLocaleString('id-ID')}</p>
+                                <p className="text-rose-600 font-black text-sm">Rp {p.wholesalePrice?.toLocaleString('id-ID')} <span className="text-[9px] font-normal text-slate-500">/ {p.unit}</span></p>
+                              </div>
+                              <span className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-100 shadow-sm text-center">
+                                Min Beli<br/>{p.wholesaleMinQty}
+                              </span>
                             </div>
-                          ) : (
-                            <button 
-                              onClick={() => addToCustomerCart(p)}
-                              className="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                            >
-                              <Plus className="w-4 h-4"/> Tambah
-                            </button>
-                          )}
+                            
+                            {inCart > 0 ? (
+                              <div className="flex items-center justify-between bg-rose-50 rounded-xl p-1 border border-rose-200 shadow-inner">
+                                <button onClick={() => updateCustomerCartQuantity(p.id, inCart - 1)} className="w-7 h-7 flex items-center justify-center bg-white rounded-lg text-rose-700 font-bold shadow-sm active:scale-95 transition-transform">-</button>
+                                <span className="font-bold text-rose-800 text-sm">{inCart}</span>
+                                <button onClick={() => updateCustomerCartQuantity(p.id, inCart + 1)} disabled={inCart >= p.stock} className="w-7 h-7 flex items-center justify-center bg-white rounded-lg text-rose-700 font-bold shadow-sm active:scale-95 transition-transform disabled:opacity-50">+</button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => addToCustomerCart(p)}
+                                className="w-full py-2 bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-700 hover:to-red-600 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3"/> Tambah ke Keranjang
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -531,6 +668,19 @@ export default function CustomerPortal() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Pilih Cabang Tujuan <span className="text-red-500">*</span></label>
+                    <select 
+                      value={selectedCheckoutBranch}
+                      onChange={e => setSelectedCheckoutBranch(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white mb-4"
+                      required
+                    >
+                      <option value="" disabled>-- Pilih Cabang KSA Mart --</option>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+
                     <label className="block text-sm font-bold text-slate-700 mb-1">Periode Pengiriman / Pengambilan</label>
                     <select 
                       value={deliveryPeriod}
@@ -557,11 +707,11 @@ export default function CustomerPortal() {
                   {/* Panduan Pembayaran */}
                   <div className="bg-green-50/50 border border-green-200/50 rounded-xl p-3 text-xs space-y-2">
                     <p className="font-bold text-green-800 flex items-center gap-1.5">
-                      <CreditCard className="w-4 h-4 text-green-700"/> Metode Pembayaran
+                      <CreditCard className="w-4 h-4 text-green-700"/> Metode Pembayaran {selectedBranchData ? `(${selectedBranchData.name})` : ''}
                     </p>
                     <div className="space-y-1.5 text-gray-700">
-                      {(!settings.paymentMethods?.bankTransfer || settings.paymentMethods.bankTransfer.length === 0) && 
-                       (!settings.paymentMethods?.ewallet || settings.paymentMethods.ewallet.length === 0) ? (
+                      {(!effectivePaymentMethods?.bankTransfer || effectivePaymentMethods.bankTransfer.length === 0) && 
+                       (!effectivePaymentMethods?.ewallet || effectivePaymentMethods.ewallet.length === 0) ? (
                         <div className="p-2 bg-white rounded border border-green-100">
                           <p className="font-bold text-green-800">Transfer Bank Syariah (BSI)</p>
                           <p className="text-[11px] font-mono">No. Rek: <span className="font-bold text-slate-900">7182938495</span></p>
@@ -569,14 +719,14 @@ export default function CustomerPortal() {
                         </div>
                       ) : (
                         <>
-                          {settings.paymentMethods?.bankTransfer?.map((b, idx) => (
+                          {effectivePaymentMethods?.bankTransfer?.map((b, idx) => (
                             <div key={idx} className="p-2 bg-white rounded border border-green-100">
                               <p className="font-bold text-green-800">{b.bankName}</p>
                               <p className="text-[11px] font-mono">No. Rek: <span className="font-bold text-slate-900">{b.accountNumber}</span></p>
                               <p className="text-[10px] text-gray-500">a.n. {b.accountName}</p>
                             </div>
                           ))}
-                          {settings.paymentMethods?.ewallet?.map((w, idx) => (
+                          {effectivePaymentMethods?.ewallet?.map((w, idx) => (
                             <div key={idx} className="p-2 bg-white rounded border border-green-100">
                               <p className="font-bold text-purple-800">{w.provider}</p>
                               <p className="text-[11px] font-mono">No / ID: <span className="font-bold text-slate-900">{w.number}</span></p>
@@ -586,10 +736,18 @@ export default function CustomerPortal() {
                         </>
                       )}
                       
-                      {settings.qrisImageUrl && (
-                        <div className="p-2 bg-white rounded border border-green-100 flex flex-col items-center">
-                          <p className="font-bold text-slate-800 text-center mb-2">Scan QRIS</p>
-                          <img src={settings.qrisImageUrl} alt="QRIS KSA Mart" className="w-full max-w-[200px] h-auto object-contain rounded" />
+                      {effectiveQrisUrl && (
+                        <div className="p-4 bg-white rounded-xl border border-green-200 flex flex-col items-center shadow-sm">
+                          <p className="font-bold text-slate-800 text-center mb-3">Scan QRIS untuk Membayar</p>
+                          <img 
+                            src={effectiveQrisUrl} 
+                            alt="QRIS KSA Mart" 
+                            className="w-full max-w-[200px] h-auto object-contain rounded cursor-pointer hover:opacity-90 transition-opacity border-2 border-slate-100 p-1" 
+                            onClick={() => setShowQrisZoom(true)}
+                          />
+                          <p className="text-[10px] text-green-600 mt-2 font-bold bg-green-50 px-2 py-1 rounded-full">
+                            Tuk Ketuk untuk memperbesar & mengunduh
+                          </p>
                         </div>
                       )}
                       <p className="text-[10px] text-gray-500 italic mt-1">
@@ -723,7 +881,7 @@ export default function CustomerPortal() {
         {/* Tab: Points */}
         {activeTab === 'POINTS' && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            <div className="bg-gradient-to-br from-fuchsia-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+            <div className="bg-fuchsia-700 bg-gradient-to-br from-fuchsia-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
               <div className="absolute top-0 right-0 p-6 opacity-10"><Tag className="w-24 h-24"/></div>
               <p className="text-fuchsia-100 font-medium mb-1">Total Poin Terkumpul</p>
               <h3 className="text-4xl font-black">{points} Poin</h3>
@@ -812,11 +970,82 @@ export default function CustomerPortal() {
           </div>
         )}
       </main>
+
+      {/* ── FLOATING CART BUTTON (only when catalog tab & has items) ── */}
+      {activeTab === 'CATALOG' && cartCount > 0 && (
+        <div className="fixed bottom-4 left-4 right-4 z-30 pointer-events-none flex justify-center">
+          <button
+            onClick={() => setActiveTab('CART')}
+            className="pointer-events-auto flex items-center gap-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-black py-3 px-6 rounded-2xl shadow-2xl transition-all hover:scale-105 active:scale-95"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            <span>Lihat Keranjang ({cartCount} item)</span>
+            <span className="bg-white/20 px-2.5 py-0.5 rounded-full font-black text-sm">
+              Rp {cartTotal.toLocaleString('id-ID')}
+            </span>
+          </button>
+        </div>
+      )}
+      {/* Modal Zoom QRIS */}
+      {showQrisZoom && (effectiveQrisUrl || settings.qrisImageUrl) && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4" onClick={() => setShowQrisZoom(false)}>
+          <div className="bg-white p-4 rounded-3xl max-w-sm w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setShowQrisZoom(false)}
+              className="absolute -top-4 -right-4 bg-white text-slate-800 p-2 rounded-full shadow-lg hover:bg-slate-100"
+            >
+              <X className="w-5 h-5"/>
+            </button>
+            <h3 className="text-center font-bold text-slate-800 mb-4">Scan QRIS KSA Mart</h3>
+            <div className="bg-slate-50 rounded-2xl p-4 border-2 border-dashed border-slate-200 mb-4 flex justify-center">
+              <img src={effectiveQrisUrl || settings.qrisImageUrl} alt="QRIS KSA Mart Besar" className="w-full h-auto object-contain" />
+            </div>
+            <a 
+              href={effectiveQrisUrl || settings.qrisImageUrl} 
+              download="QRIS_KSA_Mart.jpg"
+              className="w-full block text-center py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md transition-colors"
+            >
+              Unduh QRIS
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation Bar (Mobile Only) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-center justify-between px-2 py-2 z-50 md:hidden shadow-[0_-4px_10px_rgba(0,0,0,0.05)] pb-safe">
+        {[
+          { id: 'DASHBOARD', label: 'Home', icon: Home },
+          { id: 'CATALOG', label: 'Katalog', icon: Grid },
+          { id: 'CART', label: 'Keranjang', icon: ShoppingCart },
+          { id: 'ORDERS', label: 'Pesanan', icon: ClipboardList },
+          { id: 'POINTS', label: 'Poin', icon: Award }
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex-1 flex flex-col items-center justify-center py-1 relative transition-colors ${
+                isActive ? 'text-green-600' : 'text-slate-400 hover:text-green-500'
+              }`}
+            >
+              <div className="relative">
+                <Icon className={`w-5 h-5 mb-1 ${isActive ? 'fill-green-100' : ''}`} />
+                {tab.id === 'CART' && customerCart.length > 0 && (
+                  <span className="absolute -top-1.5 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-black rounded-full px-0.5 border border-white shadow-sm">
+                    {customerCart.length}
+                  </span>
+                )}
+              </div>
+              <span className={`text-[10px] font-bold ${isActive ? 'text-green-700' : 'font-medium'}`}>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+      {/* Spacer so content is not hidden by the bottom nav */}
+      <div className="h-16 md:hidden flex-shrink-0"></div>
+
     </div>
   );
 }
-
-// Plus Icon missing fix
-const Plus = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-);

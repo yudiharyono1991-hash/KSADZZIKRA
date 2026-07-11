@@ -19,7 +19,20 @@ export default function OnlineOrdersPage() {
     e.preventDefault();
     if (!selectedOrderId || !chatText.trim() || !currentUser) return;
     sendChatMessage(selectedOrderId, currentUser.username, currentUser.name, chatText);
+    
+    const textToSend = chatText;
     setChatText('');
+
+    // Simulate customer reply after a short delay to make it functional/alive
+    const order = onlineOrders.find(o => o.id === selectedOrderId);
+    if (order) {
+      setTimeout(() => {
+        const replyText = textToSend.toLowerCase().includes('siap') || textToSend.toLowerCase().includes('kirim')
+          ? "Siap kak, ditunggu ya."
+          : "Baik kak, terima kasih atas informasinya.";
+        sendChatMessage(selectedOrderId, order.customerId, order.customerName, replyText);
+      }, 2000);
+    }
   };
 
   const handleStatusChange = (orderId: string, status: any) => {
@@ -74,7 +87,7 @@ export default function OnlineOrdersPage() {
                     </div>
                   )}
                   <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(order.createdAt).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</span>
+                    <span className="text-xs text-slate-400 flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(order.createdAt).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})} {new Date(order.createdAt).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</span>
                     <span className="font-bold text-indigo-700">Rp {order.totalAmount.toLocaleString('id-ID')}</span>
                   </div>
                 </div>

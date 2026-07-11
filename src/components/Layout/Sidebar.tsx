@@ -57,7 +57,7 @@ type MenuGroup = {
 type MenuData = (MenuItem | MenuGroup)[];
 
 export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, onExpand }: SidebarProps) {
-  const { currentUser, logout, users, settings } = useAppStore();
+  const { currentUser, logout, users, settings, onlineOrders, products } = useAppStore();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [isHovered, setIsHovered] = useState(false);
@@ -65,6 +65,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
   const effectiveIsCollapsed = isCollapsed && !isHovered;
 
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
+  const pendingOrdersCount = onlineOrders?.filter(o => o.status === 'PENDING').length || 0;
+  const lowStockCount = products?.filter(p => !p.isPPOB && p.stock <= p.minStock).length || 0;
+
   const notifications = useAppStore(state => state.notifications);
   const currentUserLocal = useAppStore(state => state.currentUser);
   const unreadNotificationsCount = (notifications || []).filter(n => {
@@ -98,7 +101,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
-          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
+          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag, badge: pendingOrdersCount },
         ]
       },
       {
@@ -124,7 +127,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: lowStockCount },
           { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
@@ -138,7 +141,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
           { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
-          { path: '/promos', label: 'Manajemen Promo', icon: Tag },
+          { path: '/promos', label: 'Promo Transaksi', icon: Tag },
+          { path: '/promo-produk', label: 'Promo Produk', icon: Tag },
         ]
       },
       {
@@ -205,7 +209,8 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
           { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
-          { path: '/promos', label: 'Manajemen Promo', icon: Tag },
+          { path: '/promos', label: 'Promo Transaksi', icon: Tag },
+          { path: '/promo-produk', label: 'Promo Produk', icon: Tag },
         ]
       },
       ...(currentUser.role === 'ADMIN' ? [{

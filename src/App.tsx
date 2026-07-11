@@ -38,7 +38,9 @@ import {
   CoAPage,
   BeritaPusatPage,
   LoyaltyProgramPage,
-  PPOBInventoryPage
+  PPOBInventoryPage,
+  PromoProdukPage,
+  CustomerDisplayPage
 } from './pages';
 
 // Komponen pembungkus untuk route yang membutuhkan otentikasi
@@ -167,6 +169,7 @@ export default function App() {
         <Route path="/artikel-islami" element={<ArtikelIslamiPage />} />
         
         <Route path="/berita" element={<BeritaPusatPage />} />
+        <Route path="/customer-display" element={<CustomerDisplayPage />} />
         
         {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
         <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
@@ -189,6 +192,7 @@ export default function App() {
         <Route path="/online-orders" element={<ProtectedRoute><OnlineOrdersPage /></ProtectedRoute>} />
         <Route path="/suppliers" element={<ProtectedRoute><SupplierManagementPage /></ProtectedRoute>} />
         <Route path="/promos" element={<ProtectedRoute><PromoManagementPage /></ProtectedRoute>} />
+        <Route path="/promo-produk" element={<ProtectedRoute><PromoProdukPage /></ProtectedRoute>} />
         <Route path="/stock-opname" element={<ProtectedRoute><StockOpnamePage /></ProtectedRoute>} />
         <Route path="/staff" element={<ProtectedRoute><StaffManagementPage /></ProtectedRoute>} />
         <Route path="/struktur-organisasi" element={<ProtectedRoute><StrukturOrganisasiPage /></ProtectedRoute>} />

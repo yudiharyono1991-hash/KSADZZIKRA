@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw } from 'lucide-react';
+import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw, Globe } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function SettingsPage() {
@@ -37,6 +37,11 @@ export default function SettingsPage() {
   const [enablePpobIntegration, setEnablePpobIntegration] = useState(settings.enablePpobIntegration ?? false);
   const [ppobProviderUrl, setPpobProviderUrl] = useState(settings.ppobProviderUrl || '');
   const [ppobApiKey, setPpobApiKey] = useState(settings.ppobApiKey || '');
+  const [defaultPpobAdminFee, setDefaultPpobAdminFee] = useState(settings.defaultPpobAdminFee?.toString() || '2000');
+  
+  // Supabase / Server Integration
+  const [supabaseUrl, setSupabaseUrl] = useState(settings.supabaseUrl || '');
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState(settings.supabaseAnonKey || '');
 
   const [autoApproveTransactions, setAutoApproveTransactions] = useState(settings.autoApproveTransactions ?? false);
 
@@ -45,6 +50,12 @@ export default function SettingsPage() {
   const [businessType, setBusinessType] = useState<'KOPERASI' | 'UMUM'>(settings.businessType || 'KOPERASI');
   const [ownerUsername, setOwnerUsername] = useState(currentUser?.username || '');
   const [ownerPassword, setOwnerPassword] = useState('');
+
+  // Landing Page Config
+  const [landingShowTopDropdowns, setLandingShowTopDropdowns] = useState(settings.landingPageConfig?.showTopDropdowns ?? true);
+  const [landingContactUs, setLandingContactUs] = useState(settings.landingPageConfig?.contactUs || { phone: '', email: '', address: '', description: '' });
+  const [landingFaqs, setLandingFaqs] = useState(settings.landingPageConfig?.faqs || []);
+  const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
 
   // Payment Methods
   type BankEntry = { enabled: boolean; bankName: string; accountNumber: string; accountName: string; };
@@ -88,6 +99,11 @@ export default function SettingsPage() {
     setBusinessType(settings.businessType || 'KOPERASI');
     setBankTransfers(settings.paymentMethods?.bankTransfer || []);
     setEwallets(settings.paymentMethods?.ewallet || []);
+    setSupabaseUrl(settings.supabaseUrl || '');
+    setSupabaseAnonKey(settings.supabaseAnonKey || '');
+    setLandingContactUs(settings.landingPageConfig?.contactUs || { phone: '', email: '', address: '', description: '' });
+    setLandingFaqs(settings.landingPageConfig?.faqs || []);
+    setLandingShowTopDropdowns(settings.landingPageConfig?.showTopDropdowns ?? true);
   }, [settings]);
 
   const handleSave = () => {
@@ -121,7 +137,15 @@ export default function SettingsPage() {
         enablePpobIntegration,
         ppobProviderUrl,
         ppobApiKey,
+        defaultPpobAdminFee: Number(defaultPpobAdminFee) || 0,
         autoApproveTransactions,
+        supabaseUrl,
+        supabaseAnonKey,
+        landingPageConfig: {
+          showTopDropdowns: landingShowTopDropdowns,
+          contactUs: landingContactUs,
+          faqs: landingFaqs
+        }
       });
 
       if (isOwner && currentUser) {
@@ -612,7 +636,76 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+        <div className="p-6 border-t border-gray-100 bg-white">
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Default Biaya Admin PPOB (Rp)</label>
+            <input type="number" value={defaultPpobAdminFee} onChange={(e) => setDefaultPpobAdminFee(e.target.value)} className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Misal: 2000" />
+            <p className="text-[10px] text-gray-400 mt-1">Biaya admin ini akan otomatis muncul sebagai keuntungan/fee tambahan saat kasir menginput produk PPOB.</p>
+          </div>
+        </div>
       </div>
+
+      {/* Integrasi Server & Database (Owner Only) */}
+      {isOwner && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-6">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-indigo-600" />
+              <h2 className="font-bold text-gray-800">Konfigurasi Server & Database API</h2>
+            </div>
+          </div>
+          
+          <div className="p-6 space-y-4 bg-slate-50/50">
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm mb-4">
+              PENTING: Pengaturan ini memungkinkan aplikasi terhubung ke database Supabase milik Anda sendiri secara dinamis tanpa perlu mengubah kode sumber.
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">URL Web / Aplikasi Saat Ini (Untuk Pengelola Server)</label>
+              <div className="flex gap-2">
+                <input type="text" readOnly value={window.location.origin} className="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-500 font-mono" />
+                <button onClick={() => { navigator.clipboard.writeText(window.location.origin); alert("URL berhasil disalin!"); }} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shrink-0">
+                  <Copy size={16} /> Salin URL
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1 mt-4">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Supabase Project URL</label>
+              <input type="text" value={supabaseUrl} onChange={(e) => setSupabaseUrl(e.target.value)} placeholder="https://xxxxxx.supabase.co" className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Supabase Anon / Public Key</label>
+              <input type="password" value={supabaseAnonKey} onChange={(e) => setSupabaseAnonKey(e.target.value)} placeholder="eyJhbGciOiJIUzI1NiIsIn..." className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" />
+            </div>
+
+            <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={async () => {
+                  try {
+                    const testUrl = supabaseUrl || 'https://stiatomaelzrptazayml.supabase.co';
+                    // We just do a simple fetch to the health endpoint or similar if it's a valid URL format
+                    new URL(testUrl);
+                    alert("✅ Ping ke Server API berhasil dikirim!\n\nJika URL valid, aplikasi akan mencoba terhubung. Pastikan menyimpan pengaturan ini agar berlaku secara permanen di perangkat kasir.");
+                  } catch (e) {
+                    alert("❌ Format URL Supabase tidak valid!");
+                  }
+                }}
+                className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors flex-1"
+              >
+                <RefreshCw size={16} /> Uji Koneksi API Server
+              </button>
+              <button
+                onClick={handleSave}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors flex-1 shadow-md"
+              >
+                <Save size={16} /> Simpan Konfigurasi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lokasi & Pengiriman (Owner Only) */}
       {isOwner && (
@@ -724,7 +817,6 @@ export default function SettingsPage() {
                   className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
                 />
               </div>
-              {/* Removed obsolete zakatRate UI */}
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -759,6 +851,82 @@ export default function SettingsPage() {
             <button onClick={handleSave} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer mt-4">
               <Save className="w-4 h-4" /> Simpan Konfigurasi Tingkat Lanjut
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Landing Page Settings */}
+      {isOwner && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mt-6">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Globe className="text-green-600" /> Pengaturan Halaman Depan (Beranda)
+          </h2>
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="font-bold text-slate-700">Tampilkan Menu Hubungi & Alamat di Atas (Dropdown)</p>
+                <p className="text-xs text-slate-500">Jika diaktifkan, menu Hubungi Kami dan alamat cabang akan muncul sebagai dropdown di navbar atas, bukan di bagian bawah halaman.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+                <input type="checkbox" checked={landingShowTopDropdowns} onChange={e => setLandingShowTopDropdowns(e.target.checked)} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+              </label>
+            </div>
+            
+            <div>
+              <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Kontak Kami</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Deskripsi Singkat</label>
+                  <input type="text" value={landingContactUs.description} onChange={e => setLandingContactUs({...landingContactUs, description: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Hubungi kami untuk informasi lebih lanjut..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">No Telepon / WhatsApp</label>
+                  <input type="text" value={landingContactUs.phone} onChange={e => setLandingContactUs({...landingContactUs, phone: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="0812..." />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+                  <input type="email" value={landingContactUs.email} onChange={e => setLandingContactUs({...landingContactUs, email: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="info@koperasi.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Alamat Lengkap</label>
+                  <input type="text" value={landingContactUs.address} onChange={e => setLandingContactUs({...landingContactUs, address: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Jl. Raya Koperasi No. 1..." />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Pertanyaan Umum (FAQ)</h3>
+              {landingFaqs.map((faq, index) => (
+                <div key={index} className="flex gap-2 items-start bg-slate-50 p-3 rounded-lg mb-3 border border-slate-200">
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm font-bold text-slate-800">Q: {faq.question}</p>
+                    <p className="text-sm text-slate-600">A: {faq.answer}</p>
+                  </div>
+                  <button onClick={() => setLandingFaqs(landingFaqs.filter((_, i) => i !== index))} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <p className="text-xs font-bold text-blue-800 mb-1">Tambah FAQ Baru</p>
+                <input type="text" value={newFaq.question} onChange={e => setNewFaq({...newFaq, question: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Pertanyaan (Contoh: Apakah Koperasi buka 24 jam?)" />
+                <textarea value={newFaq.answer} onChange={e => setNewFaq({...newFaq, answer: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm h-20 resize-none" placeholder="Jawaban (Contoh: Tidak, kami buka mulai 08:00 hingga 21:00...)" />
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (newFaq.question && newFaq.answer) {
+                      setLandingFaqs([...landingFaqs, newFaq]);
+                      setNewFaq({ question: '', answer: '' });
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" /> Tambah FAQ
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

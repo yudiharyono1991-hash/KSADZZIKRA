@@ -122,6 +122,7 @@ interface AppState {
 
   products: Product[];
   cart: CartItem[];
+  lastTransactionId: string | null;
   customerCart: CartItem[]; // Khusus portal pelanggan
   transactions: Transaction[];
   onlineOrders: OnlineOrder[];
@@ -222,7 +223,7 @@ interface AppState {
   removeFromCustomerCart: (productId: string) => void;
   updateCustomerCartQuantity: (productId: string, quantity: number) => void;
   clearCustomerCart: () => void;
-  submitOnlineOrder: (customerId: string, customerName: string, customerPhone: string, notes: string, customerAddress?: string, paymentCode?: string, distanceKm?: number) => void;
+  submitOnlineOrder: (customerId: string, customerName: string, customerPhone: string, notes: string, customerAddress?: string, paymentCode?: string, distanceKm?: number, branchId?: string) => void;
   updateOrderStatus: (orderId: string, status: OnlineOrder['status']) => void;
   sendChatMessage: (orderId: string, senderId: string, senderName: string, text: string) => void;
   processOnlineOrderPayment: (orderId: string, paymentMethod: 'CASH' | 'TRANSFER_BSI' | 'QRIS_SHARIAH') => void;
@@ -275,6 +276,9 @@ interface AppState {
   addCoaAccountsBulk: (accounts: Omit<CoaAccount, 'id'>[]) => void;
   updateCoaAccount: (account: CoaAccount) => void;
   deleteCoaAccount: (id: string) => void;
+
+  // Feedback Actions
+  updateTransactionFeedback: (id: string, rating: 'PUAS' | 'TIDAK_PUAS', feedback?: string) => void;
 }
 
 const DEFAULT_COA: CoaAccount[] = [
@@ -283,21 +287,36 @@ const DEFAULT_COA: CoaAccount[] = [
   { id: 'coa_3', tenantId: 'tenant_default', code: '1-1020', name: 'QRIS Syariah Dana', category: 'ASSET', isActive: true },
   { id: 'coa_4', tenantId: 'tenant_default', code: '1-1030', name: 'Piutang Kasbon Pelanggan', category: 'ASSET', isActive: true },
   { id: 'coa_5', tenantId: 'tenant_default', code: '1-1040', name: 'Persediaan Barang Dagang', category: 'ASSET', isActive: true },
+  { id: 'coa_6', tenantId: 'tenant_default', code: '1-1050', name: 'Saldo Radar Pulsa / Digital', category: 'ASSET', isActive: true },
   { id: 'coa_6', tenantId: 'tenant_default', code: '2-1000', name: 'Utang Dagang ke Supplier', category: 'LIABILITY', isActive: true },
   { id: 'coa_7', tenantId: 'tenant_default', code: '2-1010', name: 'Utang Zakat Niaga Terhutang', category: 'LIABILITY', isActive: true },
   { id: 'coa_8', tenantId: 'tenant_default', code: '3-1000', name: 'Modal Awal KSA Mart', category: 'EQUITY', isActive: true },
-  { id: 'coa_9', tenantId: 'tenant_default', code: '3-1010', name: 'Dana Laba Ditahan', category: 'EQUITY', isActive: true },
-  { id: 'coa_10', tenantId: 'tenant_default', code: '4-1000', name: 'Pendapatan Penjualan Toko', category: 'REVENUE', isActive: true },
-  { id: 'coa_11', tenantId: 'tenant_default', code: '4-1010', name: 'Margin Murabahah Penjualan', category: 'REVENUE', isActive: true },
-  { id: 'coa_12', tenantId: 'tenant_default', code: '5-1000', name: 'Beban Harga Pokok Penjualan (HPP)', category: 'EXPENSE', isActive: true },
-  { id: 'coa_13', tenantId: 'tenant_default', code: '5-1010', name: 'Beban Sewa Lapak Toko', category: 'EXPENSE', isActive: true },
-  { id: 'coa_14', tenantId: 'tenant_default', code: '5-1020', name: 'Beban Listrik, Air & Wifi', category: 'EXPENSE', isActive: true },
-  { id: 'coa_15', tenantId: 'tenant_default', code: '5-1030', name: 'Beban Gaji Karyawan & Staff', category: 'EXPENSE', isActive: true }
+  { id: 'coa_9', tenantId: 'tenant_default', code: '4-1000', name: 'Pendapatan Usaha', category: 'REVENUE', isActive: true },
+  { id: 'coa_10', tenantId: 'tenant_default', code: '4-1001', name: 'Pendapatan Penjualan', category: 'REVENUE', isActive: true },
+  { id: 'coa_11', tenantId: 'tenant_default', code: '4-1010', name: 'Pendapatan Layanan PPOB', category: 'REVENUE', isActive: true },
+  { id: 'coa_12', tenantId: 'tenant_default', code: '5-1000', name: 'Beban Pokok Penjualan (HPP)', category: 'EXPENSE', isActive: true },
+  { id: 'coa_13', tenantId: 'tenant_default', code: '5-1010', name: 'Beban Pokok Layanan PPOB', category: 'EXPENSE', isActive: true },
+  { id: 'coa_14', tenantId: 'tenant_default', code: '5-2000', name: 'Beban Gaji Karyawan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_15', tenantId: 'tenant_default', code: '5-2010', name: 'Beban Listrik, Air & Internet', category: 'EXPENSE', isActive: true },
+  { id: 'coa_16', tenantId: 'tenant_default', code: '5-2020', name: 'Beban Operasional Lainnya', category: 'EXPENSE', isActive: true }
 ];
 
 const getSavedCoaList = (): CoaAccount[] => {
   const saved = getStorage('ksa_coa_list');
-  if (saved) { try { return saved as CoaAccount[]; } catch (e) {} }
+  if (saved) { 
+    try { 
+      let parsed = saved as CoaAccount[];
+      // Migrate missing PPOB COAs for existing users
+      const requiredCodes = ['1-1050', '4-1010', '5-1010'];
+      const missing = requiredCodes.filter(code => !parsed.some(c => c.code === code));
+      if (missing.length > 0) {
+        const toAdd = DEFAULT_COA.filter(c => missing.includes(c.code));
+        parsed = [...parsed, ...toAdd];
+        // Note: this will only update memory initially, but it will be saved back on next COA modification
+      }
+      return parsed; 
+    } catch (e) {} 
+  }
   return DEFAULT_COA;
 };
 
@@ -552,10 +571,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return withUpdatedOwner;
   })(),
-  products: getSavedProducts(),
-  cart: [],
-  customerCart: [],
-  transactions: getSavedTransactions(),
+  products: getStorage('ksa_products') || [],
+  cart: getStorage('ksa_cart') || [],
+  lastTransactionId: getStorage('ksa_last_transaction') || null,
+  customerCart: [], 
   onlineOrders: getSavedOnlineOrders(),
   chatMessages: getSavedChatMessages(),
   auditLogs: getSavedAuditLogs(),
@@ -646,16 +665,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         try {
           if (!e.key) return;
           const tenant = get().currentUser?.tenantId;
-          const keysToSync = ['ksa_products', 'ksa_customers', 'ksa_coa_list', 'ksa_transactions', 'ksa_users', 'ksa_product_categories'];
+          const keysToSync = ['ksa_products', 'ksa_customers', 'ksa_coa_list', 'ksa_transactions', 'ksa_users', 'ksa_product_categories', 'ksa_cart', 'ksa_last_transaction'];
           for (const k of keysToSync) {
             if (e.key === k || (tenant && e.key === `${k}__${tenant}`)) {
-              const parsed = e.newValue ? JSON.parse(e.newValue) : [];
+              const parsed = e.newValue ? JSON.parse(e.newValue) : (k === 'ksa_last_transaction' ? null : []);
               if (k === 'ksa_products') set({ products: parsed });
               if (k === 'ksa_customers') set({ customers: parsed });
               if (k === 'ksa_coa_list') set({ coaList: parsed });
               if (k === 'ksa_transactions') set({ transactions: parsed });
               if (k === 'ksa_users') set({ users: parsed });
               if (k === 'ksa_product_categories') set({ categories: parsed });
+              if (k === 'ksa_cart') set({ cart: parsed });
+              if (k === 'ksa_last_transaction') set({ lastTransactionId: parsed });
             }
           }
         } catch (err) {}
@@ -799,6 +820,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       branchId: tx.branchId,
       link: '/kasir-riwayat'
     });
+  },
+
+  updateTransactionFeedback: (id: string, rating: 'PUAS' | 'TIDAK_PUAS', feedback?: string) => {
+    const { transactions, currentUser } = get();
+    const updated = transactions.map(t => 
+      t.id === id ? { ...t, customerRating: rating, customerFeedback: feedback } : t
+    );
+    set({ transactions: updated });
+    saveStorage('ksa_transactions', updated, currentUser?.tenantId);
+    
+    // Sync to Supabase in background
+    runSupabaseTask('Update Feedback', async () => {
+      const tx = updated.find(t => t.id === id);
+      if (tx) {
+        await (supabaseService as any).saveTransaction(tx);
+      }
+    }, () => {}).catch(() => {});
   },
 
   approveVoidTransaction: (txId, isApproved) => {
@@ -1208,17 +1246,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       const newCart = [...cart];
       newCart[existingIndex] = { ...existing, quantity: newQuantity };
       set({ cart: newCart });
+      saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
     } else {
-      set({ cart: [...cart, { product, quantity: 1, isBox, targetNumber }] });
+      const newCart = [...cart, { product, quantity: 1, isBox, targetNumber }];
+      set({ cart: newCart });
+      saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
     }
   },
   
   removeFromCart: (productId: string, isBox?: boolean) => {
+    let newCart;
     if (isBox === undefined) {
-       set({ cart: get().cart.filter(item => item.product.id !== productId) });
+       newCart = get().cart.filter(item => item.product.id !== productId);
     } else {
-       set({ cart: get().cart.filter(item => !(item.product.id === productId && !!item.isBox === isBox)) });
+       newCart = get().cart.filter(item => !(item.product.id === productId && !!item.isBox === isBox));
     }
+    set({ cart: newCart });
+    saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
   },
   
   updateCartQuantity: (productId: string, quantity: number, isBox: boolean = false) => {
@@ -1243,9 +1287,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newCart = [...cart];
     newCart[itemIndex] = { ...item, quantity: newQty };
     set({ cart: newCart });
+    saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
   },
   
-  clearCart: () => set({ cart: [] }),
+  clearCart: () => {
+    set({ cart: [] });
+    saveStorage('ksa_cart', [], get().currentUser?.tenantId);
+  },
 
   // Customer Portal Actions
   addToCustomerCart: (product: Product) => {
@@ -1291,7 +1339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   clearCustomerCart: () => set({ customerCart: [] }),
 
-  submitOnlineOrder: (customerId, customerName, customerPhone, notes, customerAddress, paymentCode, distanceKm) => {
+  submitOnlineOrder: (customerId, customerName, customerPhone, notes, customerAddress, paymentCode, distanceKm, branchId) => {
     const { customerCart } = get();
     if (customerCart.length === 0) return;
 
@@ -1306,6 +1354,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       customerPhone,
       customerAddress,
       distanceKm,
+      branchId,
       items: customerCart.map(i => ({
         productId: i.product.id,
         productName: i.product.name,
@@ -1558,6 +1607,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     // Dynamic pricing for wholesale
     const getDynamicPrice = (item: CartItem) => {
+      if (item.product.isPromoActive && item.product.promoPrice) {
+        return item.product.promoPrice;
+      }
       if (item.product.wholesalePrice && item.product.wholesaleMinQty && item.quantity >= item.product.wholesaleMinQty) {
         return item.product.wholesalePrice;
       }
@@ -1662,12 +1714,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       products: updatedProducts,
       transactions: [newTx, ...get().transactions],
-      cart: []
+      cart: [],
+      lastTransactionId: newTx.id
     });
     
     // Save to localStorage immediately
     saveStorage('ksa_products', updatedProducts, get().currentUser?.tenantId);
     saveStorage('ksa_transactions', [newTx, ...get().transactions], get().currentUser?.tenantId);
+    saveStorage('ksa_cart', [], get().currentUser?.tenantId);
+    saveStorage('ksa_last_transaction', newTx.id, get().currentUser?.tenantId);
 
     // Handle KASBON customer debt logic
     if (paymentMethod === 'KASBON' && customerId) {
@@ -1746,7 +1801,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cogs = (item.isBox ? (prod.boxCostPrice || 0) : prod.costPrice) * item.quantity;
       
       revenueGroups[sCoa] = (revenueGroups[sCoa] || 0) + rev;
-      cogsGroups[cCoa] = (cogsGroups[cCoa] || 0) + cogs;
+      const invCoa = (prod.category?.toUpperCase() === 'PPOB') 
+        ? resolveCoa('radar', '1-1050 Saldo Radar Pulsa / Digital')
+        : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
+      const key = `${cCoa}|${invCoa}`;
+      cogsGroups[key] = (cogsGroups[key] || 0) + cogs;
     });
 
     const discountTotal = discountAmount + pointsDiscount;
@@ -1777,13 +1836,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     });
 
-    Object.entries(cogsGroups).forEach(([coa, amount], index) => {
+    Object.entries(cogsGroups).forEach(([key, amount], index) => {
+      const [cCoa, invCoa] = key.split('|');
       if (amount > 0) {
         autoJournals.push({
           id: `${jId}_cogs_${index}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
-          account: coa,
+          account: cCoa,
           description: `[Auto] HPP ${invoiceNo}`,
           debit: amount,
           credit: 0,
@@ -1796,8 +1856,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: `${jId}_inv_${index}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
-          account: resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang'),
-          description: `[Auto] Keluar Persediaan ${invoiceNo}`,
+          account: invCoa,
+          description: `[Auto] Keluar Saldo/Persediaan ${invoiceNo}`,
           debit: 0,
           credit: amount,
           referenceId: newTx.id,

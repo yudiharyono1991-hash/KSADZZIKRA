@@ -8,15 +8,15 @@ export function useBranchData() {
   const branchId = currentUser?.branchId;
 
   const filterByBranch = <T extends { branchId?: string }>(items: T[]) => {
-    return items.filter(item => isGlobalAdmin || item.branchId === branchId || !item.branchId);
+    return (items || []).filter(item => isGlobalAdmin || item.branchId === branchId || !item.branchId);
   };
 
   const filterStrictByBranch = <T extends { branchId?: string }>(items: T[]) => {
-    return items.filter(item => isGlobalAdmin || item.branchId === branchId);
+    return (items || []).filter(item => isGlobalAdmin || item.branchId === branchId);
   };
 
   const filterCustomersByBranch = <T extends { branchId?: string }>(items: T[]) => {
-    return items.filter(item => isGlobalAdmin || item.branchId === branchId);
+    return (items || []).filter(item => isGlobalAdmin || item.branchId === branchId);
   };
 
   return {

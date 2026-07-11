@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 import { 
   ShieldAlert, 
   Search, 
@@ -10,16 +10,32 @@ import {
 } from 'lucide-react';
 
 export default function AuditLogPage() {
-  const { auditLogs } = useAppStore();
+  const { auditLogs, currentUser, activeBranchId, users } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'POS' | 'INVENTORY' | 'FINANCE' | 'SYSTEM' | 'ZAKAT'>('ALL');
 
   // Filter logs list
   const filteredLogs = auditLogs.filter(log => {
+    // 1. Role / Branch Isolation Check
+    // If not global admin, only show logs from users in their own branch
+    const isGlobalAdmin = !currentUser?.branchId || ['OWNER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '');
+    if (!isGlobalAdmin || activeBranchId) {
+      // Find the user who made the log
+      const logUser = users.find(u => u.name === log.user);
+      // If we are filtering by activeBranchId, the log's user must belong to that branch
+      // (or if logUser is undefined for some reason, we might hide it to be safe, but let's just check if it matches)
+      const targetBranch = activeBranchId || currentUser?.branchId;
+      if (logUser && logUser.branchId !== targetBranch) {
+        return false;
+      }
+    }
+
+    // 2. Search and Category Filters
     const matchesSearch = log.action.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           log.details.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           log.user.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'ALL' || log.category === selectedCategory;
+    
     return matchesSearch && matchesCategory;
   });
 

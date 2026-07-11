@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, MonitorPlay, LogIn, Globe, BookOpen, Clock, HeartHandshake, Sun, Moon, ShoppingBag, Newspaper } from 'lucide-react';
+import { Store, MonitorPlay, LogIn, Globe, BookOpen, Clock, HeartHandshake, Sun, Moon, ShoppingBag, Newspaper, Phone, Mail, MapPin, ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import MiniJadwalShalat from '../components/MiniJadwalShalat';
+import { useAppStore } from '../store';
+import { useBranchData } from '../hooks/useBranchData';
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [language, setLanguage] = useState('ID');
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  const { settings } = useAppStore();
+  const contactUs = settings.landingPageConfig?.contactUs;
+  const faqs = settings.landingPageConfig?.faqs || [];
+  const showTopDropdowns = settings.landingPageConfig?.showTopDropdowns ?? true;
+
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const { branches } = useBranchData();
 
   const getLanguageLabel = (code: string) => {
     switch(code) {
@@ -47,6 +58,64 @@ export default function LandingPage() {
           >
             {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+
+          {/* Contact & Branches Dropdown */}
+          {showTopDropdowns && (
+            <div className="relative">
+              <button 
+                onClick={() => setShowContactDropdown(!showContactDropdown)}
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors font-medium shadow-sm ${isDarkMode ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
+              >
+                <MapPin size={18} />
+                <span className="hidden sm:block">Kontak & Cabang</span>
+                <ChevronDown size={14} className={`transition-transform ${showContactDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showContactDropdown && (
+                <div className={`absolute right-0 mt-2 w-72 rounded-xl shadow-xl border overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-green-100'} max-h-[80vh] overflow-y-auto`}>
+                  <div className="p-4 border-b border-gray-100">
+                    <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? 'text-amber-400' : 'text-green-800'}`}>Toko Pusat</h3>
+                    {contactUs?.address ? (
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{contactUs.address}</p>
+                    ) : (
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500 italic'}`}>Alamat belum diatur</p>
+                    )}
+                    {contactUs?.phone && <p className={`text-xs mt-1 font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>WA: {contactUs.phone}</p>}
+                  </div>
+                  
+                  {branches.length > 0 && (
+                    <div className="p-4 border-b border-gray-100">
+                      <h3 className={`font-bold text-sm mb-2 ${isDarkMode ? 'text-amber-400' : 'text-green-800'}`}>Cabang Kami</h3>
+                      <div className="space-y-3">
+                        {branches.map(branch => (
+                          <div key={branch.id} className="text-xs">
+                            <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{branch.name}</span>
+                            <p className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{branch.address}</p>
+                            {branch.whatsapp && <p className={`mt-0.5 font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>WA: {branch.whatsapp}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {faqs.length > 0 && (
+                    <div className="p-4">
+                      <h3 className={`font-bold text-sm mb-2 ${isDarkMode ? 'text-amber-400' : 'text-green-800'}`}>FAQ / Bantuan</h3>
+                      <div className="space-y-2">
+                        {faqs.slice(0, 3).map((faq, idx) => (
+                          <div key={idx} className="text-xs">
+                            <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Q: {faq.question}</span>
+                          </div>
+                        ))}
+                        {faqs.length > 3 && (
+                          <p className={`text-xs italic ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>...dan {faqs.length - 3} lainnya.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Language Dropdown */}
           <div className="relative">
@@ -183,6 +252,95 @@ export default function LandingPage() {
             <p className={`text-xs sm:text-sm mt-1 sm:mt-2 ${isDarkMode ? 'text-slate-400' : 'text-green-600'}`}>Info terkini dari KS Adz-Zikra Pusat.</p>
           </div>
         </motion.div>
+
+        {/* Contact Us & FAQ Section */}
+        {!showTopDropdowns && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="w-full max-w-4xl mt-12 sm:mt-16 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8"
+          >
+            {/* Contact Us */}
+            <div className={`p-6 sm:p-8 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700' : 'bg-white/80 backdrop-blur-md border-green-100'}`}>
+              <h2 className={`text-xl font-black mb-4 sm:mb-6 ${isDarkMode ? 'text-[#4ade80]' : 'text-green-800'}`}>Hubungi Kami</h2>
+              {contactUs ? (
+                <div className="space-y-4">
+                  <p className={`text-sm leading-relaxed mb-6 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {contactUs.description}
+                  </p>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-700 text-[#4ade80]' : 'bg-green-50 text-green-700'}`}>
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Telepon / WhatsApp</p>
+                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{contactUs.phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-700 text-[#4ade80]' : 'bg-green-50 text-green-700'}`}>
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Email</p>
+                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{contactUs.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-700 text-[#4ade80]' : 'bg-green-50 text-green-700'}`}>
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alamat</p>
+                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{contactUs.address}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className={`text-sm p-4 rounded-xl text-center border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                  Informasi kontak belum diatur.
+                </div>
+              )}
+            </div>
+
+            {/* FAQ */}
+            <div className="space-y-4">
+              <h2 className={`text-xl font-black mb-4 sm:mb-6 ${isDarkMode ? 'text-[#4ade80]' : 'text-green-800'}`}>Pertanyaan Umum (FAQ)</h2>
+              {faqs.length > 0 ? (
+                <div className="space-y-3">
+                  {faqs.map((faq, index) => (
+                    <div 
+                      key={index} 
+                      className={`rounded-2xl border overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white/80 border-green-100'}`}
+                    >
+                      <button 
+                        onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+                        className="w-full px-5 py-4 flex items-center justify-between text-left"
+                      >
+                        <span className={`font-bold text-sm sm:text-base pr-4 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {faq.question}
+                        </span>
+                        <ChevronDown className={`w-5 h-5 flex-shrink-0 transition-transform ${openFaqIndex === index ? 'rotate-180' : ''} ${isDarkMode ? 'text-slate-400' : 'text-green-600'}`} />
+                      </button>
+                      {openFaqIndex === index && (
+                        <div className={`px-5 pb-4 text-sm leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <div className={`pt-2 border-t ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                            {faq.answer}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`text-sm p-4 rounded-xl text-center border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                  Belum ada FAQ.
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
       </main>
 

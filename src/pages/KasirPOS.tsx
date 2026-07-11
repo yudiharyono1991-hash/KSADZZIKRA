@@ -18,6 +18,8 @@ import {
   Users,
   AlertTriangle,
   Smartphone,
+  MonitorPlay,
+  Copy,
   Store,
   ChevronDown,
   XOctagon,
@@ -86,6 +88,8 @@ export default function KasirPOS() {
   const [ppobModalOpen, setPpobModalOpen] = useState(false);
   const [selectedPpobProduct, setSelectedPpobProduct] = useState<Product | null>(null);
   const [ppobTargetNumber, setPpobTargetNumber] = useState('');
+  const [ppobAdminFee, setPpobAdminFee] = useState(settings.defaultPpobAdminFee?.toString() || '2000');
+  const [ppobCostPrice, setPpobCostPrice] = useState('');
   
   // Payment Simulation States for Presentation
   const [isQrisSimulated, setIsQrisSimulated] = useState(false);
@@ -257,7 +261,7 @@ export default function KasirPOS() {
       if (selectedCategory === 'ALL') {
         matchesCategory = true;
       } else if (selectedCategory === 'PROMO') {
-        matchesCategory = (product.wholesalePrice !== undefined && product.wholesalePrice < product.price);
+        matchesCategory = Boolean(product.isPromoActive || (product.wholesalePrice !== undefined && product.wholesalePrice < product.price));
       } else {
         matchesCategory = product.category === selectedCategory;
       }
@@ -276,23 +280,49 @@ export default function KasirPOS() {
   const handlePpobClick = (product: Product) => {
     setSelectedPpobProduct(product);
     setPpobTargetNumber('');
+    setPpobAdminFee(settings.defaultPpobAdminFee?.toString() || '2000');
+    setPpobCostPrice(product.costPrice ? product.costPrice.toString() : '');
     setPpobModalOpen(true);
   };
 
   const handleAddPpobToCart = () => {
-    if (selectedPpobProduct && ppobTargetNumber) {
-      addToCart(selectedPpobProduct, false, ppobTargetNumber);
-      setPpobModalOpen(false);
-      setSelectedPpobProduct(null);
-      setPpobTargetNumber('');
-    } else {
+    if (!selectedPpobProduct) return;
+    if (!ppobTargetNumber) {
       alert("Masukkan nomor tujuan/ID Pelanggan terlebih dahulu!");
+      return;
     }
+    const finalCostPrice = Number(ppobCostPrice);
+    const finalAdminFee = Number(ppobAdminFee);
+    const finalPrice = finalCostPrice + finalAdminFee;
+
+    if (finalPrice <= 0 || finalCostPrice <= 0) {
+      alert("Harga Jual dan Harga Modal harus diisi dengan benar (lebih dari 0).");
+      return;
+    }
+    if (finalAdminFee < 0) {
+      alert("Biaya admin tidak boleh negatif.");
+      return;
+    }
+    
+    // Create a cloned product with the dynamically inputted prices
+    const dynamicProduct = {
+      ...selectedPpobProduct,
+      price: finalPrice,
+      costPrice: finalCostPrice
+    };
+    
+    addToCart(dynamicProduct, false, ppobTargetNumber);
+    setPpobModalOpen(false);
+    setSelectedPpobProduct(null);
+    setPpobTargetNumber('');
   };
 
   const getDynamicPrice = (item: any) => {
     if (item.isBox && item.product.hasBoxUnit) {
       return item.product.boxPrice || item.product.price;
+    }
+    if (item.product.isPromoActive && item.product.promoPrice) {
+      return item.product.promoPrice;
     }
     if (item.product.wholesalePrice && item.product.wholesaleMinQty && item.quantity >= item.product.wholesaleMinQty) {
       return item.product.wholesalePrice;
@@ -597,9 +627,19 @@ export default function KasirPOS() {
             <ShoppingCart className="w-5 h-5 text-green-800" />
             <h2 className="font-bold text-gray-800 text-md">Keranjang Belanja</h2>
           </div>
-          <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full">
-            {cart.reduce((s, c) => s + c.quantity, 0)} Pcs
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.open('#/customer-display', '_blank')}
+              className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded-md flex items-center gap-1 hover:bg-green-200 transition-colors"
+              title="Buka Layar Pelanggan (Monitor ke-2)"
+            >
+              <MonitorPlay className="w-3 h-3" />
+              Layar
+            </button>
+            <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full">
+              {cart.reduce((s, c) => s + c.quantity, 0)} Pcs
+            </span>
+          </div>
         </div>
 
         {/* Shariah Compliance & Locked Prices Indicator */}
@@ -1363,10 +1403,27 @@ export default function KasirPOS() {
                   autoFocus
                 />
               </div>
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">Harga Bayar</span>
-                  <span className="font-black text-xl text-blue-700">Rp {selectedPpobProduct.price.toLocaleString('id-ID')}</span>
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Harga Modal (Beli)</label>
+                  <input
+                    type="number"
+                    value={ppobCostPrice}
+                    onChange={(e) => setPpobCostPrice(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-bold"
+                    placeholder="Masukkan harga pokok/modal..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Biaya Admin / Keuntungan</label>
+                  <input
+                    type="number"
+                    value={ppobAdminFee}
+                    onChange={(e) => setPpobAdminFee(e.target.value)}
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-blue-700 font-bold text-lg"
+                    placeholder="Masukkan biaya admin..."
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1 font-semibold">Harga Jual Otomatis: Rp {(Number(ppobCostPrice || 0) + Number(ppobAdminFee || 0)).toLocaleString('id-ID')}</p>
                 </div>
               </div>
             </div>

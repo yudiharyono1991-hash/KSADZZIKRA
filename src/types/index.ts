@@ -18,6 +18,11 @@ export interface Branch {
   phone: string;
   whatsapp?: string;
   isActive: boolean;
+  qrisImageUrl?: string;
+  paymentMethods?: {
+    bankTransfer?: { bankName: string; accountNumber: string; accountName: string }[];
+    ewallet?: { provider: string; number: string; accountName: string }[];
+  };
   createdAt: string;
 }
 
@@ -49,15 +54,35 @@ export interface StoreSettings {
   minimumCashBalance?: number;
   zakatRate?: number; // e.g. 2.5
   autoApproveTransactions?: boolean;
+  defaultPpobAdminFee?: number; // Biaya admin default untuk PPOB
   // Upload protection: optional password required for importing/uploading templates or files
   uploadPassword?: string;
   // Roles allowed to manage (set/clear) the upload password. Example: ['OWNER','ADMIN','MANAGER']
   uploadPasswordRoles?: string[];
   
+  // Landing Page Config
+  landingPageConfig?: {
+    showTopDropdowns?: boolean;
+    contactUs?: {
+      phone: string;
+      email: string;
+      address: string;
+      description: string;
+    };
+    faqs?: {
+      question: string;
+      answer: string;
+    }[];
+  };
+  
   // Points System
   enablePoints?: boolean;
   pointEarningRate?: number; // Spend this much to earn 1 point (default 1000)
   pointRedemptionValue?: number; // 1 point equals this much IDR discount (default 10)
+
+  // Server & Database Integration
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   
   // Charity / Zakat Receipt
   enableCharityZakat?: boolean;
@@ -175,6 +200,8 @@ export interface Product {
   salesCoaCode?: string; // Akun Pendapatan
   cogsCoaCode?: string;  // Akun HPP
   isPPOB?: boolean; // PPOB/Digital Product flag
+  isPromoActive?: boolean; // Flag to indicate if product promo is active
+  promoPrice?: number; // Custom promo price
 }
 
 export interface CartItem {
@@ -219,6 +246,8 @@ export interface Transaction {
   pointsEarned?: number;
   pointsRedeemed?: number;
   pointsDiscount?: number;
+  customerRating?: 'PUAS' | 'TIDAK_PUAS';
+  customerFeedback?: string;
 }
 
 export interface AuditLog {

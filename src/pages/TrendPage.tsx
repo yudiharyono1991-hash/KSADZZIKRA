@@ -256,7 +256,7 @@ export default function TrendPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         
         {/* Omset - Blue Gradient */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-600 p-5 rounded-2xl shadow-lg border-none text-white">
+        <div className="relative overflow-hidden bg-blue-600 bg-gradient-to-br from-blue-500 to-cyan-600 p-5 rounded-2xl shadow-lg border-none text-white">
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <LineChartIcon className="w-32 h-32" />
           </div>
@@ -273,7 +273,7 @@ export default function TrendPage() {
         </div>
 
         {/* Margin - Orange Gradient */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 p-5 rounded-2xl shadow-lg border-none text-white">
+        <div className="relative overflow-hidden bg-orange-500 bg-gradient-to-br from-orange-400 to-orange-600 p-5 rounded-2xl shadow-lg border-none text-white">
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <PieChartIcon className="w-32 h-32" />
           </div>
@@ -290,7 +290,7 @@ export default function TrendPage() {
         </div>
 
         {/* Zakat - Green Gradient */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 rounded-2xl shadow-lg border-none text-white">
+        <div className="relative overflow-hidden bg-emerald-500 bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 rounded-2xl shadow-lg border-none text-white">
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <AlertTriangle className="w-32 h-32" />
           </div>
@@ -307,7 +307,7 @@ export default function TrendPage() {
         </div>
 
         {/* Average Tx - Purple Gradient */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 to-indigo-600 p-5 rounded-2xl shadow-lg border-none text-white">
+        <div className="relative overflow-hidden bg-indigo-500 bg-gradient-to-br from-purple-500 to-indigo-600 p-5 rounded-2xl shadow-lg border-none text-white">
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <Users className="w-32 h-32" />
           </div>

@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
 import { useAppStore } from '../store';
-import { BookOpen, Plus, Search, Scale, Edit, Trash2, Save, X, Calendar, ArrowRight, PenLine } from 'lucide-react';
+import { BookOpen, Plus, Search, Scale, Edit, Trash2, Save, X, Calendar, ArrowRight, PenLine, ChevronDown } from 'lucide-react';
 import { JournalSourceType, JournalEntry } from '../types';
 
 export default function JurnalUmumPage() {
   const { journalEntries, addJournalEntry, deleteJournalEntryByRef, currentUser, coaList } = useBranchData();
   const [isAdding, setIsAdding] = useState(false);
+  const [isDebitDropdownOpen, setIsDebitDropdownOpen] = useState(false);
+  const [isCreditDropdownOpen, setIsCreditDropdownOpen] = useState(false);
   
   // Form State
   const [editingRefId, setEditingRefId] = useState<string | null>(null);
@@ -14,11 +16,11 @@ export default function JurnalUmumPage() {
   const [description, setDescription] = useState('');
   const [debitAccount, setDebitAccount] = useState(() => {
     const activeAccounts = useAppStore.getState().coaList.filter(c => c.isActive);
-    return activeAccounts[0]?.code || '1-1000';
+    return activeAccounts[0] ? `${activeAccounts[0].code} - ${activeAccounts[0].name}` : '1-1000';
   });
   const [creditAccount, setCreditAccount] = useState(() => {
     const activeAccounts = useAppStore.getState().coaList.filter(c => c.isActive);
-    return activeAccounts.length > 1 ? activeAccounts[1].code : '1-1000';
+    return activeAccounts.length > 1 ? `${activeAccounts[1].code} - ${activeAccounts[1].name}` : '1-1000';
   });
   const [amount, setAmount] = useState(0);
 
@@ -45,8 +47,10 @@ export default function JurnalUmumPage() {
         setEditingRefId(refId);
         setDate(new Date(debitEntry.date).toISOString().split('T')[0]);
         setDescription(debitEntry.description);
-        setDebitAccount(debitEntry.account);
-        setCreditAccount(creditEntry.account);
+        const dCoa = coaList.find(c => c.code === debitEntry.account);
+        const cCoa = coaList.find(c => c.code === creditEntry.account);
+        setDebitAccount(dCoa ? `${dCoa.code} - ${dCoa.name}` : debitEntry.account);
+        setCreditAccount(cCoa ? `${cCoa.code} - ${cCoa.name}` : creditEntry.account);
         setAmount(debitEntry.debit);
         setIsAdding(true);
       }
@@ -64,7 +68,10 @@ export default function JurnalUmumPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!description || amount <= 0) return;
-    if (debitAccount === creditAccount) {
+    const actDebit = debitAccount.includes(' - ') ? debitAccount.split(' - ')[0].trim() : debitAccount.trim();
+    const actCredit = creditAccount.includes(' - ') ? creditAccount.split(' - ')[0].trim() : creditAccount.trim();
+
+    if (actDebit === actCredit) {
       alert("Akun Debit dan Akun Kredit (Jurnal Lawan) tidak boleh sama!");
       return;
     }
@@ -84,7 +91,7 @@ export default function JurnalUmumPage() {
     addJournalEntry({
       tenantId,
       date: isoDate,
-      account: debitAccount,
+      account: actDebit,
       description,
       debit: amount,
       credit: 0,
@@ -97,7 +104,7 @@ export default function JurnalUmumPage() {
     addJournalEntry({
       tenantId,
       date: isoDate,
-      account: creditAccount,
+      account: actCredit,
       description,
       debit: 0,
       credit: amount,
@@ -196,26 +203,45 @@ export default function JurnalUmumPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center bg-green-50/50 p-4 rounded-xl border border-green-100">
-              <div className="md:col-span-2 space-y-1">
+              <div className="md:col-span-2 space-y-1 relative">
                 <label className="text-[10px] uppercase font-bold text-green-700">Akun Debit (Tujuan)</label>
-                <input 
-                  list="coa-list-debit" 
-                  value={debitAccount} 
-                  onChange={(e) => {
-                    setDebitAccount(e.target.value);
-                    const selected = coaList.find(c => c.code === e.target.value);
-                    if (selected && !description) {
-                      setDescription(`Jurnal Manual: ${selected.name}`);
-                    }
-                  }} 
-                  className="w-full border border-green-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-800 bg-white"
-                  placeholder="Ketik Kode atau Nama Akun..."
-                />
-                <datalist id="coa-list-debit">
-                  {coaList.filter(c => c.isActive).map(c => (
-                    <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
-                  ))}
-                </datalist>
+                <div className="relative">
+                  <input 
+                    value={debitAccount} 
+                    onFocus={() => setIsDebitDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setIsDebitDropdownOpen(false), 200)}
+                    onChange={(e) => {
+                      setDebitAccount(e.target.value);
+                      setIsDebitDropdownOpen(true);
+                      const actCode = e.target.value.includes(' - ') ? e.target.value.split(' - ')[0].trim() : e.target.value.trim();
+                      const selected = coaList.find(c => c.code === actCode);
+                      if (selected && !description) {
+                        setDescription(`Jurnal Manual: ${selected.name}`);
+                      }
+                    }} 
+                    className="w-full border border-green-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-800 bg-white"
+                    placeholder="Ketik Kode atau Nama Akun..."
+                  />
+                  <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                {isDebitDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-green-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {coaList.filter(c => c.isActive && (c.code.toLowerCase().includes(debitAccount.toLowerCase()) || c.name.toLowerCase().includes(debitAccount.toLowerCase()))).map(c => (
+                      <div 
+                        key={c.id} 
+                        className="p-2 hover:bg-green-50 cursor-pointer border-b border-green-50 last:border-0"
+                        onMouseDown={() => {
+                          setDebitAccount(`${c.code} - ${c.name}`);
+                          setIsDebitDropdownOpen(false);
+                          if (!description) setDescription(`Jurnal Manual: ${c.name}`);
+                        }}
+                      >
+                        <div className="font-bold text-sm text-green-800">{c.code}</div>
+                        <div className="text-xs text-slate-500">{c.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="hidden md:flex justify-center">
@@ -224,20 +250,39 @@ export default function JurnalUmumPage() {
                 </div>
               </div>
 
-              <div className="md:col-span-2 space-y-1">
+              <div className="md:col-span-2 space-y-1 relative">
                 <label className="text-[10px] uppercase font-bold text-orange-700">Akun Kredit / Jurnal Lawan (Sumber)</label>
-                <input 
-                  list="coa-list-credit" 
-                  value={creditAccount} 
-                  onChange={(e) => setCreditAccount(e.target.value)} 
-                  className="w-full border border-orange-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-800 bg-white"
-                  placeholder="Ketik Kode atau Nama Akun..."
-                />
-                <datalist id="coa-list-credit">
-                  {coaList.filter(c => c.isActive).map(c => (
-                    <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
-                  ))}
-                </datalist>
+                <div className="relative">
+                  <input 
+                    value={creditAccount} 
+                    onFocus={() => setIsCreditDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setIsCreditDropdownOpen(false), 200)}
+                    onChange={(e) => {
+                      setCreditAccount(e.target.value);
+                      setIsCreditDropdownOpen(true);
+                    }} 
+                    className="w-full border border-orange-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none font-bold text-slate-800 bg-white"
+                    placeholder="Ketik Kode atau Nama Akun..."
+                  />
+                  <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                {isCreditDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-orange-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {coaList.filter(c => c.isActive && (c.code.toLowerCase().includes(creditAccount.toLowerCase()) || c.name.toLowerCase().includes(creditAccount.toLowerCase()))).map(c => (
+                      <div 
+                        key={c.id} 
+                        className="p-2 hover:bg-orange-50 cursor-pointer border-b border-orange-50 last:border-0"
+                        onMouseDown={() => {
+                          setCreditAccount(`${c.code} - ${c.name}`);
+                          setIsCreditDropdownOpen(false);
+                        }}
+                      >
+                        <div className="font-bold text-sm text-orange-800">{c.code}</div>
+                        <div className="text-xs text-slate-500">{c.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

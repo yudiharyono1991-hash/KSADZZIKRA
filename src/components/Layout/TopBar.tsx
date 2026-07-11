@@ -73,8 +73,8 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
   // Determine branch name for current user
   const userBranchName = currentUser?.branchId 
-    ? branches.find(b => b.id === currentUser?.branchId)?.name || 'Cabang Tidak Dikenal'
-    : 'Pusat';
+    ? branches.find(b => b.id === currentUser?.branchId)?.name || 'Pusat Utama'
+    : 'Pusat Utama';
 
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
   const pendingOnlineOrdersCount = onlineOrders?.filter(o => o.status === 'PENDING').length || 0;
@@ -327,8 +327,8 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                   {currentUser.role} • {userBranchName}
                 </p>
                 {currentUser.phone && (
-                  <p className="text-[9px] text-green-700 font-bold mt-0.5">
-                    <a href={`https://wa.me/${currentUser.phone.replace(/[^0-9]/g,'')}`} target="_blank" rel="noreferrer" className="underline">Hubungi via WA</a>
+                  <p className="text-[9px] text-gray-500 font-bold mt-0.5 tracking-wider">
+                    {currentUser.phone}
                   </p>
                 )}
               </div>
