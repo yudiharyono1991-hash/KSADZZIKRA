@@ -633,7 +633,8 @@ export const supabaseService = {
         approvedBy: u.approved_by,
         approvedAt: u.approved_at,
         phone: u.phone,
-        branchId: u.branch_id
+        branchId: u.branch_id,
+        debtAmount: Number(u.debt_amount || 0)
       }));
     } catch (err: any) {
       logSync(`Failed to fetch users: ${err.message}`, true);
@@ -658,7 +659,8 @@ export const supabaseService = {
         approved_by: user.approvedBy,
         approved_at: user.approvedAt,
         phone: user.phone,
-        branch_id: user.branchId
+        branch_id: user.branchId,
+        debt_amount: Number(user.debtAmount || 0)
       };
 
       const { error } = await supabase
@@ -960,6 +962,49 @@ export const supabaseService = {
       return true;
     } catch (err: any) {
       logSync(`Failed to clear database for tenant ${tenantId}: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  // Attendances API
+  async getAttendances(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      const query = supabase.from('attendance').select('*').order('date', { ascending: false });
+      const { data, error } = tenantId === 'tenant_default' 
+        ? await query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+        : await query.eq('tenant_id', tenantId);
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch attendances: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveAttendance(attendance: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const tenantId = this.getTenantId();
+      const payload = {
+        id: attendance.id,
+        tenant_id: attendance.tenantId || tenantId,
+        user_id: attendance.userId,
+        user_name: attendance.userName,
+        date: attendance.date,
+        clock_in: attendance.clockIn,
+        clock_out: attendance.clockOut,
+        status: attendance.status,
+        branch_id: attendance.branchId,
+        photo_url: attendance.photoUrl,
+        latitude: attendance.latitude,
+        longitude: attendance.longitude
+      };
+      const { error } = await supabase.from('attendance').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save attendance: ${err.message}`, true);
       return false;
     }
   }

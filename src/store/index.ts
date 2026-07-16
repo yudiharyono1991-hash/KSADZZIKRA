@@ -115,6 +115,8 @@ const runSupabaseTask = async <T>(label: string, task: () => Promise<T>, onSucce
 };
 
 interface AppState {
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
   tenants: import('../types').Tenant[];
   registerTenant: (tenant: Omit<import('../types').Tenant, 'id' | 'status' | 'createdAt'>) => void;
   approveTenant: (tenantId: string) => void;
@@ -198,7 +200,7 @@ interface AppState {
   clockOut: (attendanceId: string, photoUrl?: string, latitude?: number, longitude?: number) => void;
 
   // Auth Actions
-  login: (username: string, password: string) => 'SUCCESS' | 'PENDING' | 'INVALID';
+  login: (username: string, password: string) => Promise<'SUCCESS' | 'PENDING' | 'INVALID'>;
   logout: () => void;
   registerUser: (user: Omit<UserAccount, 'id' | 'createdAt' | 'isActive' | 'isApproved'>) => boolean;
   updateUser: (id: string, updates: Partial<UserAccount>) => void;
@@ -226,12 +228,13 @@ interface AppState {
   submitOnlineOrder: (customerId: string, customerName: string, customerPhone: string, notes: string, customerAddress?: string, paymentCode?: string, distanceKm?: number, branchId?: string) => void;
   updateOrderStatus: (orderId: string, status: OnlineOrder['status']) => void;
   sendChatMessage: (orderId: string, senderId: string, senderName: string, text: string) => void;
-  processOnlineOrderPayment: (orderId: string, paymentMethod: 'CASH' | 'TRANSFER_BSI' | 'QRIS_SHARIAH') => void;
+  processOnlineOrderPayment: (orderId: string, paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI') => void;
   
   // Transaction Actions
   checkout: (options: {
     paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
     amountPaid: number;
+    shippingFee?: number;
     customerId?: string;
     promoId?: string;
     pointsToRedeem?: number;
@@ -253,6 +256,7 @@ interface AppState {
   // Expenses & Closing Actions
   addExpense: (expense: Omit<Expense, 'id' | 'createdBy'>) => void;
   deleteExpense: (id: string) => void;
+  addPettyCashDeposit: (amount: number, description: string) => void;
   addClosing: (closing: Omit<ClosingRecord, 'id' | 'timestamp' | 'createdBy'>) => void;
   clearAllData: () => void;
 
@@ -262,6 +266,7 @@ interface AppState {
 
   // System Log API
   addLog: (action: string, category: AuditLog['category'], details: string) => void;
+  deleteAuditLogs: (startDateStr: string, endDateStr: string) => Promise<void>;
   
   // Supabase Initial Sync
   initializeStore: (options?: { showLoading?: boolean; catalogOnly?: boolean }) => Promise<void>;
@@ -276,6 +281,7 @@ interface AppState {
   addCoaAccountsBulk: (accounts: Omit<CoaAccount, 'id'>[]) => void;
   updateCoaAccount: (account: CoaAccount) => void;
   deleteCoaAccount: (id: string) => void;
+  clearCoaList: () => void;
 
   // Feedback Actions
   updateTransactionFeedback: (id: string, rating: 'PUAS' | 'TIDAK_PUAS', feedback?: string) => void;
@@ -541,6 +547,12 @@ const getSavedChatMessages = (): ChatMessage[] => {
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
+  isDarkMode: localStorage.getItem('ksa_dark_mode') === 'true',
+  toggleDarkMode: () => {
+    const newVal = !get().isDarkMode;
+    set({ isDarkMode: newVal });
+    localStorage.setItem('ksa_dark_mode', String(newVal));
+  },
   tenants: (() => {
     const saved = localStorage.getItem('ksa_tenants');
     const parsed = saved ? JSON.parse(saved) : [];
@@ -665,7 +677,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         try {
           if (!e.key) return;
           const tenant = get().currentUser?.tenantId;
-          const keysToSync = ['ksa_products', 'ksa_customers', 'ksa_coa_list', 'ksa_transactions', 'ksa_users', 'ksa_product_categories', 'ksa_cart', 'ksa_last_transaction'];
+          const keysToSync = ['ksa_products', 'ksa_customers', 'ksa_coa_list', 'ksa_transactions', 'ksa_users', 'ksa_product_categories', 'ksa_cart', 'ksa_last_transaction', 'ksa_journal_entries', 'ksa_expenses', 'ksa_zakat_records'];
           for (const k of keysToSync) {
             if (e.key === k || (tenant && e.key === `${k}__${tenant}`)) {
               const parsed = e.newValue ? JSON.parse(e.newValue) : (k === 'ksa_last_transaction' ? null : []);
@@ -677,6 +689,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               if (k === 'ksa_product_categories') set({ categories: parsed });
               if (k === 'ksa_cart') set({ cart: parsed });
               if (k === 'ksa_last_transaction') set({ lastTransactionId: parsed });
+              if (k === 'ksa_journal_entries') set({ journalEntries: parsed });
+              if (k === 'ksa_expenses') set({ expenses: parsed });
+              if (k === 'ksa_zakat_records') set({ zakatRecords: parsed });
             }
           }
         } catch (err) {}
@@ -736,6 +751,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured) {
       supabaseService.saveCoaAccount(updatedAccount);
     }
+  },
+
+  clearCoaList: () => {
+    set({ coaList: [] });
+    saveStorage('ksa_coa_list', [], get().currentUser?.tenantId);
   },
 
   deleteCoaAccount: (id) => {
@@ -863,16 +883,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     tx.items.forEach(item => {
       const prod = updatedProducts.find(p => p.id === item.productId);
       if (prod) {
-        prod.stock += item.quantity;
+        if (!prod.isPPOB) {
+          prod.stock += item.quantity;
+          get().addStockMovement({
+            tenantId: currentUser.tenantId || 'tenant_default',
+            productId: item.productId,
+            type: 'IN',
+            qty: item.quantity,
+            reason: `VOID APPROVED: ${tx.invoiceNo}`,
+            branchId: tx.branchId
+          });
+        }
       }
-      get().addStockMovement({
-        tenantId: currentUser.tenantId || 'tenant_default',
-        productId: item.productId,
-        type: 'IN',
-        qty: item.quantity,
-        reason: `VOID APPROVED: ${tx.invoiceNo}`,
-        branchId: tx.branchId
-      });
     });
 
     // 3. Rollback journal (Create reversing entries)
@@ -923,6 +945,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ branches: updated });
     saveStorage('ksa_branches', updated, get().currentUser?.tenantId);
     get().addLog('BRANCH_ADD', 'SYSTEM', `Menambah cabang baru: ${newBranch.name}`);
+    if (isSupabaseConfigured) {
+      (supabaseService as any).saveBranch(newBranch);
+    }
   },
 
   updateBranch: (id, updates) => {
@@ -930,6 +955,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ branches: updated });
     saveStorage('ksa_branches', updated, get().currentUser?.tenantId);
     get().addLog('BRANCH_UPDATE', 'SYSTEM', `Update data cabang: ${updated.find(b => b.id === id)?.name}`);
+    if (isSupabaseConfigured) {
+      const branchToUpdate = updated.find(b => b.id === id);
+      if (branchToUpdate) (supabaseService as any).saveBranch(branchToUpdate);
+    }
   },
 
   deleteBranch: (id) => {
@@ -939,6 +968,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_branches', updated, get().currentUser?.tenantId);
     if (branch) {
       get().addLog('BRANCH_DELETE', 'SYSTEM', `Menghapus cabang: ${branch.name}`);
+    }
+    if (isSupabaseConfigured) {
+      (supabaseService as any).deleteBranch(id);
     }
   },
 
@@ -977,18 +1009,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ suppliers: updated });
     saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_ADD', 'SYSTEM', `Menambah supplier: ${newSupplier.name}`);
+    
+    if (isSupabaseConfigured) {
+      (supabaseService as any).saveSupplier(newSupplier);
+    }
   },
   updateSupplier: (id, updates) => {
     const updated = get().suppliers.map(s => s.id === id ? { ...s, ...updates } : s);
     set({ suppliers: updated });
     saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_UPDATE', 'SYSTEM', `Update supplier ID: ${id}`);
+
+    if (isSupabaseConfigured) {
+      const updatedSupplier = updated.find(s => s.id === id);
+      if (updatedSupplier) (supabaseService as any).saveSupplier(updatedSupplier);
+    }
   },
   deleteSupplier: (id) => {
     const updated = get().suppliers.filter(s => s.id !== id);
     set({ suppliers: updated });
     saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_DELETE', 'SYSTEM', `Menghapus supplier ID: ${id}`);
+
+    if (isSupabaseConfigured) {
+      (supabaseService as any).deleteSupplier(id);
+    }
   },
 
   // Promos
@@ -1029,6 +1074,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updated = [newAtt, ...get().attendances];
     set({ attendances: updated });
     saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
+    if (isSupabaseConfigured) {
+      supabaseService.saveAttendance(newAtt);
+    }
     get().addLog('ATTENDANCE', 'SYSTEM', `${userName} Clock-In Shift`);
   },
   clockOut: (attendanceId, photoUrl, latitude, longitude) => {
@@ -1037,6 +1085,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     set({ attendances: updated });
     saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
+    const modifiedAtt = updated.find(a => a.id === attendanceId);
+    if (isSupabaseConfigured && modifiedAtt) {
+      supabaseService.saveAttendance(modifiedAtt);
+    }
     get().addLog('ATTENDANCE', 'SYSTEM', `Selesai Shift (Clock-Out) ID: ${attendanceId}`);
   },
 
@@ -1048,6 +1100,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     set({ attendances: updated });
     saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
+    const modifiedAtt = updated.find(a => a.id === attendanceId);
+    if (isSupabaseConfigured && modifiedAtt) {
+      supabaseService.saveAttendance(modifiedAtt);
+    }
     get().addLog('ATTENDANCE', 'SYSTEM', `Permohonan koreksi absen diajukan untuk ID: ${attendanceId}`);
   },
 
@@ -1069,6 +1125,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     set({ attendances: updated });
     saveStorage('ksa_attendances', updated, get().currentUser?.tenantId);
+    const modifiedAtt = updated.find(a => a.id === attendanceId);
+    if (isSupabaseConfigured && modifiedAtt) {
+      supabaseService.saveAttendance(modifiedAtt);
+    }
     get().addLog('ATTENDANCE', 'SYSTEM', `Koreksi absen ${approved ? 'DISETUJUI' : 'DITOLAK'} untuk ID: ${attendanceId}`);
   },
 
@@ -1137,10 +1197,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const defaultSettings: StoreSettings = settingsSaved || { tenantId, isTaxEnabled: false, taxRate: 11, businessType: 'KOPERASI', ownerWhatsapp: '', qrisEnabled: true, maxDeliveryRadiusKm: 5, storeName: '', storeAddress: '', storePhone: '' };
 
+    const migratedTransactions = (transactionsSaved || []).map((t: any) => {
+      let pm = t.paymentMethod;
+      if (pm === 'TEMPO') pm = 'KASBON';
+      if (pm === 'QRIS') pm = 'QRIS_SHARIAH';
+      if (pm === 'TRANSFER') pm = 'TRANSFER_BSI';
+      return { ...t, paymentMethod: pm };
+    });
+
     set({
       settings: defaultSettings,
       stockMovements: stockMovementsSaved || [],
-      transactions: transactionsSaved || [],
+      transactions: migratedTransactions,
       products: productsSaved || [],
       journalEntries: journalSaved || [],
       branches: branchesSaved || [],
@@ -1171,9 +1239,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!auditSaved) saveStorage('ksa_audit_logs', [], tenantId);
   },
 
-  login: (username, password) => {
-    const { users } = get();
-    const foundUser = users.find(u => u.username === username && u.password === password && u.isActive);
+  login: async (username, password) => {
+    let { users } = get();
+    let foundUser = users.find(u => u.username === username && u.password === password && u.isActive);
+
+    if (!foundUser && isSupabaseConfigured) {
+      // Fetch users dynamically for new devices that haven't synced yet
+      const remoteUsers = await supabaseService.getUsers();
+      if (remoteUsers) {
+        const defaultUsers = getStorage('ksa_users') || [];
+        const merged = [...remoteUsers];
+        defaultUsers.forEach((du: any) => {
+          if (!merged.some(ru => ru.username === du.username)) {
+            merged.push(du);
+            supabaseService.saveUser(du);
+          }
+        });
+        set({ users: merged });
+        saveStorage('ksa_users', merged);
+        foundUser = merged.find(u => u.username === username && u.password === password && u.isActive);
+      }
+    }
 
     if (!foundUser) return 'INVALID';
     if (!foundUser.isApproved) return 'PENDING';
@@ -1362,6 +1448,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         price: i.product.price
       })),
       totalAmount: baseTotal,
+      shippingFee: 0,
       status: 'PENDING',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1412,22 +1499,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     order.items.forEach(item => {
       const prodIndex = updatedProducts.findIndex(p => p.id === item.productId);
       if (prodIndex !== -1) {
-        const itemCost = updatedProducts[prodIndex].costPrice || 0;
+        const prod = updatedProducts[prodIndex];
+        const itemCost = prod.costPrice || 0;
         totalCost += (itemCost * item.quantity);
-        updatedProducts[prodIndex].stock -= item.quantity;
-        get().addStockMovement({
-          tenantId: currentUser.tenantId || 'tenant_default',
-          productId: item.productId,
-          type: 'OUT',
-          qty: item.quantity,
-          reason: `Pesanan Online ${order.orderNo}`,
-          branchId: order.branchId
-        });
+        if (!prod.isPPOB) {
+          prod.stock -= item.quantity;
+          get().addStockMovement({
+            tenantId: currentUser.tenantId || 'tenant_default',
+            productId: item.productId,
+            type: 'OUT',
+            qty: item.quantity,
+            reason: `Pesanan Online ${order.orderNo}`,
+            branchId: order.branchId
+          });
+        }
       }
     });
 
     const marginContribution = totalAmount - totalCost;
-    const zakatContribution = marginContribution > 0 ? marginContribution * 0.025 : 0;
+    const zakatContribution = marginContribution > 0 ? Math.round(marginContribution * 0.025) : 0;
 
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
@@ -1443,6 +1533,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         costPrice: 0 
       })),
       totalAmount,
+      shippingFee: order.shippingFee,
       paymentMethod,
       amountPaid: totalAmount,
       changeAmount: 0,
@@ -1463,7 +1554,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       return fuzzy ? fuzzy.code : fallback;
     };
 
-    const kasCode = paymentMethod === 'TRANSFER_BSI' ? resolveCoa('bank', '1-1002 Kas di Bank') : resolveCoa('kas', '1-1001 Kas Tunai');
+    const kasCode = paymentMethod === 'TRANSFER_BSI' 
+      ? resolveCoa('bank', '1-1010 Bank Syariah Indonesia (BSI)') 
+      : paymentMethod === 'QRIS_SHARIAH'
+      ? resolveCoa('qris', '1-1020 QRIS Syariah Dana')
+      : resolveCoa('kas', '1-1000 Kas Tunai Toko');
 
     const newJournals: JournalEntry[] = [
       {
@@ -1486,14 +1581,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     order.items.forEach(item => {
       const prod = products.find(p => p.id === item.productId);
-      const sCoa = prod?.salesCoaCode || resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan');
-      const cCoa = prod?.cogsCoaCode || resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)');
+      const sCoa = prod?.salesCoaCode || resolveCoa('pendapatan online', resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan'));
+      const cCoa = prod?.cogsCoaCode || resolveCoa('hpp online', resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)'));
       
       const rev = item.price * item.quantity;
       const cogs = (prod?.costPrice || 0) * item.quantity;
       
       revenueGroups[sCoa] = (revenueGroups[sCoa] || 0) + rev;
-      cogsGroups[cCoa] = (cogsGroups[cCoa] || 0) + cogs;
+      
+      const invCoa = prod?.isPPOB 
+        ? resolveCoa('radar', '1-1050 Saldo Radar Pulsa / Digital')
+        : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
+        
+      const key = `${cCoa}|${invCoa}`;
+      cogsGroups[key] = (cogsGroups[key] || 0) + cogs;
     });
 
     Object.entries(revenueGroups).forEach(([coa, amount], index) => {
@@ -1514,13 +1615,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     });
 
-    Object.entries(cogsGroups).forEach(([coa, amount], index) => {
+    Object.entries(cogsGroups).forEach(([key, amount], index) => {
       if (amount > 0) {
+        const [cogsCoa, inventoryCoa] = key.split('|');
         newJournals.push({
           id: `je_cogs_${Date.now()}_${index}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
-          account: coa,
+          account: cogsCoa,
           description: `HPP Online ${invoiceNo}`,
           debit: amount,
           credit: 0,
@@ -1533,8 +1635,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: `je_inv_${Date.now()}_${index}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
-          account: resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang'),
-          description: `Keluar Persediaan ${invoiceNo}`,
+          account: inventoryCoa,
+          description: `Keluar Persediaan/Radar ${invoiceNo}`,
           debit: 0,
           credit: amount,
           referenceId: newTx.id,
@@ -1601,7 +1703,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   // Checkout Implementation
   checkout: (options) => {
-    const { paymentMethod, amountPaid, customerId, promoId, pointsToRedeem, splitPayments } = options;
+    const { paymentMethod, amountPaid, shippingFee = 0, customerId, promoId, pointsToRedeem, splitPayments } = options;
     const { cart, currentUser, products, customers, promos, settings, addStockMovement } = get();
     if (cart.length === 0 || !currentUser) return null;
     
@@ -1636,7 +1738,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return null;
     }
     const pointsDiscount = (settings.enablePoints !== false) ? (redeemed * (settings.pointRedemptionValue || 10)) : 0;
-    let totalAmount = Math.max(0, baseTotal - discountAmount - pointsDiscount);
+    let totalAmount = Math.max(0, baseTotal - discountAmount - pointsDiscount) + shippingFee;
     let taxAmount = 0;
     if (settings.isTaxEnabled) {
       taxAmount = totalAmount * (settings.taxRate / 100);
@@ -1648,7 +1750,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     let zakatContribution = 0;
     if (settings.enableCharityZakat !== false) {
       const zakatPct = (settings.charityZakatPercentage ?? 2.5) / 100;
-      zakatContribution = marginContribution > 0 ? marginContribution * zakatPct : 0;
+      zakatContribution = marginContribution > 0 ? Math.round(marginContribution * zakatPct) : 0;
     }
     
     let actualPaid = splitPayments ? splitPayments.reduce((s, p) => s + p.amount, 0) : amountPaid;
@@ -1675,6 +1777,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         targetNumber: item.targetNumber
       })),
       totalAmount,
+      shippingFee,
       paymentMethod,
       amountPaid: actualPaid,
       changeAmount,
@@ -1801,7 +1904,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const cogs = (item.isBox ? (prod.boxCostPrice || 0) : prod.costPrice) * item.quantity;
       
       revenueGroups[sCoa] = (revenueGroups[sCoa] || 0) + rev;
-      const invCoa = (prod.category?.toUpperCase() === 'PPOB') 
+      const invCoa = prod.isPPOB 
         ? resolveCoa('radar', '1-1050 Saldo Radar Pulsa / Digital')
         : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
       const key = `${cCoa}|${invCoa}`;
@@ -1962,12 +2065,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   updateProduct: (updatedProd) => {
+    const oldProd = get().products.find(p => p.id === updatedProd.id);
     const updated = get().products.map(p => p.id === updatedProd.id ? updatedProd : p);
     set({
       products: updated
     });
     saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_UPDATE', 'INVENTORY', `Ubah informasi produk: ${updatedProd.name}`);
+    
+    // Check for Restock Notification
+    if (oldProd && oldProd.stock <= 0 && updatedProd.stock > 0) {
+      get().addNotification({
+        title: 'Barang Berhasil Di-restock',
+        message: `Stok untuk ${updatedProd.name} (SKU: ${updatedProd.sku}) telah diperbarui dari Habis menjadi ${updatedProd.stock} pcs.`,
+        type: 'INFO',
+        link: '/inventory'
+      });
+    }
     
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(updatedProd);
@@ -2091,6 +2205,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       products: updatedList
     });
     saveStorage('ksa_products', updatedList, get().currentUser?.tenantId);
+    
+    // Check for Restock Notification
+    if (prod.stock <= 0 && updated.stock > 0) {
+      get().addNotification({
+        title: 'Barang Berhasil Di-restock',
+        message: `Stok untuk ${prod.name} (SKU: ${prod.sku}) telah diperbarui dari Habis menjadi ${updated.stock} pcs.`,
+        type: 'INFO',
+        link: '/inventory'
+      });
+    }
 
     // Log stock movement
     get().addStockMovement({
@@ -2335,6 +2459,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_purchase_orders', updated, get().currentUser?.tenantId);
     get().addLog('PO_CREATE', 'INVENTORY', `Membuat PO baru: ${newPo.poNumber} ke ${newPo.supplier} senilai Rp ${newPo.totalAmount.toLocaleString('id-ID')}`);
 
+    if (isSupabaseConfigured) {
+      (supabaseService as any).savePurchaseOrder(newPo);
+    }
+
     // === JURNAL OTOMATIS dari Purchase Order ===
     const now = new Date().toISOString();
     const poJournals: JournalEntry[] = [
@@ -2366,6 +2494,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedJournals = [...poJournals, ...get().journalEntries];
     set({ journalEntries: updatedJournals });
     saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    
+    if (isSupabaseConfigured) {
+      poJournals.forEach(j => (supabaseService as any).saveJournalEntry(j));
+    }
     // === END JURNAL OTOMATIS ===
   },
 
@@ -2374,6 +2506,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ purchaseOrders: updated });
     saveStorage('ksa_purchase_orders', updated, get().currentUser?.tenantId);
     get().addLog('PO_UPDATE', 'INVENTORY', `Update PO ID: ${id}`);
+
+    if (isSupabaseConfigured) {
+      const updatedPo = updated.find(p => p.id === id);
+      if (updatedPo) (supabaseService as any).savePurchaseOrder(updatedPo);
+    }
   },
 
   addJournalEntry: (entryData) => {
@@ -2412,6 +2549,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ expenses: updated });
     saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
     get().addLog('EXPENSE_ADD', 'FINANCE', `Mencatat pengeluaran: ${newExpense.description} Rp ${newExpense.amount.toLocaleString('id-ID')} oleh ${newExpense.createdBy}`);
+
+    // Update Petty Cash Balance if applicable
+    if (newExpense.category === 'OPERASIONAL' && (newExpense.description.startsWith('Kas Kecil:') || newExpense.description.startsWith('Pemasukan Kas:'))) {
+      const currentSettings = get().settings;
+      const currentBalance = currentSettings.pettyCashBalance || 0;
+      get().updateSettings({ pettyCashBalance: currentBalance - newExpense.amount });
+    }
 
     // === JURNAL OTOMATIS dari Pengeluaran ===
     const now = new Date().toISOString();
@@ -2455,7 +2599,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
     if (exp) {
       get().addLog('EXPENSE_DELETE', 'FINANCE', `Menghapus pengeluaran: ${exp.description}`);
+      
+      // Refund Petty Cash Balance if applicable
+      if (exp.category === 'OPERASIONAL' && (exp.description.startsWith('Kas Kecil:') || exp.description.startsWith('Pemasukan Kas:'))) {
+        const currentSettings = get().settings;
+        const currentBalance = currentSettings.pettyCashBalance || 0;
+        get().updateSettings({ pettyCashBalance: currentBalance + exp.amount });
+      }
     }
+  },
+
+  addPettyCashDeposit: (amount, description) => {
+    const { currentUser, settings, addLog, updateSettings } = get();
+    const currentBalance = settings.pettyCashBalance || 0;
+    updateSettings({ pettyCashBalance: currentBalance + amount });
+    addLog('PETTY_CASH_TOPUP', 'FINANCE', `Top Up Kas Kecil: ${description} (Rp ${amount.toLocaleString('id-ID')}) oleh ${currentUser?.name || 'System'}`);
   },
 
   addClosing: (closing) => {
@@ -2540,6 +2698,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  deleteAuditLogs: async (startDateStr: string, endDateStr: string) => {
+    // 1. Delete from local state & storage
+    const currentLogs = get().auditLogs;
+    const updatedLogs = currentLogs.filter(log => {
+      // Keep logs that are OUTSIDE the date range
+      return log.timestamp < startDateStr || log.timestamp > endDateStr;
+    });
+    
+    set({ auditLogs: updatedLogs });
+    saveStorage('ksa_audit_logs', updatedLogs, get().currentUser?.tenantId);
+
+    // 2. Delete from Supabase cloud
+    if (isSupabaseConfigured && (supabaseService as any).deleteAuditLogs) {
+      await (supabaseService as any).deleteAuditLogs(startDateStr, endDateStr);
+    }
+  },
+
   // Supabase Syncing on startup
   initializeStore: async (options?: { showLoading?: boolean; catalogOnly?: boolean }) => {
     const shouldShowLoading = options?.showLoading ?? true;
@@ -2579,6 +2754,56 @@ export const useAppStore = create<AppState>((set, get) => ({
             set({ customers: mapped });
           }
         }));
+
+        tasks.push(runSupabaseTask('getBranches', async () => {
+          return await (supabaseService as any).getBranches();
+        }, (remoteBranches) => {
+          if (remoteBranches && remoteBranches.length > 0) {
+            const mapped = remoteBranches.map(b => ({
+              id: b.id,
+              tenantId: b.tenant_id,
+              name: b.name,
+              address: b.address,
+              phone: b.phone,
+              whatsapp: b.whatsapp || '',
+              isActive: b.is_active,
+              qrisImageUrl: b.qris_image_url || '',
+              createdAt: b.created_at || new Date().toISOString()
+            }));
+            set({ branches: mapped });
+            saveStorage('ksa_branches', mapped, tenantId);
+          }
+        }));
+
+        tasks.push(runSupabaseTask('getAttendances', async () => {
+          return await supabaseService.getAttendances();
+        }, (remoteAttendances) => {
+          if (remoteAttendances && remoteAttendances.length > 0) {
+            const mapped = remoteAttendances.map(a => ({
+              id: a.id,
+              tenantId: a.tenant_id,
+              userId: a.user_id,
+              userName: a.user_name,
+              date: a.date,
+              clockIn: a.clock_in,
+              clockOut: a.clock_out,
+              status: a.status,
+              photoUrl: a.photo_url,
+              clockOutPhotoUrl: a.clock_out_photo_url,
+              latitude: a.latitude,
+              longitude: a.longitude,
+              clockOutLatitude: a.clock_out_latitude,
+              clockOutLongitude: a.clock_out_longitude,
+              correctionStatus: a.correction_status,
+              correctionReason: a.correction_reason,
+              correctionType: a.correction_type,
+              requestedClockIn: a.requested_clock_in,
+              requestedClockOut: a.requested_clock_out,
+              isRevised: a.is_revised
+            }));
+            set({ attendances: mapped });
+          }
+        }));
       }
 
       tasks.push(runSupabaseTask('fetchProducts', async () => {
@@ -2614,7 +2839,8 @@ export const useAppStore = create<AppState>((set, get) => ({
               cashierName: t.cashier_name,
               items: t.items,
               totalAmount: Number(t.total_amount),
-              paymentMethod: t.payment_method,
+              shippingFee: Number(t.shipping_fee || 0),
+              paymentMethod: t.payment_method === 'TEMPO' ? 'KASBON' : t.payment_method === 'QRIS' ? 'QRIS_SHARIAH' : t.payment_method === 'TRANSFER' ? 'TRANSFER_BSI' : t.payment_method,
               amountPaid: Number(t.amount_paid),
               changeAmount: Number(t.change_amount),
               zakatContribution: Number(t.zakat_contribution),
@@ -2726,15 +2952,63 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         }));
 
+        tasks.push(runSupabaseTask('getSuppliers', async () => {
+          return await (supabaseService as any).getSuppliers();
+        }, (remoteSuppliers) => {
+          if (remoteSuppliers && remoteSuppliers.length > 0) {
+            const mapped = remoteSuppliers.map(s => ({
+              id: s.id,
+              tenantId: s.tenant_id,
+              name: s.name,
+              contactPerson: s.contact_person || '',
+              phone: s.phone || '',
+              address: s.address || '',
+              debtAmount: Number(s.debt_amount || 0),
+              branchId: s.branch_id,
+              createdAt: s.created_at || new Date().toISOString()
+            }));
+            set({ suppliers: mapped });
+          }
+        }));
+
+        tasks.push(runSupabaseTask('getPurchaseOrders', async () => {
+          return await (supabaseService as any).getPurchaseOrders();
+        }, (remotePOs) => {
+          if (remotePOs && remotePOs.length > 0) {
+            const mapped = remotePOs.map(po => ({
+              id: po.id,
+              tenantId: po.tenant_id,
+              poNumber: po.po_number,
+              date: po.date,
+              supplier: po.supplier,
+              items: po.items || [],
+              totalAmount: Number(po.total_amount || 0),
+              status: po.status,
+              createdBy: po.created_by,
+              notes: po.notes || '',
+              branchId: po.branch_id,
+              invoiceSupplier: po.invoice_supplier
+            }));
+            set({ purchaseOrders: mapped });
+          }
+        }));
+
         tasks.push(runSupabaseTask('fetchOnlineOrders', async () => {
           await get().fetchOnlineOrders();
         }, () => {}));
       }
 
-      await Promise.allSettled(tasks);
+      // Execute tasks in background without blocking the UI
+      Promise.allSettled(tasks).catch(e => {
+        console.warn('Supabase initialization encountered an unexpected error. Proceeding in offline-first mode.', e);
+      });
+
+      // Release UI immediately (max 1.5s delay to allow fast queries to complete and prevent flicker)
+      if (shouldShowLoading) {
+        setTimeout(() => set({ isLoading: false }), 1500);
+      }
     } catch (e) {
-      console.warn('Supabase initialization encountered an unexpected error. Proceeding in offline-first mode.', e);
-    } finally {
+      console.warn('Initialization error:', e);
       if (shouldShowLoading) {
         set({ isLoading: false });
       }
@@ -2763,11 +3037,34 @@ export const useAppStore = create<AppState>((set, get) => ({
             unit: p.unit,
             barcode: p.barcode || undefined,
             isHalal: p.is_halal,
-            image: p.image || localP?.image || undefined
+            isPPOB: Boolean(p.is_ppob),
+            image: p.image || localP?.image || undefined,
+            expiryDate: p.expiry_date || localP?.expiryDate || undefined
           };
         });
         set({ products: productsMap });
         saveStorage('ksa_products', productsMap, tenantId);
+        
+        // Expiry Date Check Notification (Once per day)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const lastCheck = localStorage.getItem('ksa_last_expiry_check');
+        if (lastCheck !== todayStr) {
+          const nearExpired = productsMap.filter((prod: any) => {
+            if (prod.isPPOB || !prod.expiryDate) return false;
+            const daysToExpiry = (new Date(prod.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+            return daysToExpiry >= 0 && daysToExpiry <= 30;
+          });
+          
+          if (nearExpired.length > 0) {
+            get().addNotification({
+              title: 'Peringatan Stok Mendekati Expired',
+              message: `Terdapat ${nearExpired.length} produk yang mendekati masa kadaluarsa (<= 30 hari). Silakan periksa inventaris Anda.`,
+              type: 'WARNING',
+              link: '/inventory'
+            });
+            localStorage.setItem('ksa_last_expiry_check', todayStr);
+          }
+        }
       }
       return;
     };
@@ -2808,16 +3105,24 @@ export const useAppStore = create<AppState>((set, get) => ({
             paymentTimeoutMinutes: Number(remoteSettings.payment_timeout_minutes),
             storeLocationLat: remoteSettings.store_location_lat ? Number(remoteSettings.store_location_lat) : undefined,
             storeLocationLng: remoteSettings.store_location_lng ? Number(remoteSettings.store_location_lng) : undefined,
-            maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km),
+            maxDeliveryRadiusKm: Number(remoteSettings.max_delivery_radius_km) || 5,
+            attendanceRadiusMeters: Number(remoteSettings.attendance_radius_meters) || 50,
             qrisEnabled: Boolean(remoteSettings.qris_enabled),
             qrisImageUrl: remoteSettings.qris_image_url || '',
             maintenanceMode: Boolean(remoteSettings.maintenance_mode),
             minimumCashBalance: Number(remoteSettings.minimum_cash_balance),
+            pettyCashBalance: Number(remoteSettings.petty_cash_balance) || 0,
             zakatRate: Number(remoteSettings.zakat_rate),
             autoApproveTransactions: Boolean(remoteSettings.auto_approve_transactions),
             ownerBankName: remoteSettings.owner_bank_name || '',
             ownerBankAccount: remoteSettings.owner_bank_account || '',
-            paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] }
+            paymentMethods: remoteSettings.payment_methods || { bankTransfer: [], ewallet: [] },
+            operationalHours: remoteSettings.operational_hours || {
+              isOpen: true,
+              openTime: '07:00',
+              closeTime: '21:00',
+              closedMessage: 'Maaf, toko sedang tutup.'
+            }
           }
         });
       }
@@ -2841,6 +3146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           customerAddress: o.customer_address,
           items: o.items,
           totalAmount: Number(o.total_amount),
+          shippingFee: Number(o.shipping_fee || 0),
           status: o.status,
           notes: o.notes,
           createdAt: o.created_at,
@@ -2903,6 +3209,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
         syncTask('coa accounts', state.coaList, async (coa) => {
           await (supabaseService as any).saveCoaAccount(coa);
+        }),
+        syncTask('suppliers', state.suppliers, async (supplier) => {
+          await (supabaseService as any).saveSupplier(supplier);
+        }),
+        syncTask('purchase orders', state.purchaseOrders, async (po) => {
+          await (supabaseService as any).savePurchaseOrder(po);
         }),
         syncTask('journal entries', state.journalEntries, async (journal) => {
           await (supabaseService as any).saveJournalEntry(journal);

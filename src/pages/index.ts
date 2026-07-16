@@ -11,6 +11,7 @@ export { default as AdminManagementPage } from './AdminManagementPage';
 export { default as PurchaseOrderPage } from './PurchaseOrderPage';
 export { default as BranchManagementPage } from './BranchManagementPage';
 export { default as KasirRiwayatPage } from './KasirRiwayatPage';
+export { default as KasirShiftPage } from './KasirShiftPage';
 export { default as CustomerManagementPage } from './CustomerManagementPage';
 export { default as SupplierManagementPage } from './SupplierManagementPage';
 export { default as PromoManagementPage } from './PromoManagementPage';

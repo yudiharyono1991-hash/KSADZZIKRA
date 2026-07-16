@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
 import * as XLSX from 'xlsx';
-import html2pdf from 'html2pdf.js';
+import { useReactToPrint } from 'react-to-print';
 import { 
   FileText, 
   Search, 
@@ -11,11 +11,18 @@ import {
   TrendingUp,
   Printer
 } from 'lucide-react';
+import PrintHeader from '../components/Print/PrintHeader';
+import PrintFooter from '../components/Print/PrintFooter';
 
 export default function SalesReportPage() {
-  const { transactions, currentUser, addLog, addNotification } = useBranchData();
+  const { transactions, products, currentUser, addLog, addNotification } = useBranchData();
   const { activeBranchId } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
   const reportRef = useRef<HTMLDivElement>(null);
   
   // Date filters defaulting to current month
@@ -58,19 +65,29 @@ export default function SalesReportPage() {
           });
         }
         const existing = itemMap.get(item.productId);
-        existing.qty += item.quantity;
+        const qty = Number(item.quantity || 0);
+        const price = Number(item.price || 0);
         
-        const itemOmset = item.price * item.quantity;
-        const itemCost = item.costPrice * item.quantity;
-        const itemProfit = itemOmset - itemCost;
-        const itemZakat = itemProfit > 0 ? itemProfit * 0.025 : 0;
-
-        existing.omset += itemOmset;
+        existing.qty += qty;
+        existing.omset += (price * qty);
+        
+        // Coba ambil HPP dari record transaksi, jika 0 atau tidak ada, fallback ke master produk
+        let costPrice = Number(item.costPrice || 0);
+        const productData = products.find((p: any) => p.id === item.productId);
+        if (!costPrice && productData) {
+          // Cari apakah item ini terjual dalam bentuk box
+          const isBox = item.productName.toLowerCase().includes('(box)');
+          costPrice = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+        }
+        
+        // Profit = (Harga Jual - HPP) * Qty
+        const itemProfit = (price - costPrice) * qty;
         existing.profit += itemProfit;
+        const itemZakat = itemProfit > 0 ? Math.round(itemProfit * 0.025) : 0;
         existing.zakat += itemZakat;
 
-        totalQty += item.quantity;
-        totalOmset += itemOmset;
+        totalQty += qty;
+        totalOmset += (price * qty);
         totalProfit += itemProfit;
         totalZakat += itemZakat;
       });
@@ -84,11 +101,36 @@ export default function SalesReportPage() {
     // Sort by quantity sold descending
     resultArr.sort((a, b) => b.qty - a.qty);
 
+    let finalQty = 0;
+    let finalOmset = 0;
+    let finalProfit = 0;
+
+    resultArr.forEach(item => {
+      finalQty += item.qty;
+      finalOmset += item.omset;
+      finalProfit += item.profit;
+    });
+
+    const finalZakat = finalProfit > 0 ? Math.round(finalProfit * 0.025) : 0;
+
     return { 
       aggregatedData: resultArr, 
-      grandTotal: { qty: totalQty, omset: totalOmset, profit: totalProfit, zakat: totalZakat } 
+      grandTotal: { qty: finalQty, omset: finalOmset, profit: finalProfit, zakat: finalZakat } 
     };
-  }, [transactions, activeBranchId, startDate, endDate, searchQuery]);
+  }, [transactions, products, activeBranchId, startDate, endDate, searchQuery]);
+
+  // Handle Search Input Change (Reset Page)
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
+  // Pagination Logic
+  const totalPages = Math.ceil(aggregatedData.length / itemsPerPage);
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return aggregatedData.slice(startIndex, startIndex + itemsPerPage);
+  }, [aggregatedData, currentPage]);
 
   const handleExportExcel = () => {
     addLog('EXPORT_EXCEL', 'SYSTEM', `Export Excel Laporan Penjualan periode ${startDate} sd ${endDate}`);
@@ -111,22 +153,42 @@ export default function SalesReportPage() {
     });
     
     const ws = XLSX.utils.json_to_sheet(excelData);
+    
+    // Set column widths for better formatting
+    const colWidths = [
+      { wch: 5 },  // No
+      { wch: 30 }, // Nama Produk
+      { wch: 15 }, // Qty
+      { wch: 20 }, // Harga Pokok
+      { wch: 20 }, // Harga Jual
+      { wch: 15 }, // Margin
+      { wch: 20 }, // Omset
+      { wch: 20 }, // Profit
+      { wch: 20 }  // Zakat
+    ];
+    ws['!cols'] = colWidths;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Laporan Penjualan");
     XLSX.writeFile(wb, `Laporan_Penjualan_${startDate}_sd_${endDate}.xlsx`);
   };
 
-  const handlePrintReport = () => {
-    addLog('PRINT_REPORT', 'SYSTEM', `Mencetak Laporan Penjualan periode ${startDate} sd ${endDate}`);
-    window.print();
-  };
+  const handlePrintReport = useReactToPrint({
+    contentRef: reportRef,
+    documentTitle: `Laporan_Penjualan_${startDate}_sd_${endDate}`,
+    onAfterPrint: () => addLog('PRINT_REPORT', 'SYSTEM', `Mencetak Laporan Penjualan periode ${startDate} sd ${endDate}`)
+  });
 
   return (
-    <div className="space-y-6">
-      {/* Search and Filters Header */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="space-y-6 print:m-0 print:p-0">
+      
+      <PrintHeader title="Laporan Penjualan Barang" period={`${startDate} s/d ${endDate}`} />
+
+      <div className="print:hidden space-y-6">
+        {/* Search and Filters Header */}
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+          <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-green-600" />
             Rekapitulasi Penjualan Barang
           </h2>
@@ -134,20 +196,20 @@ export default function SalesReportPage() {
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1">
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
             <Calendar className="w-4 h-4 text-slate-400 ml-2" />
             <input 
               type="date" 
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-700 outline-none p-1 cursor-pointer"
+              className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none p-1 cursor-pointer"
             />
             <span className="text-slate-400 text-xs">-</span>
             <input 
               type="date" 
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-700 outline-none p-1 cursor-pointer"
+              className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none p-1 cursor-pointer"
             />
           </div>
 
@@ -157,10 +219,10 @@ export default function SalesReportPage() {
             </span>
             <input
               type="text"
-              className="w-full pl-9 pr-4 py-1.5 border border-gray-200 rounded-lg text-xs"
+              className="w-full pl-9 pr-4 py-1.5 border border-gray-200 dark:border-slate-700 rounded-lg text-xs"
               placeholder="Cari nama barang..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchChange}
             />
           </div>
           <div className="flex gap-2">
@@ -177,21 +239,21 @@ export default function SalesReportPage() {
                 });
                 alert('Laporan berhasil dikirim ke Owner/Pengurus untuk persetujuan!');
               }}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-semibold"
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 active:scale-95 active:bg-blue-800 text-white px-4 py-2 rounded-lg transition-all font-semibold shadow-sm hover:shadow"
             >
               <span>Kirim Laporan</span>
             </button>
             <button
               onClick={handleExportExcel}
-              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition font-semibold"
+              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 active:scale-95 active:bg-green-800 text-white px-4 py-2 rounded-lg transition-all font-semibold shadow-sm hover:shadow"
             >
               <Download className="w-5 h-5" />
               <span>Excel</span>
             </button>
 
             <button
-              onClick={handlePrintReport}
-              className="flex items-center space-x-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition font-semibold"
+              onClick={() => handlePrintReport()}
+              className="flex items-center space-x-2 bg-gray-800 hover:bg-gray-900 active:scale-95 active:bg-black text-white px-4 py-2 rounded-lg transition-all font-semibold shadow-sm hover:shadow"
             >
               <Printer className="w-5 h-5" />
               <span>Cetak / PDF</span>
@@ -202,32 +264,32 @@ export default function SalesReportPage() {
 
       {/* Overview stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
-          <div className="flex items-center gap-2 text-gray-500 mb-1">
+        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 mb-1">
             <Package className="w-4 h-4" />
             <p className="text-[10px] uppercase font-bold tracking-wider">Total Barang Terjual</p>
           </div>
-          <p className="text-xl font-extrabold text-gray-800">{grandTotal.qty} Item</p>
+          <p className="text-xl font-extrabold text-gray-800 dark:text-slate-200">{grandTotal.qty} Item</p>
         </div>
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
-          <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Total Omset</p>
+        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-slate-400 mb-1">Total Omset</p>
           <p className="text-xl font-extrabold text-green-800">Rp {grandTotal.omset.toLocaleString('id-ID')}</p>
         </div>
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
-          <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Total Margin (Profit)</p>
+        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-slate-400 mb-1">Total Margin (Profit)</p>
           <p className="text-xl font-extrabold text-blue-700">Rp {grandTotal.profit.toLocaleString('id-ID')}</p>
         </div>
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl">
-          <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 mb-1">Total Zakat (2.5%)</p>
+        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-gray-500 dark:text-slate-400 mb-1">Total Zakat (2.5%)</p>
           <p className="text-xl font-extrabold text-amber-600">Rp {grandTotal.zakat.toLocaleString('id-ID')}</p>
         </div>
       </div>
 
       {/* Aggregated Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-200">
+            <thead className="bg-slate-50 dark:bg-slate-800 uppercase tracking-widest text-[10px] text-gray-500 dark:text-slate-400 font-bold border-b border-gray-200 dark:border-slate-700">
               <tr>
                 <th className="py-3.5 px-5">Nama Barang</th>
                 <th className="py-3.5 px-3 text-center">Qty</th>
@@ -239,35 +301,35 @@ export default function SalesReportPage() {
                 <th className="py-3.5 px-4 text-right">Zakat</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-              {aggregatedData.length === 0 ? (
+            <tbody className="divide-y divide-gray-100 font-medium text-gray-700 dark:text-slate-300">
+              {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-gray-400">
+                  <td colSpan={8} className="text-center py-12 text-gray-400">
                     Tidak ada data penjualan pada rentang tanggal tersebut.
                   </td>
                 </tr>
               ) : (
-                aggregatedData.map((item) => {
+                paginatedData.map((item) => {
                   const avgCost = (item.omset - item.profit) / item.qty;
                   const avgSell = item.omset / item.qty;
                   const marginPct = avgCost > 0 ? (((avgSell - avgCost) / avgCost) * 100).toFixed(1) : '0';
 
                   return (
-                    <tr key={item.productId} className="hover:bg-slate-50/50">
-                      <td className="py-3 px-5 font-bold text-gray-900">{item.productName} <span className="text-[9px] font-normal text-green-600 block">(Akad Jual Beli)</span></td>
+                    <tr key={item.productId} className="hover:bg-slate-50 dark:bg-slate-800/50">
+                      <td className="py-3 px-5 font-bold text-gray-900 dark:text-white">{item.productName} <span className="text-[9px] font-normal text-green-600 block">(Akad Jual Beli)</span></td>
                       <td className="py-3 px-3 text-center text-green-700 font-bold bg-green-50/30">
                         {item.qty}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-gray-500">
+                      <td className="py-3 px-3 text-right font-mono text-gray-500 dark:text-slate-400">
                         Rp {Math.round(avgCost).toLocaleString('id-ID')}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-gray-700 font-semibold">
+                      <td className="py-3 px-3 text-right font-mono text-gray-700 dark:text-slate-300 font-semibold">
                         Rp {Math.round(avgSell).toLocaleString('id-ID')}
                       </td>
                       <td className="py-3 px-3 text-center font-mono text-blue-600">
                         {marginPct}%
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-800">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-800 dark:text-slate-200">
                         Rp {item.omset.toLocaleString('id-ID')}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-blue-700 font-bold">
@@ -282,13 +344,18 @@ export default function SalesReportPage() {
               )}
             </tbody>
             {aggregatedData.length > 0 && (
-              <tfoot className="bg-slate-50 font-bold text-gray-800 border-t-2 border-gray-200">
+              <tfoot className="bg-slate-50 dark:bg-slate-800 font-bold text-gray-800 dark:text-slate-200 border-t-2 border-gray-200 dark:border-slate-700">
                 <tr>
                   <td className="py-3 px-5 text-right uppercase text-[10px] tracking-widest">Grand Total:</td>
                   <td className="py-3 px-3 text-center text-green-700">{grandTotal.qty}</td>
                   <td className="py-3 px-3"></td>
                   <td className="py-3 px-3"></td>
-                  <td className="py-3 px-3"></td>
+                  <td className="py-3 px-3 text-center font-bold text-blue-600">
+                    {(() => {
+                      const totalHpp = grandTotal.omset - grandTotal.profit;
+                      return totalHpp > 0 ? ((grandTotal.profit / totalHpp) * 100).toFixed(1) + '%' : '0%';
+                    })()}
+                  </td>
                   <td className="py-3 px-4 text-right">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
                   <td className="py-3 px-4 text-right text-blue-700">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
                   <td className="py-3 px-4 text-right text-amber-600">Rp {grandTotal.zakat.toLocaleString('id-ID')}</td>
@@ -296,18 +363,48 @@ export default function SalesReportPage() {
               </tfoot>
             )}
           </table>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 print:hidden">
+              <span className="text-sm text-gray-700 dark:text-slate-300">
+                Menampilkan <span className="font-semibold">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-semibold">{Math.min(currentPage * itemsPerPage, aggregatedData.length)}</span> dari <span className="font-semibold">{aggregatedData.length}</span> produk
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      </div>
 
-      {/* Printable Area - A4 Report */}
-      <div className="printable-area printable-a4 space-y-6" ref={reportRef}>
-        <div className="text-center border-b-2 border-gray-800 pb-4">
-          <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
-          <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN PENJUALAN DAN KEUANGAN (BERDASARKAN AKAD SYARIAH)</p>
-          <p className="text-xs text-gray-500 mt-1">Periode: {startDate} s/d {endDate}</p>
+      {/* Printable Area - Hidden in UI, shown by react-to-print */}
+      <div style={{ display: 'none' }}>
+      <div className="printable-a4 space-y-6 bg-white dark:bg-slate-900 p-8 text-black" ref={reportRef}>
+        <div className="flex items-center justify-center gap-4 border-b-2 border-gray-800 pb-4">
+          <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-16 h-16 object-contain" />
+          <div className="text-center">
+            <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900 dark:text-white">KSA Mart</h1>
+            <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mt-1">LAPORAN PENJUALAN DAN KEUANGAN (BERDASARKAN AKAD SYARIAH)</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Periode: {startDate} s/d {endDate}</p>
+          </div>
         </div>
         
-        <div className="flex justify-between items-end text-xs font-semibold text-gray-700">
+        <div className="flex justify-between items-end text-xs font-semibold text-gray-700 dark:text-slate-300">
           <div>
             <p>Cabang: {activeBranchId || 'Semua Cabang'}</p>
             <p>Dicetak Oleh: {currentUser?.name || 'Sistem'}</p>
@@ -317,35 +414,35 @@ export default function SalesReportPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-4 py-4 border-y border-gray-200">
+        <div className="grid grid-cols-4 gap-4 py-4 border-y border-gray-200 dark:border-slate-700">
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">Total Barang</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 uppercase font-bold">Total Barang</p>
             <p className="text-lg font-black">{grandTotal.qty} Item</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">Total Omset</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 uppercase font-bold">Total Omset</p>
             <p className="text-lg font-black">Rp {grandTotal.omset.toLocaleString('id-ID')}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">Total Margin (Profit)</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 uppercase font-bold">Total Margin (Profit)</p>
             <p className="text-lg font-black">Rp {grandTotal.profit.toLocaleString('id-ID')}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 uppercase font-bold">Zakat Disalurkan (2.5%)</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 uppercase font-bold">Zakat Disalurkan (2.5%)</p>
             <p className="text-lg font-black">Rp {grandTotal.zakat.toLocaleString('id-ID')}</p>
           </div>
         </div>
 
         <table className="w-full text-left text-xs border-collapse">
-          <thead className="bg-gray-100 uppercase font-bold text-gray-800 border-b-2 border-gray-300">
+          <thead className="bg-gray-100 dark:bg-slate-800 uppercase font-bold text-gray-800 dark:text-slate-200 border-b-2 border-gray-300 dark:border-slate-600">
             <tr>
-              <th className="py-2 px-2 border border-gray-300">No</th>
-              <th className="py-2 px-2 border border-gray-300">Nama Barang</th>
-              <th className="py-2 px-2 border border-gray-300 text-center">Qty</th>
-              <th className="py-2 px-2 border border-gray-300 text-right">Harga Pokok (Avg)</th>
-              <th className="py-2 px-2 border border-gray-300 text-right">Harga Jual (Avg)</th>
-              <th className="py-2 px-2 border border-gray-300 text-right">Omset</th>
-              <th className="py-2 px-2 border border-gray-300 text-right">Profit</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600">No</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600">Nama Barang</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-center">Qty</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right">Harga Pokok (Avg)</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right">Harga Jual (Avg)</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right">Omset</th>
+              <th className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right">Profit</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -354,55 +451,33 @@ export default function SalesReportPage() {
               const avgSell = item.omset / item.qty;
               return (
                 <tr key={item.productId}>
-                  <td className="py-1.5 px-2 border border-gray-200">{index + 1}</td>
-                  <td className="py-1.5 px-2 border border-gray-200 font-semibold">{item.productName} <span className="text-[9px] font-normal text-gray-500">(Akad Jual Beli)</span></td>
-                  <td className="py-1.5 px-2 border border-gray-200 text-center">{item.qty}</td>
-                  <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {Math.round(avgCost).toLocaleString('id-ID')}</td>
-                  <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {Math.round(avgSell).toLocaleString('id-ID')}</td>
-                  <td className="py-1.5 px-2 border border-gray-200 text-right">Rp {item.omset.toLocaleString('id-ID')}</td>
-                  <td className="py-1.5 px-2 border border-gray-200 text-right font-bold">Rp {item.profit.toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700">{index + 1}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700 font-semibold">{item.productName} <span className="text-[9px] font-normal text-gray-500 dark:text-slate-400">(Akad Jual Beli)</span></td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700 text-center">{item.qty}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700 text-right whitespace-nowrap">Rp {Math.round(avgCost).toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700 text-right whitespace-nowrap">Rp {Math.round(avgSell).toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700 text-right whitespace-nowrap">Rp {item.omset.toLocaleString('id-ID')}</td>
+                  <td className="py-1.5 px-2 border border-gray-200 dark:border-slate-700 text-right font-bold whitespace-nowrap">Rp {item.profit.toLocaleString('id-ID')}</td>
                 </tr>
               );
             })}
           </tbody>
           {aggregatedData.length > 0 && (
-            <tfoot className="bg-gray-100 font-bold border-t-2 border-gray-300">
+            <tfoot className="bg-gray-100 dark:bg-slate-800 font-bold border-t-2 border-gray-300 dark:border-slate-600">
               <tr>
-                <td colSpan={2} className="py-2 px-2 border border-gray-300 text-right uppercase text-[10px]">Grand Total:</td>
-                <td className="py-2 px-2 border border-gray-300 text-center">{grandTotal.qty}</td>
-                <td className="py-2 px-2 border border-gray-300"></td>
-                <td className="py-2 px-2 border border-gray-300"></td>
-                <td className="py-2 px-2 border border-gray-300 text-right">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
-                <td className="py-2 px-2 border border-gray-300 text-right">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
+                <td colSpan={2} className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right uppercase text-[10px]">Grand Total:</td>
+                <td className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-center">{grandTotal.qty}</td>
+                <td className="py-2 px-2 border border-gray-300 dark:border-slate-600"></td>
+                <td className="py-2 px-2 border border-gray-300 dark:border-slate-600"></td>
+                <td className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right whitespace-nowrap">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
+                <td className="py-2 px-2 border border-gray-300 dark:border-slate-600 text-right whitespace-nowrap">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
               </tr>
             </tfoot>
           )}
         </table>
         
-        <div className="mt-8 pt-8 flex justify-between items-end border-t-2 border-gray-300">
-          <div className="text-center w-1/3 px-2">
-            <p className="text-xs font-semibold mb-12">Diperiksa Oleh,</p>
-            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
-              {currentUser?.role === 'ADMIN' ? currentUser.name : ''}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">Admin</p>
-          </div>
-          
-          <div className="text-center w-1/3 px-2 border-l border-gray-200">
-            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
-            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
-              {currentUser?.role === 'MANAGER' ? currentUser.name : ''}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">Manager Cabang</p>
-          </div>
-
-          <div className="text-center w-1/3 px-2 border-l border-gray-200">
-            <p className="text-[10px] text-gray-600 mb-2">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p className="text-xs font-semibold mb-12">Menyetujui,</p>
-            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-2 whitespace-nowrap h-6 flex items-end justify-center">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
-            <p className="text-xs text-gray-500 mt-1">Ketua Toko Koperasi KSA Mart</p>
-          </div>
-        </div>
+        <PrintFooter />
+      </div>
       </div>
     </div>
   );

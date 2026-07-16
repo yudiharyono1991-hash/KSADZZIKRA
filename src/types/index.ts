@@ -49,9 +49,11 @@ export interface StoreSettings {
   storeLocationLat?: number;
   storeLocationLng?: number;
   maxDeliveryRadiusKm?: number;
+  attendanceRadiusMeters?: number;
   // Advanced Config
   maintenanceMode?: boolean;
   minimumCashBalance?: number;
+  pettyCashBalance?: number;
   zakatRate?: number; // e.g. 2.5
   autoApproveTransactions?: boolean;
   defaultPpobAdminFee?: number; // Biaya admin default untuk PPOB
@@ -59,6 +61,14 @@ export interface StoreSettings {
   uploadPassword?: string;
   // Roles allowed to manage (set/clear) the upload password. Example: ['OWNER','ADMIN','MANAGER']
   uploadPasswordRoles?: string[];
+  
+  // Operational Hours Management
+  operationalHours?: {
+    isOpen: boolean; // Master toggle (True = Open, False = Closed completely)
+    openTime: string; // e.g., '07:00'
+    closeTime: string; // e.g., '21:00'
+    closedMessage: string; // Custom message to show when closed
+  };
   
   // Landing Page Config
   landingPageConfig?: {
@@ -226,6 +236,7 @@ export interface Transaction {
     targetNumber?: string;
   }[];
   totalAmount: number;
+  shippingFee?: number;
   paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
   amountPaid: number;
   changeAmount: number;
@@ -342,6 +353,7 @@ export interface UserAccount {
   phone?: string;
   approvedBy?: string;
   isKoperasiMember?: boolean;
+  debtAmount?: number;
 }
 
 export interface AppNotification {
@@ -427,6 +439,7 @@ export interface OnlineOrder {
     price: number;
   }[];
   totalAmount: number;
+  shippingFee?: number;
   status: 'PENDING' | 'PROCESSED' | 'READY' | 'COMPLETED' | 'CANCELLED';
   createdAt: string;
   updatedAt: string;

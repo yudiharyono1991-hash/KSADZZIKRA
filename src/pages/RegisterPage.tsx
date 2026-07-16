@@ -83,7 +83,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className={`min-h-screen flex ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} font-sans`}>
+    <div className={`min-h-screen flex ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white'} font-sans`}>
       
       {/* Left Panel - Branding (Hidden on small screens) */}
       <div className="hidden lg:flex lg:w-5/12 relative overflow-hidden bg-green-950 text-white flex-col justify-between p-12">
@@ -155,21 +155,21 @@ export default function RegisterPage() {
               <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="h-14 w-auto" />
             </div>
             <h2 className="text-2xl font-bold">Daftar Aplikasi</h2>
-            <p className="text-slate-500 mt-2">KSA Mart</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">KSA Mart</p>
           </div>
 
           {!isSubmitted ? (
             <>
               <div className="mb-10">
                 <h2 className="text-3xl font-extrabold hidden lg:block mb-2">Daftar Akun Bisnis</h2>
-                <p className="text-slate-500 font-medium">Isi formulir di bawah ini untuk mengajukan akses penggunaan aplikasi.</p>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">Isi formulir di bawah ini untuk mengajukan akses penggunaan aplikasi.</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 
                 {/* Tipe Usaha Selection */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-bold text-slate-700">Kategori Usaha</label>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Kategori Usaha</label>
                   <div className="grid grid-cols-2 gap-4">
                     {['Koperasi', 'Toko Umum / Ritel'].map((type) => (
                       <button
@@ -179,11 +179,11 @@ export default function RegisterPage() {
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col gap-2 ${
                           form.tipeUsaha === type 
                             ? 'border-green-500 bg-green-50/50 shadow-sm shadow-green-100' 
-                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900'
                         }`}
                       >
                         <Store size={24} className={form.tipeUsaha === type ? 'text-green-600' : 'text-slate-400'} />
-                        <span className={`font-bold ${form.tipeUsaha === type ? 'text-green-900' : 'text-slate-600'}`}>{type}</span>
+                        <span className={`font-bold ${form.tipeUsaha === type ? 'text-green-900' : 'text-slate-600 dark:text-slate-400'}`}>{type}</span>
                       </button>
                     ))}
                   </div>
@@ -191,7 +191,7 @@ export default function RegisterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700">Nama Usaha / Koperasi <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Nama Usaha / Koperasi <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Store size={18} className="text-slate-400" />
@@ -201,13 +201,13 @@ export default function RegisterPage() {
                         required
                         value={form.namaUsaha}
                         onChange={(e) => setForm({...form, namaUsaha: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 dark:text-white" 
                         placeholder="Contoh: Koperasi Berkah" 
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700">Nama Pengelola / Pemilik <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Nama Pengelola / Pemilik <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <User size={18} className="text-slate-400" />
@@ -217,7 +217,7 @@ export default function RegisterPage() {
                         required
                         value={form.namaPemilik}
                         onChange={(e) => setForm({...form, namaPemilik: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 dark:text-white" 
                         placeholder="Nama Lengkap" 
                       />
                     </div>
@@ -226,7 +226,7 @@ export default function RegisterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700">Email Utama <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Email Utama <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Mail size={18} className="text-slate-400" />
@@ -236,13 +236,13 @@ export default function RegisterPage() {
                         required
                         value={form.email}
                         onChange={(e) => setForm({...form, email: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 dark:text-white" 
                         placeholder="nama@email.com" 
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700">No. WhatsApp <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">No. WhatsApp <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Phone size={18} className="text-slate-400" />
@@ -252,7 +252,7 @@ export default function RegisterPage() {
                         required
                         value={form.wa}
                         onChange={(e) => setForm({...form, wa: e.target.value})}
-                        className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 dark:text-white" 
                         placeholder="081234567890" 
                       />
                     </div>
@@ -260,7 +260,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold text-slate-700">Alamat Lengkap Usaha</label>
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Alamat Lengkap Usaha</label>
                   <div className="relative">
                     <div className="absolute top-4 left-0 pl-4 flex items-start pointer-events-none">
                       <MapPin size={18} className="text-slate-400" />
@@ -269,7 +269,7 @@ export default function RegisterPage() {
                       rows={3}
                       value={form.alamat}
                       onChange={(e) => setForm({...form, alamat: e.target.value})}
-                      className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 resize-none" 
+                      className="w-full pl-11 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-4 focus:ring-green-500/10 focus:border-green-500 focus:outline-none transition-all font-medium text-slate-900 dark:text-white resize-none" 
                       placeholder="Jalan, RT/RW, Kelurahan, Kecamatan, Kota..." 
                     />
                   </div>
@@ -286,7 +286,7 @@ export default function RegisterPage() {
                         type="checkbox" 
                         checked={form.isPactAgreed}
                         onChange={(e) => setForm({...form, isPactAgreed: e.target.checked})}
-                        className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded focus:ring-2 focus:ring-green-500/20 checked:bg-green-600 checked:border-green-600 transition-colors"
+                        className="peer appearance-none w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-green-500/20 checked:bg-green-600 checked:border-green-600 transition-colors"
                       />
                       <CheckCircle2 size={14} className="absolute text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
                     </div>
@@ -309,12 +309,12 @@ export default function RegisterPage() {
                 </button>
 
                 {/* Login Link Prominent */}
-                <div className="pt-6 border-t border-slate-200 mt-8 text-center">
-                  <p className="text-slate-600 font-medium mb-3">Sudah memiliki akun pendaftaran yang disetujui?</p>
+                <div className="pt-6 border-t border-slate-200 dark:border-slate-700 mt-8 text-center">
+                  <p className="text-slate-600 dark:text-slate-400 font-medium mb-3">Sudah memiliki akun pendaftaran yang disetujui?</p>
                   <button
                     type="button"
                     onClick={() => navigate('/login')}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold rounded-xl transition-colors"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-900 dark:text-white font-bold rounded-xl transition-colors"
                   >
                     <LogIn size={18} /> Masuk ke Aplikasi
                   </button>
@@ -332,8 +332,8 @@ export default function RegisterPage() {
               <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600">
                 <CheckCircle2 size={48} />
               </div>
-              <h2 className="text-3xl font-extrabold text-slate-900 mb-4">Pendaftaran Terkirim!</h2>
-              <p className="text-lg text-slate-600 max-w-md mx-auto leading-relaxed mb-8">
+              <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-4">Pendaftaran Terkirim!</h2>
+              <p className="text-lg text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed mb-8">
                 Terima kasih, <strong>{form.namaPemilik}</strong>. Permohonan pendaftaran untuk <strong>{form.namaUsaha}</strong> telah kami terima dan sedang dalam proses peninjauan oleh tim kami.
               </p>
               
@@ -349,7 +349,7 @@ export default function RegisterPage() {
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <button
                   onClick={() => navigate('/')}
-                  className="px-6 py-3 bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
+                  className="px-6 py-3 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors"
                 >
                   Kembali ke Beranda
                 </button>

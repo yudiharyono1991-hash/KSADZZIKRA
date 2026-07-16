@@ -26,4 +26,27 @@ ADD COLUMN IF NOT EXISTS branch_id TEXT;
 ALTER TABLE public.journal_entries 
 ADD COLUMN IF NOT EXISTS branch_id TEXT;
 
+-- 6. Tambahkan jam operasional untuk Store Settings
+ALTER TABLE public.store_settings 
+ADD COLUMN IF NOT EXISTS operational_hours JSONB DEFAULT '{"isOpen": true, "openTime": "07:00", "closeTime": "21:00", "closedMessage": "Maaf, toko sedang tutup."}'::jsonb;
+
+-- 7. Tambahkan kolom ongkos kirim pada Transaksi dan Pesanan Online
+ALTER TABLE public.transactions
+ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0;
+
+ALTER TABLE public.online_orders
+ADD COLUMN IF NOT EXISTS shipping_fee NUMERIC DEFAULT 0;
+
+-- 8. Tambahkan kolom whatsapp pada ksa_branches
+ALTER TABLE public.ksa_branches
+ADD COLUMN IF NOT EXISTS whatsapp TEXT;
+
+-- 9. Tambahkan saldo kas kecil (Petty Cash) pada Store Settings
+ALTER TABLE public.store_settings
+ADD COLUMN IF NOT EXISTS petty_cash_balance NUMERIC DEFAULT 0;
+
+-- 10. Tambahkan Piutang / Kasbon pada ksa_users
+ALTER TABLE public.ksa_users
+ADD COLUMN IF NOT EXISTS debt_amount NUMERIC DEFAULT 0;
+
 -- Selesai! Script ini aman dijalankan berkali-kali tanpa error.

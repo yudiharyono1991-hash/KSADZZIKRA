@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
 
 @theme {
   /* KSA Adz-Zikra Core Green Palette */
@@ -30,26 +32,52 @@
 
 @media print {
   @page {
-    margin: 0;
+    margin: 10mm;
+    size: A4 portrait;
   }
-  body * {
-    visibility: hidden;
-  }
-  .printable-area, .printable-area * {
-    visibility: visible;
-  }
-  .printable-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100% !important;
+
+  /* react-to-print injects content into a separate iframe - no need to hide body */
+  body {
     margin: 0;
     padding: 0;
-    box-shadow: none;
-    border: none;
-    background-color: white;
-    color: black;
+    background: white !important;
+    color: black !important;
   }
+
+  body * {
+    color: black !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Preserve white backgrounds for table cells */
+  table, th, td {
+    background-color: white !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: black !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Page break helpers */
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  /* Hide sidebar/nav if window.print() is used as fallback */
+  .no-print, aside, nav, .print\:hidden {
+    display: none !important;
+  }
+
+  /* Thermal receipt width */
   .printable-thermal {
     width: 80mm !important;
     max-width: 80mm !important;
@@ -57,14 +85,5 @@
     padding: 5mm !important;
     font-size: 11px;
   }
-  .printable-a4 {
-    width: 210mm !important;
-    padding: 15mm !important;
-    margin: 0 auto !important;
-    font-size: 12px;
-  }
-  /* Hide non-printable elements inside receipt if any */
-  .no-print {
-    display: none !important;
-  }
 }
+

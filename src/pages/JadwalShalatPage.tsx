@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Clock, MapPin, Calendar as CalendarIcon, Sunrise, Sun, Sunset, Moon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAppStore } from '../store';
 
 interface PrayerTimes {
   tanggal: string;
@@ -16,6 +17,7 @@ interface PrayerTimes {
 
 export default function JadwalShalatPage() {
   const navigate = useNavigate();
+  const { isDarkMode, toggleDarkMode } = useAppStore();
   const [cityId, setCityId] = useState('1301'); // 1301 = Kota Jakarta
   const [jadwal, setJadwal] = useState<PrayerTimes | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,11 +56,11 @@ export default function JadwalShalatPage() {
     'Dzuhur': <Sun className="w-8 h-8 text-amber-500" />,
     'Ashar': <Sun className="w-8 h-8 text-orange-500" />,
     'Maghrib': <Sunset className="w-8 h-8 text-rose-500" />,
-    'Isya': <Moon className="w-8 h-8 text-slate-700" />,
+    'Isya': <Moon className="w-8 h-8 text-slate-700 dark:text-slate-300" />,
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans pb-12">
+    <div className={`min-h-screen font-sans pb-12 transition-colors ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-[#f8fafc] text-slate-800 dark:text-slate-200'}`}>
       <header className="bg-green-800 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -72,6 +74,11 @@ export default function JadwalShalatPage() {
               <Clock className="w-6 h-6 text-amber-400" />
               <h1 className="text-xl font-bold tracking-tight">Jadwal Shalat</h1>
             </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button onClick={toggleDarkMode} className="p-1.5 hover:bg-green-700 rounded-full transition-colors">
+              {isDarkMode ? <Sun className="w-5 h-5 text-amber-300" /> : <Moon className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </header>
@@ -96,15 +103,15 @@ export default function JadwalShalatPage() {
         </div>
 
         {/* CITY SELECTOR */}
-        <div className="mt-8 flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-          <div className="flex items-center gap-2 text-slate-500 font-medium whitespace-nowrap">
+        <div className={`mt-8 flex flex-col md:flex-row gap-4 items-center p-4 rounded-2xl shadow-sm border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
+          <div className={`flex items-center gap-2 font-medium whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
             <MapPin className="w-5 h-5" />
             <span>Pilih Kota Lokasi:</span>
           </div>
           <select 
             value={cityId}
             onChange={(e) => setCityId(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-green-800 focus:ring-2 focus:ring-green-500 focus:outline-none"
+            className={`w-full border rounded-xl px-4 py-2.5 font-bold focus:ring-2 focus:ring-green-500 focus:outline-none ${isDarkMode ? 'bg-slate-700 border-slate-600 text-green-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-green-800'}`}
           >
             <option value="1301">Kota Jakarta</option>
             <option value="1219">Kota Bandung</option>
@@ -127,12 +134,12 @@ export default function JadwalShalatPage() {
         ) : jadwal ? (
           <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-4">
             {['Subuh', 'Dzuhur', 'Ashar', 'Maghrib', 'Isya'].map((waktu) => (
-              <div key={waktu} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:border-green-300 hover:shadow-md transition-all">
-                <div className="mb-3 bg-slate-50 p-3 rounded-full">
+              <div key={waktu} className={`rounded-2xl p-6 shadow-sm border flex flex-col items-center justify-center text-center hover:border-green-300 hover:shadow-md transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
+                <div className={`mb-3 p-3 rounded-full ${isDarkMode ? 'bg-slate-700' : 'bg-slate-50 dark:bg-slate-800'}`}>
                   {prayerIcons[waktu]}
                 </div>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">{waktu}</h3>
-                <p className="text-2xl font-black font-mono text-green-800">
+                <h3 className={`text-sm font-bold uppercase tracking-widest mb-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>{waktu}</h3>
+                <p className={`text-2xl font-black font-mono ${isDarkMode ? 'text-green-400' : 'text-green-800'}`}>
                   {jadwal[waktu.toLowerCase() as keyof PrayerTimes]}
                 </p>
               </div>

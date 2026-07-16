@@ -48,7 +48,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div id="shariahpos-root" className="flex bg-slate-50 h-[100dvh] text-slate-800 antialiased overflow-hidden">
+    <div id="shariahpos-root" className="flex bg-slate-50 dark:bg-slate-800 h-[100dvh] text-slate-800 dark:text-slate-200 antialiased overflow-hidden">
       {/* Sidebar — slides over content on mobile, static on desktop */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -58,7 +58,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       />
 
       {/* Main content panel */}
-      <div className="flex-1 flex flex-col min-w-0 w-full h-[100dvh] overflow-hidden transition-all duration-300">
+      <div id="main-content-panel" className="flex-1 flex flex-col min-w-0 w-full h-[100dvh] overflow-hidden transition-all duration-300">
 
         {/* ─── STICKY HEADER ─────────────────────────────────────── */}
         <TopBar

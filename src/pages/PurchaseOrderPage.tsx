@@ -20,7 +20,7 @@ export default function PurchaseOrderPage() {
   // Prevent accessing if not admin or owner
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4">
+      <div className="flex flex-col items-center justify-center h-full text-slate-500 dark:text-slate-400 space-y-4">
         <ShieldAlert className="w-16 h-16 text-red-400" />
         <h2 className="text-xl font-bold">Akses Ditolak</h2>
         <p>Anda tidak memiliki izin untuk mengakses halaman Purchase Order.</p>
@@ -106,14 +106,15 @@ export default function PurchaseOrderPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="print:hidden space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center space-x-3">
           <div className="p-3 bg-blue-100 text-blue-800 rounded-xl">
             <ShoppingBag className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Purchase Order (PO)</h1>
-            <p className="text-xs font-semibold text-slate-500 mt-1">Catat pesanan barang ke supplier.</p>
+            <h1 className="text-2xl font-black text-slate-800 dark:text-slate-200 tracking-tight">Purchase Order (PO)</h1>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Catat pesanan barang ke supplier.</p>
           </div>
         </div>
         
@@ -126,16 +127,16 @@ export default function PurchaseOrderPage() {
       </div>
 
       {isAdding ? (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-          <h2 className="text-lg font-bold text-slate-800 mb-4">Formulir Purchase Order</h2>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-6">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">Formulir Purchase Order</h2>
           <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-slate-500">Nomor PO</label>
-                <input type="text" required value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="PO-2026-001" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Nomor PO</label>
+                <input type="text" required value={poNumber} onChange={(e) => setPoNumber(e.target.value)} placeholder="PO-2026-001" className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-slate-500">Nama Supplier</label>
+                <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Nama Supplier</label>
                 <select 
                   required 
                   value={supplier} 
@@ -144,7 +145,7 @@ export default function PurchaseOrderPage() {
                     const sup = suppliers.find(s => s.name === e.target.value);
                     if (sup) setSupplierPhone(sup.phone);
                   }}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                  className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-slate-900"
                 >
                   <option value="" disabled>Pilih Supplier...</option>
                   {suppliers.map(s => (
@@ -153,37 +154,37 @@ export default function PurchaseOrderPage() {
                   <option value="Supplier Lainnya">Supplier Lainnya (Input Manual)</option>
                 </select>
                 {supplier === 'Supplier Lainnya' && (
-                  <input type="text" required value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Ketik nama supplier..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-2" />
+                  <input type="text" required value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Ketik nama supplier..." className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-2" />
                 )}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-slate-500">Total Estimasi Harga (Rp)</label>
-                <input type="number" required min="0" value={totalAmount} onChange={(e) => setTotalAmount(Number(e.target.value))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Total Estimasi Harga (Rp)</label>
+                <input type="number" required min="0" value={totalAmount} onChange={(e) => setTotalAmount(Number(e.target.value))} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-slate-500">No. WA Supplier (Opsional)</label>
-                <input type="text" value={supplierPhone} onChange={(e) => setSupplierPhone(e.target.value)} placeholder="08123456789" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">No. WA Supplier (Opsional)</label>
+                <input type="text" value={supplierPhone} onChange={(e) => setSupplierPhone(e.target.value)} placeholder="08123456789" className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-slate-500">Total Estimasi Harga (Rp)</label>
-              <input type="number" required min="0" value={totalAmount} onChange={(e) => setTotalAmount(Number(e.target.value))} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Total Estimasi Harga (Rp)</label>
+              <input type="number" required min="0" value={totalAmount} onChange={(e) => setTotalAmount(Number(e.target.value))} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold text-slate-500">Catatan / Rincian Barang</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Minyak 10 dus, Beras 50 karung..." className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+              <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Catatan / Rincian Barang</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Minyak 10 dus, Beras 50 karung..." className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
             </div>
             <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors">Simpan PO</button>
           </form>
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase tracking-wider font-bold">
+                <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
                   <th className="p-4">Tanggal & No. PO</th>
                   <th className="p-4">Supplier</th>
                   <th className="p-4 text-right">Total (Rp)</th>
@@ -195,19 +196,19 @@ export default function PurchaseOrderPage() {
               <tbody className="text-sm">
                 {purchaseOrders.map((po) => (
                   <React.Fragment key={po.id}>
-                  <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
                     <td className="p-4">
-                      <p className="font-bold text-slate-800">{po.poNumber}</p>
-                      <p className="text-[10px] text-slate-500">{new Date(po.date).toLocaleDateString('id-ID')}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{po.poNumber}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{new Date(po.date).toLocaleDateString('id-ID')}</p>
                     </td>
-                    <td className="p-4 font-semibold text-slate-700">{po.supplier}</td>
+                    <td className="p-4 font-semibold text-slate-700 dark:text-slate-300">{po.supplier}</td>
                     <td className="p-4 text-right font-mono font-bold text-green-700">
                       {po.totalAmount.toLocaleString('id-ID')}
                     </td>
                     <td className="p-4 text-center">
                       <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${
                         po.status === 'RECEIVED' ? 'bg-green-100 text-green-800' : 
-                        po.status === 'ORDERED' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                        po.status === 'ORDERED' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200'
                       }`}>
                         <CheckCircle className="w-3 h-3" />
                         <span>{po.status}</span>
@@ -218,7 +219,7 @@ export default function PurchaseOrderPage() {
                         </div>
                       )}
                     </td>
-                    <td className="p-4 text-xs text-slate-500">{po.createdBy}</td>
+                    <td className="p-4 text-xs text-slate-500 dark:text-slate-400">{po.createdBy}</td>
                     <td className="p-4 text-right space-x-2">
                       <button 
                         onClick={() => handleSendWA(po)}
@@ -248,14 +249,14 @@ export default function PurchaseOrderPage() {
                   
                   {/* Receive Action Form inline row */}
                   {receivingPoId === po.id && (
-                    <tr className="bg-blue-50/50 border-b border-slate-200">
+                    <tr className="bg-blue-50/50 border-b border-slate-200 dark:border-slate-700">
                       <td colSpan={6} className="p-4">
                         <div className="flex items-center gap-3 max-w-xl ml-auto">
-                          <label className="text-xs font-bold text-slate-700 whitespace-nowrap">Input Invoice Supplier:</label>
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Input Invoice Supplier:</label>
                           <input 
                             type="text" 
                             placeholder="INV-SUP-123 atau URL" 
-                            className="flex-1 px-3 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="flex-1 px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                             value={invoiceInput}
                             onChange={(e) => setInvoiceInput(e.target.value)}
                           />
@@ -267,7 +268,7 @@ export default function PurchaseOrderPage() {
                           </button>
                           <button 
                             onClick={() => setReceivingPoId(null)}
-                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-bold"
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded text-xs font-bold"
                           >
                             Batal
                           </button>
@@ -280,13 +281,14 @@ export default function PurchaseOrderPage() {
               </tbody>
             </table>
             {purchaseOrders.length === 0 && (
-              <div className="p-8 text-center text-slate-500 text-sm">
+              <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">
                 Belum ada data Purchase Order.
               </div>
             )}
           </div>
         </div>
       )}
+      </div>
 
       {/* Printable Area - 2 Rangkap PO */}
       {printPo && (() => {
@@ -299,30 +301,30 @@ export default function PurchaseOrderPage() {
           <div className="border-2 border-gray-800 p-6 rounded-lg mb-8">
             <div className="flex justify-between items-start border-b-2 border-gray-800 pb-4 mb-4">
               <div>
-                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
-                <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Asli (Untuk Supplier)</p>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900 dark:text-white">KSA Mart</h1>
+                <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mt-1">PURCHASE ORDER (PO)</p>
+                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">Rangkap: Asli (Untuk Supplier)</p>
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-gray-900">{printPo.poNumber}</p>
-                <p className="text-xs text-gray-600">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{printPo.poNumber}</p>
+                <p className="text-xs text-gray-600 dark:text-slate-400">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
               <div>
-                <p className="font-bold text-gray-500 text-xs uppercase">Kepada Yth:</p>
-                <p className="font-bold text-lg text-gray-900">{printPo.supplier}</p>
+                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Kepada Yth:</p>
+                <p className="font-bold text-lg text-gray-900 dark:text-white">{printPo.supplier}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-500 text-xs uppercase">Estimasi Total Harga:</p>
-                <p className="font-black text-xl text-gray-900">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
+                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Estimasi Total Harga:</p>
+                <p className="font-black text-xl text-gray-900 dark:text-white">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <p className="font-bold text-gray-500 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-gray-800 whitespace-pre-wrap min-h-[100px]">
+              <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 whitespace-pre-wrap min-h-[100px]">
                 {printPo.notes || '-'}
               </div>
             </div>
@@ -331,12 +333,12 @@ export default function PurchaseOrderPage() {
               <div className="text-center w-40">
                 <p className="mb-12 font-semibold">Dibuat Oleh,</p>
                 <p className="border-b border-gray-800 pb-1 font-bold">{printPo.createdBy}</p>
-                <p className="text-[10px] text-gray-500 mt-1 uppercase">{creatorRole}</p>
+                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1 uppercase">{creatorRole}</p>
               </div>
               <div className="text-center w-40">
                 <p className="mb-12 font-semibold">Disetujui/Diterima Oleh,</p>
                 <p className="border-b border-gray-800 pb-1 text-transparent select-none">__________</p>
-                <p className="text-[10px] text-gray-500 mt-1 uppercase">Pihak Supplier</p>
+                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1 uppercase">Pihak Supplier</p>
               </div>
             </div>
           </div>
@@ -347,30 +349,30 @@ export default function PurchaseOrderPage() {
           <div className="border border-gray-400 p-6 rounded-lg">
             <div className="flex justify-between items-start border-b border-gray-400 pb-4 mb-4">
               <div>
-                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
-                <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Copy (Arsip Toko)</p>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900 dark:text-white">KSA Mart</h1>
+                <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mt-1">PURCHASE ORDER (PO)</p>
+                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">Rangkap: Copy (Arsip Toko)</p>
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-gray-900">{printPo.poNumber}</p>
-                <p className="text-xs text-gray-600">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{printPo.poNumber}</p>
+                <p className="text-xs text-gray-600 dark:text-slate-400">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
               <div>
-                <p className="font-bold text-gray-500 text-xs uppercase">Kepada Yth:</p>
-                <p className="font-bold text-lg text-gray-900">{printPo.supplier}</p>
+                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Kepada Yth:</p>
+                <p className="font-bold text-lg text-gray-900 dark:text-white">{printPo.supplier}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-500 text-xs uppercase">Estimasi Total Harga:</p>
-                <p className="font-black text-xl text-gray-900">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
+                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Estimasi Total Harga:</p>
+                <p className="font-black text-xl text-gray-900 dark:text-white">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <p className="font-bold text-gray-500 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-gray-800 whitespace-pre-wrap min-h-[100px]">
+              <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
+              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 whitespace-pre-wrap min-h-[100px]">
                 {printPo.notes || '-'}
               </div>
             </div>
@@ -379,7 +381,7 @@ export default function PurchaseOrderPage() {
               <div className="text-center w-40">
                 <p className="mb-12 font-semibold">Dibuat Oleh,</p>
                 <p className="border-b border-gray-800 pb-1 font-bold">{printPo.createdBy}</p>
-                <p className="text-[10px] text-gray-500 mt-1 uppercase">{creatorRole}</p>
+                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1 uppercase">{creatorRole}</p>
               </div>
             </div>
             

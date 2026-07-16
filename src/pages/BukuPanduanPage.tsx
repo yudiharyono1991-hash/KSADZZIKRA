@@ -34,8 +34,8 @@ export default function BukuPanduanPage() {
       { id: 'm5', title: 'Kasbon & Piutang Pelanggan', content: 'Saat pelanggan membayar dengan Kasbon, sistem mencatat Piutang dan menambah Piutang Pelanggan. Piutang ini bisa dilunasi di Master Pelanggan atau pada transaksi berikutnya.' }
     ];
 
-    const ownerGuide = [
-      { id: 'o1', title: 'Konfigurasi Sistem Tingkat Lanjut', content: 'Masuk ke menu Tata Kelola > Pengaturan Toko. Di bagian bawah terdapat "Konfigurasi Sistem Tingkat Lanjut". Anda bisa mengatur Mode Pemeliharaan (memblokir sementara akses login staf), Batas Minimum Saldo Kas, Presentase Zakat Niaga (Default 2.5%), dan opsi Auto-Approval.' },
+      const ownerGuide = [
+      { id: 'o1', title: 'Konfigurasi Sistem & Jam Operasional', content: 'Masuk ke menu Tata Kelola > Pengaturan Toko. Anda dapat mengatur Jam Operasional Toko (hidup/mati serta pesan libur), Mode Pemeliharaan (memblokir sementara akses login staf), Batas Minimum Saldo Kas, Presentase Zakat Niaga (Default 2.5%), dan opsi Auto-Approval.' },
       { id: 'o2', title: 'Standar Akuntansi Syariah (Laba Rugi & Neraca)', content: 'Akses menu Dashboard & Laporan > Laporan Laba Rugi. Laporan ini telah memisahkan antara Laba Bersih dan Zakat Niaga. Zakat ditarik otomatis dari surplus laba bersih, menyisakan SHU Bersih untuk dibagihasilkan secara Mudharabah. Fitur ini dirancang sesuai tinjauan dan standar kepatuhan syariah (Review Pak Grandis).' },
       { id: 'o3', title: 'Manajemen Chart of Accounts (CoA)', content: 'Gunakan menu "Daftar Akun (CoA)" untuk menyesuaikan tata letak akuntansi (misal menambahkan pos Zakat, Infak, atau Bagi Hasil khusus).' },
       { id: 'o4', title: 'Zakat Niaga Otomatis', content: 'Sistem mengkalkulasi kewajiban zakat (zakatReserve) otomatis sebesar 2.5% (atau sesuai pengaturan) dari netProfit berjalan jika usahanya untung. Transparan tanpa intervensi manual.' },
@@ -69,18 +69,18 @@ export default function BukuPanduanPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         <div className="space-y-4">
-          <h2 className="font-bold text-gray-800 text-lg border-b pb-2">Panduan Operasional</h2>
+          <h2 className="font-bold text-gray-800 dark:text-slate-200 text-lg border-b pb-2">Panduan Operasional</h2>
           {guides.map((item) => (
-            <div key={item.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
+            <div key={item.id} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
               <button 
                 onClick={() => toggleSection(item.id)}
-                className="w-full text-left px-5 py-4 font-semibold text-green-800 flex justify-between items-center bg-gray-50 hover:bg-green-50"
+                className="w-full text-left px-5 py-4 font-semibold text-green-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800 hover:bg-green-50"
               >
                 {item.title}
                 {openSection === item.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </button>
               {openSection === item.id && (
-                <div className="p-5 text-gray-600 bg-white leading-relaxed text-sm border-t border-gray-100">
+                <div className="p-5 text-gray-600 dark:text-slate-400 bg-white dark:bg-slate-900 leading-relaxed text-sm border-t border-gray-100 dark:border-slate-800">
                   {item.content}
                 </div>
               )}
@@ -89,12 +89,12 @@ export default function BukuPanduanPage() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="font-bold text-gray-800 text-lg border-b pb-2">Integrasi Perangkat & Sistem Eksternal</h2>
+          <h2 className="font-bold text-gray-800 dark:text-slate-200 text-lg border-b pb-2">Integrasi Perangkat & Sistem Eksternal</h2>
           <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm space-y-4 text-sm text-blue-900 leading-relaxed">
             <h3 className="font-bold text-blue-800 text-base mb-2">1. Dukungan Perangkat Keras (Hardware)</h3>
             <ul className="list-disc pl-5 space-y-2">
               <li><strong>Barcode Scanner:</strong> Aplikasi KSA Mart sepenuhnya mendukung pemindai *barcode* standar (USB/Bluetooth). Cukup arahkan kursor ke kolom pencarian di halaman Kasir POS, lalu *scan* barang. Scanner akan otomatis mengetikkan kode dan menekan tombol *Enter* untuk memasukkan barang ke keranjang secara instan.</li>
-              <li><strong>Mesin Printer Kasir (Thermal):</strong> Pencetakan struk transaksi menggunakan fungsi cetak bawaan sistem (`window.print()`). Anda dapat menghubungkan printer kasir (Bluetooth/USB ukuran 58mm atau 80mm) ke komputer/tablet, lalu memilih printer tersebut pada jendela *Print Dialog* browser.</li>
+              <li><strong>Mesin Printer Kasir (Thermal):</strong> Pencetakan struk transaksi menggunakan fungsi cetak bawaan sistem (`window.print()`). Pada layar Kasir, Anda dapat menghubungkan printer kasir kabel/USB tipe lama maupun baru. Tersedia pilihan ukuran kertas (58mm, 80mm, atau A4) sesaat sebelum Anda menekan tombol Cetak, yang secara otomatis akan menyesuaikan ukuran struk agar pas di kertas tanpa terpotong.</li>
             </ul>
             <h3 className="font-bold text-blue-800 text-base mt-4 mb-2">2. Kerjasama Pihak Ketiga (PPOB, E-Wallet, VA)</h3>
             <ul className="list-disc pl-5 space-y-2">
@@ -105,14 +105,14 @@ export default function BukuPanduanPage() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="font-bold text-gray-800 text-lg border-b pb-2">Hubungan Peran & Izin</h2>
-          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+          <h2 className="font-bold text-gray-800 dark:text-slate-200 text-lg border-b pb-2">Hubungan Peran & Izin</h2>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm space-y-4">
             {((currentUser?.role as any) === 'KASIR' || (currentUser?.role as any) === 'KASIR_TOKO') && (
               <div className="flex items-start gap-3">
                 <div className="bg-green-100 p-2 rounded-lg text-green-700 mt-1"><UserCheck className="w-5 h-5"/></div>
                 <div>
-                  <h3 className="font-bold text-gray-800">KASIR</h3>
-                  <p className="text-xs text-gray-500 mt-1">Akses sangat terbatas pada operasional harian (Transaksi POS, Riwayat Transaksi). Tidak dapat mengedit harga barang atau menghapus log.</p>
+                  <h3 className="font-bold text-gray-800 dark:text-slate-200">KASIR</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Akses sangat terbatas pada operasional harian (Transaksi POS, Riwayat Transaksi). Tidak dapat mengedit harga barang atau menghapus log.</p>
                 </div>
               </div>
             )}
@@ -121,8 +121,8 @@ export default function BukuPanduanPage() {
               <div className="flex items-start gap-3">
                 <div className="bg-amber-100 p-2 rounded-lg text-amber-700 mt-1"><ShieldCheck className="w-5 h-5"/></div>
                 <div>
-                  <h3 className="font-bold text-gray-800">ADMIN</h3>
-                  <p className="text-xs text-gray-500 mt-1">Akses staf untuk inventori dasar dan mencatat pesanan. Tidak punya akses ke Laba Rugi atau Pengaturan Toko.</p>
+                  <h3 className="font-bold text-gray-800 dark:text-slate-200">ADMIN</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Akses staf untuk inventori dasar dan mencatat pesanan. Tidak punya akses ke Laba Rugi atau Pengaturan Toko.</p>
                 </div>
               </div>
             )}
@@ -131,8 +131,8 @@ export default function BukuPanduanPage() {
               <div className="flex items-start gap-3">
                 <div className="bg-blue-100 p-2 rounded-lg text-blue-700 mt-1"><Users className="w-5 h-5"/></div>
                 <div>
-                  <h3 className="font-bold text-gray-800">MANAGER</h3>
-                  <p className="text-xs text-gray-500 mt-1">Akses manajerial. Bisa mengatur cabang, menyetujui akun, dan melihat laporan penjualan serta kas. Tidak dapat mengubah pengaturan krusial toko.</p>
+                  <h3 className="font-bold text-gray-800 dark:text-slate-200">MANAGER</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Akses manajerial. Bisa mengatur cabang, menyetujui akun, dan melihat laporan penjualan serta kas. Tidak dapat mengubah pengaturan krusial toko.</p>
                 </div>
               </div>
             )}
@@ -141,8 +141,8 @@ export default function BukuPanduanPage() {
               <div className="flex items-start gap-3">
                 <div className="bg-purple-100 p-2 rounded-lg text-purple-700 mt-1"><Settings className="w-5 h-5"/></div>
                 <div>
-                  <h3 className="font-bold text-gray-800">OWNER / PENGAWAS</h3>
-                  <p className="text-xs text-gray-500 mt-1">Hak akses penuh (Superadmin). Pemilik bisa melihat Neraca Laba Rugi, mengatur semua Hak Akses, Zakat, hingga fitur penuh Tata Kelola Toko.</p>
+                  <h3 className="font-bold text-gray-800 dark:text-slate-200">OWNER / PENGAWAS</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Hak akses penuh (Superadmin). Pemilik bisa melihat Neraca Laba Rugi, mengatur semua Hak Akses, Zakat, hingga fitur penuh Tata Kelola Toko.</p>
                 </div>
               </div>
             )}

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
 import * as XLSX from 'xlsx';
+import { useReactToPrint } from 'react-to-print';
+import PrintHeader from '../components/Print/PrintHeader';
+import PrintFooter from '../components/Print/PrintFooter';
 import {
   TrendingUp,
   Scale,
@@ -102,9 +105,19 @@ export default function NeracaRugiPage() {
   });
 
   const periodTransactionsRevenue = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
-  const periodTransactionsHPP = filteredTransactions.reduce((sum, tx) =>
-    sum + (tx.items || []).reduce((s, it) => s + ((Number(it.costPrice) || 0) * (Number(it.quantity) || 0)), 0), 0
-  );
+  const periodTransactionsHPP = filteredTransactions.reduce((sum, tx) => {
+    return sum + (tx.items || []).reduce((s, it) => {
+      let cp = Number(it.costPrice || 0);
+      if (!cp) {
+        const productData = products?.find((p: any) => p.id === it.productId);
+        if (productData) {
+          const isBox = it.productName?.toLowerCase().includes('(box)');
+          cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+        }
+      }
+      return s + (cp * (Number(it.quantity) || 0));
+    }, 0);
+  }, 0);
   const periodTransactionsExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
   // Manual Journals
@@ -120,6 +133,7 @@ export default function NeracaRugiPage() {
   let periodManualExpenses = 0;
 
   periodManualJournals.forEach(j => {
+    if (!j.account) return;
     if (j.account.startsWith('4-')) periodManualRevenue += (j.credit - j.debit);
     else if (j.account.startsWith('5-')) periodManualHPP += (j.debit - j.credit);
     else if (j.account.startsWith('6-')) periodManualExpenses += (j.debit - j.credit);
@@ -131,7 +145,7 @@ export default function NeracaRugiPage() {
   const totalExpenses = periodTransactionsExpenses + periodManualExpenses;
   const netProfit = grossProfit - totalExpenses;
   const zakatRateDecimal = (settings.charityZakatPercentage || 2.5) / 100;
-  const zakatReserve = Math.max(0, netProfit) * zakatRateDecimal; // Zakat Niaga berdasarkan Keuntungan Bersih
+  const zakatReserve = Math.round(Math.max(0, netProfit) * zakatRateDecimal); // Zakat Niaga berdasarkan Keuntungan Bersih, dibulatkan
 
   // Cumulative all-time balances supporting position (Balance Sheet)
   const allTimeTransactionsRevenue = (transactions || [])
@@ -173,6 +187,7 @@ export default function NeracaRugiPage() {
   let allTimeManualCash = 0;
 
   cumulativeManualJournals.forEach(j => {
+    if (!j.account) return;
     if (j.account.startsWith('4-')) allTimeManualRevenue += (j.credit - j.debit);
     else if (j.account.startsWith('5-')) allTimeManualHPP += (j.debit - j.credit);
     else if (j.account.startsWith('6-')) allTimeManualExpenses += (j.debit - j.credit);
@@ -189,7 +204,8 @@ export default function NeracaRugiPage() {
   const cashOnHand = initialStoreCapital + allTimeTransactionsRevenue - allTimeTransactionsExpenses + allTimeManualCash;
 
   // Unsold merchandise stock valuation (asset)
-  const valueOfInventory = (products || []).reduce((sum, p) => sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
+  // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
+  const valueOfInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
 
   // Total Aktiva (Assets)
   const totalAssets = cashOnHand + valueOfInventory + Number(receivablesVal);
@@ -245,15 +261,20 @@ export default function NeracaRugiPage() {
     XLSX.writeFile(wb, `Neraca_Laba_Rugi_KSAMart_${startDate}_to_${endDate}.xlsx`);
   };
 
+  const handlePrint = useReactToPrint({
+    contentRef: reportRef,
+    documentTitle: `Neraca_Laba_Rugi_KSAMart_${startDate}_to_${endDate}`,
+    onAfterPrint: () => addLog('PRINT_REPORT', 'FINANCE', `Mencetak Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate}`)
+  });
 
   return (
     <div className="space-y-6">
 
       {/* HEADER CARD */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h2 className="font-extrabold text-slate-800 text-sm flex items-center space-x-1.5">
+            <h2 className="font-extrabold text-slate-800 dark:text-slate-200 text-sm flex items-center space-x-1.5">
               <Scale className="w-5 h-5 text-[#388e3c]" />
               <span>Neraca Laba Rugi Syariah</span>
             </h2>
@@ -268,20 +289,20 @@ export default function NeracaRugiPage() {
 
         {/* Filters and Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center space-x-1.5 bg-slate-50 border border-gray-200 rounded-lg px-2 py-1">
-            <Calendar className="w-3.5 h-3.5 text-gray-500" />
+          <div className="flex items-center space-x-1.5 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2 py-1">
+            <Calendar className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="bg-transparent border-none text-xs focus:outline-none text-slate-700 font-medium"
+              className="bg-transparent border-none text-xs focus:outline-none text-slate-700 dark:text-slate-300 font-medium"
             />
             <span className="text-gray-455 text-xs">s/d</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-transparent border-none text-xs focus:outline-none text-slate-700 font-medium"
+              className="bg-transparent border-none text-xs focus:outline-none text-slate-700 dark:text-slate-300 font-medium"
             />
           </div>
 
@@ -324,15 +345,15 @@ export default function NeracaRugiPage() {
 
           <button
             onClick={handleExportExcel}
-            className="bg-white hover:bg-slate-50 text-gray-700 border border-gray-200 font-bold text-xs py-1.5 px-3 rounded-lg flex items-center space-x-1 shadow-2xs transition-colors"
+            className="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:bg-slate-800 active:scale-95 active:bg-gray-100 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 font-bold text-xs py-1.5 px-3 rounded-lg flex items-center space-x-1 shadow-sm hover:shadow transition-all"
           >
             <FileSpreadsheet className="w-4 h-4 text-[#388e3c]" />
             <span>Unduh Excel</span>
           </button>
 
           <button
-            onClick={() => window.print()}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-xs transition-colors"
+            onClick={handlePrint}
+            className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 active:bg-indigo-800 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg flex items-center space-x-1 shadow-sm hover:shadow transition-all"
           >
             <Printer className="w-4 h-4" />
             <span>Cetak PDF/Kertas</span>
@@ -344,14 +365,14 @@ export default function NeracaRugiPage() {
       <div className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-200 ${isAutoBalanced
           ? 'bg-green-50/75 border-green-100 text-green-950'
           : isBalanced
-            ? 'bg-slate-50 border-slate-200 text-slate-900'
+            ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'
             : 'bg-amber-50/75 border-amber-200 text-amber-950'
         }`}>
         <div className="flex items-start md:items-center space-x-3.5">
           <div className={`p-2 rounded-xl flex-shrink-0 ${isAutoBalanced
               ? 'bg-green-100/80 text-green-700'
               : isBalanced
-                ? 'bg-slate-150 text-slate-600'
+                ? 'bg-slate-150 text-slate-600 dark:text-slate-400'
                 : 'bg-amber-105 text-amber-700'
             }`}>
             {isAutoBalanced ? (
@@ -366,15 +387,24 @@ export default function NeracaRugiPage() {
                 ? '🛡️ Kunci Anti-Selisih Otomatis Aktif (Neraca Terkunci Seimbang)'
                 : isBalanced
                   ? '✓ Neraca Seimbang Secara Manual'
-                  : '⚠️ Perhatian: Neraca Mengalami Selisih Buku'}
+                  : '⚠️ PERHATIAN: NERACA MENGALAMI SELISIH BUKU'}
             </h4>
-            <p className="text-[11px] opacity-90 mt-0.5 leading-relaxed">
+            <div className="text-[11px] opacity-90 mt-1 leading-relaxed">
               {isAutoBalanced
-                ? 'Formula balancing pintar otomatis mengunci nilai Modal Sendiri agar saldo Aktiva (Aset) & Pasiva (Kewajiban) selalu seimbang Rp 0 tanpa selisih deviasi.'
+                ? <p>Formula balancing pintar otomatis mengunci nilai Modal Sendiri agar saldo Aktiva (Aset) & Pasiva (Kewajiban) selalu seimbang Rp 0 tanpa selisih deviasi.</p>
                 : isBalanced
-                  ? 'Angka saldo seimbang dengan modal manual yang Anda inputkan. Selisih adalah Rp 0.'
-                  : `Terdapat ketimpangan buku sebesar Rp ${netDifference.toLocaleString('id-ID')}. Anda bisa klik tombol di samping untuk mengunci modal penyeimbang.`}
-            </p>
+                  ? <p>Angka saldo seimbang dengan modal manual yang Anda inputkan. Selisih adalah Rp 0.</p>
+                  : (
+                    <div className="space-y-1 mt-1">
+                      <p className="font-semibold text-red-100">Terdapat selisih/ketimpangan buku sebesar Rp {netDifference.toLocaleString('id-ID')}. Apa yang harus dilakukan?</p>
+                      <ul className="list-disc pl-4 space-y-0.5">
+                        <li>Pastikan Anda sudah menginput <strong>Modal Awal / Setoran Kas</strong> melalui menu Arus Kas/Jurnal.</li>
+                        <li>Periksa apakah ada Kasbon/Piutang atau Pengeluaran Beban yang salah input/belum tercatat.</li>
+                        <li>Jika ini adalah penggunaan pertama aplikasi, klik tombol <strong>"Seimbangkan & Kunci"</strong> di sebelah kanan untuk langsung menyeimbangkan selisih ini secara otomatis ke akun Modal Penyeimbang.</li>
+                      </ul>
+                    </div>
+                  )}
+            </div>
           </div>
         </div>
 
@@ -382,7 +412,7 @@ export default function NeracaRugiPage() {
           {isAutoBalanced ? (
             <button
               onClick={() => setIsAutoBalanced(false)}
-              className="bg-white hover:bg-slate-100 text-slate-750 font-bold text-[10px] uppercase tracking-wider px-3.5 py-1.5 rounded-lg border border-slate-200 transition-all flex items-center space-x-1"
+              className="bg-white dark:bg-slate-900 hover:bg-slate-100 dark:bg-slate-800 text-slate-750 font-bold text-[10px] uppercase tracking-wider px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 transition-all flex items-center space-x-1"
             >
               <Unlock className="w-3.5 h-3.5" />
               <span>Buka Kunci Manual</span>
@@ -403,10 +433,10 @@ export default function NeracaRugiPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* SECTION 1: INCOME STATEMENT (LABA RUGI) */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="border-b border-gray-100 pb-3.5 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center space-x-2">
+            <div className="border-b border-gray-100 dark:border-slate-800 pb-3.5 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm flex items-center space-x-2">
                 <TrendingUp className="w-5 h-5 text-[#307c34]" />
                 <span>Laporan Laba Rugi Operasional</span>
               </h3>
@@ -415,13 +445,13 @@ export default function NeracaRugiPage() {
 
             {/* Calculations Fields */}
             <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between font-bold text-slate-800 bg-slate-50/80 px-3.5 py-2.5 rounded-lg border">
+              <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 rounded-lg border">
                 <span>PENDAPATAN PENJUALAN</span>
                 <span className="font-mono">Rp {totalRevenue.toLocaleString('id-ID')}</span>
               </div>
 
-              <div className="flex justify-between items-center pl-4 py-1.5 border-b border-dashed border-gray-100">
-                <span className="text-gray-500 font-medium">Beban Pokok Penjualan (HPP produk keluar)</span>
+              <div className="flex justify-between items-center pl-4 py-1.5 border-b border-dashed border-gray-100 dark:border-slate-800">
+                <span className="text-gray-500 dark:text-slate-400 font-medium">Beban Pokok Penjualan (HPP produk keluar)</span>
                 <span className="text-red-500 font-semibold font-mono">- Rp {totalHPP.toLocaleString('id-ID')}</span>
               </div>
 
@@ -441,7 +471,7 @@ export default function NeracaRugiPage() {
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
                   ) : (
                     filteredExpenses.map((exp) => (
-                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 hover:text-slate-900 transition-colors">
+                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors">
                         <span className="truncate max-w-[240px]">• {exp.description} ({exp.category})</span>
                         <span className="text-red-500 font-mono">- Rp {exp.amount.toLocaleString('id-ID')}</span>
                       </div>
@@ -449,7 +479,7 @@ export default function NeracaRugiPage() {
                   )}
                 </div>
 
-                <div className="flex justify-between font-bold text-gray-500 pl-4 py-2 mt-2 border-t border-gray-100 text-[11px]">
+                <div className="flex justify-between font-bold text-gray-500 dark:text-slate-400 pl-4 py-2 mt-2 border-t border-gray-100 dark:border-slate-800 text-[11px]">
                   <span>Total Kebutuhan Biaya Operasi</span>
                   <span className="font-mono text-red-500">Rp {totalExpenses.toLocaleString('id-ID')}</span>
                 </div>
@@ -457,8 +487,8 @@ export default function NeracaRugiPage() {
             </div>
           </div>
 
-          <div className="mt-6 space-y-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between font-extrabold text-slate-900 text-sm py-3 bg-slate-50 px-3.5 rounded-lg border">
+          <div className="mt-6 space-y-3 pt-3 border-t border-gray-100 dark:border-slate-800">
+            <div className="flex justify-between font-extrabold text-slate-900 dark:text-white text-sm py-3 bg-slate-50 dark:bg-slate-800 px-3.5 rounded-lg border">
               <span>{netProfit >= 0 ? 'LABA BERSIH (SEBELUM DIBAGI HASIL)' : 'RUGI BERSIH BERJALAN'}</span>
               <span className={`${netProfit >= 0 ? 'text-green-800' : 'text-red-600'} font-mono`}>
                 {netProfit < 0 ? '-' : ''}Rp {Math.abs(netProfit).toLocaleString('id-ID')}
@@ -481,9 +511,9 @@ export default function NeracaRugiPage() {
         </div>
 
         {/* SECTION 2: BALANCE SHEET POSITION (NERACA) */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs space-y-4">
-          <div className="border-b border-gray-100 pb-3.5 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center space-x-2">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs space-y-4">
+          <div className="border-b border-gray-100 dark:border-slate-800 pb-3.5 flex justify-between items-center">
+            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm flex items-center space-x-2">
               <ShieldCheck className="w-5 h-5 text-[#307c34]" />
               <span>Neraca Posisi Keuangan (Aktiva vs Pasiva)</span>
             </h3>
@@ -495,27 +525,27 @@ export default function NeracaRugiPage() {
             </span>
           </div>
 
-          <div className="space-y-4 text-xs text-gray-700">
+          <div className="space-y-4 text-xs text-gray-700 dark:text-slate-300">
 
             {/* AKTIVA */}
-            <div className="bg-[#fafafa] p-4 rounded-xl border border-gray-200/60 space-y-3">
-              <p className="font-black text-slate-800 tracking-wider text-[11px] border-b pb-1 flex justify-between items-center">
+            <div className="bg-[#fafafa] p-4 rounded-xl border border-gray-200 dark:border-slate-700/60 space-y-3">
+              <p className="font-black text-slate-800 dark:text-slate-200 tracking-wider text-[11px] border-b pb-1 flex justify-between items-center">
                 <span>AKTIVA (ASET)</span>
                 <span className="text-[10px] text-green-700">Sesuai PSAK 101</span>
               </p>
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-500 font-medium">Kas & Setara Kas (Saldo Bersih)</span>
-                  <span className="font-mono font-semibold text-slate-900">Rp {cashOnHand.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Kas & Setara Kas (Saldo Bersih)</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {cashOnHand.toLocaleString('id-ID')}</span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-500 font-medium">Persediaan Barang Dagang</span>
-                  <span className="font-mono font-semibold text-slate-900">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Persediaan Barang Dagang</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
                 </div>
 
-                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-150 shadow-2xs">
+                <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
                   <span className="text-gray-650 font-bold">Modal Awal Toko (Seed):</span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
@@ -524,12 +554,12 @@ export default function NeracaRugiPage() {
                       value={initialStoreCapital}
                       disabled={isReadOnlyRole}
                       onChange={(e) => setInitialStoreCapital(Number(e.target.value))}
-                      className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
+                      className="w-28 text-right bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-150 shadow-2xs">
+                <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
                   <span className="text-gray-650 font-bold">Piutang Dagang:</span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
@@ -538,7 +568,7 @@ export default function NeracaRugiPage() {
                       value={receivablesVal}
                       disabled={isReadOnlyRole}
                       onChange={(e) => setReceivablesVal(Number(e.target.value))}
-                      className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
+                      className="w-28 text-right bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
                     />
                   </div>
                 </div>
@@ -551,15 +581,15 @@ export default function NeracaRugiPage() {
             </div>
 
             {/* PASIVA */}
-            <div className="bg-[#fafafa] p-4 rounded-xl border border-gray-200/60 space-y-3">
-              <p className="font-black text-slate-800 tracking-wider text-[11px] border-b pb-1 flex justify-between items-center">
+            <div className="bg-[#fafafa] p-4 rounded-xl border border-gray-200 dark:border-slate-700/60 space-y-3">
+              <p className="font-black text-slate-800 dark:text-slate-200 tracking-wider text-[11px] border-b pb-1 flex justify-between items-center">
                 <span>PASIVA (LIABILITAS & DANA SYIRKAH)</span>
                 <span className="text-[10px] text-blue-700">Sesuai PSAK 105</span>
               </p>
 
               <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-150 shadow-2xs">
-                  <span className="text-gray-600 font-bold">Utang (Qardh/Kewajiban):</span>
+                <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
+                  <span className="text-gray-600 dark:text-slate-400 font-bold">Utang (Qardh/Kewajiban):</span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
                     <input
@@ -567,13 +597,13 @@ export default function NeracaRugiPage() {
                       value={accountsPayables}
                       disabled={isReadOnlyRole}
                       onChange={(e) => setAccountsPayables(Number(e.target.value))}
-                      className="w-28 text-right bg-slate-50 hover:bg-slate-100/50 border border-gray-200 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
+                      className="w-28 text-right bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-green-550"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-150 shadow-2xs">
-                  <span className="text-gray-600 font-bold flex items-center space-x-1">
+                <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
+                  <span className="text-gray-600 dark:text-slate-400 font-bold flex items-center space-x-1">
                     <span>Dana Syirkah Temporer (Modal):</span>
                     {isAutoBalanced && <span className="bg-green-100 text-green-800 text-[8px] font-black uppercase px-1 rounded">Locked</span>}
                   </span>
@@ -586,21 +616,21 @@ export default function NeracaRugiPage() {
                       onChange={(e) => setEquityCapitalInput(Number(e.target.value))}
                       className={`w-28 text-right border rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none ${isReadOnlyRole || isAutoBalanced
                           ? 'bg-green-50/55 border-green-100 text-green-900 cursor-not-allowed font-black'
-                          : 'bg-slate-50 hover:bg-slate-100/50 border-gray-200'
+                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700'
                         }`}
                     />
                   </div>
                 </div>
 
                 <div className="flex justify-between pt-1">
-                  <span className="text-gray-500 font-medium">Laba Berjalan Ditahan (Sistem)</span>
-                  <span className="font-mono font-semibold text-slate-900">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Laba Berjalan Ditahan (Sistem)</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">
                     {allTimeProfit < 0 ? '-' : ''}Rp {Math.abs(allTimeProfit).toLocaleString('id-ID')}
                   </span>
                 </div>
               </div>
 
-              <div className="flex justify-between font-bold text-slate-800 bg-slate-100 px-3 py-2 rounded-lg border border-slate-250 mt-3">
+              <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-lg border border-slate-250 mt-3">
                 <span>TOTAL PASIVA</span>
                 <span className="font-mono text-xs font-extrabold">Rp {totalLiabilitiesAndEquity.toLocaleString('id-ID')}</span>
               </div>
@@ -612,7 +642,7 @@ export default function NeracaRugiPage() {
                 <span>Visual Posisi Keseimbangan Buku (Balance Ratio)</span>
                 <span>{isBalanced ? '100% Balanced' : 'Deviasi Mismatch'}</span>
               </div>
-              <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden flex shadow-inner border">
+              <div className="w-full h-2.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden flex shadow-inner border">
                 <div
                   className="h-full bg-green-600 transition-all duration-300"
                   style={{ width: `${Math.min(100, Math.max(10, (totalAssets / (totalAssets + totalLiabilitiesAndEquity || 1)) * 100))}%` }}
@@ -636,50 +666,38 @@ export default function NeracaRugiPage() {
       </div>
 
       {/* Printable Area - A4 Report */}
-      <div className="printable-area printable-a4 space-y-6 bg-white p-8" ref={reportRef}>
-        <div className="text-center border-b-2 border-gray-800 pb-4">
-          <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">KSA Mart</h1>
-          <p className="text-sm font-semibold text-gray-600 mt-1">LAPORAN NERACA & LABA RUGI (SYARIAH)</p>
-          <p className="text-xs text-gray-500 mt-1">Periode: {startDate} s/d {endDate}</p>
-        </div>
-
-        <div className="flex justify-between items-end text-xs font-semibold text-gray-700">
-          <div>
-            <p>Dicetak Oleh: {currentUser?.name || 'Sistem'}</p>
-          </div>
-          <div>
-            <p>Tanggal Cetak: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-          </div>
-        </div>
+      <div style={{ display: 'none' }}>
+        <div className="printable-area printable-a4 space-y-6 bg-white dark:bg-slate-900 p-8 text-black" ref={reportRef}>
+          <PrintHeader title="Laporan Neraca Laba Rugi" period={`${startDate} s/d ${endDate}`} />
 
         {/* Laba Rugi Print Section */}
         <div className="mb-8">
-          <h2 className="font-bold text-sm bg-gray-100 p-2 border border-gray-300">I. LAPORAN LABA RUGI</h2>
-          <table className="w-full text-xs text-left border-collapse border border-gray-300">
+          <h2 className="font-bold text-sm bg-gray-100 dark:bg-slate-800 p-2 border border-gray-300 dark:border-slate-600">I. LAPORAN LABA RUGI</h2>
+          <table className="w-full text-xs text-left border-collapse border border-gray-300 dark:border-slate-600">
             <tbody>
               <tr>
-                <td className="p-2 border border-gray-300 font-semibold">Pendapatan Usaha (Omset)</td>
-                <td className="p-2 border border-gray-300 text-right">Rp {totalRevenue.toLocaleString('id-ID')}</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 font-semibold">Pendapatan Usaha (Omset)</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {totalRevenue.toLocaleString('id-ID')}</td>
               </tr>
               <tr>
-                <td className="p-2 border border-gray-300">Harga Pokok Penjualan (HPP)</td>
-                <td className="p-2 border border-gray-300 text-right text-red-600">(Rp {totalHPP.toLocaleString('id-ID')})</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600">Harga Pokok Penjualan (HPP)</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600">(Rp {totalHPP.toLocaleString('id-ID')})</td>
               </tr>
-              <tr className="bg-gray-50 font-bold">
-                <td className="p-2 border border-gray-300">Laba Kotor Perdagangan</td>
-                <td className="p-2 border border-gray-300 text-right">Rp {grossProfit.toLocaleString('id-ID')}</td>
-              </tr>
-              <tr>
-                <td className="p-2 border border-gray-300">Beban Operasional</td>
-                <td className="p-2 border border-gray-300 text-right text-red-600">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
-              </tr>
-              <tr className="bg-gray-50 font-bold">
-                <td className="p-2 border border-gray-300 uppercase">Laba Bersih Operasional</td>
-                <td className="p-2 border border-gray-300 text-right text-green-800">Rp {netProfit.toLocaleString('id-ID')}</td>
+              <tr className="bg-gray-50 dark:bg-slate-800 font-bold">
+                <td className="p-2 border border-gray-300 dark:border-slate-600">Laba Kotor Perdagangan</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {grossProfit.toLocaleString('id-ID')}</td>
               </tr>
               <tr>
-                <td className="p-2 border border-gray-300 italic">Cadangan {settings.charityTitle || 'Amal/Zakat'} ({settings.charityZakatPercentage || 2.5}% dari Laba Bersih)</td>
-                <td className="p-2 border border-gray-300 text-right italic text-amber-700">Rp {zakatReserve.toLocaleString('id-ID')}</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600">Beban Operasional</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
+              </tr>
+              <tr className="bg-gray-50 dark:bg-slate-800 font-bold">
+                <td className="p-2 border border-gray-300 dark:border-slate-600 uppercase">Laba Bersih Operasional</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-green-800">Rp {netProfit.toLocaleString('id-ID')}</td>
+              </tr>
+              <tr>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 italic">Cadangan {settings.charityTitle || 'Amal/Zakat'} ({settings.charityZakatPercentage || 2.5}% dari Laba Bersih)</td>
+                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right italic text-amber-700">Rp {zakatReserve.toLocaleString('id-ID')}</td>
               </tr>
             </tbody>
           </table>
@@ -687,7 +705,7 @@ export default function NeracaRugiPage() {
 
         {/* Neraca Print Section */}
         <div>
-          <h2 className="font-bold text-sm bg-gray-100 p-2 border border-gray-300 flex justify-between">
+          <h2 className="font-bold text-sm bg-gray-100 dark:bg-slate-800 p-2 border border-gray-300 dark:border-slate-600 flex justify-between">
             <span>II. NERACA KEUANGAN</span>
             <span className={isBalanced ? "text-green-700" : "text-amber-700"}>
               {isBalanced ? "STATUS: SEIMBANG" : "STATUS: SELISIH"}
@@ -695,80 +713,58 @@ export default function NeracaRugiPage() {
           </h2>
           <div className="grid grid-cols-2 gap-4">
             {/* Aktiva */}
-            <table className="w-full text-xs text-left border-collapse border border-gray-300">
-              <thead className="bg-gray-50">
-                <tr><th colSpan={2} className="p-2 border border-gray-300 text-center">AKTIVA (ASET)</th></tr>
+            <table className="w-full text-xs text-left border-collapse border border-gray-300 dark:border-slate-600">
+              <thead className="bg-gray-50 dark:bg-slate-800">
+                <tr><th colSpan={2} className="p-2 border border-gray-300 dark:border-slate-600 text-center">AKTIVA (ASET)</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="p-2 border border-gray-300">Kas & Setara Kas</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {cashOnHand.toLocaleString('id-ID')}</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Kas & Setara Kas</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {cashOnHand.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>
-                  <td className="p-2 border border-gray-300">Persediaan Barang Dagang</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {valueOfInventory.toLocaleString('id-ID')}</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Persediaan Barang Dagang</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {valueOfInventory.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>
-                  <td className="p-2 border border-gray-300">Piutang Dagang</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {receivablesVal.toLocaleString('id-ID')}</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Piutang Dagang</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {receivablesVal.toLocaleString('id-ID')}</td>
                 </tr>
-                <tr className="font-bold bg-gray-50">
-                  <td className="p-2 border border-gray-300">TOTAL AKTIVA</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {totalAssets.toLocaleString('id-ID')}</td>
+                <tr className="font-bold bg-gray-50 dark:bg-slate-800">
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">TOTAL AKTIVA</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {totalAssets.toLocaleString('id-ID')}</td>
                 </tr>
               </tbody>
             </table>
 
             {/* Pasiva */}
-            <table className="w-full text-xs text-left border-collapse border border-gray-300">
-              <thead className="bg-gray-50">
-                <tr><th colSpan={2} className="p-2 border border-gray-300 text-center">PASIVA (KEWAJIBAN & MODAL)</th></tr>
+            <table className="w-full text-xs text-left border-collapse border border-gray-300 dark:border-slate-600">
+              <thead className="bg-gray-50 dark:bg-slate-800">
+                <tr><th colSpan={2} className="p-2 border border-gray-300 dark:border-slate-600 text-center">PASIVA (KEWAJIBAN & MODAL)</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="p-2 border border-gray-300">Utang (Qardh)</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {accountsPayables.toLocaleString('id-ID')}</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Utang (Qardh)</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {accountsPayables.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>
-                  <td className="p-2 border border-gray-300">Dana Syirkah Temporer</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {activeEquityValue.toLocaleString('id-ID')}</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Dana Syirkah Temporer</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {activeEquityValue.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>
-                  <td className="p-2 border border-gray-300">Ekuitas Laba Ditahan</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {allTimeProfit.toLocaleString('id-ID')}</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Ekuitas Laba Ditahan</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {allTimeProfit.toLocaleString('id-ID')}</td>
                 </tr>
-                <tr className="font-bold bg-gray-50">
-                  <td className="p-2 border border-gray-300">TOTAL PASIVA</td>
-                  <td className="p-2 border border-gray-300 text-right">Rp {totalLiabilitiesAndEquity.toLocaleString('id-ID')}</td>
+                <tr className="font-bold bg-gray-50 dark:bg-slate-800">
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">TOTAL PASIVA</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {totalLiabilitiesAndEquity.toLocaleString('id-ID')}</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <div className="mt-8 pt-8 flex justify-between items-end border-t-2 border-gray-300 px-4">
-          <div className="text-center w-1/3 px-2">
-            <p className="text-xs font-semibold mb-12">Diperiksa Oleh,</p>
-            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
-              {currentUser?.role === 'ADMIN' ? currentUser.name : ''}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">Admin</p>
-          </div>
-
-          <div className="text-center w-1/3 px-2 border-l border-gray-200">
-            <p className="text-xs font-semibold mb-12">Mengetahui,</p>
-            <p className="text-xs border-b border-gray-800 pb-1 font-bold h-6">
-              {currentUser?.role === 'MANAGER' ? currentUser.name : ''}
-            </p>
-            <p className="text-[10px] text-gray-500 mt-1 uppercase">Manager Cabang</p>
-          </div>
-
-          <div className="text-center w-1/3 px-2 border-l border-gray-200">
-            <p className="text-[10px] text-gray-600 mb-2">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p className="text-xs font-semibold mb-12">Menyetujui,</p>
-            <p className="font-bold text-gray-800 border-b border-gray-400 pb-1 px-2 whitespace-nowrap h-6 flex items-end justify-center">Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.</p>
-            <p className="text-xs text-gray-500 mt-1">Ketua Toko Koperasi KSA Mart</p>
-          </div>
+          <PrintFooter />
         </div>
       </div>
 

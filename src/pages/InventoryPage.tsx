@@ -26,6 +26,7 @@ export default function InventoryPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchDebounceRef = useRef<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [stockFilter, setStockFilter] = useState('ALL');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -219,10 +220,11 @@ export default function InventoryPage() {
   }, [products.length, categories, currentUser, activeBranchId, selectedCategory, debouncedQuery]);
 
   // Stats Counters (memoized)
-  const totalSku = useMemo(() => products.length, [products.length]);
-  const outOfStock = useMemo(() => products.filter(p => p.stock === 0).length, [products]);
-  const lowStock = useMemo(() => products.filter(p => p.stock > 0 && p.stock <= p.minStock).length, [products]);
-  const totalValue = useMemo(() => products.reduce((sum, p) => sum + (p.costPrice * p.stock), 0), [products]);
+  const physicalProducts = useMemo(() => products.filter(p => !p.isPPOB), [products]);
+  const totalSku = useMemo(() => physicalProducts.length, [physicalProducts]);
+  const outOfStock = useMemo(() => physicalProducts.filter(p => p.stock <= 0).length, [physicalProducts]);
+  const lowStock = useMemo(() => physicalProducts.filter(p => p.stock > 0 && p.stock <= p.minStock).length, [physicalProducts]);
+  const totalValue = useMemo(() => physicalProducts.reduce((sum, p) => sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0), [physicalProducts]);
 
   // Filter products (memoized). If there is a search query, use worker-provided matched ids to avoid scanning full array.
   const filteredProducts = useMemo(() => {
@@ -241,7 +243,27 @@ export default function InventoryPage() {
         if (product.isPPOB) return false;
         const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
         const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
-        return matchesCategory && matchesBranch;
+        
+        let matchesStock = true;
+        if (stockFilter === 'AMAN') matchesStock = product.stock > product.minStock;
+        else if (stockFilter === 'MENIPIS') matchesStock = product.stock > 0 && product.stock <= product.minStock;
+        else if (stockFilter === 'HABIS') matchesStock = product.stock <= 0;
+        else if (stockFilter === 'NEAR_EXPIRED') {
+          if (!product.expiryDate) matchesStock = false;
+          else {
+            const daysToExpiry = (new Date(product.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+            matchesStock = daysToExpiry >= 0 && daysToExpiry <= 30;
+          }
+        }
+        else if (stockFilter === 'EXPIRED') {
+          if (!product.expiryDate) matchesStock = false;
+          else {
+            const daysToExpiry = (new Date(product.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+            matchesStock = daysToExpiry < 0;
+          }
+        }
+        
+        return matchesCategory && matchesBranch && matchesStock;
       });
     }
 
@@ -253,9 +275,29 @@ export default function InventoryPage() {
       const matchesSearch = !q || name.includes(q) || skuStr.includes(q);
       const matchesCategory = selectedCategory === 'ALL' || product.category === selectedCategory;
       const matchesBranch = !activeBranchId || product.branchId === activeBranchId || !product.branchId;
-      return matchesSearch && matchesCategory && matchesBranch;
+      
+      let matchesStock = true;
+      if (stockFilter === 'AMAN') matchesStock = product.stock > product.minStock;
+      else if (stockFilter === 'MENIPIS') matchesStock = product.stock > 0 && product.stock <= product.minStock;
+      else if (stockFilter === 'HABIS') matchesStock = product.stock <= 0;
+      else if (stockFilter === 'NEAR_EXPIRED') {
+        if (!product.expiryDate) matchesStock = false;
+        else {
+          const daysToExpiry = (new Date(product.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+          matchesStock = daysToExpiry >= 0 && daysToExpiry <= 30;
+        }
+      }
+      else if (stockFilter === 'EXPIRED') {
+        if (!product.expiryDate) matchesStock = false;
+        else {
+          const daysToExpiry = (new Date(product.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+          matchesStock = daysToExpiry < 0;
+        }
+      }
+      
+      return matchesSearch && matchesCategory && matchesBranch && matchesStock;
     });
-  }, [products, debouncedQuery, selectedCategory, activeBranchId, searchMatchedIds]);
+  }, [products, debouncedQuery, selectedCategory, stockFilter, activeBranchId, searchMatchedIds]);
 
   // Pagination calculations
   const totalItems = filteredProducts.length;
@@ -267,7 +309,7 @@ export default function InventoryPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, stockFilter]);
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -583,41 +625,39 @@ export default function InventoryPage() {
       alert('Semua produk berhasil dihapus.');
       setSearchQuery('');
       setSelectedCategory('ALL');
+      setStockFilter('ALL');
       setPage(1);
     }
   };
 
   const handleExportExcel = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + 
-      "SKU,NAMA_BARANG,KATEGORI,HARGA_MODAL,HARGA_JUAL,STOK_MINIMAL,SISA_STOK,UNIT,EXPIRED_DATE\n" +
-      products.map(p => {
-        return `"${p.sku}","${p.name}","${p.category}",${p.costPrice},${p.price},${p.minStock},${p.stock},"${p.unit}","${p.expiryDate || ''}"`;
-      }).join("\n");
-      
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Data_Inventori_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws_data = [
+      ["SKU", "NAMA_BARANG", "KATEGORI", "HARGA_MODAL", "HARGA_JUAL", "STOK_MINIMAL", "SISA_STOK", "UNIT", "EXPIRED_DATE"],
+      ...products.filter(p => !p.isPPOB).map(p => [
+        p.sku, p.name, p.category, p.costPrice, p.price, p.minStock, p.stock, p.unit, p.expiryDate || ''
+      ])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data Inventori");
+    XLSX.writeFile(wb, `Data_Inventori_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   return (
     <div className="space-y-6">
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-gray-400 text-xs font-semibold">Total SKU Terdaftar</p>
-            <h3 className="text-2xl font-black text-gray-800 mt-1">{totalSku} Item</h3>
+            <h3 className="text-2xl font-black text-gray-800 dark:text-slate-200 mt-1">{totalSku} Item</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-700">
             <Package className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-gray-400 text-xs font-semibold">Habis Pemesanan (0 Stok)</p>
             <h3 className="text-2xl font-black text-red-600 mt-1">{outOfStock} SKU</h3>
@@ -627,7 +667,7 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-gray-400 text-xs font-semibold">Stok Menipis (Limit Alert)</p>
             <h3 className="text-2xl font-black text-amber-600 mt-1">{lowStock} SKU</h3>
@@ -637,7 +677,7 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-gray-400 text-xs font-semibold">Estimasi Modal Inventori</p>
             <h3 className="text-xl font-extrabold text-green-800 mt-1">Rp {totalValue.toLocaleString('id-ID')}</h3>
@@ -649,10 +689,10 @@ export default function InventoryPage() {
       </div>
 
       {/* List / Stock Control Controls panel */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs overflow-hidden">
         {/* Table Filter Topbar */}
-        <div className="p-5 border-b border-gray-100 bg-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
+        <div className="p-5 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                 <Search className="w-4 h-4 text-gray-400" />
@@ -660,31 +700,63 @@ export default function InventoryPage() {
               <input
                 type="text"
                 placeholder="Cari SKU / nama produk..."
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs leading-none w-64 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                className="pl-9 pr-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-xs leading-none w-64 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             {/* Category selection */}
-            <select
-              className="border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              <option value="ALL">Semua Kategori</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1">
+              <select
+                className="border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                <option value="ALL">Semua Kategori</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              {selectedCategory !== 'ALL' && customSavedCategories.includes(selectedCategory) && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Hapus kategori "${selectedCategory}" dari daftar pilihan?`)) {
+                      removeCategory(selectedCategory);
+                      setSelectedCategory('ALL');
+                    }
+                  }}
+                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200 ml-1"
+                  title="Hapus Kategori Ini"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            {/* Stock Filter selection */}
+            <div className="flex items-center gap-1">
+              <select
+                className="border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500/20"
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+              >
+                <option value="ALL">Semua Status Stok</option>
+                <option value="AMAN">Stok Aman</option>
+                <option value="MENIPIS">Stok Menipis</option>
+                <option value="HABIS">Stok Habis</option>
+                <option value="NEAR_EXPIRED">Mendekati Expired</option>
+                <option value="EXPIRED">Sudah Expired</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
                 placeholder="Tambah kategori baru"
-                className="border border-gray-200 rounded-lg py-2 px-3 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                className="border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
               />
@@ -707,7 +779,7 @@ export default function InventoryPage() {
 
             <button
               onClick={downloadTemplate}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-350 font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 border border-slate-350 font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
             >
               <span>📥 Template Excel</span>
             </button>
@@ -752,7 +824,7 @@ export default function InventoryPage() {
         {/* Master Products Listing Table (virtualized list for performance) */}
         <div className="overflow-x-auto">
           <div className="min-w-[1000px] text-left text-xs border-collapse">
-            <div className="bg-slate-50 uppercase tracking-widest text-[10px] text-gray-500 font-bold border-b border-gray-100 py-3 px-4 grid grid-cols-12 gap-3 items-center">
+            <div className="bg-slate-50 dark:bg-slate-800 uppercase tracking-widest text-[10px] text-gray-500 dark:text-slate-400 font-bold border-b border-gray-100 dark:border-slate-800 py-3 px-4 grid grid-cols-12 gap-3 items-center">
               <div className="col-span-1 whitespace-nowrap">SKU / Code</div>
               <div className="col-span-2">Nama Barang</div>
               <div className="col-span-1">Kategori</div>
@@ -776,17 +848,17 @@ export default function InventoryPage() {
                   const isOutOfStock = p.stock === 0;
                   const isLowStock = p.stock > 0 && p.stock <= p.minStock;
                   return (
-                    <div key={p.id} className="px-4 py-2 border-b border-gray-100 grid grid-cols-12 gap-3 items-center text-xs hover:bg-slate-50 transition-colors">
-                      <div className="col-span-1 font-mono text-gray-500 truncate" title={p.sku}>{p.sku}</div>
-                      <div className="col-span-2 font-bold text-gray-900 truncate" title={p.name}>{p.name}</div>
+                    <div key={p.id} className="px-4 py-2 border-b border-gray-100 dark:border-slate-800 grid grid-cols-12 gap-3 items-center text-xs hover:bg-slate-50 dark:bg-slate-800 transition-colors">
+                      <div className="col-span-1 font-mono text-gray-500 dark:text-slate-400 truncate" title={p.sku}>{p.sku}</div>
+                      <div className="col-span-2 font-bold text-gray-900 dark:text-white truncate" title={p.name}>{p.name}</div>
                       <div className="col-span-1 truncate">
-                        <span className="bg-slate-100 text-slate-700 text-[9px] px-2 py-0.5 rounded border border-slate-200">{p.category}</span>
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{p.category}</span>
                       </div>
-                      <div className="col-span-1 text-right font-mono text-gray-600 whitespace-nowrap">Rp {p.costPrice.toLocaleString('id-ID')}</div>
+                      <div className="col-span-1 text-right font-mono text-gray-600 dark:text-slate-400 whitespace-nowrap">Rp {p.costPrice.toLocaleString('id-ID')}</div>
                       <div className="col-span-1 text-right font-bold text-green-700 whitespace-nowrap">Rp {p.price.toLocaleString('id-ID')}</div>
                       <div className="col-span-1 text-center text-green-700 font-mono text-[9px] whitespace-nowrap flex flex-col items-center justify-center">
                         <span>Rp {profitAmt.toLocaleString('id-ID')}</span>
-                        <span className="text-[8px] text-slate-500">({marginPct}%)</span>
+                        <span className="text-[8px] text-slate-500 dark:text-slate-400">({marginPct}%)</span>
                       </div>
                       <div className="col-span-1 text-center text-[9px] whitespace-nowrap">{p.expiryDate ? new Date(p.expiryDate).toLocaleDateString('id-ID') : '-'}</div>
                       <div className="col-span-1 text-center font-mono font-bold whitespace-nowrap">{p.stock} <span className="text-gray-400 font-sans text-[9px] font-normal">{p.unit}</span></div>
@@ -794,13 +866,13 @@ export default function InventoryPage() {
                         {isOutOfStock ? <span className="bg-red-50 text-red-700 text-[9px] px-2 py-0.5 rounded">Habis</span> : isLowStock ? <span className="bg-amber-50 text-amber-700 text-[9px] px-2 py-0.5 rounded">Kritis</span> : <span className="bg-green-50 text-green-800 text-[9px] px-2 py-0.5 rounded">Sehat</span>}
                       </div>
                       <div className="col-span-2 text-center flex items-center justify-center gap-1">
-                        <button onClick={() => handleOpenEdit(p)} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600">
+                        <button onClick={() => handleOpenEdit(p)} className="p-1 rounded bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:border-green-300 hover:bg-green-50 hover:text-green-800 text-gray-600 dark:text-slate-400">
                           <Edit className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="px-2 py-1 text-[9px] font-bold rounded bg-slate-50 border border-gray-200 hover:bg-amber-50 hover:border-amber-300 whitespace-nowrap">
+                        <button onClick={() => { const amountStr = prompt(`Tambah/Kurang stok ${p.name}. Masukkan angka (misal: 10 atau -5):`); const amount = Number(amountStr); if (!isNaN(amount) && amount !== 0) adjustStock(p.id, amount); }} className="px-2 py-1 text-[9px] font-bold rounded bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-amber-50 hover:border-amber-300 whitespace-nowrap">
                           +/- Stok
                         </button>
-                        <button onClick={() => { if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) deleteProduct(p.id); }} className="p-1 rounded bg-slate-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 text-gray-400">
+                        <button onClick={() => { if (confirm(`Apakah Anda yakin mencabut SKU ${p.name} dari catalog?`)) deleteProduct(p.id); }} className="p-1 rounded bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:border-red-300 hover:bg-red-50 text-gray-400">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -809,7 +881,7 @@ export default function InventoryPage() {
                 })}
               </div>
               {/* TOTAL ROW */}
-              <div className="bg-indigo-50/50 text-[11px] text-gray-800 font-extrabold border-t-2 border-indigo-100 py-4 px-4 grid grid-cols-12 gap-3 items-center shadow-inner mt-4">
+              <div className="bg-indigo-50/50 text-[11px] text-gray-800 dark:text-slate-200 font-extrabold border-t-2 border-indigo-100 py-4 px-4 grid grid-cols-12 gap-3 items-center shadow-inner mt-4">
                 <div className="col-span-4 text-right pr-4 uppercase tracking-widest text-indigo-700 flex items-center justify-end gap-2">
                   <span>TOTAL KESELURUHAN</span>
                   <span className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-[9px]">{filteredProducts.length} Jenis (SKU)</span>
@@ -825,22 +897,22 @@ export default function InventoryPage() {
 
               {/* Pagination Controls */}
               {Math.ceil(filteredProducts.length / pageSize) > 1 && (
-                <div className="flex justify-between items-center py-4 px-4 border-t border-gray-100 bg-white sticky bottom-0">
-                  <span className="text-xs text-gray-500 font-medium">
+                <div className="flex justify-between items-center py-4 px-4 border-t border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky bottom-0">
+                  <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
                     Menampilkan {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, filteredProducts.length)} dari {filteredProducts.length} produk
                   </span>
                   <div className="flex space-x-2">
                     <button
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 text-xs font-bold shadow-sm"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 disabled:opacity-50 text-xs font-bold shadow-sm"
                     >
                       Sebelumnya
                     </button>
                     <button
                       onClick={() => setPage(p => Math.min(Math.ceil(filteredProducts.length / pageSize), p + 1))}
                       disabled={page === Math.ceil(filteredProducts.length / pageSize)}
-                      className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 disabled:opacity-50 text-xs font-bold shadow-sm"
+                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 disabled:opacity-50 text-xs font-bold shadow-sm"
                     >
                       Selanjutnya
                     </button>
@@ -856,15 +928,15 @@ export default function InventoryPage() {
       {/* Inventory Modal Sheet: Create / Edit Products */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
-            <div className="p-5 border-b border-gray-100 bg-slate-50 flex justify-between items-center">
-              <h3 className="font-extrabold text-gray-800 text-md">
+            <div className="p-5 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center">
+              <h3 className="font-extrabold text-gray-800 dark:text-slate-200 text-md">
                 {editingProduct ? 'Ubah SKU Inventori' : 'Tambah SKU Baru'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 font-bold text-sm"
+                className="text-gray-400 hover:text-gray-600 dark:text-slate-400 font-bold text-sm"
               >
                 ✕
               </button>
@@ -897,11 +969,11 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="block text-sm font-bold text-slate-700 mb-1">Kode SKU</label>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Kode SKU</label>
                           <input
                             type="text"
                             required
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 font-mono text-sm"
+                            className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 font-mono text-sm"
                             value={sku}
                             onChange={e => setSku(e.target.value)}
                           />
@@ -910,9 +982,9 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Kategori</label>
+                          <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Kategori</label>
                           <select
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none"
+                            className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs focus:outline-none"
                             value={category}
                             onChange={(e) => setCategory(e.target.value)}
                           >
@@ -924,10 +996,10 @@ export default function InventoryPage() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600">Nama Barang</label>
+                        <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Nama Barang</label>
                         <input
                           type="text"
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                          className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs"
                           placeholder="Contoh: Beras Pandan Wangi 5kg"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
@@ -939,7 +1011,7 @@ export default function InventoryPage() {
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-650">Akun Penjualan (Revenue)</label>
                           <select
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs focus:outline-none font-semibold text-slate-700 bg-white"
+                            className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs focus:outline-none font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900"
                             value={salesCoaCode}
                             onChange={(e) => setSalesCoaCode(e.target.value)}
                           >
@@ -952,7 +1024,7 @@ export default function InventoryPage() {
                         <div className="space-y-1">
                           <label className="text-xs font-bold text-slate-650">Akun Beban HPP (Expense)</label>
                           <select
-                            className="w-full border border-gray-205 rounded-lg py-2 px-3 text-xs focus:outline-none font-semibold text-slate-700 bg-white"
+                            className="w-full border border-gray-205 rounded-lg py-2 px-3 text-xs focus:outline-none font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900"
                             value={cogsCoaCode}
                             onChange={(e) => setCogsCoaCode(e.target.value)}
                           >
@@ -966,10 +1038,10 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Satuan Unit</label>
+                          <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Satuan Unit</label>
                           <input
                             type="text"
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                            className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs"
                             placeholder="Pcs, Kg, Botol, dll"
                             value={unit}
                             onChange={(e) => setUnit(e.target.value)}
@@ -978,10 +1050,10 @@ export default function InventoryPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Stok Awal</label>
+                          <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Stok Awal</label>
                           <input
                             type="number"
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                            className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs"
                             value={stock}
                             onChange={(e) => setStock(e.target.value)}
                             required
@@ -989,10 +1061,10 @@ export default function InventoryPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Batas Minimum</label>
+                          <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Batas Minimum</label>
                           <input
                             type="number"
-                            className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                            className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs"
                             value={minStock}
                             onChange={(e) => setMinStock(e.target.value)}
                             required
@@ -1002,13 +1074,13 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Harga Modal (Beli)</label>
+                          <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Harga Modal (Beli)</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-400 font-bold">Rp</span>
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : ''
+                              className={`w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed border-dashed' : ''
                                 }`}
                               value={costPrice}
                               onChange={(e) => handleCostPriceChange(e.target.value)}
@@ -1023,7 +1095,7 @@ export default function InventoryPage() {
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-green-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50 focus:ring-2 focus:ring-green-500/20'
+                              className={`w-full border border-green-200 rounded-lg py-2 pl-3 pr-8 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50 focus:ring-2 focus:ring-green-500/20'
                                 } outline-none`}
                               value={marginPct}
                               onChange={(e) => handleMarginChange(e.target.value)}
@@ -1034,13 +1106,13 @@ export default function InventoryPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-600">Harga Jual POS</label>
+                          <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Harga Jual POS</label>
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-400 font-bold">Rp</span>
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50/20 focus:ring-2 focus:ring-green-500/20'
+                              className={`w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50/20 focus:ring-2 focus:ring-green-500/20'
                                 } outline-none`}
                               value={price}
                               onChange={(e) => handlePriceChange(e.target.value)}
@@ -1058,7 +1130,7 @@ export default function InventoryPage() {
                             <input
                               type="number"
                               disabled={isPriceEditLockedForAdmin}
-                              className={`w-full border border-green-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
+                              className={`w-full border border-green-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
                                 }`}
                               value={wholesalePrice}
                               onChange={(e) => setWholesalePrice(e.target.value)}
@@ -1071,7 +1143,7 @@ export default function InventoryPage() {
                           <input
                             type="number"
                             disabled={isPriceEditLockedForAdmin}
-                            className={`w-full border border-green-200 rounded-lg py-2 px-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
+                            className={`w-full border border-green-200 rounded-lg py-2 px-3 text-xs font-bold ${isPriceEditLockedForAdmin ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed border-dashed' : 'bg-green-50'
                               }`}
                             value={wholesaleMinQty}
                             onChange={(e) => setWholesaleMinQty(e.target.value)}
@@ -1085,10 +1157,10 @@ export default function InventoryPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-600">Scan Barcode / Kode Batang</label>
+                    <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Scan Barcode / Kode Batang</label>
                     <input
                       type="text"
-                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
+                      className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs font-mono"
                       placeholder="Masukkan Barcode..."
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
@@ -1099,7 +1171,7 @@ export default function InventoryPage() {
                     <label className="text-xs font-bold text-red-600">Tanggal Expired (Opsional)</label>
                     <input
                       type="date"
-                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
+                      className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs font-mono"
                       value={expiryDate}
                       onChange={(e) => setExpiryDate(e.target.value)}
                     />
@@ -1119,17 +1191,17 @@ export default function InventoryPage() {
                         checked={hasBoxUnit}
                         onChange={(e) => setHasBoxUnit(e.target.checked)}
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-900 after:border-gray-300 dark:border-slate-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </label>
                   </div>
 
                   {hasBoxUnit && (
                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-indigo-100">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600">Barcode Box</label>
+                        <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Barcode Box</label>
                         <input
                           type="text"
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs font-mono"
+                          className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs font-mono"
                           placeholder="Scan Barcode Box"
                           value={boxBarcode}
                           onChange={(e) => setBoxBarcode(e.target.value)}
@@ -1137,22 +1209,22 @@ export default function InventoryPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600">Isi per Box (Satuan {unit})</label>
+                        <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Isi per Box (Satuan {unit})</label>
                         <input
                           type="number"
-                          className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs"
+                          className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs"
                           placeholder="Contoh: 24"
                           value={pcsPerBox}
                           onChange={(e) => setPcsPerBox(e.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600">Harga Modal (Box)</label>
+                        <label className="text-xs font-bold text-gray-600 dark:text-slate-400">Harga Modal (Box)</label>
                         <div className="relative">
                           <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-gray-400 font-bold">Rp</span>
                           <input
                             type="number"
-                            className="w-full border border-gray-200 rounded-lg py-2 pl-8 pr-3 text-xs font-bold bg-white"
+                            className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 pl-8 pr-3 text-xs font-bold bg-white dark:bg-slate-900"
                             value={boxCostPrice}
                             onChange={(e) => setBoxCostPrice(e.target.value)}
                           />
@@ -1174,8 +1246,8 @@ export default function InventoryPage() {
                   )}
                 </div>
 
-                <div className="space-y-2 border border-gray-200 rounded-xl p-4 bg-white">
-                  <label className="text-xs font-bold text-gray-800 flex items-center gap-2"><Camera className="w-4 h-4 text-green-600" /> Foto Produk (Opsional)</label>
+                <div className="space-y-2 border border-gray-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-900">
+                  <label className="text-xs font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2"><Camera className="w-4 h-4 text-green-600" /> Foto Produk (Opsional)</label>
 
                   {isUploadingImage && (
                     <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-3 text-xs text-green-800">
@@ -1185,12 +1257,12 @@ export default function InventoryPage() {
                   )}
 
                   {image && !isUploadingImage && (
-                    <div className="relative w-32 h-32 border border-gray-200 rounded-xl overflow-hidden shadow-sm mx-auto mb-3">
+                    <div className="relative w-32 h-32 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm mx-auto mb-3">
                       <img loading="lazy" src={image} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="100%" height="100%" fill="#f1f5f9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="#64748b">No Image</text></svg>'); }} />
                       <button
                         type="button"
                         onClick={() => setImage('')}
-                        className="absolute top-1 right-1 bg-white/90 p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-red-100 shadow-xs"
+                        className="absolute top-1 right-1 bg-white dark:bg-slate-900/90 p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-red-100 shadow-xs"
                         title="Hapus Foto"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1241,15 +1313,16 @@ export default function InventoryPage() {
                     </button>
                   </div>
 
-                  <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800">
                     <p className="text-[10px] text-gray-400 mb-1 font-semibold">Atau gunakan URL Gambar (Link Internet):</p>
                     <input
                       type="text"
-                      className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 outline-none transition-all"
+                      className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs bg-gray-50 dark:bg-slate-800 focus:bg-white dark:bg-slate-900 focus:ring-2 focus:ring-green-500/20 outline-none transition-all"
                       placeholder="https://images.unsplash.com/..."
                       value={image.startsWith('data:') ? '' : image}
                       onChange={(e) => setImage(e.target.value)}
                     />
+                    <p className="text-[9px] text-gray-500 mt-1">Gunakan link langsung (akhiran .jpg / .png). Jika gambar kosong/gagal, website asal memblokir (Hotlinking). Solusi: Download gambarnya ke HP/PC, lalu gunakan tombol "Upload Galeri".</p>
                   </div>
                 </div>
 
@@ -1263,11 +1336,11 @@ export default function InventoryPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-4 pt-1">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-700">Akun Pendapatan (Sales)</label>
+                      <label className="text-xs font-bold text-gray-700 dark:text-slate-300">Akun Pendapatan (Sales)</label>
                       <select
                         value={salesCoaCode}
                         onChange={(e) => setSalesCoaCode(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-white focus:ring-2 focus:ring-green-500"
+                        className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs bg-white dark:bg-slate-900 focus:ring-2 focus:ring-green-500"
                       >
                         <option value="">- Default (Auto) -</option>
                         {coaList.filter(c => c.category === 'REVENUE' && c.isActive).map(c => (
@@ -1276,11 +1349,11 @@ export default function InventoryPage() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-700">Akun Beban Pokok (COGS)</label>
+                      <label className="text-xs font-bold text-gray-700 dark:text-slate-300">Akun Beban Pokok (COGS)</label>
                       <select
                         value={cogsCoaCode}
                         onChange={(e) => setCogsCoaCode(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg py-2 px-3 text-xs bg-white focus:ring-2 focus:ring-green-500"
+                        className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs bg-white dark:bg-slate-900 focus:ring-2 focus:ring-green-500"
                       >
                         <option value="">- Default (Auto) -</option>
                         {coaList.filter(c => c.category === 'EXPENSE' && c.isActive).map(c => (
@@ -1293,11 +1366,11 @@ export default function InventoryPage() {
               </div>
 
               {/* Form actions */}
-              <div className="p-4 bg-slate-50 border-t border-gray-100 flex justify-end space-x-2">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="py-2 px-4 bg-white border border-gray-200 text-gray-700 text-xs font-semibold rounded-lg hover:bg-slate-50"
+                  className="py-2 px-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-50 dark:bg-slate-800"
                 >
                   Batal
                 </button>
@@ -1311,9 +1384,9 @@ export default function InventoryPage() {
             </form>
           </div>
           {isImporting && (
-            <div className="p-3 text-xs text-gray-700 bg-yellow-50 border-t border-yellow-100 flex items-center justify-between">
+            <div className="p-3 text-xs text-gray-700 dark:text-slate-300 bg-yellow-50 border-t border-yellow-100 flex items-center justify-between">
               <div>Import berjalan: {importProgress.done} / {importProgress.total}</div>
-              <div className="text-[11px] text-gray-500">Proses background, halaman tetap responsif.</div>
+              <div className="text-[11px] text-gray-500 dark:text-slate-400">Proses background, halaman tetap responsif.</div>
             </div>
           )}
         </div>

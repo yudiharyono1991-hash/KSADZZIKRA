@@ -40,12 +40,12 @@ export default function CustomerDisplayPage() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-8 text-center">
-        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white p-12 rounded-3xl shadow-xl max-w-lg w-full border border-green-100">
+        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-slate-900 p-12 rounded-3xl shadow-xl max-w-lg w-full border border-green-100">
           <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle size={48} />
           </div>
           <h1 className="text-3xl font-black text-green-800 mb-4">Terima Kasih!</h1>
-          <p className="text-slate-600 text-lg">Masukan Anda sangat berarti bagi KSA Mart.</p>
+          <p className="text-slate-600 dark:text-slate-400 text-lg">Masukan Anda sangat berarti bagi KSA Mart.</p>
         </motion.div>
       </div>
     );
@@ -54,11 +54,11 @@ export default function CustomerDisplayPage() {
   // TRANSAKSI SELESAI - FEEDBACK MODE
   if (lastTx) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col p-6">
-        <div className="flex-1 bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-800 flex flex-col p-6">
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-slate-100 dark:border-slate-800">
           {/* Kiri: Struk Ringkas */}
           <div className="w-full md:w-1/3 bg-green-900 text-white p-8 flex flex-col justify-center text-center">
-            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 bg-white dark:bg-slate-900/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle size={40} className="text-green-300" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Pembayaran Berhasil</h2>
@@ -73,40 +73,40 @@ export default function CustomerDisplayPage() {
           
           {/* Kanan: Feedback Form */}
           <div className="w-full md:w-2/3 p-8 md:p-12 flex flex-col justify-center">
-            <h1 className="text-3xl font-black text-slate-800 mb-2">Bagaimana Pelayanan Kami?</h1>
-            <p className="text-slate-500 mb-10 text-lg">Bantu kami meningkatkan kualitas layanan KSA Mart.</p>
+            <h1 className="text-3xl font-black text-slate-800 dark:text-slate-200 mb-2">Bagaimana Pelayanan Kami?</h1>
+            <p className="text-slate-500 dark:text-slate-400 mb-10 text-lg">Bantu kami meningkatkan kualitas layanan KSA Mart.</p>
             
             <div className="grid grid-cols-2 gap-6 mb-8">
               <button 
                 onClick={() => handleFeedback('PUAS')}
-                className="group flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-slate-200 hover:border-green-500 hover:bg-green-50 transition-all duration-300"
+                className="group flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-700 hover:border-green-500 hover:bg-green-50 transition-all duration-300"
               >
-                <div className="w-24 h-24 rounded-full bg-slate-100 group-hover:bg-green-100 flex items-center justify-center mb-4 transition-colors">
+                <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-green-100 flex items-center justify-center mb-4 transition-colors">
                   <Smile size={48} className="text-slate-400 group-hover:text-green-600" />
                 </div>
-                <span className="text-xl font-bold text-slate-600 group-hover:text-green-700">Sangat Puas</span>
+                <span className="text-xl font-bold text-slate-600 dark:text-slate-400 group-hover:text-green-700">Sangat Puas</span>
               </button>
               
               <button 
                 onClick={() => handleFeedback('TIDAK_PUAS')}
-                className="group flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-slate-200 hover:border-rose-500 hover:bg-rose-50 transition-all duration-300"
+                className="group flex flex-col items-center justify-center p-8 rounded-3xl border-2 border-slate-200 dark:border-slate-700 hover:border-rose-500 hover:bg-rose-50 transition-all duration-300"
               >
-                <div className="w-24 h-24 rounded-full bg-slate-100 group-hover:bg-rose-100 flex items-center justify-center mb-4 transition-colors">
+                <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-rose-100 flex items-center justify-center mb-4 transition-colors">
                   <Frown size={48} className="text-slate-400 group-hover:text-rose-600" />
                 </div>
-                <span className="text-xl font-bold text-slate-600 group-hover:text-rose-700">Kurang Puas</span>
+                <span className="text-xl font-bold text-slate-600 dark:text-slate-400 group-hover:text-rose-700">Kurang Puas</span>
               </button>
             </div>
             
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Pesan & Kesan (Opsional)</label>
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Pesan & Kesan (Opsional)</label>
               <div className="flex gap-2">
                 <input 
                   type="text" 
                   value={feedbackText}
                   onChange={e => setFeedbackText(e.target.value)}
                   placeholder="Ketik masukkan Anda di sini..."
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all text-lg"
+                  className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all text-lg"
                 />
                 <button 
                   onClick={() => handleFeedback('PUAS')} // Default send uses 'PUAS' if they just typed something
@@ -125,9 +125,9 @@ export default function CustomerDisplayPage() {
 
   // STANDBY ATAU CART MODE
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col p-4 sm:p-6 overflow-hidden">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800 flex flex-col p-4 sm:p-6 overflow-hidden">
       {/* Header */}
-      <header className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between mb-4 sm:mb-6 shrink-0 z-10 border border-slate-200">
+      <header className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm flex items-center justify-between mb-4 sm:mb-6 shrink-0 z-10 border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
           <img src="/ksa_mart_logo.png" alt="Logo" className="h-10 w-auto" />
           <div>
@@ -136,7 +136,7 @@ export default function CustomerDisplayPage() {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm font-bold text-slate-500">Total Tagihan</div>
+          <div className="text-sm font-bold text-slate-500 dark:text-slate-400">Total Tagihan</div>
           <div className="text-3xl font-black text-green-700">Rp {calculateTotal().toLocaleString('id-ID')}</div>
         </div>
       </header>
@@ -144,7 +144,7 @@ export default function CustomerDisplayPage() {
       {/* Main Content */}
       <main className="flex-1 min-h-0 flex gap-4 sm:gap-6 z-10">
         {/* Left: Cart Items */}
-        <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
           <div className="bg-green-50 p-4 border-b border-green-100">
             <h2 className="font-bold text-green-800 flex items-center gap-2">
               <ShoppingBag size={20} /> Daftar Belanjaan
@@ -170,9 +170,9 @@ export default function CustomerDisplayPage() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50 shadow-sm"
+                    className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 shadow-sm"
                   >
-                    <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                    <div className="w-16 h-16 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
                       {item.product.image ? (
                         <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
                       ) : (
@@ -180,13 +180,13 @@ export default function CustomerDisplayPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-slate-800 text-lg truncate">{item.product.name}</h3>
-                      <div className="text-sm font-medium text-slate-500">
+                      <h3 className="font-bold text-slate-800 dark:text-slate-200 text-lg truncate">{item.product.name}</h3>
+                      <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
                         {item.quantity} {item.isBox ? 'Dus/Box' : 'Pcs'} × Rp {getDynamicPrice(item).toLocaleString('id-ID')}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-black text-lg text-slate-800">
+                      <div className="font-black text-lg text-slate-800 dark:text-slate-200">
                         Rp {(getDynamicPrice(item) * item.quantity).toLocaleString('id-ID')}
                       </div>
                     </div>
@@ -204,7 +204,7 @@ export default function CustomerDisplayPage() {
             <h2 className="text-3xl font-black mb-4">Mari Berbelanja Sambil Beramal</h2>
             <p className="text-green-100 text-lg mb-8">Sebagian keuntungan KSA Mart disalurkan untuk ziswaf dan pemberdayaan umat.</p>
             {settings.qrisImageUrl && (
-              <div className="bg-white p-4 rounded-2xl z-10 relative">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl z-10 relative">
                 <p className="text-green-800 font-bold mb-2">Scan QRIS untuk Bayar</p>
                 <img src={settings.qrisImageUrl} alt="QRIS" className="w-48 h-48 object-contain mx-auto" />
               </div>

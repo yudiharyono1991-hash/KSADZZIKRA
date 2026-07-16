@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Store, User, Lock, AlertCircle, Sparkles, Eye, EyeOff, UserPlus, ArrowLeft, Phone, Mail, HelpCircle } from 'lucide-react';
+import { Store, User, Lock, AlertCircle, Sparkles, Eye, EyeOff, UserPlus, ArrowLeft, Phone, Mail, HelpCircle, Sun, Moon } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, registerUser, branches, settings } = useAppStore();
+  const { login, registerUser, branches, settings, isDarkMode, toggleDarkMode } = useAppStore();
 
   const verses = [
     {
@@ -73,7 +73,7 @@ export default function LoginPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -108,7 +108,7 @@ export default function LoginPage() {
         setErrorMsg('Pendaftaran gagal: Email atau No. Handphone tersebut sudah terdaftar di sistem. Silakan gunakan yang lain.');
       }
     } else {
-      const result = login(username, password);
+      const result = await login(username, password);
       if (result === 'SUCCESS') {
         const currentUser = useAppStore.getState().currentUser;
         if (currentUser) {
@@ -118,6 +118,9 @@ export default function LoginPage() {
             setErrorMsg('⛔ Login Ditolak: Sistem sedang dalam Mode Pemeliharaan. Hanya Owner yang diizinkan masuk.');
             return;
           }
+
+          // Trigger sinkronisasi data dari Supabase setelah berhasil login
+          useAppStore.getState().initializeStore({ showLoading: true, catalogOnly: false });
 
           if (currentUser.role === 'OWNER' || currentUser.role === 'SUPERADMIN' || currentUser.role === 'MANAGER' || currentUser.role === 'PENGURUS') {
             window.location.hash = '#/trend';
@@ -150,8 +153,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div id="login-container" className="h-[100dvh] w-full bg-green-600 flex flex-col justify-center items-center p-2 md:p-4 relative overflow-hidden bg-linear-to-b from-green-500 via-green-600 to-green-800">
+    <div id="login-container" className={`h-[100dvh] w-full flex flex-col justify-center items-center p-2 md:p-4 relative overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-900' : 'bg-green-600 bg-linear-to-b from-green-500 via-green-600 to-green-800'}`}>
       
+      {/* Theme Toggle Floating Button */}
+      <div className="absolute top-10 right-4 lg:top-12 lg:right-8 z-50">
+        <button 
+          onClick={toggleDarkMode}
+          className={`p-2.5 rounded-full shadow-lg transition-colors flex items-center justify-center ${isDarkMode ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-white text-green-700 hover:bg-green-50 shadow-md'}`}
+          title="Ubah Tema"
+        >
+          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+      </div>
       {/* Custom CSS for LED Running Text & Fonts */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap');
@@ -251,7 +264,7 @@ export default function LoginPage() {
       {/* Left Side: Login Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center relative z-10 order-first px-2 lg:px-4">
         <div className="w-full max-w-[640px] relative">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 md:p-4 lg:p-5 w-full border border-gray-100 animate-in fade-in slide-in-from-bottom-8 duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-3 md:p-4 lg:p-5 w-full border border-gray-100 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-8 duration-200 max-h-[90vh] overflow-y-auto">
         
         {/* Brand Modern Logo Header */}
         <div className="flex flex-col items-center text-center space-y-0.5 mb-2">
@@ -277,8 +290,8 @@ export default function LoginPage() {
             </h2>
           </div>
           <div className="w-full mt-1 text-center">
-            <p className="text-[9px] md:text-[10px] text-gray-500 font-medium leading-tight">
-              Sistem POS & Akuntansi Terintegrasi untuk UMKM & Bisnis Ritel Modern
+            <p className="text-[9px] md:text-[10px] text-gray-500 dark:text-slate-400 font-medium leading-tight">
+              Hadir dalam rangka meningkatkan ekonomi UMAT tanpa RIBA. ✨
             </p>
           </div>
         </div>
@@ -310,12 +323,12 @@ export default function LoginPage() {
 
           {isRegisterMode && (
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider font-bold text-gray-600">Nama Lengkap</label>
+              <label className="text-xs uppercase tracking-wider font-bold text-gray-600 dark:text-slate-400">Nama Lengkap</label>
               <div className="flex space-x-2">
                 <select
                   value={salutation}
                   onChange={(e) => setSalutation(e.target.value)}
-                  className="w-24 bg-slate-50 border border-gray-200 rounded-xl py-4 px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600 transition-all text-gray-800"
+                  className="w-24 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl py-4 px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-600 transition-all text-gray-800 dark:text-slate-200"
                 >
                   <option value="Bpk">Bpk</option>
                   <option value="Ibu">Ibu</option>
@@ -331,7 +344,7 @@ export default function LoginPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Masukkan nama..."
-                    className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-11 pr-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white dark:bg-slate-900 focus:border-green-600 transition-all text-gray-800 dark:text-slate-200"
                   />
                 </div>
               </div>
@@ -340,7 +353,7 @@ export default function LoginPage() {
 
           {/* Username/Email Field */}
           <div className="space-y-1">
-            <label className="text-[10px] md:text-xs uppercase tracking-wider font-bold text-gray-600">
+            <label className="text-[10px] md:text-xs uppercase tracking-wider font-bold text-gray-600 dark:text-slate-400">
               Username / No. Handphone
             </label>
             <div className="relative group">
@@ -352,14 +365,14 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={isRegisterMode ? "Masukkan email..." : "Masukkan Username atau No. HP..."}
-                className="w-full bg-slate-50 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[10px] md:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-3 text-[10px] md:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-green-500/20 focus:bg-white dark:bg-slate-900 focus:border-green-600 transition-all text-gray-800 dark:text-slate-200"
               />
             </div>
           </div>
 
           {isRegisterMode && (
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider font-bold text-gray-600">Pilih Cabang (Opsional)</label>
+              <label className="text-xs uppercase tracking-wider font-bold text-gray-600 dark:text-slate-400">Pilih Cabang (Opsional)</label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <Store className="w-5 h-5 text-slate-400" />
@@ -367,7 +380,7 @@ export default function LoginPage() {
                 <select
                   value={selectedBranchId}
                   onChange={(e) => setSelectedBranchId(e.target.value)}
-                  className="w-full bg-slate-50 border border-gray-200 rounded-xl py-3 pl-11 pr-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800 appearance-none"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:bg-white dark:bg-slate-900 focus:border-green-600 transition-all text-gray-800 dark:text-slate-200 appearance-none"
                 >
                   <option value="">-- Pusat / Global --</option>
                   {branches.map(b => (
@@ -380,7 +393,7 @@ export default function LoginPage() {
 
           {/* Password Field */}
           <div className="space-y-1">
-            <label className="text-[10px] md:text-xs uppercase tracking-wider font-bold text-gray-600">Kata Sandi (Password)</label>
+            <label className="text-[10px] md:text-xs uppercase tracking-wider font-bold text-gray-600 dark:text-slate-400">Kata Sandi (Password)</label>
             <div className="relative group">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-green-500 transition-colors">
                 <Lock className="w-4 h-4" />
@@ -390,7 +403,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
-                className="w-full bg-slate-50 border border-gray-200 rounded-lg py-2 pl-9 pr-9 text-[10px] md:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-green-500/20 focus:bg-white focus:border-green-600 transition-all text-gray-800"
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-9 text-[10px] md:text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-green-500/20 focus:bg-white dark:bg-slate-900 focus:border-green-600 transition-all text-gray-800 dark:text-slate-200"
               />
               <button
                 type="button"
@@ -402,14 +415,14 @@ export default function LoginPage() {
             </div>
             {isRegisterMode && password.length > 0 && (
               <div className="pt-1.5 space-y-1.5">
-                <div className="flex gap-1 h-1 w-full rounded-full overflow-hidden bg-gray-100">
+                <div className="flex gap-1 h-1 w-full rounded-full overflow-hidden bg-gray-100 dark:bg-slate-800">
                   <div className={`h-full ${pwdStrength >= 1 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
                   <div className={`h-full ${pwdStrength >= 2 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
                   <div className={`h-full ${pwdStrength >= 3 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
                   <div className={`h-full ${pwdStrength >= 4 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
                   <div className={`h-full ${pwdStrength >= 5 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
                 </div>
-                <div className="flex items-start gap-1.5 text-xs text-gray-500 font-medium">
+                <div className="flex items-start gap-1.5 text-xs text-gray-500 dark:text-slate-400 font-medium">
                   <AlertCircle className={`w-4 h-4 ${pwdStrength <= 2 ? 'text-red-500' : pwdStrength <= 4 ? 'text-amber-500' : 'text-green-500'} flex-shrink-0 mt-0.5`} />
                   <span className="leading-tight">
                     Kekuatan: <span className={`font-bold uppercase tracking-wider mr-1 ${pwdStrength <= 2 ? 'text-red-600' : pwdStrength <= 4 ? 'text-amber-600' : 'text-green-600'}`}>{strengthLabel}</span> 
@@ -428,15 +441,15 @@ export default function LoginPage() {
           </button>
           
           {isRegisterMode && (
-            <p className="text-center text-[9px] text-gray-500 font-medium mt-2">
+            <p className="text-center text-[9px] text-gray-500 dark:text-slate-400 font-medium mt-2">
               Dengan mendaftar, Anda menyetujui bahwa <b>pengiriman pesanan maksimal radius 5 KM</b> dari KSA Mart.
             </p>
           )}
         </form>
 
         {!isRegisterMode && showDemoAccess && (
-          <div className="mt-3 pt-2 border-t border-slate-100 space-y-1.5 text-left">
-            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest text-center">Akun Demo (Klik untuk masuk)</p>
+          <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-left">
+            <p className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-center">Akun Demo (Klik untuk masuk)</p>
             <div className="flex flex-wrap justify-center gap-1 text-[8px] md:text-[9px] font-semibold">
               <button
                 type="button"
@@ -470,7 +483,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => { setUsername('superadmin.platform'); setPassword('superadmin123!'); }}
-              className="w-full py-1 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded text-center text-[8px] md:text-[9px] font-bold transition-colors cursor-pointer"
+              className="w-full py-1 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded text-center text-[8px] md:text-[9px] font-bold transition-colors cursor-pointer"
             >
               ⚙️ Superadmin Platform
             </button>
@@ -492,13 +505,13 @@ export default function LoginPage() {
           
           {!isRegisterMode && (
             <div className="flex flex-col items-center gap-3">
-              <p className="text-[9px] md:text-[10px] text-gray-500 font-medium">
+              <p className="text-[9px] md:text-[10px] text-gray-500 dark:text-slate-400 font-medium">
                 Lupa password? <a href="#" onClick={(e) => { e.preventDefault(); alert("Silakan hubungi Pengembang (WA: 082210027952 / Email: yudiharyono1991@gmail.com) untuk mereset password Anda."); }} className="text-green-600 hover:text-green-700 font-bold underline decoration-green-600/30 underline-offset-2">Hubungi Pengembang</a>
               </p>
               
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-left w-full max-w-[280px]">
-                <h4 className="font-bold text-slate-700 text-[10px] mb-1.5 flex items-center gap-1.5"><HelpCircle className="w-3 h-3 text-green-600"/> Panduan Login</h4>
-                <ul className="text-[9px] text-slate-600 space-y-1 list-disc pl-4">
+              <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-left w-full max-w-[280px]">
+                <h4 className="font-bold text-slate-700 dark:text-slate-300 text-[10px] mb-1.5 flex items-center gap-1.5"><HelpCircle className="w-3 h-3 text-green-600"/> Panduan Login</h4>
+                <ul className="text-[9px] text-slate-600 dark:text-slate-400 space-y-1 list-disc pl-4">
                   <li>Masukkan <b>Username</b> dan <b>Password</b> yang telah didaftarkan.</li>
                   <li>Jika Anda Kasir/Admin, tanyakan kredensial ke Ketua Toko.</li>
                   <li>Pelanggan Umum bisa mendaftar akun baru terlebih dahulu.</li>
@@ -510,7 +523,7 @@ export default function LoginPage() {
         </div>
 
         {/* Quran Verse Footer Block inside card */}
-        <div className="mt-3 border-t border-gray-100 pt-2 text-center h-[90px] flex items-center justify-center relative overflow-hidden">
+        <div className="mt-3 border-t border-gray-100 dark:border-slate-800 pt-2 text-center h-[90px] flex items-center justify-center relative overflow-hidden">
           <div key={currentVerseIndex} className="animate-in fade-in slide-in-from-bottom-2 duration-1000 absolute w-full">
             <p className="text-[9px] md:text-[10px] text-gray-400 italic font-medium leading-tight max-w-[380px] mx-auto">
               &quot;{verses[currentVerseIndex].text}&quot;

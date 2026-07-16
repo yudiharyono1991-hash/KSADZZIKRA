@@ -20,12 +20,18 @@ export default function CustomerManagementPage() {
   const [debtAmount, setDebtAmount] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
   const filtered = customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentCustomers = filtered.slice(startIndex, startIndex + itemsPerPage);
 
   const totalPointsEarnedSum = filtered.reduce((sum, c) => sum + (c.totalPointsEarned || c.points), 0);
   const totalPointsRedeemedSum = filtered.reduce((sum, c) => sum + (c.totalPointsRedeemed || 0), 0);
@@ -120,8 +126,8 @@ export default function CustomerManagementPage() {
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Master Pelanggan (CRM)</h1>
-            <p className="text-sm text-gray-500">Kelola data pelanggan, loyalitas, dan catatan piutang/kasbon.</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Master Pelanggan (CRM)</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Kelola data pelanggan, loyalitas, dan catatan piutang/kasbon.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -138,10 +144,10 @@ export default function CustomerManagementPage() {
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Template Master Pelanggan');
             XLSX.writeFile(wb, 'template_master_pelanggan_ksa_mart.xlsx');
-          }} className="ml-2 bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+          }} className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2">
             <Download className="w-4 h-4" /> Unduh Template
           </button>
-          <label className="ml-2 bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
+          <label className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2 cursor-pointer">
             <Upload className="w-4 h-4" /> Import
             <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => {
               const file = e.target.files?.[0]; if (!file) return;
@@ -214,84 +220,98 @@ export default function CustomerManagementPage() {
       )}
 
       {isAdding && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 mb-6">
           <h2 className="text-lg font-bold mb-4">{editingId ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}</h2>
           <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">id</label>
-              <input type="text" value={customId} onChange={e => setCustomId(e.target.value)} placeholder="(Otomatis)" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" />
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">id</label>
+              <input type="text" value={customId} onChange={e => setCustomId(e.target.value)} placeholder="(Otomatis)" className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">phone</label>
-              <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">phone</label>
+              <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">name</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">name</label>
+              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Total Point</label>
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Total Point</label>
                 <input type="number" min={0} value={totalPointsEarned} onChange={e => {
                   const val = Number(e.target.value) || 0;
                   setTotalPointsEarned(val);
                   setPoints(Math.max(0, val - totalPointsRedeemed));
-                }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                }} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">point terpakai</label>
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">point terpakai</label>
                 <input type="number" min={0} value={totalPointsRedeemed} onChange={e => {
                   const val = Number(e.target.value) || 0;
                   setTotalPointsRedeemed(val);
                   setPoints(Math.max(0, totalPointsEarned - val));
-                }} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                }} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Sisa Point</label>
-                <input type="number" min={0} value={points} onChange={e => setPoints(Number(e.target.value) || 0)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Sisa Point</label>
+                <input type="number" min={0} value={points} onChange={e => setPoints(Number(e.target.value) || 0)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold text-center" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">tanggal update</label>
-                <input type="date" required value={lastPointsUpdate} onChange={e => setLastPointsUpdate(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">tanggal update</label>
+                <input type="date" required value={lastPointsUpdate} onChange={e => setLastPointsUpdate(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nilai (Rp)</label>
-                <input type="number" min={0} value={points * (settings?.pointRedemptionValue || 10)} onChange={e => setPoints(Math.floor((Number(e.target.value) || 0) / (settings?.pointRedemptionValue || 10)))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-right font-bold text-green-700" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Nilai (Rp)</label>
+                <input type="number" min={0} value={points * (settings?.pointRedemptionValue || 10)} onChange={e => setPoints(Math.floor((Number(e.target.value) || 0) / (settings?.pointRedemptionValue || 10)))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-right font-bold text-green-700" />
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-red-600 dark:text-red-400 mb-1">Piutang / Kasbon (Rp)</label>
+              <input type="number" min={0} value={debtAmount} onChange={e => setDebtAmount(Number(e.target.value) || 0)} className="w-full border border-red-200 dark:border-red-900/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none font-bold text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-900/10" />
             </div>
             <button type="submit" className="w-full bg-green-600 text-white font-bold py-2 rounded-lg mt-2">Simpan Data</button>
           </form>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Cari pelanggan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none" />
+            <input 
+              type="text" 
+              placeholder="Cari pelanggan..." 
+              value={searchTerm} 
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // Reset page on search
+              }} 
+              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none" 
+            />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50/50 text-gray-500 font-medium whitespace-nowrap">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap">
               <tr>
-                <th className="px-4 py-4 align-middle">No</th>
-                <th className="px-4 py-4 align-middle">id</th>
-                <th className="px-4 py-4 align-middle">phone</th>
-                <th className="px-4 py-4 align-middle">name</th>
-                <th className="px-4 py-4 text-center align-middle">Total Point</th>
-                <th className="px-4 py-4 text-center align-middle">point terpakai</th>
-                <th className="px-4 py-4 text-center align-middle">Sisa Point</th>
-                <th className="px-4 py-4 align-middle">tanggal update</th>
-                <th className="px-4 py-4 text-right align-middle">Nilai (Rp)</th>
-                <th className="px-4 py-4 text-center align-middle">Aksi</th>
+                <th className="px-2 py-3 align-middle">No</th>
+                <th className="px-2 py-3 align-middle">ID</th>
+                <th className="px-2 py-3 align-middle">Phone</th>
+                <th className="px-2 py-3 align-middle min-w-[120px]">Name</th>
+                <th className="px-2 py-3 text-right align-middle">Piutang (Kasbon)</th>
+                <th className="px-2 py-3 text-center align-middle">Tot. Poin</th>
+                <th className="px-2 py-3 text-center align-middle">Terpakai</th>
+                <th className="px-2 py-3 text-center align-middle">Sisa</th>
+                <th className="px-2 py-3 align-middle hidden sm:table-cell">Tgl Update</th>
+                <th className="px-2 py-3 text-right align-middle">Nilai (Rp)</th>
+                <th className="px-2 py-3 text-center align-middle">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 whitespace-nowrap">
-              {filtered.map((c, index) => {
+              {currentCustomers.map((c, index) => {
                 const totalPoint = c.totalPointsEarned || c.points;
                 const pointTerpakai = c.totalPointsRedeemed || 0;
                 const sisaPoint = c.points;
@@ -299,51 +319,106 @@ export default function CustomerManagementPage() {
                 const nilaiRp = sisaPoint * (settings?.pointRedemptionValue || 10);
 
                 return (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 text-gray-600 align-middle">{index + 1}</td>
-                    <td className="px-4 py-4 text-gray-500 font-mono text-xs align-middle">{c.id.substring(0, 8)}</td>
-                    <td className="px-4 py-4 text-gray-600 align-middle">{c.phone}</td>
-                    <td className="px-4 py-4 font-bold text-gray-800 align-middle whitespace-normal min-w-[200px]">{c.name}</td>
-                    <td className="px-4 py-4 text-center align-middle">{totalPoint}</td>
-                    <td className="px-4 py-4 text-center align-middle">{pointTerpakai}</td>
-                    <td className="px-4 py-4 text-center align-middle">
+                  <tr key={c.id} className="hover:bg-gray-50 dark:bg-slate-800">
+                    <td className="px-2 py-3 text-gray-600 dark:text-slate-400 align-middle">{startIndex + index + 1}</td>
+                    <td className="px-2 py-3 text-gray-500 dark:text-slate-400 font-mono text-[10px] sm:text-xs align-middle">{c.id.substring(0, 8)}</td>
+                    <td className="px-2 py-3 text-gray-600 dark:text-slate-400 align-middle text-[10px] sm:text-xs">{c.phone}</td>
+                    <td className="px-2 py-3 font-bold text-gray-800 dark:text-slate-200 align-middle whitespace-normal break-words">{c.name}</td>
+                    <td className="px-2 py-3 text-right text-red-600 dark:text-red-400 font-bold align-middle">
+                      Rp {Number(c.debtAmount || 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-2 py-3 text-center align-middle">{totalPoint}</td>
+                    <td className="px-2 py-3 text-center align-middle">{pointTerpakai}</td>
+                    <td className="px-2 py-3 text-center align-middle">
                       <button onClick={() => {
                         const val = prompt(`Ubah poin untuk ${c.name}:`, String(c.points));
                         if (val === null) return;
                         const n = Number(val);
                         if (isNaN(n)) { alert('Masukkan angka valid'); return; }
                         updateCustomer(c.id, { points: n });
-                      }} className="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-xs hover:opacity-80">
+                      }} className="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-[10px] sm:text-xs hover:opacity-80">
                         {sisaPoint}
                       </button>
                     </td>
-                    <td className="px-4 py-4 text-gray-500 text-xs align-middle">{updateDate}</td>
-                    <td className="px-4 py-4 text-right font-bold text-green-700 align-middle">Rp {nilaiRp.toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-4 text-center space-x-2 align-middle">
-                      <button onClick={() => handleEdit(c)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg" title="Edit">
-                        <Edit className="w-4 h-4" />
+                    <td className="px-2 py-3 text-gray-500 dark:text-slate-400 text-[10px] align-middle hidden sm:table-cell">{updateDate}</td>
+                    <td className="px-2 py-3 text-right font-bold text-green-700 align-middle">Rp {nilaiRp.toLocaleString('id-ID')}</td>
+                    <td className="px-2 py-3 text-center space-x-1 align-middle">
+                      <button onClick={() => handleEdit(c)} className="p-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 rounded-lg" title="Edit">
+                        <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
-                      <button onClick={() => deleteCustomer(c.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Hapus">
-                        <Trash2 className="w-4 h-4" />
+                      <button onClick={() => deleteCustomer(c.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-lg" title="Hapus">
+                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </td>
                   </tr>
                 );
               })}
+              {currentCustomers.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-400">Tidak ada data pelanggan ditemukan.</td>
+                </tr>
+              )}
             </tbody>
-            <tfoot className="bg-gray-100 font-bold text-gray-800 border-t border-gray-200 whitespace-nowrap">
+            <tfoot className="bg-gray-100 dark:bg-slate-800 font-bold text-gray-800 dark:text-slate-200 border-t border-gray-200 dark:border-slate-700 whitespace-nowrap text-[10px] sm:text-xs">
               <tr>
-                <td colSpan={4} className="px-4 py-4 text-right align-middle">TOTAL</td>
-                <td className="px-4 py-4 text-center align-middle">{totalPointsEarnedSum}</td>
-                <td className="px-4 py-4 text-center align-middle">{totalPointsRedeemedSum}</td>
-                <td className="px-4 py-4 text-center align-middle">{totalRemainingPointsSum}</td>
-                <td className="px-4 py-4 align-middle"></td>
-                <td className="px-4 py-4 text-right text-green-700 align-middle">Rp {totalValueSum.toLocaleString('id-ID')}</td>
-                <td className="px-4 py-4 align-middle"></td>
+                <td colSpan={4} className="px-2 py-3 text-right align-middle">TOTAL</td>
+                <td className="px-2 py-3 text-center align-middle">{totalPointsEarnedSum}</td>
+                <td className="px-2 py-3 text-center align-middle">{totalPointsRedeemedSum}</td>
+                <td className="px-2 py-3 text-center align-middle">{totalRemainingPointsSum}</td>
+                <td className="px-2 py-3 align-middle hidden sm:table-cell"></td>
+                <td className="px-2 py-3 text-right text-green-700 align-middle">Rp {totalValueSum.toLocaleString('id-ID')}</td>
+                <td className="px-2 py-3 align-middle"></td>
               </tr>
             </tfoot>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-xs text-gray-500 dark:text-slate-400">
+              Menampilkan {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filtered.length)} dari {filtered.length} pelanggan
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg text-xs hover:bg-gray-200 disabled:opacity-50"
+              >
+                Sebelumnya
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum = currentPage;
+                  if (currentPage < 3) pageNum = i + 1;
+                  else if (currentPage > totalPages - 2) pageNum = totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+                  
+                  if (pageNum < 1 || pageNum > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                        currentPage === pageNum ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="px-3 py-1 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded-lg text-xs hover:bg-gray-200 disabled:opacity-50"
+              >
+                Selanjutnya
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -24,7 +24,7 @@ export default function BottomNavBar({ onOpenMenu }: BottomNavBarProps) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex items-stretch z-40 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-stretch z-40 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
       {navItems.map(item => (
         <NavLink
           key={item.path}
@@ -33,7 +33,7 @@ export default function BottomNavBar({ onOpenMenu }: BottomNavBarProps) {
             `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-all relative ${
               isActive
                 ? 'text-green-600 bg-green-50'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800'
             }`
           }
         >
@@ -59,7 +59,7 @@ export default function BottomNavBar({ onOpenMenu }: BottomNavBarProps) {
       ))}
       <button
         onClick={onOpenMenu}
-        className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all"
+        className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 transition-all"
       >
         <Menu className="w-5 h-5" />
         <span className="text-[10px] font-medium leading-none">Menu</span>

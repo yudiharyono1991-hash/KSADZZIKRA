@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowLeft, BookOpen, ChevronRight, BookText, X, Scale, HeartHandshake, BookHeart, Calculator } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronRight, BookText, X, Scale, HeartHandshake, BookHeart, Calculator, Sun, Moon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAppStore } from '../store';
 
 const ARTIKEL_MOCK = [
   {
@@ -52,10 +53,11 @@ const ARTIKEL_MOCK = [
 
 export default function ArtikelIslamiPage() {
   const navigate = useNavigate();
+  const { isDarkMode, toggleDarkMode } = useAppStore();
   const [selectedArticle, setSelectedArticle] = useState<typeof ARTIKEL_MOCK[0] | null>(null);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans pb-12">
+    <div className={`min-h-screen font-sans pb-12 transition-colors ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-[#f8fafc] text-slate-800 dark:text-slate-200'}`}>
       <header className="bg-green-800 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -70,6 +72,11 @@ export default function ArtikelIslamiPage() {
               <h1 className="text-xl font-bold tracking-tight">Edukasi Fikih Muamalah</h1>
             </div>
           </div>
+          <div className="flex items-center gap-4">
+            <button onClick={toggleDarkMode} className="p-1.5 hover:bg-green-700 rounded-full transition-colors">
+              {isDarkMode ? <Sun className="w-5 h-5 text-amber-300" /> : <Moon className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -78,27 +85,27 @@ export default function ArtikelIslamiPage() {
         {/* HERO ARTICLE */}
         <div 
           onClick={() => setSelectedArticle(ARTIKEL_MOCK[0])}
-          className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col md:flex-row group cursor-pointer hover:shadow-md hover:border-green-200 transition-all mb-10"
+          className={`rounded-3xl shadow-lg border overflow-hidden group cursor-pointer hover:shadow-xl transition-all flex flex-col md:flex-row mb-12 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}
         >
           <div className={`w-full md:w-1/2 h-64 md:h-auto relative overflow-hidden bg-gradient-to-br ${ARTIKEL_MOCK[0].bgGradient} flex items-center justify-center p-8`}>
             {(() => {
               const Icon = ARTIKEL_MOCK[0].icon;
               return <Icon className="w-32 h-32 text-white opacity-80 group-hover:scale-110 transition-transform duration-700" />;
             })()}
-            <div className="absolute top-4 left-4 bg-white/20 backdrop-blur-sm border border-white/40 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase">
+            <div className="absolute top-4 left-4 bg-white dark:bg-slate-900/20 backdrop-blur-sm border border-white/40 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase">
               Artikel Pilihan
             </div>
           </div>
-          <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
-            <div className="flex items-center space-x-2 text-sm text-slate-500 mb-3 font-medium">
-              <span>{ARTIKEL_MOCK[0].author}</span>
+          <div className={`md:w-3/5 p-6 md:p-10 flex flex-col justify-center ${isDarkMode ? 'bg-slate-800' : 'bg-white dark:bg-slate-900'}`}>
+            <div className="flex items-center space-x-2 text-xs font-bold mb-4">
+              <span className={`${isDarkMode ? 'text-green-400' : 'text-green-700'} uppercase tracking-wider`}>Sorotan</span>
               <span>•</span>
               <span className="text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded">Baru Diperbarui</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-4 leading-tight group-hover:text-green-700 transition-colors">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4 leading-tight group-hover:text-green-700 transition-colors">
               {ARTIKEL_MOCK[0].title}
             </h2>
-            <p className="text-slate-600 leading-relaxed mb-6">
+            <p className={`leading-relaxed mb-6 ${isDarkMode ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
               {ARTIKEL_MOCK[0].excerpt}
             </p>
             <button className="flex items-center space-x-2 text-green-600 font-bold group-hover:text-green-800 transition-colors w-max">
@@ -110,10 +117,10 @@ export default function ArtikelIslamiPage() {
 
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2">
-            <BookText className="w-6 h-6 text-green-700" />
-            <h2 className="text-xl font-bold text-slate-800">Artikel Terbaru</h2>
+            <BookText className={`w-6 h-6 ${isDarkMode ? 'text-green-400' : 'text-green-700'}`} />
+            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800 dark:text-slate-200'}`}>Artikel Terbaru</h2>
           </div>
-          <div className="text-xs text-slate-500 italic bg-white px-3 py-1.5 rounded-full border border-slate-200">
+          <div className={`text-xs italic px-3 py-1.5 rounded-full border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
             Diperbarui secara berkala
           </div>
         </div>
@@ -126,20 +133,20 @@ export default function ArtikelIslamiPage() {
               <div 
                 key={artikel.id} 
                 onClick={() => setSelectedArticle(artikel)}
-                className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group cursor-pointer hover:shadow-md hover:border-green-200 transition-all flex flex-col"
+                className={`rounded-2xl shadow-sm border overflow-hidden group cursor-pointer hover:shadow-md hover:border-green-200 transition-all flex flex-col ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}
               >
                 <div className={`h-40 relative overflow-hidden bg-gradient-to-br ${artikel.bgGradient} flex items-center justify-center`}>
                   <IconComponent className="w-16 h-16 text-white opacity-80 group-hover:scale-110 transition-transform duration-500" />
                 </div>
                 <div className="p-5 flex flex-col flex-1">
-                  <div className="flex justify-between items-center text-xs text-slate-500 font-medium mb-3">
+                  <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 font-medium mb-3">
                     <span className="truncate pr-2">{artikel.author}</span>
-                    <span className="whitespace-nowrap font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded">{artikel.date}</span>
+                    <span className="whitespace-nowrap font-bold text-slate-400 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 rounded">{artikel.date}</span>
                   </div>
-                  <h3 className={`font-bold text-lg text-slate-800 leading-tight mb-2 group-hover:${artikel.colorClass} transition-colors`}>
+                  <h3 className={`font-bold text-lg leading-tight mb-2 group-hover:${artikel.colorClass} transition-colors ${isDarkMode ? 'text-slate-200' : 'text-slate-800 dark:text-slate-200'}`}>
                     {artikel.title}
                   </h3>
-                  <p className="text-sm text-slate-600 line-clamp-3 mb-4 flex-1">
+                  <p className={`text-sm line-clamp-3 mb-4 flex-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
                     {artikel.excerpt}
                   </p>
                   <div className={`flex items-center font-bold text-sm mt-auto ${artikel.colorClass}`}>
@@ -156,17 +163,17 @@ export default function ArtikelIslamiPage() {
       {/* ARTICLE READING MODAL */}
       {selectedArticle && (
         <div className="fixed inset-0 z-50 flex justify-center items-end sm:items-center bg-slate-900/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl sm:rounded-3xl rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
+          <div className={`w-full max-w-2xl sm:rounded-3xl rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-8 duration-300 ${isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200'}`}>
             {/* Modal Header */}
             <div className={`p-6 sm:p-8 sm:rounded-t-3xl rounded-t-3xl bg-gradient-to-br ${selectedArticle.bgGradient} text-white relative`}>
               <button 
                 onClick={() => setSelectedArticle(null)}
-                className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 p-2 rounded-full backdrop-blur-md transition-colors"
+                className="absolute top-4 right-4 bg-white dark:bg-slate-900/20 hover:bg-white dark:bg-slate-900/40 p-2 rounded-full backdrop-blur-md transition-colors"
               >
                 <X className="w-5 h-5 text-white" />
               </button>
               <div className="flex items-center space-x-2 text-white/80 text-sm mb-3 font-medium">
-                <span className="bg-white/20 px-2 py-0.5 rounded border border-white/20">{selectedArticle.author}</span>
+                <span className="bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded border border-white/20">{selectedArticle.author}</span>
                 <span>•</span>
                 <span>{selectedArticle.date}</span>
               </div>
@@ -176,13 +183,13 @@ export default function ArtikelIslamiPage() {
             </div>
             
             {/* Modal Content */}
-            <div className="p-6 sm:p-8 overflow-y-auto bg-[#fafafa]">
-              <p className="text-slate-800 text-base sm:text-lg leading-relaxed whitespace-pre-line font-medium">
+            <div className={`p-6 sm:p-8 overflow-y-auto ${isDarkMode ? 'bg-slate-800' : 'bg-[#fafafa]'}`}>
+              <p className={`text-base sm:text-lg leading-relaxed whitespace-pre-line font-medium ${isDarkMode ? 'text-slate-300' : 'text-slate-800 dark:text-slate-200'}`}>
                 {selectedArticle.content}
               </p>
               
-              <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <p className="text-sm text-slate-500 italic text-center sm:text-left">
+              <div className={`mt-8 pt-6 border-t flex flex-col sm:flex-row justify-between items-center gap-4 ${isDarkMode ? 'border-slate-700' : 'border-slate-200 dark:border-slate-700'}`}>
+                <p className={`text-sm italic text-center sm:text-left ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>
                   Materi ini disediakan khusus untuk edukasi pengguna KSA Mart.
                 </p>
                 <button 

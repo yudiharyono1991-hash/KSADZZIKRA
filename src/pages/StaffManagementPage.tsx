@@ -28,13 +28,6 @@ export default function StaffManagementPage() {
     return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
-  // Calculate commission
-  const getCommission = (cashierName: string) => {
-    const totalSales = transactions
-      .filter(t => t.cashierName === cashierName)
-      .reduce((sum, t) => sum + t.totalAmount, 0);
-    return totalSales * 0.01;
-  };
 
   const filteredAttendances = attendances.filter(a => a.userName.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -48,23 +41,23 @@ export default function StaffManagementPage() {
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Manajemen Karyawan (HR)</h1>
-            <p className="text-sm text-gray-500">Log absensi shift dan perhitungan komisi performa kasir.</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Manajemen Karyawan (HR)</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Log absensi shift dan manajemen staf.</p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 gap-1 flex-wrap">
+      <div className="flex border-b border-gray-200 dark:border-slate-700 gap-1 flex-wrap">
         <button
           onClick={() => setActiveTab('LOG')}
-          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'LOG' ? 'border-b-2 border-teal-600 text-teal-700 bg-teal-50' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'LOG' ? 'border-b-2 border-teal-600 text-teal-700 bg-teal-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
           <Clock className="w-4 h-4 inline mr-1" /> Log Absensi
         </button>
         <button
           onClick={() => setActiveTab('CORRECTIONS')}
-          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CORRECTIONS' ? 'border-b-2 border-amber-500 text-amber-700 bg-amber-50' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CORRECTIONS' ? 'border-b-2 border-amber-500 text-amber-700 bg-amber-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
           <AlertTriangle className="w-4 h-4" /> Permohonan Koreksi
           {pendingCorrections.length > 0 && (
@@ -73,31 +66,32 @@ export default function StaffManagementPage() {
         </button>
         <button
           onClick={() => setActiveTab('CASH_OPNAME')}
-          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CASH_OPNAME' ? 'border-b-2 border-green-600 text-green-700 bg-green-50' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CASH_OPNAME' ? 'border-b-2 border-green-600 text-green-700 bg-green-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
           <Banknote className="w-4 h-4" /> Cash Opname
         </button>
       </div>
 
       {activeTab === 'LOG' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Attendances Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-bold text-gray-800 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-teal-600" /> Log Absensi
               </h2>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+                <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
               </div>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50/50 text-gray-500 font-bold uppercase tracking-wide sticky top-0">
+                <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wide sticky top-0">
                   <tr>
                     <th className="px-4 py-3">Tanggal</th>
                     <th className="px-4 py-3">Nama Staff</th>
+                    <th className="px-4 py-3 text-center">Foto Masuk</th>
                     <th className="px-4 py-3 text-center">Masuk</th>
                     <th className="px-4 py-3 text-center">Keluar</th>
                     <th className="px-4 py-3 text-center">Status</th>
@@ -105,12 +99,24 @@ export default function StaffManagementPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
                   {filteredAttendances.map(a => (
-                    <tr key={a.id} className="hover:bg-gray-50">
+                    <tr key={a.id} className="hover:bg-gray-50 dark:bg-slate-800">
                       <td className="px-4 py-3">
                         {a.date}
                         {a.isRevised && <span className="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Direvisi</span>}
                       </td>
-                      <td className="px-4 py-3 font-bold text-gray-800">{a.userName}</td>
+                      <td className="px-4 py-3 font-bold text-gray-800 dark:text-slate-200">{a.userName}</td>
+                      <td className="px-4 py-3 text-center flex justify-center">
+                        {a.photoUrl ? (
+                          <div className="relative group cursor-pointer w-8 h-8 rounded-full overflow-hidden border-2 border-teal-500 shadow-sm">
+                            <img src={a.photoUrl} alt="Selfie" className="w-full h-full object-cover" />
+                            <div className="hidden group-hover:block absolute bottom-0 left-0 w-32 h-32 z-50 bg-white rounded shadow-xl overflow-hidden transform translate-x-4 -translate-y-4">
+                              <img src={a.photoUrl} alt="Selfie Zoom" className="w-full h-full object-cover" />
+                            </div>
+                          </div>
+                        ) : (
+                           <span className="text-[10px] text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-center text-teal-600">{new Date(a.clockIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                       <td className="px-4 py-3 text-center text-amber-600">
                         {a.clockOut ? new Date(a.clockOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}
@@ -124,47 +130,11 @@ export default function StaffManagementPage() {
                   ))}
                   {filteredAttendances.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500">Belum ada log absensi.</td>
+                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">Belum ada log absensi.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          {/* Commission Report */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600" /> Estimasi Komisi (1% Sales)
-              </h2>
-            </div>
-            <div className="p-4">
-              <div className="space-y-4">
-                {users.filter(u => u.role === 'CASHIER').map(u => {
-                  const commission = getCommission(u.name);
-                  return (
-                    <div key={u.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
-                          {u.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-800 text-sm">{u.name}</p>
-                          <p className="text-[10px] text-gray-500">@{u.username}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-gray-500 font-bold mb-0.5">EST. KOMISI</p>
-                        <p className="font-extrabold text-green-600 text-sm">Rp {commission.toLocaleString('id-ID')}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {users.filter(u => u.role === 'CASHIER').length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">Belum ada akun kasir terdaftar.</p>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -174,34 +144,34 @@ export default function StaffManagementPage() {
       {activeTab === 'CORRECTIONS' && (
         <div className="space-y-4">
           {pendingCorrections.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 border border-gray-100 shadow-sm text-center">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 border border-gray-100 dark:border-slate-800 shadow-sm text-center">
               <CheckCircle className="w-16 h-16 text-green-200 mx-auto mb-4" />
-              <h3 className="font-bold text-gray-700 text-lg">Tidak Ada Permohonan Koreksi</h3>
-              <p className="text-gray-500 text-sm mt-1">Semua absensi karyawan sudah berstatus normal.</p>
+              <h3 className="font-bold text-gray-700 dark:text-slate-300 text-lg">Tidak Ada Permohonan Koreksi</h3>
+              <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">Semua absensi karyawan sudah berstatus normal.</p>
             </div>
           ) : (
             pendingCorrections.map(a => (
-              <div key={a.id} className="bg-white rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
+              <div key={a.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
                 <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold text-gray-800 text-sm">{a.userName} — <span className="text-amber-700">{a.date}</span></p>
-                    <p className="text-xs text-gray-500">Memohon koreksi: <strong>{a.correctionType === 'CLOCK_IN' ? 'Jam Masuk' : a.correctionType === 'CLOCK_OUT' ? 'Jam Keluar' : 'Jam Masuk & Keluar'}</strong></p>
+                    <p className="font-bold text-gray-800 dark:text-slate-200 text-sm">{a.userName} — <span className="text-amber-700">{a.date}</span></p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Memohon koreksi: <strong>{a.correctionType === 'CLOCK_IN' ? 'Jam Masuk' : a.correctionType === 'CLOCK_OUT' ? 'Jam Keluar' : 'Jam Masuk & Keluar'}</strong></p>
                   </div>
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-500 mb-1">Jam Masuk Saat Ini</p>
-                      <p className="font-bold text-gray-800">{new Date(a.clockIn).toLocaleString('id-ID')}</p>
+                    <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Jam Masuk Saat Ini</p>
+                      <p className="font-bold text-gray-800 dark:text-slate-200">{new Date(a.clockIn).toLocaleString('id-ID')}</p>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-3">
                       <p className="text-xs text-blue-500 mb-1">Jam Masuk yang Diminta</p>
                       <p className="font-bold text-blue-800">{a.requestedClockIn ? new Date(a.requestedClockIn).toLocaleString('id-ID') : '(tidak diubah)'}</p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-500 mb-1">Jam Keluar Saat Ini</p>
-                      <p className="font-bold text-gray-800">{a.clockOut ? new Date(a.clockOut).toLocaleString('id-ID') : '(belum absen)'}</p>
+                    <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Jam Keluar Saat Ini</p>
+                      <p className="font-bold text-gray-800 dark:text-slate-200">{a.clockOut ? new Date(a.clockOut).toLocaleString('id-ID') : '(belum absen)'}</p>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-3">
                       <p className="text-xs text-blue-500 mb-1">Jam Keluar yang Diminta</p>
@@ -266,45 +236,45 @@ export default function StaffManagementPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Input Form */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-                <h3 className="font-bold text-gray-800 border-b pb-3 flex items-center gap-2"><Calculator className="w-4 h-4 text-green-600"/> Form Penghitungan</h3>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 p-6 space-y-4">
+                <h3 className="font-bold text-gray-800 dark:text-slate-200 border-b pb-3 flex items-center gap-2"><Calculator className="w-4 h-4 text-green-600"/> Form Penghitungan</h3>
                 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Tanggal Opname</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">Tanggal Opname</label>
                   <input type="date" value={opnameDate} onChange={e => setOpnameDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"/>
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"/>
                 </div>
                 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Kasir yang Bertugas</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">Kasir yang Bertugas</label>
                   <select value={opnameCashierName} onChange={e => setOpnameCashierName(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none">
                     <option value="">-- Semua Kasir --</option>
                     {cashierNames.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2 border border-slate-200">
-                  <h4 className="font-bold text-slate-700 text-sm mb-2">💻 Data Sistem</h4>
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 space-y-2 border border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-300 text-sm mb-2">💻 Data Sistem</h4>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Total Tunai Masuk</span>
+                    <span className="text-slate-600 dark:text-slate-400">Total Tunai Masuk</span>
                     <span className="font-bold text-green-700">Rp {systemCashIn.toLocaleString('id-ID')}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Total Pengeluaran Kas Kecil</span>
+                    <span className="text-slate-600 dark:text-slate-400">Total Pengeluaran Kas Kecil</span>
                     <span className="font-bold text-red-600">- Rp {systemExpenses.toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="flex justify-between text-sm border-t border-slate-300 pt-2 mt-1">
-                    <span className="font-bold text-slate-800">Kas Bersih Sistem</span>
-                    <span className="font-extrabold text-slate-900">Rp {systemNetCash.toLocaleString('id-ID')}</span>
+                  <div className="flex justify-between text-sm border-t border-slate-300 dark:border-slate-600 pt-2 mt-1">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Kas Bersih Sistem</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white">Rp {systemNetCash.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">💵 Uang Fisik di Laci (Hasil Hitung)</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">💵 Uang Fisik di Laci (Hasil Hitung)</label>
                   <input type="number" value={physicalCash} onChange={e => setPhysicalCash(e.target.value)}
                     placeholder="Masukkan jumlah uang fisik..."
-                    className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold"/>
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold"/>
                 </div>
 
                 {physicalCash && (
@@ -326,11 +296,11 @@ export default function StaffManagementPage() {
                 )}
 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Catatan Opname</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">Catatan Opname</label>
                   <textarea value={opnameNotes} onChange={e => setOpnameNotes(e.target.value)}
                     placeholder="Contoh: Semua sesuai. / Selisih disebabkan uang kembalian rusak."
                     rows={2}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"/>
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"/>
                 </div>
 
                 <button
@@ -358,9 +328,9 @@ export default function StaffManagementPage() {
               </div>
 
               {/* History */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Printer className="w-4 h-4 text-gray-500"/> Riwayat Cash Opname</h3>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 dark:border-slate-800">
+                  <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2"><Printer className="w-4 h-4 text-gray-500 dark:text-slate-400"/> Riwayat Cash Opname</h3>
                 </div>
                 <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
                   {savedOpnameResults.length === 0 ? (
@@ -370,11 +340,11 @@ export default function StaffManagementPage() {
                     </div>
                   ) : (
                     savedOpnameResults.map((r, i) => (
-                      <div key={i} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div key={i} className="p-4 hover:bg-gray-50 dark:bg-slate-800 transition-colors">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-bold text-sm text-gray-800">{new Date(r.date + 'T00:00:00').toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'short', year:'numeric'})}</p>
-                            <p className="text-xs text-gray-500">Kasir: {r.cashierName} | Dicatat: {r.recordedBy}</p>
+                            <p className="font-bold text-sm text-gray-800 dark:text-slate-200">{new Date(r.date + 'T00:00:00').toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'short', year:'numeric'})}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Kasir: {r.cashierName} | Dicatat: {r.recordedBy}</p>
                           </div>
                           <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full ${
                             r.difference === 0 ? 'bg-green-100 text-green-700' :
@@ -384,24 +354,24 @@ export default function StaffManagementPage() {
                           </span>
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div className="bg-slate-50 rounded-lg p-2 text-center">
-                            <p className="text-gray-500">Sistem</p>
-                            <p className="font-bold text-gray-800">Rp {r.systemCash.toLocaleString('id-ID')}</p>
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2 text-center">
+                            <p className="text-gray-500 dark:text-slate-400">Sistem</p>
+                            <p className="font-bold text-gray-800 dark:text-slate-200">Rp {r.systemCash.toLocaleString('id-ID')}</p>
                           </div>
-                          <div className="bg-slate-50 rounded-lg p-2 text-center">
-                            <p className="text-gray-500">Fisik</p>
-                            <p className="font-bold text-gray-800">Rp {r.physicalCash.toLocaleString('id-ID')}</p>
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2 text-center">
+                            <p className="text-gray-500 dark:text-slate-400">Fisik</p>
+                            <p className="font-bold text-gray-800 dark:text-slate-200">Rp {r.physicalCash.toLocaleString('id-ID')}</p>
                           </div>
                           <div className={`rounded-lg p-2 text-center ${
                             r.difference === 0 ? 'bg-green-50' : r.difference > 0 ? 'bg-blue-50' : 'bg-red-50'
                           }`}>
-                            <p className="text-gray-500">Selisih</p>
+                            <p className="text-gray-500 dark:text-slate-400">Selisih</p>
                             <p className={`font-extrabold ${
                               r.difference === 0 ? 'text-green-700' : r.difference > 0 ? 'text-blue-700' : 'text-red-700'
                             }`}>{r.difference >= 0 ? '+' : ''}Rp {r.difference.toLocaleString('id-ID')}</p>
                           </div>
                         </div>
-                        {r.notes && <p className="text-xs text-gray-500 mt-1 italic">📝 {r.notes}</p>}
+                        {r.notes && <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 italic">📝 {r.notes}</p>}
                       </div>
                     ))
                   )}

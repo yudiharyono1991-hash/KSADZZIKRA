@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
+import { useAppStore } from '../store';
 import { 
   AreaChart, 
   Area, 
@@ -27,20 +28,67 @@ import {
   ShieldCheck,
   AlertTriangle,
   LineChart as LineChartIcon,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Wallet
 } from 'lucide-react';
 
 type DateRange = 'TODAY' | '7_DAYS' | '30_DAYS' | 'THIS_YEAR';
 
 export default function TrendPage() {
   const { transactions, expenses, products, activeBranchId } = useBranchData();
+  const { settings, addPettyCashDeposit } = useAppStore();
   const [dateRange, setDateRange] = useState<DateRange>('7_DAYS');
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpDesc, setTopUpDesc] = useState('');
+
+  const handleTopUpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (Number(topUpAmount) > 0) {
+      addPettyCashDeposit(Number(topUpAmount), topUpDesc || 'Top Up Rutin');
+      setShowTopUpModal(false);
+      setTopUpAmount('');
+      setTopUpDesc('');
+      alert('Top Up Kas Kecil berhasil dicatat!');
+    }
+  };
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => !tx.isVoided && (!activeBranchId || tx.branchId === activeBranchId || !tx.branchId));
   }, [transactions, activeBranchId]);
 
   const { chartData, totals, comparisons, ratios } = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayTransactions = filteredTransactions.filter(tx => tx.timestamp.startsWith(today));
+    
+    // Summary Metrics
+    const totalOmset = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+    const todayOmset = todayTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+    const totalTransactions = filteredTransactions.length;
+    const todayTransactionsCount = todayTransactions.length;
+    
+    const totalItemsSold = filteredTransactions.reduce((sum, tx) => sum + (tx.items?.reduce((s, item) => s + Number(item.quantity || 0), 0) || 0), 0);
+    const todayItemsSold = todayTransactions.reduce((sum, tx) => sum + (tx.items?.reduce((s, item) => s + Number(item.quantity || 0), 0) || 0), 0);
+
+    const calculateMargin = (txs: any[]) => {
+      return txs.reduce((sum, tx) => {
+        return sum + (tx.items?.reduce((s: number, it: any) => {
+          let cp = Number(it.costPrice || 0);
+          if (!cp) {
+            const productData = products?.find((p: any) => p.id === it.productId);
+            if (productData) {
+              const isBox = it.productName?.toLowerCase().includes('(box)');
+              cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+            }
+          }
+          return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
+        }, 0) || 0);
+      }, 0);
+    };
+
+    const totalMargin = calculateMargin(filteredTransactions);
+    const todayMargin = calculateMargin(todayTransactions);
+    
     const now = new Date();
     let startDate = new Date();
     let prevStartDate = new Date();
@@ -91,15 +139,27 @@ export default function TrendPage() {
 
     const aggregate = (txs, exps) => {
       const acc = txs.reduce((a, t) => {
+        const tMargin = t.items?.reduce((s: number, it: any) => {
+          let cp = Number(it.costPrice || 0);
+          if (!cp) {
+            const productData = products?.find((p: any) => p.id === it.productId);
+            if (productData) {
+              const isBox = it.productName?.toLowerCase().includes('(box)');
+              cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+            }
+          }
+          return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
+        }, 0) || 0;
+
         a.omset += t.totalAmount;
-        a.margin += t.marginContribution || 0;
-        a.zakat += t.zakatContribution || 0;
+        a.margin += tMargin;
         a.count += 1;
         return a;
-      }, { omset: 0, margin: 0, zakat: 0, count: 0 });
+      }, { omset: 0, margin: 0, count: 0 });
       
       const totalExp = exps.reduce((a, e) => a + (Number(e.amount) || 0), 0);
-      return { ...acc, expenses: totalExp, netProfit: acc.margin - totalExp };
+      const zakat = acc.margin > 0 ? Math.round(acc.margin * 0.025) : 0;
+      return { ...acc, zakat, expenses: totalExp, netProfit: acc.margin - totalExp };
     };
 
     const curTotals = aggregate(currentTxs, currentExps);
@@ -124,9 +184,26 @@ export default function TrendPage() {
         mapData.set(key, { name: key, omset: 0, margin: 0, zakat: 0 });
       }
       const existing = mapData.get(key);
+      
+      const tMargin = t.items?.reduce((s: number, it: any) => {
+        let cp = Number(it.costPrice || 0);
+        if (!cp) {
+          const productData = products?.find((p: any) => p.id === it.productId);
+          if (productData) {
+            const isBox = it.productName?.toLowerCase().includes('(box)');
+            cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+          }
+        }
+        return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
+      }, 0) || 0;
+
       existing.omset += t.totalAmount;
-      existing.margin += t.marginContribution || 0;
-      existing.zakat += t.zakatContribution || 0;
+      existing.margin += tMargin;
+    });
+
+    // Recalculate Zakat once per aggregated period (e.g., per day/month)
+    mapData.forEach(value => {
+      value.zakat = value.margin > 0 ? Math.round(value.margin * 0.025) : 0;
     });
 
     let finalChartData = [];
@@ -223,26 +300,26 @@ export default function TrendPage() {
   const renderGrowth = (value: number, isDark = false) => {
     if (value > 0) return <span className={`${isDark ? 'text-green-200' : 'bg-green-50 text-green-700 border border-green-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>+{value.toFixed(1)}%</span>;
     if (value < 0) return <span className={`${isDark ? 'text-red-200' : 'bg-red-50 text-red-700 border border-red-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>{value.toFixed(1)}%</span>;
-    return <span className={`${isDark ? 'text-white/70' : 'bg-slate-50 text-slate-500 border border-slate-200'} text-[11px] font-bold px-2 py-0.5 rounded`}>0%</span>;
+    return <span className={`${isDark ? 'text-white/70' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'} text-[11px] font-bold px-2 py-0.5 rounded`}>0%</span>;
   };
 
   return (
     <div className="space-y-6">
       {/* Date Filter Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-green-600" />
             Grafik Trend & Analitik
           </h1>
-          <p className="text-xs text-gray-500 mt-1">Bandingkan performa omset, margin, dan zakat.</p>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Bandingkan performa omset, margin, dan zakat.</p>
         </div>
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-gray-400" />
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as DateRange)}
-            className="text-sm font-bold text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-green-500 outline-none"
+            className="text-sm font-bold text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-green-500 outline-none"
           >
             <option value="TODAY">Hari Ini</option>
             <option value="7_DAYS">7 Hari Terakhir</option>
@@ -250,6 +327,25 @@ export default function TrendPage() {
             <option value="THIS_YEAR">Tahun Ini</option>
           </select>
         </div>
+      </div>
+
+      {/* Saldo Kas Kecil Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-amber-50 rounded-xl">
+            <Wallet className="w-6 h-6 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Saldo Kas Kecil (Fisik)</p>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Rp {(settings?.pettyCashBalance || 0).toLocaleString('id-ID')}</h3>
+          </div>
+        </div>
+        <button 
+          onClick={() => setShowTopUpModal(true)}
+          className="mt-4 md:mt-0 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-colors"
+        >
+          + Top Up Modal Kas Kecil
+        </button>
       </div>
 
       {/* Visual Analytics Quick Stats - Vibrant Gradients */}
@@ -283,7 +379,7 @@ export default function TrendPage() {
               <h3 className="text-2xl font-extrabold">Rp {totals.margin.toLocaleString('id-ID')}</h3>
             </div>
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-white bg-white/20 px-2 py-0.5 rounded text-[11px] font-bold">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
+              <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
               {renderGrowth(comparisons.margin, true)}
             </div>
           </div>
@@ -297,7 +393,7 @@ export default function TrendPage() {
           <div className="relative z-10">
             <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Himpunan Zakat (Est.)</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {totals.zakat.toLocaleString('id-ID')}</h3>
+              <h3 className="text-2xl font-extrabold">Rp {Math.round(totals.zakat).toLocaleString('id-ID')}</h3>
             </div>
             <div className="mt-3 flex items-center justify-between">
               {renderGrowth(comparisons.zakat, true)}
@@ -317,36 +413,38 @@ export default function TrendPage() {
               <h3 className="text-2xl font-extrabold">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
             </div>
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-white bg-white/20 px-2 py-0.5 rounded text-[11px] font-bold">{totals.count} Struk</span>
+              <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{totals.count} Struk</span>
               <span className="text-white/70 text-[10px] font-medium">Per struk</span>
             </div>
           </div>
         </div>
       </div>
 
+
+
       {/* Main Charts area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Sales Omset & Profit Trend chart Area - Left (8 Cols) */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+        <div className="lg:col-span-8 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="font-bold text-gray-800 text-sm">Grafik Perkembangan Penjualan</h2>
+              <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Grafik Perkembangan Penjualan</h2>
               <p className="text-[11px] text-gray-400 mt-0.5">Analisa komparatif harian omset dan margin bersih KSA Mart</p>
             </div>
             
             <div className="flex items-center space-x-4 text-xs font-semibold">
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                <span className="text-gray-500">Omset</span>
+                <span className="text-gray-500 dark:text-slate-400">Omset</span>
               </span>
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                <span className="text-gray-500">Margin</span>
+                <span className="text-gray-500 dark:text-slate-400">Margin</span>
               </span>
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                <span className="text-gray-500">Zakat</span>
+                <span className="text-gray-500 dark:text-slate-400">Zakat</span>
               </span>
             </div>
           </div>
@@ -384,9 +482,9 @@ export default function TrendPage() {
         </div>
 
         {/* Categories distribution panel - Right (4 Cols) */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div>
-            <h2 className="font-bold text-gray-800 text-sm">Distribusi Kategori Produk</h2>
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Distribusi Kategori Produk</h2>
             <p className="text-[11px] text-gray-400 mt-0.5">Penjualan berdasarkan kelompok barang halalan</p>
           </div>
 
@@ -417,17 +515,17 @@ export default function TrendPage() {
             <div className="absolute text-center">
               <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Utama</p>
               <p className="font-black text-green-950 text-md">{categoryShare.length > 0 ? categoryShare[0].name : 'N/A'}</p>
-              <p className="text-[10px] text-slate-500 font-semibold font-mono">{categoryShare.length > 0 ? categoryShare[0].value : 0}%</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold font-mono">{categoryShare.length > 0 ? categoryShare[0].value : 0}%</p>
             </div>
           </div>
 
           {/* Table index indicators */}
           <div className="space-y-2 mt-4 text-xs font-semibold">
             {categoryShare.map((entry, idx) => (
-              <div key={idx} className="flex items-center justify-between text-gray-600">
+              <div key={idx} className="flex items-center justify-between text-gray-600 dark:text-slate-400">
                 <div className="flex items-center space-x-2">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: entry.color }}></span>
-                  <span className="text-gray-700">{entry.name}</span>
+                  <span className="text-gray-700 dark:text-slate-300">{entry.name}</span>
                 </div>
                 <span className="font-mono">{entry.value}%</span>
               </div>
@@ -438,10 +536,10 @@ export default function TrendPage() {
 
       
       {/* Financial Ratios Panel */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm flex items-center gap-2">
               <Activity className="w-4 h-4 text-indigo-600" />
               Analisa Rasio Keuangan
             </h2>
@@ -453,67 +551,67 @@ export default function TrendPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <Percent className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Gross Margin (GPM)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.gpm.toFixed(1)}%</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.gpm.toFixed(1)}%</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.gpm >= 20 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Sangat Sehat (&gt;20%)</span> : <span className="text-amber-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Perlu Evaluasi HPP</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <Target className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Net Margin (NPM)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.npm.toFixed(1)}%</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.npm.toFixed(1)}%</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.npm >= 10 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Sangat Sehat (&gt;10%)</span> : <span className="text-amber-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Cek Beban Operasional</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <LineChartIcon className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Rasio Operasional (BOPO)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.bopo.toFixed(1)}%</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.bopo.toFixed(1)}%</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.bopo <= 70 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Sangat Efisien (&lt;70%)</span> : <span className="text-red-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Kurang Efisien</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <Activity className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Current Ratio (Lancar)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.currentRatio.toFixed(2)}x</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.currentRatio.toFixed(2)}x</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.currentRatio >= 1.5 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Likuiditas Aman (&gt;1.5x)</span> : <span className="text-amber-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Risiko Likuiditas</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <PieChartIcon className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Rasio Solvabilitas (DER)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.der.toFixed(2)}x</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.der.toFixed(2)}x</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.der <= 1.0 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Modal Kuat (&lt;1.0x)</span> : <span className="text-red-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Utang Tinggi</span>}
             </p>
           </div>
@@ -521,9 +619,9 @@ export default function TrendPage() {
       </div>
 
       {/* Bar graph comparing accumulated Zakat Funds */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div className="mb-4">
-          <h2 className="font-bold text-gray-800 text-sm">Himpunan Dana Kebajikan (Zakat Perdagangan)</h2>
+          <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Himpunan Dana Kebajikan (Zakat Perdagangan)</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">Estimasi kontribusi dana zakat kemitraan per hari</p>
         </div>
 
@@ -542,6 +640,47 @@ export default function TrendPage() {
           </ResponsiveContainer>
         </div>
       </div>
+      {/* Top Up Kas Kecil Modal */}
+      {showTopUpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
+              <h3 className="font-bold text-lg">Top Up Kas Kecil</h3>
+              <button onClick={() => setShowTopUpModal(false)} className="text-white/70 hover:text-white text-xl font-bold">×</button>
+            </div>
+            <form onSubmit={handleTopUpSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nominal Top Up (Rp) *</label>
+                <input
+                  type="number"
+                  required
+                  min="1000"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-xl font-bold bg-white dark:bg-slate-900"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Keterangan Tambahan</label>
+                <input
+                  type="text"
+                  value={topUpDesc}
+                  onChange={(e) => setTopUpDesc(e.target.value)}
+                  className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900"
+                  placeholder="Misal: Dari kas utama / ATM"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl mt-4"
+              >
+                Simpan Saldo Masuk
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -71,8 +71,8 @@ export default function SupplierManagementPage() {
             <Truck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Master Supplier</h1>
-            <p className="text-sm text-gray-500">Buku alamat dan catatan hutang usaha ke Pemasok.</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Master Supplier</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Buku alamat dan catatan hutang usaha ke Pemasok.</p>
           </div>
         </div>
         <button 
@@ -84,25 +84,25 @@ export default function SupplierManagementPage() {
       </div>
 
       {isAdding && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 mb-6">
           <h2 className="text-lg font-bold mb-4">{editingId ? 'Edit Supplier' : 'Tambah Supplier Baru'}</h2>
           <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nama Supplier/Perusahaan</label>
-                <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Nama Supplier/Perusahaan</label>
+                <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nama Kontak (Sales/PIC)</label>
-                <input type="text" required value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Nama Kontak (Sales/PIC)</label>
+                <input type="text" required value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nomor WhatsApp/Telepon</label>
-                <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Nomor WhatsApp/Telepon</label>
+                <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Alamat</label>
-                <input type="text" required value={address} onChange={e => setAddress(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Alamat</label>
+                <input type="text" required value={address} onChange={e => setAddress(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
             </div>
             <button type="submit" className="w-full md:w-auto bg-green-600 text-white font-bold py-2 px-6 rounded-lg">Simpan Data</button>
@@ -110,17 +110,17 @@ export default function SupplierManagementPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Cari supplier..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none" />
+            <input type="text" placeholder="Cari supplier..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none" />
           </div>
         </div>
         
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50/50 text-gray-500 font-medium">
+            <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium">
               <tr>
                 <th className="px-6 py-4">Perusahaan</th>
                 <th className="px-6 py-4">PIC / Kontak</th>
@@ -130,12 +130,12 @@ export default function SupplierManagementPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(s => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-bold text-gray-800">
+                <tr key={s.id} className="hover:bg-gray-50 dark:bg-slate-800">
+                  <td className="px-6 py-4 font-bold text-gray-800 dark:text-slate-200">
                     {s.name}
-                    <p className="text-[10px] text-gray-500 font-normal">{s.address}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-slate-400 font-normal">{s.address}</p>
                   </td>
-                  <td className="px-6 py-4 text-gray-600">
+                  <td className="px-6 py-4 text-gray-600 dark:text-slate-400">
                     {s.contactPerson}
                     <p className="text-[10px] text-blue-500">{s.phone}</p>
                   </td>
@@ -152,7 +152,7 @@ export default function SupplierManagementPage() {
                         <CreditCard className="w-4 h-4" />
                       </button>
                     )}
-                    <button onClick={() => handleEdit(s)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg" title="Edit">
+                    <button onClick={() => handleEdit(s)} className="p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 rounded-lg" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
                     <button onClick={() => deleteSupplier(s.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Hapus">
@@ -163,7 +163,7 @@ export default function SupplierManagementPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500 dark:text-slate-400">
                     Belum ada data supplier.
                   </td>
                 </tr>

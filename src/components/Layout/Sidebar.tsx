@@ -150,6 +150,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
@@ -171,6 +172,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: ShoppingCart,
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
@@ -218,6 +220,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
@@ -254,6 +257,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: ShoppingCart,
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
@@ -333,7 +337,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         id="app-sidebar" 
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`fixed md:sticky top-0 left-0 h-screen ${effectiveIsCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 ${
+        className={`fixed md:sticky top-0 left-0 h-[100dvh] ${effectiveIsCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -358,7 +362,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
               onClick={onExpand}
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-green-300 rounded-xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500"></div>
-              <div className={`relative ${effectiveIsCollapsed ? 'w-10 h-10 md:w-12 md:h-12' : 'w-16 md:w-32 h-12 md:h-16'} bg-white rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition-all duration-300 overflow-hidden`}>
+              <div className={`relative ${effectiveIsCollapsed ? 'w-10 h-10 md:w-12 md:h-12' : 'w-16 md:w-32 h-12 md:h-16'} bg-white dark:bg-slate-900 rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition-all duration-300 overflow-hidden`}>
                 {/* Clean Logo Display */}
                 <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-full h-full object-contain" />
               </div>

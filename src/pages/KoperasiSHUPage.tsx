@@ -67,8 +67,8 @@ export default function KoperasiSHUPage() {
             <Calculator className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Simulasi Pembagian SHU</h1>
-            <p className="text-sm text-gray-500">Sisa Hasil Usaha berdasarkan Jasa Modal dan Jasa Usaha (Poin Belanja).</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Simulasi Pembagian SHU</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Sisa Hasil Usaha berdasarkan Jasa Modal dan Jasa Usaha (Poin Belanja).</p>
           </div>
         </div>
         <button className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all">
@@ -79,7 +79,7 @@ export default function KoperasiSHUPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Kolom Kiri: Konfigurasi SHU */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100 relative overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-green-100 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
               <Wallet className="w-32 h-32" />
             </div>
@@ -88,7 +88,7 @@ export default function KoperasiSHUPage() {
               Laba Bersih Tahunan
             </h2>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-500">Rp</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-500 dark:text-slate-400">Rp</span>
               <input 
                 type="number" 
                 value={labaBersih}
@@ -96,39 +96,39 @@ export default function KoperasiSHUPage() {
                 className="w-full bg-green-50 border border-green-200 text-green-900 font-black text-xl rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-2 flex items-start gap-1">
               <Info className="w-3 h-3 mt-0.5 shrink-0" />
               Nilai ini bisa diambil otomatis dari laporan Neraca Laba Rugi akhir tahun.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <h2 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Persentase Alokasi SHU</h2>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800">
+            <h2 className="text-sm font-bold text-gray-800 dark:text-slate-200 mb-4 uppercase tracking-wider">Persentase Alokasi SHU</h2>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold text-gray-700">Jasa Modal (Simpanan)</span>
+                  <span className="font-semibold text-gray-700 dark:text-slate-300">Jasa Modal (Simpanan)</span>
                   <span className="font-bold text-green-600">{porsiModal}%</span>
                 </div>
                 <input type="range" min="0" max="100" value={porsiModal} onChange={e => setPorsiModal(Number(e.target.value))} className="w-full accent-green-600" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold text-gray-700">Jasa Usaha (Poin Belanja)</span>
+                  <span className="font-semibold text-gray-700 dark:text-slate-300">Jasa Usaha (Poin Belanja)</span>
                   <span className="font-bold text-amber-600">{porsiUsaha}%</span>
                 </div>
                 <input type="range" min="0" max="100" value={porsiUsaha} onChange={e => setPorsiUsaha(Number(e.target.value))} className="w-full accent-amber-500" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold text-gray-700">Dana Pengurus</span>
+                  <span className="font-semibold text-gray-700 dark:text-slate-300">Dana Pengurus</span>
                   <span className="font-bold text-blue-600">{porsiPengurus}%</span>
                 </div>
                 <input type="range" min="0" max="100" value={porsiPengurus} onChange={e => setPorsiPengurus(Number(e.target.value))} className="w-full accent-blue-600" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="font-semibold text-gray-700">Dana Sosial / ZISWAF</span>
+                  <span className="font-semibold text-gray-700 dark:text-slate-300">Dana Sosial / ZISWAF</span>
                   <span className="font-bold text-purple-600">{porsiSosial}%</span>
                 </div>
                 <input type="range" min="0" max="100" value={porsiSosial} onChange={e => setPorsiSosial(Number(e.target.value))} className="w-full accent-purple-600" />
@@ -164,7 +164,7 @@ export default function KoperasiSHUPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
             <div className="p-4 bg-green-900 text-white flex justify-between items-center">
               <h3 className="font-bold flex items-center gap-2"><Users className="w-5 h-5"/> Distribusi SHU Anggota</h3>
               <div className="text-xs font-medium bg-green-800 px-3 py-1 rounded-full border border-green-700">
@@ -173,30 +173,30 @@ export default function KoperasiSHUPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-gray-50 text-gray-500 font-semibold text-[11px] uppercase tracking-wider">
+                <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
                   <tr>
                     <th className="px-5 py-3">NIA / Nama</th>
                     <th className="px-5 py-3 text-right">Modal Koperasi</th>
                     <th className="px-5 py-3 text-center">Poin Usaha</th>
                     <th className="px-5 py-3 text-right text-green-600 bg-green-50">SHU Modal</th>
                     <th className="px-5 py-3 text-right text-amber-600 bg-amber-50">SHU Usaha</th>
-                    <th className="px-5 py-3 text-right font-bold text-gray-800">Total SHU Diterima</th>
+                    <th className="px-5 py-3 text-right font-bold text-gray-800 dark:text-slate-200">Total SHU Diterima</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {shuMembers.map((m, idx) => (
-                    <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={m.id} className="hover:bg-gray-50 dark:bg-slate-800 transition-colors">
                       <td className="px-5 py-4">
-                        <div className="font-bold text-gray-800 flex items-center gap-2">
+                        <div className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
                           {idx === 0 && <Award className="w-4 h-4 text-amber-500"/>}
                           {m.name}
                         </div>
-                        <div className="text-[10px] text-gray-500">{m.nia}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400">{m.nia}</div>
                       </td>
-                      <td className="px-5 py-4 text-right font-medium text-gray-600">
+                      <td className="px-5 py-4 text-right font-medium text-gray-600 dark:text-slate-400">
                         Rp {m.totalSimpananAnggota.toLocaleString('id-ID')}
                       </td>
-                      <td className="px-5 py-4 text-center font-bold text-gray-600">
+                      <td className="px-5 py-4 text-center font-bold text-gray-600 dark:text-slate-400">
                         {m.points.toLocaleString('id-ID')}
                       </td>
                       <td className="px-5 py-4 text-right font-medium text-green-700 bg-green-50/50">

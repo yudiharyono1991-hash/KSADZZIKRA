@@ -53,29 +53,29 @@ export default function StockOpnamePage() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
             <PackageSearch className="w-6 h-6 text-indigo-600" />
             Stock Opname & Kartu Stok
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Lacak pergerakan riwayat stok dan sesuaikan fisik barang.</p>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Lacak pergerakan riwayat stok dan sesuaikan fisik barang.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Adjustment Form */}
-        <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-3">
+        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm space-y-4">
+          <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2 border-b border-gray-100 dark:border-slate-800 pb-3">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
             Stock Opname & Variance
           </h3>
           
-          <div className="space-y-3 pb-3 border-b border-gray-100">
+          <div className="space-y-3 pb-3 border-b border-gray-100 dark:border-slate-800">
             <div className="relative">
               <Filter className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
               <select 
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="ALL">Semua Kategori</option>
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -84,13 +84,13 @@ export default function StockOpnamePage() {
           </div>
 
           <div className="relative">
-            <label className="text-xs font-bold text-gray-600 mb-1 block">Scan Barcode / Cari Produk</label>
+            <label className="text-xs font-bold text-gray-600 dark:text-slate-400 mb-1 block">Scan Barcode / Cari Produk</label>
             <div className="relative">
               <Search className="w-5 h-5 text-gray-400 absolute left-3 top-3" />
               <input 
                 type="text"
                 placeholder="Scan Barcode atau ketik nama produk..."
-                className="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
+                className="w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 font-bold"
                 value={opnameSearch}
                 onFocus={() => setIsDropdownOpen(true)}
                 onChange={(e) => {
@@ -113,9 +113,9 @@ export default function StockOpnamePage() {
             
             {/* Custom Dropdown */}
             {isDropdownOpen && !selectedProductId && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                 {filteredProducts.length > 0 ? (
-                  filteredProducts.map(p => (
+                  filteredProducts.slice(0, 50).map(p => (
                     <div 
                       key={p.id} 
                       className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-50 last:border-0 flex justify-between items-center"
@@ -127,17 +127,17 @@ export default function StockOpnamePage() {
                       }}
                     >
                       <div>
-                        <div className="font-bold text-sm text-gray-800">{p.name}</div>
-                        <div className="text-xs text-gray-500">SKU: {p.sku}</div>
+                        <div className="font-bold text-sm text-gray-800 dark:text-slate-200">{p.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400">SKU: {p.sku}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[10px] text-gray-500 font-semibold uppercase">Stok Inventory</div>
+                        <div className="text-[10px] text-gray-500 dark:text-slate-400 font-semibold uppercase">Stok Inventory</div>
                         <div className="font-bold text-indigo-600 text-sm">{p.stock || 0}</div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="p-4 text-sm text-gray-500 text-center font-medium">Produk tidak ditemukan</div>
+                  <div className="p-4 text-sm text-gray-500 dark:text-slate-400 text-center font-medium">Produk tidak ditemukan</div>
                 )}
               </div>
             )}
@@ -149,14 +149,14 @@ export default function StockOpnamePage() {
                  <p className="text-[10px] text-amber-700 mt-1">Masukkan hasil perhitungan fisik aktual di rak/gudang.</p>
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-600 mb-1 block">Stok Fisik Aktual</label>
+                <label className="text-xs font-bold text-gray-600 dark:text-slate-400 mb-1 block">Stok Fisik Aktual</label>
                 <input 
                   type="number"
                   value={physicalCount}
                   onChange={(e) => setPhysicalCount(e.target.value)}
                   placeholder="Jumlah Fisik"
                   min="0"
-                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
+                  className="w-full border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 font-mono font-bold"
                 />
               </div>
               {physicalCount !== '' && (
@@ -180,16 +180,16 @@ export default function StockOpnamePage() {
         </div>
 
         {/* Stock Card Table */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-100 bg-slate-50 flex items-center justify-between">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+            <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
               Kartu Stok {selectedProductId ? 'Produk Terpilih' : 'Semua Produk'}
             </h3>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50/50 text-gray-500 font-medium text-xs">
+              <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium text-xs">
                 <tr>
                   <th className="px-4 py-3">Tanggal</th>
                   <th className="px-4 py-3">Produk</th>
@@ -203,11 +203,11 @@ export default function StockOpnamePage() {
                 {filteredMovements.map(m => {
                   const prod = products.find(p => p.id === m.productId);
                   return (
-                    <tr key={m.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                    <tr key={m.id} className="hover:bg-slate-50 dark:bg-slate-800">
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-slate-400">
                         {new Date(m.date).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-gray-800">{prod?.name || 'Unknown'}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-800 dark:text-slate-200">{prod?.name || 'Unknown'}</td>
                       <td className="px-4 py-3">
                         {m.type === 'IN' ? (
                           <span className="flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
@@ -226,8 +226,8 @@ export default function StockOpnamePage() {
                       <td className={`px-4 py-3 font-bold ${m.type === 'IN' ? 'text-green-600' : 'text-amber-600'}`}>
                         {m.type === 'IN' ? '+' : '-'}{m.qty}
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{m.reason}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{m.userId}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">{m.reason}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-slate-400">{m.userId}</td>
                     </tr>
                   );
                 })}

@@ -8,13 +8,17 @@ import { useBranchData } from '../hooks/useBranchData';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { settings, isDarkMode, toggleDarkMode } = useAppStore();
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [language, setLanguage] = useState('ID');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
-  const { settings } = useAppStore();
-  const contactUs = settings.landingPageConfig?.contactUs;
+  const contactUs = {
+    address: settings.landingPageConfig?.contactUs?.address || settings.storeAddress,
+    phone: settings.landingPageConfig?.contactUs?.phone || settings.storePhone || settings.ownerWhatsapp,
+    email: settings.landingPageConfig?.contactUs?.email,
+    description: settings.landingPageConfig?.contactUs?.description
+  };
   const faqs = settings.landingPageConfig?.faqs || [];
   const showTopDropdowns = settings.landingPageConfig?.showTopDropdowns ?? true;
 
@@ -52,7 +56,7 @@ export default function LandingPage() {
           
           {/* Dark Mode Toggle */}
           <button 
-            onClick={() => setIsDarkMode(!isDarkMode)} 
+            onClick={() => toggleDarkMode()} 
             title="Ubah Tema"
             className={`p-2 rounded-lg transition-colors font-medium shadow-sm flex items-center justify-center ${isDarkMode ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
           >
@@ -71,26 +75,26 @@ export default function LandingPage() {
                 <ChevronDown size={14} className={`transition-transform ${showContactDropdown ? 'rotate-180' : ''}`} />
               </button>
               {showContactDropdown && (
-                <div className={`absolute right-0 mt-2 w-72 rounded-xl shadow-xl border overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-green-100'} max-h-[80vh] overflow-y-auto`}>
-                  <div className="p-4 border-b border-gray-100">
+                <div className={`absolute right-0 mt-2 w-72 rounded-xl shadow-xl border overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-green-100'} max-h-[80vh] overflow-y-auto`}>
+                  <div className="p-4 border-b border-gray-100 dark:border-slate-800">
                     <h3 className={`font-bold text-sm mb-1 ${isDarkMode ? 'text-amber-400' : 'text-green-800'}`}>Toko Pusat</h3>
                     {contactUs?.address ? (
-                      <p className={`text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{contactUs.address}</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>{contactUs.address}</p>
                     ) : (
-                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500 italic'}`}>Alamat belum diatur</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400 italic'}`}>Alamat belum diatur</p>
                     )}
                     {contactUs?.phone && <p className={`text-xs mt-1 font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>WA: {contactUs.phone}</p>}
                   </div>
                   
                   {branches.length > 0 && (
-                    <div className="p-4 border-b border-gray-100">
+                    <div className="p-4 border-b border-gray-100 dark:border-slate-800">
                       <h3 className={`font-bold text-sm mb-2 ${isDarkMode ? 'text-amber-400' : 'text-green-800'}`}>Cabang Kami</h3>
                       <div className="space-y-3">
                         {branches.map(branch => (
                           <div key={branch.id} className="text-xs">
-                            <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{branch.name}</span>
-                            <p className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{branch.address}</p>
-                            {branch.whatsapp && <p className={`mt-0.5 font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>WA: {branch.whatsapp}</p>}
+                            <span className={`font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-700 dark:text-slate-300'}`}>{branch.name}</span>
+                            <p className={`${isDarkMode ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>{branch.address || '-'}</p>
+                            {(branch.whatsapp || branch.phone) && <p className={`mt-0.5 font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>WA/Telp: {branch.whatsapp || branch.phone}</p>}
                           </div>
                         ))}
                       </div>
@@ -103,11 +107,11 @@ export default function LandingPage() {
                       <div className="space-y-2">
                         {faqs.slice(0, 3).map((faq, idx) => (
                           <div key={idx} className="text-xs">
-                            <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Q: {faq.question}</span>
+                            <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700 dark:text-slate-300'}`}>Q: {faq.question}</span>
                           </div>
                         ))}
                         {faqs.length > 3 && (
-                          <p className={`text-xs italic ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>...dan {faqs.length - 3} lainnya.</p>
+                          <p className={`text-xs italic ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>...dan {faqs.length - 3} lainnya.</p>
                         )}
                       </div>
                     </div>
@@ -117,33 +121,7 @@ export default function LandingPage() {
             </div>
           )}
 
-          {/* Language Dropdown */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors font-medium shadow-sm ${isDarkMode ? 'bg-slate-800 text-green-400 hover:bg-slate-700' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
-            >
-              <Globe size={18} />
-              <span className="hidden sm:block">{getLanguageLabel(language)}</span>
-            </button>
-            {showLanguageDropdown && (
-              <div className={`absolute right-0 mt-2 w-44 rounded-xl shadow-xl border overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-green-100'}`}>
-                {['ID', 'EN', 'AR'].map(lang => (
-                  <button 
-                    key={lang}
-                    onClick={() => { setLanguage(lang); setShowLanguageDropdown(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
-                      language === lang 
-                        ? (isDarkMode ? 'bg-slate-700 text-amber-400' : 'bg-green-50 text-green-700 font-bold') 
-                        : (isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50')
-                    }`}
-                  >
-                    {getLanguageLabel(lang)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+
         </div>
       </header>
 
@@ -190,8 +168,8 @@ export default function LandingPage() {
           </div>
 
           {/* Description */}
-          <p className={`text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed transition-colors ${isDarkMode ? 'text-slate-300' : 'text-green-700'}`}>
-            Sistem Kasir Pintar Berbasis Syariah — terintegrasi laporan keuangan, zakat otomatis, dan manajemen operasional koperasi. <span className={`font-bold whitespace-nowrap ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>Halal. Amanah. Berkah.</span>
+          <p className={`text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed transition-colors mt-2`}>
+            <span className={isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold'}>Menepis Transaksi Riba,</span> <span className={isDarkMode ? 'text-green-400 font-bold' : 'text-green-700 font-bold'}>Demi Meraih Keberkahan Laba</span>
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center pt-4 sm:pt-6 shrink-0 mt-4">
@@ -219,7 +197,7 @@ export default function LandingPage() {
         >
           <div 
             onClick={() => navigate('/quran')}
-            className={`p-3 sm:p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700 hover:bg-slate-800' : 'bg-white/60 backdrop-blur-md border-green-100 hover:bg-white'}`}
+            className={`p-3 sm:p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700 hover:bg-slate-800' : 'bg-white dark:bg-slate-900/60 backdrop-blur-md border-green-100 hover:bg-white dark:bg-slate-900'}`}
           >
             <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-2 sm:mb-3 transition-colors ${isDarkMode ? 'bg-[#135d25]/50 text-[#4ade80]' : 'bg-[#e7f5eb] text-[#135d25]'}`}>
               <BookOpen size={20} className="sm:w-6 sm:h-6" />
@@ -232,7 +210,7 @@ export default function LandingPage() {
           
           <div 
             onClick={() => navigate('/artikel-islami')}
-            className={`p-3 sm:p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700 hover:bg-slate-800' : 'bg-white/60 backdrop-blur-md border-green-100 hover:bg-white'}`}
+            className={`p-3 sm:p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700 hover:bg-slate-800' : 'bg-white dark:bg-slate-900/60 backdrop-blur-md border-green-100 hover:bg-white dark:bg-slate-900'}`}
           >
             <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-2 sm:mb-3 transition-colors ${isDarkMode ? 'bg-[#135d25]/50 text-[#4ade80]' : 'bg-[#e7f5eb] text-[#135d25]'}`}>
               <HeartHandshake size={20} className="sm:w-6 sm:h-6" />
@@ -243,7 +221,7 @@ export default function LandingPage() {
           
           <div 
             onClick={() => navigate('/berita')}
-            className={`p-3 sm:p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700 hover:bg-slate-800' : 'bg-white/60 backdrop-blur-md border-green-100 hover:bg-white'}`}
+            className={`p-3 sm:p-4 rounded-2xl border shadow-sm flex flex-col items-center text-center cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700 hover:bg-slate-800' : 'bg-white dark:bg-slate-900/60 backdrop-blur-md border-green-100 hover:bg-white dark:bg-slate-900'}`}
           >
             <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-2 sm:mb-3 transition-colors ${isDarkMode ? 'bg-amber-900/30 text-amber-400' : 'bg-amber-100 text-amber-600'}`}>
               <Newspaper size={20} className="sm:w-6 sm:h-6" />
@@ -262,11 +240,11 @@ export default function LandingPage() {
             className="w-full max-w-4xl mt-12 sm:mt-16 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8"
           >
             {/* Contact Us */}
-            <div className={`p-6 sm:p-8 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700' : 'bg-white/80 backdrop-blur-md border-green-100'}`}>
+            <div className={`p-6 sm:p-8 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-slate-800/80 backdrop-blur-md border-slate-700' : 'bg-white dark:bg-slate-900/80 backdrop-blur-md border-green-100'}`}>
               <h2 className={`text-xl font-black mb-4 sm:mb-6 ${isDarkMode ? 'text-[#4ade80]' : 'text-green-800'}`}>Hubungi Kami</h2>
               {contactUs ? (
                 <div className="space-y-4">
-                  <p className={`text-sm leading-relaxed mb-6 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <p className={`text-sm leading-relaxed mb-6 ${isDarkMode ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
                     {contactUs.description}
                   </p>
                   <div className="flex items-start gap-3">
@@ -274,8 +252,8 @@ export default function LandingPage() {
                       <Phone className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Telepon / WhatsApp</p>
-                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{contactUs.phone}</p>
+                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>Telepon / WhatsApp</p>
+                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800 dark:text-slate-200'}`}>{contactUs.phone}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -283,8 +261,8 @@ export default function LandingPage() {
                       <Mail className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Email</p>
-                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{contactUs.email}</p>
+                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>Email</p>
+                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800 dark:text-slate-200'}`}>{contactUs.email}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -292,13 +270,13 @@ export default function LandingPage() {
                       <MapPin className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alamat</p>
-                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{contactUs.address}</p>
+                      <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>Alamat</p>
+                      <p className={`font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800 dark:text-slate-200'}`}>{contactUs.address}</p>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className={`text-sm p-4 rounded-xl text-center border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                <div className={`text-sm p-4 rounded-xl text-center border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
                   Informasi kontak belum diatur.
                 </div>
               )}
@@ -312,20 +290,20 @@ export default function LandingPage() {
                   {faqs.map((faq, index) => (
                     <div 
                       key={index} 
-                      className={`rounded-2xl border overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white/80 border-green-100'}`}
+                      className={`rounded-2xl border overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-white dark:bg-slate-900/80 border-green-100'}`}
                     >
                       <button 
                         onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
                         className="w-full px-5 py-4 flex items-center justify-between text-left"
                       >
-                        <span className={`font-bold text-sm sm:text-base pr-4 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                        <span className={`font-bold text-sm sm:text-base pr-4 ${isDarkMode ? 'text-slate-200' : 'text-slate-800 dark:text-slate-200'}`}>
                           {faq.question}
                         </span>
                         <ChevronDown className={`w-5 h-5 flex-shrink-0 transition-transform ${openFaqIndex === index ? 'rotate-180' : ''} ${isDarkMode ? 'text-slate-400' : 'text-green-600'}`} />
                       </button>
                       {openFaqIndex === index && (
-                        <div className={`px-5 pb-4 text-sm leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                          <div className={`pt-2 border-t ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                        <div className={`px-5 pb-4 text-sm leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600 dark:text-slate-400'}`}>
+                          <div className={`pt-2 border-t ${isDarkMode ? 'border-slate-700' : 'border-slate-100 dark:border-slate-800'}`}>
                             {faq.answer}
                           </div>
                         </div>
@@ -334,7 +312,7 @@ export default function LandingPage() {
                   ))}
                 </div>
               ) : (
-                <div className={`text-sm p-4 rounded-xl text-center border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                <div className={`text-sm p-4 rounded-xl text-center border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>
                   Belum ada FAQ.
                 </div>
               )}

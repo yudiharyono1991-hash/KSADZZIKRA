@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, BookOpen, Search, PlayCircle, PauseCircle, Settings, X, ChevronDown, Check } from 'lucide-react';
+import { ArrowLeft, BookOpen, Search, PlayCircle, PauseCircle, Settings, X, ChevronDown, Check, Sun, Moon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
+import { useAppStore } from '../store';
 interface Surah {
   nomor: number;
   nama: string;
@@ -81,6 +81,7 @@ const JUZ_MAPPING: Record<number, {nomor: number, ayat: string}[]> = {
 
 export default function QuranPage() {
   const navigate = useNavigate();
+  const { isDarkMode, toggleDarkMode } = useAppStore();
   const [surahs, setSurahs] = useState<Surah[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -195,6 +196,11 @@ export default function QuranPage() {
     
     setPlayingAudio(audio);
     setCurrentPlayingAyat(ayatNumber);
+
+    // Auto-scroll to the currently playing ayat
+    setTimeout(() => {
+      handleScrollToAyat(ayatNumber);
+    }, 100);
   };
 
   const filteredSurahs = surahs.filter(s => 
@@ -208,7 +214,7 @@ export default function QuranPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans pb-12">
+    <div className={`min-h-screen font-sans pb-12 transition-colors ${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-[#f8fafc] text-slate-800 dark:text-slate-200'}`}>
       {/* MAIN HEADER */}
       <header className="bg-green-800 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -229,59 +235,57 @@ export default function QuranPage() {
               </h1>
             </div>
           </div>
-          <div className="text-xs font-bold text-green-200 hidden sm:flex items-center gap-2">
-            KSA Mart <span className="text-amber-400 tracking-[0.2em]">ADZ-ZIKRA</span>
+          <div className="flex items-center gap-4">
+            <button onClick={toggleDarkMode} className="p-1.5 hover:bg-green-700 rounded-full transition-colors">
+              {isDarkMode ? <Sun className="w-5 h-5 text-amber-300" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <div className="text-xs font-bold text-green-200 hidden sm:flex items-center gap-2">
+              KSA Mart <span className="text-amber-400 tracking-[0.2em]">ADZ-ZIKRA</span>
+            </div>
           </div>
         </div>
       </header>
 
       {/* QUICK NAVIGATION BAR FOR SURAH DETAIL */}
       {selectedSurah && (
-        <div className="bg-slate-100 border-b border-slate-200 sticky top-[68px] z-30 shadow-sm py-2">
+        <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'} border-b sticky top-[68px] z-30 shadow-sm py-2`}>
           <div className="max-w-4xl mx-auto px-4 flex items-center gap-3">
             {/* Surah Dropdown */}
             <div className="relative">
               <button 
                 onClick={() => { setShowSurahDropdown(!showSurahDropdown); setShowAyatDropdown(false); }} 
-                className="bg-white text-slate-700 px-4 py-1.5 rounded-lg flex items-center gap-2 font-bold text-sm border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors min-w-[140px] justify-between"
+                className={`${isDarkMode ? 'bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-600' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800'} px-4 py-1.5 rounded-lg flex items-center gap-2 font-bold text-sm border shadow-sm transition-colors min-w-[140px] justify-between`}
               >
                 {selectedSurah.namaLatin} <ChevronDown size={16}/>
               </button>
               {showSurahDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowSurahDropdown(false)}></div>
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in slide-in-from-top-2">
-                    <div className="p-3 border-b border-slate-100 bg-slate-50">
-                      <input 
-                         type="text" 
-                         placeholder="Search.." 
-                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
-                         value={surahSearchText}
-                         onChange={(e) => setSurahSearchText(e.target.value)}
-                         autoFocus
-                      />
-                    </div>
-                    <div className="overflow-y-auto">
-                       {filteredDropdownSurahs.map(s => (
-                         <div 
-                           key={s.nomor}
-                           onClick={() => { handleSelectSurah(s.nomor); setShowSurahDropdown(false); }}
-                           className={`px-4 py-3 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-50 last:border-0 ${selectedSurah.nomor === s.nomor ? 'bg-green-50' : 'hover:bg-slate-50'}`}
-                         >
-                           <div>
-                             <div className={`font-bold text-sm ${selectedSurah.nomor === s.nomor ? 'text-green-700' : 'text-slate-800'}`}>
-                               {s.namaLatin}
-                             </div>
-                             <div className="text-xs text-slate-500">{s.arti}</div>
-                           </div>
-                           <div className={`font-arabic text-lg ${selectedSurah.nomor === s.nomor ? 'text-green-600' : 'text-slate-600'}`}>
-                             {s.nama}
-                           </div>
-                         </div>
-                       ))}
-                    </div>
+                <div className={`absolute top-full left-0 mt-1 w-64 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'} rounded-xl shadow-lg border overflow-hidden`}>
+                  <div className={`p-2 border-b ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800'}`}>
+                    <input 
+                       type="text" 
+                       placeholder="Search.." 
+                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
+                       value={surahSearchText}
+                       onChange={(e) => setSurahSearchText(e.target.value)}
+                       autoFocus
+                    />
                   </div>
-                </>
+                  <div className="max-h-60 overflow-y-auto">
+                     {filteredDropdownSurahs.map(s => (
+                       <button 
+                         key={s.nomor}
+                         onClick={() => { handleSelectSurah(s); setShowSurahDropdown(false); }}
+                         className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-green-50 text-slate-700 dark:text-slate-300'} ${selectedSurah.nomor === s.nomor ? (isDarkMode ? 'bg-green-900/50 text-green-400 font-bold' : 'bg-green-50 text-green-700 font-bold') : ''}`}
+                       >
+                         <div>
+                           <div className="font-bold text-sm">{s.namaLatin}</div>
+                           <div className="text-xs opacity-70">{s.arti}</div>
+                         </div>
+                         <div className="font-arabic text-lg">{s.nama}</div>
+                       </button>
+                     ))}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -289,25 +293,24 @@ export default function QuranPage() {
             <div className="relative">
               <button 
                 onClick={() => { setShowAyatDropdown(!showAyatDropdown); setShowSurahDropdown(false); }} 
-                className="bg-white text-slate-700 px-4 py-1.5 rounded-lg flex items-center gap-2 font-bold text-sm border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors min-w-[100px] justify-between"
+                className={`${isDarkMode ? 'bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-600' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800'} px-4 py-1.5 rounded-lg flex items-center gap-2 font-bold text-sm border shadow-sm transition-colors min-w-[120px] justify-between`}
               >
                 Ayat 1 <ChevronDown size={16}/>
               </button>
               {showAyatDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowAyatDropdown(false)}></div>
-                  <div className="absolute top-full left-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                <div className={`absolute top-full left-0 mt-1 w-64 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'} rounded-xl shadow-lg border overflow-hidden`}>
+                  <div className={`p-2 border-b ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800'}`}>
                      {selectedSurah.ayat.map(a => (
-                       <div 
+                       <button 
                          key={a.nomorAyat}
                          onClick={() => handleScrollToAyat(a.nomorAyat)}
-                         className="px-4 py-2 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-50 last:border-0 text-center"
+                         className={`w-full text-left px-4 py-2 text-sm ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
                        >
                          Ayat {a.nomorAyat}
-                       </div>
+                       </button>
                      ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -320,11 +323,11 @@ export default function QuranPage() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Bismillah Header */}
             {selectedSurah.nomor !== 9 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6 text-center border border-green-100 mt-2">
-                <h2 className="text-3xl md:text-4xl font-arabic text-green-800 leading-loose">
+              <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-green-100'} rounded-2xl shadow-sm p-6 text-center border mt-2`}>
+                <h2 className={`text-3xl md:text-4xl font-arabic ${isDarkMode ? 'text-green-400' : 'text-green-800'} leading-loose`}>
                   بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيم
                 </h2>
-                <p className="text-sm text-slate-500 mt-3 font-medium">Dengan nama Allah Yang Maha Pengasih, Maha Penyayang.</p>
+                <p className={`text-sm mt-3 font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'}`}>Dengan nama Allah Yang Maha Pengasih, Maha Penyayang.</p>
               </div>
             )}
 
@@ -336,16 +339,16 @@ export default function QuranPage() {
                   <div 
                     key={ayat.nomorAyat} 
                     ref={el => ayatRefs.current[ayat.nomorAyat] = el}
-                    className={`bg-white rounded-2xl shadow-sm p-5 md:p-6 border relative group transition-all ${isPlaying ? 'border-amber-400 shadow-md ring-2 ring-amber-100' : 'border-slate-100 hover:border-green-200 hover:shadow-md'}`}
+                    className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'} rounded-2xl shadow-sm p-5 md:p-6 border relative group transition-all ${isPlaying ? 'border-amber-400 shadow-md ring-2 ring-amber-100' : 'hover:border-green-200 hover:shadow-md'}`}
                   >
                     <div className="flex justify-between items-start mb-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border shadow-sm transition-colors ${isPlaying ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-green-100 text-green-700 border-green-200'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border shadow-sm transition-colors ${isPlaying ? 'bg-amber-100 text-amber-700 border-amber-300' : (isDarkMode ? 'bg-slate-700 text-slate-300 border-slate-600' : 'bg-green-100 text-green-700 border-green-200')}`}>
                         {ayat.nomorAyat}
                       </div>
                       <div className="flex-1 ml-4 flex justify-end">
                         <button 
                           onClick={() => handlePlayAudio(ayat.audio, ayat.nomorAyat, selectedSurah.ayat)}
-                          className={`transition-colors p-2 rounded-full ${isPlaying ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-green-600 hover:text-green-800 hover:bg-green-50'}`}
+                          className={`transition-colors p-2 rounded-full ${isPlaying ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : (isDarkMode ? 'text-slate-400 hover:bg-slate-700 hover:text-white' : 'text-green-600 hover:text-green-800 hover:bg-green-50')}`}
                           title={isPlaying ? "Jeda Audio" : "Putar Audio Ayat"}
                         >
                           {isPlaying ? (
@@ -358,18 +361,18 @@ export default function QuranPage() {
                     </div>
                     
                     <div className="text-right mb-6">
-                      <p className={`text-3xl md:text-4xl font-arabic leading-[2.5] ${isPlaying ? 'text-green-900' : 'text-slate-900'}`} dir="rtl">
+                      <p className={`text-3xl md:text-4xl font-arabic leading-[2.5] ${isPlaying ? 'text-green-500' : (isDarkMode ? 'text-slate-200' : 'text-slate-900 dark:text-white')}`} dir="rtl">
                         {ayat.teksArab}
                       </p>
                     </div>
                     
-                    <div className="space-y-2 border-t border-slate-50 pt-4">
+                    <div className="space-y-2 border-t border-slate-50 dark:border-slate-800 pt-4">
                       {hoverDisplay === 'Transliterasi' || hoverDisplay === 'Terjemahan (Indonesia)' ? (
-                        <p className="text-green-700 text-sm font-medium italic">
+                        <p className={`text-sm font-medium italic ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>
                           {ayat.teksLatin}
                         </p>
                       ) : null}
-                      <p className="text-slate-600 text-[15px] leading-relaxed">
+                      <p className={`text-[15px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
                         {hoverDisplay === 'Terjemahan (English)' ? "(English translation placeholder for demo)" : ayat.teksIndonesia}
                       </p>
                     </div>
@@ -381,7 +384,7 @@ export default function QuranPage() {
         ) : (
           /* MAIN MENU TABS */
           <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Search Bar & Settings (Only visible on Al-Quran tab) */}
+            {/* Search Bar & Settings */}
             {activeTab === 'Al-Quran' && (
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
@@ -393,12 +396,12 @@ export default function QuranPage() {
                     placeholder="Cari Surah atau Terjemahan..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 shadow-sm transition-all"
+                    className={`w-full border rounded-2xl py-4 pl-12 pr-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 shadow-sm transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}
                   />
                 </div>
                 <button 
                   onClick={() => setShowSettings(true)}
-                  className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-500 hover:text-green-600 hover:border-green-200 transition-colors"
+                  className={`ml-auto p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-green-600'} shadow-sm transition-colors`}
                   title="Pengaturan"
                 >
                   <Settings className="w-6 h-6" />
@@ -414,7 +417,7 @@ export default function QuranPage() {
                   <button 
                     key={tab}
                     onClick={() => setQuranSubTab(tab)}
-                    className={`px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${quranSubTab === tab ? 'bg-[#3b82f6] text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                    className={`px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-sm ${quranSubTab === tab ? 'bg-[#3b82f6] text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:bg-slate-800'}`}
                   >
                     {tab}
                   </button>
@@ -435,15 +438,15 @@ export default function QuranPage() {
                         <div 
                           key={surah.nomor}
                           onClick={() => handleSelectSurah(surah.nomor)}
-                          className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-green-200 cursor-pointer transition-all flex items-center justify-between group"
+                          className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-green-200 cursor-pointer transition-all flex items-center justify-between group"
                         >
                           <div className="flex items-center space-x-4">
                             <div className="w-10 h-10 bg-green-50 text-green-700 rounded-lg flex items-center justify-center font-bold text-sm border border-green-100 group-hover:bg-green-600 group-hover:text-white transition-colors rotate-45">
                               <span className="-rotate-45">{surah.nomor}</span>
                             </div>
                             <div>
-                              <h3 className="font-bold text-slate-800 text-base">{surah.namaLatin}</h3>
-                              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide mt-0.5">
+                              <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base">{surah.namaLatin}</h3>
+                              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mt-0.5">
                                 {surah.arti} • {surah.jumlahAyat} Ayat
                               </p>
                             </div>
@@ -454,7 +457,7 @@ export default function QuranPage() {
                         </div>
                       ))}
                       {filteredSurahs.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-slate-500">
+                        <div className="col-span-full py-12 text-center text-slate-500 dark:text-slate-400">
                           Surah tidak ditemukan.
                         </div>
                       )}
@@ -496,10 +499,10 @@ export default function QuranPage() {
                       { num: 29, eng: "Twenty-Ninth Juz", ar: "ٱلْجُزْءُ ٱلتَّاسِعُ وَٱلْعِشْرُونَ" },
                       { num: 30, eng: "Thirtieth Juz", ar: "ٱلْجُزْءُ ٱلثَّلَاثُونَ" }
                     ].map(juz => (
-                      <div key={juz.num} className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden transition-all group">
+                      <div key={juz.num} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden transition-all group">
                         <div 
                           onClick={() => setExpandedJuz(expandedJuz === juz.num ? null : juz.num)}
-                          className="p-5 flex items-center justify-between hover:bg-slate-50 cursor-pointer relative"
+                          className="p-5 flex items-center justify-between hover:bg-slate-50 dark:bg-slate-800 cursor-pointer relative"
                         >
                           <div className={`absolute left-0 top-0 bottom-0 w-1 ${expandedJuz === juz.num ? 'bg-blue-500' : 'bg-[#fbbf24]'}`}></div>
                           <div className="flex items-center gap-4">
@@ -507,11 +510,11 @@ export default function QuranPage() {
                               {juz.num}
                             </div>
                             <div>
-                              <h4 className={`font-bold ${expandedJuz === juz.num ? 'text-blue-600' : 'text-slate-800'}`}>Juz ke {juz.num}</h4>
-                              <p className="text-xs text-slate-500 italic">{juz.eng}</p>
+                              <h4 className={`font-bold ${expandedJuz === juz.num ? 'text-blue-600' : 'text-slate-800 dark:text-slate-200'}`}>Juz ke {juz.num}</h4>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 italic">{juz.eng}</p>
                             </div>
                           </div>
-                          <div className={`text-xl font-arabic transition-colors ${expandedJuz === juz.num ? 'text-blue-600' : 'text-slate-600 group-hover:text-green-600'}`}>
+                          <div className={`text-xl font-arabic transition-colors ${expandedJuz === juz.num ? 'text-blue-600' : 'text-slate-600 dark:text-slate-400 group-hover:text-green-600'}`}>
                             {juz.ar}
                           </div>
                         </div>
@@ -519,7 +522,7 @@ export default function QuranPage() {
                         {/* Expanded Menu */}
                         {expandedJuz === juz.num && (
                           <div className="bg-blue-500 animate-in fade-in slide-in-from-top-2 duration-300 relative border-t-2 border-white/20 shadow-inner">
-                            <div className="absolute right-2 top-2 bottom-2 w-1.5 bg-white/20 rounded-full"></div>
+                            <div className="absolute right-2 top-2 bottom-2 w-1.5 bg-white dark:bg-slate-900/20 rounded-full"></div>
                             <div className="divide-y divide-blue-400/30">
                               {(JUZ_MAPPING[juz.num] || []).map((sm, idx) => {
                                 const surahInfo = surahs.find(s => s.nomor === sm.nomor);
@@ -550,7 +553,7 @@ export default function QuranPage() {
             </div>
             
             {loadingDetail && (
-              <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="fixed inset-0 bg-white dark:bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div className="bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-lg flex items-center space-x-2">
                   <BookOpen className="w-5 h-5 animate-spin" />
                   <span>Membuka Surah...</span>
@@ -565,9 +568,9 @@ export default function QuranPage() {
       {showSettings && (
         <>
           <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50" onClick={() => setShowSettings(false)}></div>
-          <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-50 p-6 flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-bold text-slate-700 uppercase tracking-widest">Pengaturan</h3>
+          <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-slate-900 shadow-2xl z-50 p-6 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex justify-between items-center mb-8 border-b border-slate-100 dark:border-slate-800 pb-4">
+              <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">Pengaturan</h3>
               <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-rose-500 transition-colors">
                 <X className="w-6 h-6" />
               </button>
@@ -575,12 +578,12 @@ export default function QuranPage() {
             
             <div className="space-y-6 flex-1">
               <div>
-                <h4 className="font-bold text-slate-800 mb-3 text-sm">Pilih Qori (Pembaca)</h4>
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm">Pilih Qori (Pembaca)</h4>
                 <div className="space-y-2">
                   <select 
                     value={selectedQori} 
                     onChange={(e) => setSelectedQori(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     {QORI_LIST.map(q => (
                       <option key={q.id} value={q.id}>{q.name}</option>
@@ -589,8 +592,8 @@ export default function QuranPage() {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100">
-                <h4 className="font-bold text-slate-800 mb-4">Tampilan Hover Ayat</h4>
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-4">Tampilan Hover Ayat</h4>
                 <div className="space-y-3">
                   {['Terjemahan (Indonesia)', 'Terjemahan (English)', 'Transliterasi'].map(opt => (
                     <label key={opt} className="flex items-center gap-3 cursor-pointer group">
@@ -600,10 +603,10 @@ export default function QuranPage() {
                           name="hover" 
                           checked={hoverDisplay === opt} 
                           onChange={() => setHoverDisplay(opt)} 
-                          className="w-5 h-5 text-blue-600 border-slate-300 focus:ring-blue-500 peer cursor-pointer"
+                          className="w-5 h-5 text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 peer cursor-pointer"
                         />
                       </div>
-                      <span className={`text-sm font-medium transition-colors ${hoverDisplay === opt ? 'text-blue-700 font-bold' : 'text-slate-600 group-hover:text-slate-800'}`}>
+                      <span className={`text-sm font-medium transition-colors ${hoverDisplay === opt ? 'text-blue-700 font-bold' : 'text-slate-600 dark:text-slate-400 group-hover:text-slate-800 dark:text-slate-200'}`}>
                         {opt}
                       </span>
                     </label>

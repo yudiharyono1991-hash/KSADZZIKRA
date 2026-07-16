@@ -20,6 +20,7 @@ import {
   PurchaseOrderPage,
   BranchManagementPage,
   KasirRiwayatPage,
+  KasirShiftPage,
   CustomerManagementPage,
   SupplierManagementPage,
   PromoManagementPage,
@@ -83,7 +84,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
-  const { initializeStore, fetchProducts, fetchStoreSettings, fetchOnlineOrders, isLoading } = useAppStore();
+  const { initializeStore, fetchProducts, fetchStoreSettings, fetchOnlineOrders, isLoading, isDarkMode } = useAppStore();
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -173,6 +182,7 @@ export default function App() {
         
         {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
         <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
+        <Route path="/absen" element={<ProtectedRoute><KasirShiftPage /></ProtectedRoute>} />
         <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
         <Route path="/inventory-ppob" element={<ProtectedRoute><PPOBInventoryPage /></ProtectedRoute>} />

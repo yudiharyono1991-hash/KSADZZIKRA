@@ -85,8 +85,8 @@ export default function KoperasiAnggotaPage() {
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Buku Anggota Koperasi</h1>
-            <p className="text-sm text-gray-500">Manajemen keanggotaan, poin belanja, dan simpanan syariah.</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Buku Anggota Koperasi</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Manajemen keanggotaan, poin belanja, dan simpanan syariah.</p>
           </div>
         </div>
         <button 
@@ -99,56 +99,56 @@ export default function KoperasiAnggotaPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center space-x-4">
           <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Total Anggota</p>
-            <p className="text-2xl font-black text-gray-800">{members.length}</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wider">Total Anggota</p>
+            <p className="text-2xl font-black text-gray-800 dark:text-slate-200">{members.length}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center space-x-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center space-x-4">
           <div className="p-3 bg-amber-100 text-amber-600 rounded-xl">
             <Award className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Total Poin Beredar</p>
-            <p className="text-2xl font-black text-gray-800">{members.reduce((sum, m) => sum + m.points, 0).toLocaleString('id-ID')}</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wider">Total Poin Beredar</p>
+            <p className="text-2xl font-black text-gray-800 dark:text-slate-200">{members.reduce((sum, m) => sum + m.points, 0).toLocaleString('id-ID')}</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-green-100 flex items-center space-x-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-green-100 flex items-center space-x-4">
           <div className="p-3 bg-green-100 text-green-600 rounded-xl">
             <CreditCard className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Total Simpanan</p>
+            <p className="text-xs text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wider">Total Simpanan</p>
             <p className="text-2xl font-black text-green-700">Rp {totalSimpananSemua.toLocaleString('id-ID')}</p>
           </div>
         </div>
       </div>
 
       {isAdding && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-200 mb-6 animate-in fade-in slide-in-from-top-4">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-green-200 mb-6 animate-in fade-in slide-in-from-top-4">
           <h2 className="text-lg font-bold mb-4 text-green-800">Form Pendaftaran Anggota Koperasi</h2>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Nama Lengkap Sesuai KTP</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Nama Lengkap Sesuai KTP</label>
+              <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Nomor WhatsApp Aktif</label>
-              <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Nomor WhatsApp Aktif</label>
+              <input type="text" required value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Setoran Simpanan Pokok (Rp)</label>
-              <input type="number" required value={simpananPokok} onChange={e => setSimpananPokok(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50" />
-              <p className="text-[10px] text-gray-500 mt-1">Simpanan yang dibayarkan 1x saat mendaftar.</p>
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Setoran Simpanan Pokok (Rp)</label>
+              <input type="number" required value={simpananPokok} onChange={e => setSimpananPokok(Number(e.target.value))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50 dark:bg-slate-800" />
+              <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">Simpanan yang dibayarkan 1x saat mendaftar.</p>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Setoran Simpanan Wajib Awal (Rp)</label>
-              <input type="number" required value={simpananWajib} onChange={e => setSimpananWajib(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50" />
-              <p className="text-[10px] text-gray-500 mt-1">Simpanan rutin bulanan.</p>
+              <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">Setoran Simpanan Wajib Awal (Rp)</label>
+              <input type="number" required value={simpananWajib} onChange={e => setSimpananWajib(Number(e.target.value))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-slate-50 dark:bg-slate-800" />
+              <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1">Simpanan rutin bulanan.</p>
             </div>
             <div className="md:col-span-2 pt-2">
               <button type="submit" className="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 transition-colors">Daftarkan Anggota & Cetak Bukti</button>
@@ -157,15 +157,15 @@ export default function KoperasiAnggotaPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50 dark:bg-slate-800/50">
           <div className="relative w-full md:w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder="Cari NIA atau Nama Anggota..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 text-sm outline-none shadow-sm" />
+            <input type="text" placeholder="Cari NIA atau Nama Anggota..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-green-500 text-sm outline-none shadow-sm" />
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <button className="flex-1 md:flex-none px-4 py-2 bg-white border border-gray-200 text-gray-600 font-semibold text-sm rounded-xl hover:bg-gray-50">Filter Status</button>
-            <button className="flex-1 md:flex-none px-4 py-2 bg-white border border-gray-200 text-gray-600 font-semibold text-sm rounded-xl hover:bg-gray-50">Export Excel</button>
+            <button className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 font-semibold text-sm rounded-xl hover:bg-gray-50 dark:bg-slate-800">Filter Status</button>
+            <button className="flex-1 md:flex-none px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-400 font-semibold text-sm rounded-xl hover:bg-gray-50 dark:bg-slate-800">Export Excel</button>
           </div>
         </div>
         
@@ -188,17 +188,17 @@ export default function KoperasiAnggotaPage() {
                 return (
                   <tr key={c.id} className="hover:bg-green-50/50 transition-colors group">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-gray-800 text-base">{c.name}</div>
-                      <div className="text-xs text-gray-500 font-medium">{c.nia} • {c.phone}</div>
+                      <div className="font-bold text-gray-800 dark:text-slate-200 text-base">{c.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">{c.nia} • {c.phone}</div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className="px-3 py-1 bg-amber-100 border border-amber-200 text-amber-800 font-black rounded-full text-xs shadow-sm">
                         {c.points.toLocaleString('id-ID')} Pts
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-medium text-gray-600">Rp {c.simpananPokok.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4 text-right font-medium text-gray-600">Rp {c.simpananWajib.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4 text-right font-medium text-gray-600">Rp {c.simpananSukarela.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 text-right font-medium text-gray-600 dark:text-slate-400">Rp {c.simpananPokok.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 text-right font-medium text-gray-600 dark:text-slate-400">Rp {c.simpananWajib.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 text-right font-medium text-gray-600 dark:text-slate-400">Rp {c.simpananSukarela.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4 text-right font-bold text-green-700 bg-green-50/30">
                       Rp {totalSaldo.toLocaleString('id-ID')}
                     </td>
@@ -207,7 +207,7 @@ export default function KoperasiAnggotaPage() {
                         <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="Catat Setoran">
                           <CreditCard className="w-4 h-4" />
                         </button>
-                        <button className="p-2 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors" title="Edit Data">
+                        <button className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200 rounded-lg transition-colors" title="Edit Data">
                           <Edit className="w-4 h-4" />
                         </button>
                         <button onClick={() => deleteMember(c.id)} className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Hapus Anggota">
@@ -220,7 +220,7 @@ export default function KoperasiAnggotaPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
                     Tidak ada anggota koperasi yang ditemukan.
                   </td>
                 </tr>

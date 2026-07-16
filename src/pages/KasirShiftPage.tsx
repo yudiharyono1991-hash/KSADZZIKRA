@@ -2,11 +2,23 @@ import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store';
 import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X } from 'lucide-react';
 
+const getDistanceFromLatLonInM = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; // Radius of the earth in m
+  const dLat = (lat2-lat1) * (Math.PI/180);
+  const dLon = (lon2-lon1) * (Math.PI/180); 
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return Math.round(R * c);
+};
+
 export default function KasirShiftPage() {
-  const { transactions, currentUser, addExpense, expenses, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection } = useAppStore();
-  
+  const { transactions, currentUser, addExpense, expenses, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
+  const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [actualCash, setActualCash] = useState<string>('');
   const [isShiftClosed, setIsShiftClosed] = useState(false);
   const [clockingMode, setClockingMode] = useState<'IN' | 'OUT' | null>(null);
@@ -73,15 +85,19 @@ export default function KasirShiftPage() {
   );
 
   const totalTunai = myTransactions
-    .filter(t => t.paymentMethod === 'CASH')
+    .filter(t => t.paymentMethod === 'CASH' && !t.isVoided)
     .reduce((sum, t) => sum + t.totalAmount, 0);
 
   const totalQris = myTransactions
-    .filter(t => t.paymentMethod === 'QRIS_SHARIAH')
+    .filter(t => t.paymentMethod.includes('QRIS') && !t.isVoided)
     .reduce((sum, t) => sum + t.totalAmount, 0);
 
   const totalTransfer = myTransactions
-    .filter(t => t.paymentMethod === 'TRANSFER_BSI')
+    .filter(t => t.paymentMethod.includes('TRANSFER') && !t.isVoided)
+    .reduce((sum, t) => sum + t.totalAmount, 0);
+
+  const totalKasbon = myTransactions
+    .filter(t => t.paymentMethod === 'KASBON' && !t.isVoided)
     .reduce((sum, t) => sum + t.totalAmount, 0);
 
   const totalPettyCash = myExpenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -93,13 +109,25 @@ export default function KasirShiftPage() {
     e.preventDefault();
     if (!pettyCashAmount || !pettyCashDesc) return;
     
-    addExpense({
-      tenantId: currentUser?.tenantId || 'tenant_default',
-      date: new Date().toISOString(),
-      category: 'OPERASIONAL',
-      amount: Number(pettyCashAmount),
-      description: `Kas Kecil: ${pettyCashDesc}`
-    });
+    const amountNum = Number(pettyCashAmount);
+    
+    if (pettyCashType === 'PEMASUKAN') {
+      addExpense({
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: new Date().toISOString(),
+        category: 'OPERASIONAL',
+        amount: -amountNum, // Negative expense equals income
+        description: `Pemasukan Kas: ${pettyCashDesc}`
+      });
+    } else {
+      addExpense({
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: new Date().toISOString(),
+        category: 'OPERASIONAL',
+        amount: amountNum,
+        description: `Kas Kecil: ${pettyCashDesc}`
+      });
+    }
     
     setPettyCashAmount('');
     setPettyCashDesc('');
@@ -141,20 +169,21 @@ export default function KasirShiftPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="print:hidden space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
             <Lock className="w-6 h-6 text-green-600" />
             Rekap & Tutup Shift
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Cek uang laci, catat pengeluaran kas kecil, dan cetak laporan akhir shift.</p>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Cek uang laci, catat pengeluaran kas kecil, dan cetak laporan akhir shift.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Absensi Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden md:col-span-2">
-          <div className="p-4 border-b border-gray-100 bg-teal-50 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden md:col-span-2">
+          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-teal-50 flex items-center justify-between">
             <h2 className="font-bold text-teal-900 text-md flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-teal-600" />
               Status Absensi Hari Ini
@@ -168,11 +197,11 @@ export default function KasirShiftPage() {
           <div className="p-5 flex flex-col items-start gap-4">
             <div className="w-full flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
-                <p className="text-sm text-gray-600">
-                  Waktu Masuk: <span className="font-bold text-gray-800">{myAttendance ? new Date(myAttendance.clockIn).toLocaleTimeString() : '-'}</span>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Waktu Masuk: <span className="font-bold text-gray-800 dark:text-slate-200">{myAttendance ? new Date(myAttendance.clockIn).toLocaleTimeString() : '-'}</span>
                 </p>
-                <p className="text-sm text-gray-600">
-                  Waktu Keluar: <span className="font-bold text-gray-800">{myAttendance?.clockOut ? new Date(myAttendance.clockOut).toLocaleTimeString() : '-'}</span>
+                <p className="text-sm text-gray-600 dark:text-slate-400">
+                  Waktu Keluar: <span className="font-bold text-gray-800 dark:text-slate-200">{myAttendance?.clockOut ? new Date(myAttendance.clockOut).toLocaleTimeString() : '-'}</span>
                 </p>
                 {myAttendance?.photoUrl && (
                   <p className="text-xs text-teal-700 mt-2 font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Selfie Terekam</p>
@@ -203,11 +232,11 @@ export default function KasirShiftPage() {
 
             {/* Clock-In/Out Widget: Selfie & GPS */}
             {clockingMode && currentUser && (
-              <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 mt-2">
-                <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2">Verifikasi Kehadiran ({clockingMode === 'IN' ? 'Masuk' : 'Keluar'})</h4>
+              <div className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 mt-2">
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3 text-sm flex items-center gap-2">Verifikasi Kehadiran ({clockingMode === 'IN' ? 'Masuk' : 'Keluar'})</h4>
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 space-y-3">
-                    <p className="text-xs text-slate-500">Mohon izinkan akses Kamera dan Lokasi (GPS) untuk melakukan absensi.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Mohon izinkan akses Kamera dan Lokasi (GPS) untuk melakukan absensi.</p>
                     <div className="flex gap-2">
                       <button 
                         onClick={() => {
@@ -222,28 +251,28 @@ export default function KasirShiftPage() {
                             alert("Browser tidak mendukung Geolocation");
                           }
                         }}
-                        className={`text-xs py-2 px-3 rounded border font-bold flex items-center gap-1 ${locationData ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                        className={`text-xs py-2 px-3 rounded border font-bold flex items-center gap-1 ${locationData ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800'}`}
                       >
                         <MapPin className="w-4 h-4"/> {locationData ? 'Lokasi Tersimpan' : 'Ambil Lokasi (GPS)'}
                       </button>
                       <button 
                         onClick={startCamera}
-                        className={`text-xs py-2 px-3 rounded border font-bold flex items-center gap-1 ${selfieData ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                        className={`text-xs py-2 px-3 rounded border font-bold flex items-center gap-1 ${selfieData ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800'}`}
                       >
-                        <Camera className="w-4 h-4" /> {selfieData ? 'Foto Tersimpan' : 'Ambil Selfie Langsung'}
+                        <Camera className="w-4 h-4" /> {selfieData ? 'Foto Tersimpan' : 'Ambil Selfie (Opsional)'}
                       </button>
                     </div>
 
                     {/* Camera Live View UI */}
                     {isCameraActive && (
                       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
-                        <div className="bg-white p-4 rounded-xl max-w-md w-full shadow-2xl flex flex-col items-center">
-                          <h3 className="font-bold text-slate-800 mb-2">Ambil Selfie Absen</h3>
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl max-w-md w-full shadow-2xl flex flex-col items-center">
+                          <h3 className="font-bold text-slate-800 dark:text-slate-200 mb-2">Ambil Selfie Absen</h3>
                           <div className="relative w-full aspect-square bg-slate-900 rounded-lg overflow-hidden mb-4">
                             <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]"></video>
                           </div>
                           <div className="flex gap-3 w-full">
-                            <button onClick={stopCamera} className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg">Batal</button>
+                            <button onClick={stopCamera} className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold rounded-lg">Batal</button>
                             <button onClick={takePicture} className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg flex justify-center items-center gap-2"><Camera className="w-5 h-5"/> Jepret</button>
                           </div>
                           <canvas ref={canvasRef} className="hidden"></canvas>
@@ -270,14 +299,24 @@ export default function KasirShiftPage() {
                       <div className="flex gap-2">
                         <button 
                           onClick={() => setClockingMode(null)}
-                          className="py-2 px-4 text-xs font-bold text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50"
+                          className="py-2 px-4 text-xs font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-50 dark:bg-slate-800"
                         >
                           Batal
                         </button>
                         <button 
-                          disabled={!selfieData || !locationData}
+                          disabled={!locationData}
                           onClick={() => {
-                            if (selfieData && locationData) {
+                            if (locationData) {
+                              // Validasi Geofencing
+                              if (settings?.storeLocationLat && settings?.storeLocationLng) {
+                                const radiusLimit = settings.attendanceRadiusMeters || 50;
+                                const distance = getDistanceFromLatLonInM(locationData.lat, locationData.lng, settings.storeLocationLat, settings.storeLocationLng);
+                                if (distance > radiusLimit) {
+                                  alert(`GAGAL ABSEN: Anda berada di luar area toko.\n\nJarak Anda: ${distance} meter.\nMaksimal Jarak: ${radiusLimit} meter.`);
+                                  return; // Stop the process
+                                }
+                              }
+
                               if (clockingMode === 'IN') {
                                 clockIn(currentUser.username, currentUser.name, selfieData, locationData.lat, locationData.lng);
                               } else if (clockingMode === 'OUT' && myAttendance) {
@@ -298,9 +337,9 @@ export default function KasirShiftPage() {
                   {(selfieData || locationData) && (
                     <div className="w-32 flex-shrink-0">
                       {selfieData ? (
-                         <img src={selfieData} alt="Selfie" className="w-full h-32 object-cover rounded-lg border border-slate-200 shadow-sm" />
+                         <img src={selfieData} alt="Selfie" className="w-full h-32 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm" />
                       ) : (
-                         <div className="w-full h-32 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 flex-col gap-1">
+                         <div className="w-full h-32 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg flex items-center justify-center text-slate-400 flex-col gap-1">
                            <ImageIcon className="w-6 h-6" />
                            <span className="text-[10px]">Belum Ada Foto</span>
                          </div>
@@ -314,30 +353,34 @@ export default function KasirShiftPage() {
         </div>
 
         {/* Ringkasan Shift */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-slate-50">
-            <h2 className="font-bold text-gray-800 text-md">Rekapitulasi Shift Hari Ini</h2>
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-md">Rekapitulasi Shift Hari Ini</h2>
           </div>
-          <div className="p-5 space-y-4 text-sm text-gray-600">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+          <div className="p-5 space-y-4 text-sm text-gray-600 dark:text-slate-400">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
               <span>Total Transaksi</span>
-              <span className="font-bold">{myTransactions.length} Struk</span>
+              <span className="font-bold">{myTransactions.filter(t => !t.isVoided).length} Struk</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
               <span>Pembayaran Tunai</span>
-              <span className="font-bold text-gray-800">Rp {totalTunai.toLocaleString('id-ID')}</span>
+              <span className="font-bold text-gray-800 dark:text-slate-200">Rp {totalTunai.toLocaleString('id-ID')}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
               <span>Pembayaran QRIS</span>
               <span className="font-bold text-blue-600">Rp {totalQris.toLocaleString('id-ID')}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+            <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800">
               <span>Pembayaran Transfer</span>
-              <span className="font-bold text-blue-600">Rp {totalTransfer.toLocaleString('id-ID')}</span>
+              <span className="font-bold text-indigo-600">Rp {totalTransfer.toLocaleString('id-ID')}</span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100 text-red-600">
-              <span>Pengeluaran Kas Kecil</span>
-              <span className="font-bold">- Rp {totalPettyCash.toLocaleString('id-ID')}</span>
+            <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800">
+              <span>Pembayaran Kasbon</span>
+              <span className="font-bold text-red-600">Rp {totalKasbon.toLocaleString('id-ID')}</span>
+            </div>
+            <div className={`flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800 ${totalPettyCash < 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <span>Kas Kecil (Net)</span>
+              <span className="font-bold">{totalPettyCash < 0 ? '+' : '-'} Rp {Math.abs(totalPettyCash).toLocaleString('id-ID')}</span>
             </div>
             <div className="pt-4 flex justify-between items-center">
               <span className="font-bold text-green-800">ESTIMASI TUNAI DI LACI</span>
@@ -345,7 +388,7 @@ export default function KasirShiftPage() {
             </div>
           </div>
           
-          <div className="p-4 bg-slate-50 border-t border-gray-100 no-print">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 no-print">
             <button
               onClick={handleCloseShift}
               disabled={isShiftClosed}
@@ -368,10 +411,30 @@ export default function KasirShiftPage() {
               <Calculator className="w-16 h-16 text-amber-900" />
             </div>
             <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-2"><Banknote className="w-5 h-5"/> Input Kas Kecil</h3>
-            <p className="text-xs text-amber-700 mb-4 leading-relaxed">
+            <p className="text-xs text-amber-700 mb-2 leading-relaxed">
               Catat pengeluaran tunai tak terduga selama shift Anda (misal: bayar parkir, beli galon, dll) agar perhitungan akhir tunai di laci tetap akurat.
             </p>
+            <div className="mb-4 bg-amber-100/50 p-2 rounded-lg border border-amber-200/50 flex justify-between items-center">
+              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Saldo Kas Fisik</span>
+              <span className="text-sm font-black text-amber-900">Rp {(settings?.pettyCashBalance || 0).toLocaleString('id-ID')}</span>
+            </div>
             <form onSubmit={handleAddPettyCash} className="space-y-3 relative z-10">
+              <div className="flex bg-amber-100 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={() => setPettyCashType('PENGELUARAN')}
+                  className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${pettyCashType === 'PENGELUARAN' ? 'bg-amber-500 text-white shadow-sm' : 'text-amber-800 hover:bg-amber-200'}`}
+                >
+                  Pengeluaran
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPettyCashType('PEMASUKAN')}
+                  className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${pettyCashType === 'PEMASUKAN' ? 'bg-amber-500 text-white shadow-sm' : 'text-amber-800 hover:bg-amber-200'}`}
+                >
+                  Pemasukan
+                </button>
+              </div>
               <div>
                 <label className="text-[10px] font-bold text-amber-800 uppercase">Jumlah Rp</label>
                 <input 
@@ -400,24 +463,26 @@ export default function KasirShiftPage() {
                 disabled={isShiftClosed}
                 className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-lg transition-colors flex justify-center items-center gap-1 disabled:opacity-50 shadow-md shadow-amber-900/10"
               >
-                <Plus className="w-4 h-4" /> Tambah Pengeluaran
+                <Plus className="w-4 h-4" /> {pettyCashType === 'PEMASUKAN' ? 'Tambah Pemasukan' : 'Tambah Pengeluaran'}
               </button>
             </form>
           </div>
 
           {/* List Kas Kecil */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-             <div className="p-3 border-b border-slate-100 bg-slate-50">
-               <h3 className="font-bold text-sm text-slate-700">Daftar Kas Kecil (Shift Ini)</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+             <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+               <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">Daftar Kas Kecil (Shift Ini)</h3>
              </div>
              <div className="p-2 space-y-1">
                 {myExpenses.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4 italic">Belum ada pengeluaran.</p>
+                  <p className="text-xs text-slate-400 text-center py-4 italic">Belum ada transaksi kas kecil.</p>
                 ) : (
                   myExpenses.map(exp => (
-                    <div key={exp.id} className="flex justify-between items-center p-2 bg-slate-50 hover:bg-slate-100 rounded text-xs transition-colors">
-                      <span className="text-slate-600 font-medium">{exp.description}</span>
-                      <span className="font-bold text-rose-600">- Rp {exp.amount.toLocaleString('id-ID')}</span>
+                    <div key={exp.id} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 rounded text-xs transition-colors">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">{exp.description}</span>
+                      <span className={`font-bold ${exp.amount < 0 ? 'text-green-600' : 'text-rose-600'}`}>
+                        {exp.amount < 0 ? '+' : '-'} Rp {Math.abs(exp.amount).toLocaleString('id-ID')}
+                      </span>
                     </div>
                   ))
                 )}
@@ -427,15 +492,15 @@ export default function KasirShiftPage() {
       </div>
 
       {/* Riwayat Absensi */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <h2 className="font-bold text-slate-800 text-md flex items-center gap-2">
+      <div className="print:hidden bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <h2 className="font-bold text-slate-800 dark:text-slate-200 text-md flex items-center gap-2">
             Riwayat Absensi Anda
           </h2>
           <select 
             value={historyFilter}
             onChange={(e) => setHistoryFilter(e.target.value as any)}
-            className="p-2 text-sm border border-gray-200 rounded-lg"
+            className="p-2 text-sm border border-gray-200 dark:border-slate-700 rounded-lg"
           >
             <option value="7_DAYS">7 Hari Terakhir</option>
             <option value="1_MONTH">1 Bulan Terakhir</option>
@@ -446,30 +511,30 @@ export default function KasirShiftPage() {
         <div className="p-0 overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
-              <tr className="bg-slate-100 text-slate-500 text-xs uppercase">
-                <th className="p-4 font-bold border-b border-slate-200">Tanggal</th>
-                <th className="p-4 font-bold border-b border-slate-200">Jam Masuk</th>
-                <th className="p-4 font-bold border-b border-slate-200">Jam Keluar</th>
-                <th className="p-4 font-bold border-b border-slate-200">Bukti Kehadiran</th>
-                <th className="p-4 font-bold border-b border-slate-200">Aksi</th>
+              <tr className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs uppercase">
+                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Tanggal</th>
+                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Jam Masuk</th>
+                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Jam Keluar</th>
+                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Bukti Kehadiran</th>
+                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500 text-sm">Tidak ada riwayat absensi.</td>
+                  <td colSpan={4} className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">Tidak ada riwayat absensi.</td>
                 </tr>
               ) : (
                 filteredHistory.map(att => (
-                  <tr key={att.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="p-4 text-sm font-semibold text-slate-800">
+                  <tr key={att.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800">
+                    <td className="p-4 text-sm font-semibold text-slate-800 dark:text-slate-200">
                       {new Date(att.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
                       {att.isRevised && <span className="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Direvisi</span>}
                       {att.correctionStatus === 'PENDING' && <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1 rounded">Menunggu Koreksi</span>}
                       {att.correctionStatus === 'REJECTED' && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1 rounded">Koreksi Ditolak</span>}
                     </td>
-                    <td className="p-4 text-sm text-slate-700">{new Date(att.clockIn).toLocaleTimeString('id-ID')}</td>
-                    <td className="p-4 text-sm text-slate-700">{att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-'}</td>
+                    <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{new Date(att.clockIn).toLocaleTimeString('id-ID')}</td>
+                    <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-'}</td>
                     <td className="p-4 flex gap-2 items-center">
                       {att.photoUrl ? (
                         <div className="flex flex-col gap-1 items-center" title="Foto Masuk">
@@ -505,48 +570,63 @@ export default function KasirShiftPage() {
           </table>
         </div>
       </div>
+      </div>
 
       {/* Hidden Thermal Print Receipt for Shift Close */}
       {isShiftClosed && (
-        <div id="printable-receipt" className="hidden print:block fixed inset-0 bg-white p-4 font-mono text-xs text-black">
-          <div className="text-center space-y-1 border-b border-dashed border-black pb-3 mb-3">
-            <h2 className="font-bold text-base uppercase">Rekap Tutup Shift</h2>
-            <p>Toko KSA Mart</p>
-            <p className="text-[10px] uppercase">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}</p>
-            <p>================================</p>
-            <p className="text-left">Tanggal : {new Date().toLocaleString('id-ID')}</p>
-            <p className="text-left">Kasir   : {currentUser?.name}</p>
-          </div>
+        <>
+          <style type="text/css" media="print">
+            {`
+              @page { size: 58mm auto; margin: 0; }
+              body * { visibility: hidden; }
+              body { margin: 0; padding: 0; background: white; }
+              .printable-thermal, .printable-thermal * { visibility: visible; }
+              .printable-thermal { position: absolute; left: 0; top: 0; width: 58mm; padding: 2mm; margin: 0; border: none; max-height: none; overflow: visible; font-size: 10px; color: black; }
+            `}
+          </style>
+          <div id="printable-receipt" className="hidden print:block printable-thermal font-mono text-black bg-white">
+            <div className="text-center space-y-1 border-b border-dashed border-black pb-3 mb-3">
+              <h2 className="font-bold text-base uppercase">Rekap Tutup Shift</h2>
+              <p>Toko KSA Mart</p>
+              <p className="text-[10px] uppercase">{activeBranchId ? `Cabang ${activeBranchId}` : 'Kantor Pusat'}</p>
+              <p>================================</p>
+              <p className="text-left">Tanggal : {new Date().toLocaleString('id-ID')}</p>
+              <p className="text-left">Kasir   : {currentUser?.name}</p>
+            </div>
           
           <div className="space-y-2 border-b border-dashed border-black pb-3 mb-3">
             <div className="flex justify-between">
               <span>Total Transaksi :</span>
-              <span>{myTransactions.length} Struk</span>
+              <span>{myTransactions.filter(t => !t.isVoided).length} Struk</span>
             </div>
             <div className="flex justify-between">
               <span>Penerimaan Tunai:</span>
               <span>Rp {totalTunai.toLocaleString('id-ID')}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between mt-1">
               <span>Penerimaan QRIS :</span>
               <span>Rp {totalQris.toLocaleString('id-ID')}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Penerimaan Trans:</span>
+            <div className="flex justify-between mt-1">
+              <span>Penerimaan Transfer :</span>
               <span>Rp {totalTransfer.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between mt-1">
+              <span>Piutang Kasbon :</span>
+              <span>Rp {totalKasbon.toLocaleString('id-ID')}</span>
             </div>
           </div>
 
           <div className="space-y-2 border-b border-dashed border-black pb-3 mb-3">
-            <p className="font-bold">Pengeluaran Kas Kecil:</p>
+            <p className="font-bold">Transaksi Kas Kecil:</p>
             {myExpenses.length === 0 ? <p>- Nihil -</p> : myExpenses.map(exp => (
               <div key={exp.id} className="flex justify-between pl-2">
-                <span>{exp.description.replace('Kas Kecil: ', '')}</span>
-                <span>Rp {exp.amount.toLocaleString('id-ID')}</span>
+                <span>{exp.description.replace('Kas Kecil: ', '').replace('Pemasukan Kas: ', '[+] ')}</span>
+                <span>{exp.amount < 0 ? '+' : '-'} Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
               </div>
             ))}
             <div className="flex justify-between font-bold pt-1 border-t border-black mt-1">
-              <span>Total Pengeluaran:</span>
+              <span>Total Bersih:</span>
               <span>Rp {totalPettyCash.toLocaleString('id-ID')}</span>
             </div>
           </div>
@@ -574,19 +654,20 @@ export default function KasirShiftPage() {
             </div>
           </div>
         </div>
+        </>
       )}
       {/* Correction Request Modal */}
       {correctionModal.open && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setCorrectionModal({open: false, attendanceId: null})}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-500"/>Ajukan Koreksi Absen</h3>
-              <button onClick={() => setCorrectionModal({open: false, attendanceId: null})} className="p-1 hover:bg-slate-100 rounded-lg"><X className="w-5 h-5 text-slate-500"/></button>
+              <h3 className="font-bold text-slate-800 dark:text-slate-200 text-lg flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-500"/>Ajukan Koreksi Absen</h3>
+              <button onClick={() => setCorrectionModal({open: false, attendanceId: null})} className="p-1 hover:bg-slate-100 dark:bg-slate-800 rounded-lg"><X className="w-5 h-5 text-slate-500 dark:text-slate-400"/></button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Bagian yang Perlu Dikoreksi *</label>
-                <select value={corrType} onChange={e => setCorrType(e.target.value as any)} className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bagian yang Perlu Dikoreksi *</label>
+                <select value={corrType} onChange={e => setCorrType(e.target.value as any)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="CLOCK_IN">Jam Masuk</option>
                   <option value="CLOCK_OUT">Jam Keluar</option>
                   <option value="BOTH">Keduanya</option>
@@ -594,22 +675,22 @@ export default function KasirShiftPage() {
               </div>
               {(corrType === 'CLOCK_IN' || corrType === 'BOTH') && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Jam Masuk yang Seharusnya *</label>
-                  <input type="datetime-local" value={corrReqClockIn} onChange={e => setCorrReqClockIn(e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jam Masuk yang Seharusnya *</label>
+                  <input type="datetime-local" value={corrReqClockIn} onChange={e => setCorrReqClockIn(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
                 </div>
               )}
               {(corrType === 'CLOCK_OUT' || corrType === 'BOTH') && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Jam Keluar yang Seharusnya *</label>
-                  <input type="datetime-local" value={corrReqClockOut} onChange={e => setCorrReqClockOut(e.target.value)} className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jam Keluar yang Seharusnya *</label>
+                  <input type="datetime-local" value={corrReqClockOut} onChange={e => setCorrReqClockOut(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Alasan Permohonan Koreksi *</label>
-                <textarea value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Jelaskan alasan koreksi absen Anda..." className="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-20"></textarea>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alasan Permohonan Koreksi *</label>
+                <textarea value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Jelaskan alasan koreksi absen Anda..." className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-20"></textarea>
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setCorrectionModal({open: false, attendanceId: null})} className="flex-1 py-2 border border-slate-200 rounded-xl text-slate-600 font-bold text-sm hover:bg-slate-50">Batal</button>
+                <button onClick={() => setCorrectionModal({open: false, attendanceId: null})} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 font-bold text-sm hover:bg-slate-50 dark:bg-slate-800">Batal</button>
                 <button
                   disabled={!corrReason || ((corrType === 'CLOCK_IN' || corrType === 'BOTH') && !corrReqClockIn) || ((corrType === 'CLOCK_OUT' || corrType === 'BOTH') && !corrReqClockOut)}
                   onClick={() => {

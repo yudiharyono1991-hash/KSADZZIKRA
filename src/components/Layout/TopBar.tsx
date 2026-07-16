@@ -17,7 +17,9 @@ import {
   Users,
   Bell,
   RefreshCw,
-  ShoppingBag
+  ShoppingBag,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 interface TopBarProps {
@@ -26,7 +28,7 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopBarProps) {
-  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser, onlineOrders, notifications, markNotificationAsRead } = useBranchData();
+  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser, onlineOrders, notifications, markNotificationAsRead, isDarkMode, toggleDarkMode } = useBranchData();
   const [time, setTime] = useState(new Date());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -107,12 +109,12 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
     <header id="app-topbar" className="h-16 bg-gradient-to-r from-emerald-50 via-white to-green-50 border-b-2 border-green-700 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none">
       
       {/* Brand Context */}
-      <div className="flex items-center space-x-1.5 md:space-x-2 text-gray-500 font-semibold text-xs">
+      <div className="flex items-center space-x-1.5 md:space-x-2 text-gray-500 dark:text-slate-400 font-semibold text-xs">
         {/* Mobile Hamburger */}
         {onToggleSidebar && (
           <button 
             onClick={onToggleSidebar}
-            className="p-1.5 -ml-1 mr-1 bg-slate-100 hover:bg-slate-200 text-gray-700 rounded-lg md:hidden transition-colors"
+            className="p-1.5 -ml-1 mr-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-gray-700 dark:text-slate-300 rounded-lg md:hidden transition-colors"
             aria-label="Buka Menu Mobile"
           >
             <Menu className="w-5 h-5 text-green-800" />
@@ -122,14 +124,14 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
         {onToggleDesktopSidebar && (
           <button 
             onClick={onToggleDesktopSidebar}
-            className="p-1.5 -ml-1 mr-1 bg-slate-100 hover:bg-slate-200 text-gray-700 rounded-lg hidden md:block transition-colors"
+            className="p-1.5 -ml-1 mr-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-gray-700 dark:text-slate-300 rounded-lg hidden md:block transition-colors"
             aria-label="Buka/Tutup Menu Desktop"
           >
             <Menu className="w-5 h-5 text-green-800" />
           </button>
         )}
         <Building className="w-4.5 h-4.5 text-green-700 hidden sm:inline" />
-        <span className="text-gray-800 font-extrabold font-sans">KSA Mart</span>
+        <span className="text-gray-800 dark:text-slate-200 font-extrabold font-sans">KSA Mart</span>
         <span className="text-gray-300 hidden sm:inline">|</span>
         
         {isSupabaseConfigured ? (
@@ -152,7 +154,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
         {/* Refresh Button */}
         <button 
           onClick={handleRefresh}
-          className="p-1.5 bg-slate-100 hover:bg-green-100 text-gray-500 hover:text-green-700 rounded-lg transition-colors cursor-pointer"
+          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-green-100 text-gray-500 dark:text-slate-400 hover:text-green-700 rounded-lg transition-colors cursor-pointer"
           title="Sinkronisasi Data"
         >
           <RefreshCw className="w-4 h-4" />
@@ -168,14 +170,14 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             </div>
             
             {/* Dropdown list of expiring products on hover */}
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-2 hidden group-hover:block">
-              <div className="px-3 pb-2 border-b border-gray-100 mb-1">
-                <span className="text-xs font-bold text-gray-800">Peringatan Kedaluwarsa</span>
+            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-lg z-50 py-2 hidden group-hover:block">
+              <div className="px-3 pb-2 border-b border-gray-100 dark:border-slate-800 mb-1">
+                <span className="text-xs font-bold text-gray-800 dark:text-slate-200">Peringatan Kedaluwarsa</span>
               </div>
               <div className="max-h-48 overflow-y-auto">
                 {expiringProducts.map(p => (
-                  <div key={p.id} className="px-3 py-1.5 hover:bg-slate-50 flex justify-between items-center text-xs">
-                    <span className="font-semibold text-gray-700 truncate max-w-[140px]">{p.name}</span>
+                  <div key={p.id} className="px-3 py-1.5 hover:bg-slate-50 dark:bg-slate-800 flex justify-between items-center text-xs">
+                    <span className="font-semibold text-gray-700 dark:text-slate-300 truncate max-w-[140px]">{p.name}</span>
                     <span className="text-[10px] font-mono text-red-600 font-bold bg-red-50 px-1 rounded border border-red-100">
                       {new Date(p.expiryDate!).toLocaleDateString('id-ID')}
                     </span>
@@ -205,10 +207,10 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
         {/* Live Counters */}
         {currentUser && (currentUser.role === 'OWNER' || currentUser.role === 'ADMIN' || currentUser.role === 'CASHIER') && (
-          <div className="hidden lg:flex items-center space-x-4 text-[10px] font-bold uppercase tracking-wider border-l border-r border-gray-100 px-5">
+          <div className="hidden lg:flex items-center space-x-4 text-[10px] font-bold uppercase tracking-wider border-l border-r border-gray-100 dark:border-slate-800 px-5">
             <div>
               <p className="text-gray-400">Total Omset Hari Ini</p>
-              <p className="font-extrabold text-gray-900 text-xs font-mono mt-0.5">Rp {todaySales.toLocaleString('id-ID')}</p>
+              <p className="font-extrabold text-gray-900 dark:text-white text-xs font-mono mt-0.5">Rp {todaySales.toLocaleString('id-ID')}</p>
             </div>
             <div>
               <p className="text-gray-400">Margin Berkah</p>
@@ -216,6 +218,15 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             </div>
           </div>
         )}
+
+        {/* Dark Mode Toggle */}
+        <button 
+          onClick={() => toggleDarkMode()}
+          className="p-2 text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:bg-slate-800 rounded-full transition cursor-pointer"
+          title="Ubah Tema"
+        >
+          {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
+        </button>
 
         {/* Notification Bell */}
         {currentUser && (
@@ -225,7 +236,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                 setIsNotifOpen(!isNotifOpen);
                 setIsUserMenuOpen(false);
               }}
-              className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
+              className="relative p-2 text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:bg-slate-800 rounded-full transition cursor-pointer"
             >
               <Bell className="w-5 h-5" />
               {(lowStockCount > 0 || pendingUsersCount > 0 || expiringProducts.length > 0 || pendingOnlineOrdersCount > 0 || unreadNotifications.length > 0) && (
@@ -236,16 +247,16 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             {isNotifOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)} />
-                <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-2">
                   <div className="px-4 py-2 border-b border-gray-50 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-800 text-sm">Notifikasi</h3>
+                    <h3 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Notifikasi</h3>
                     <span className="text-[10px] bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">Baru</span>
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     {unreadNotifications.map(notif => (
                       <div 
                         key={notif.id} 
-                        className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer"
+                        className="px-4 py-3 hover:bg-slate-50 dark:bg-slate-800 border-b border-gray-50 flex items-start gap-3 cursor-pointer"
                         onClick={() => {
                           markNotificationAsRead(notif.id);
                           setIsNotifOpen(false);
@@ -254,45 +265,45 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                       >
                         <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg shrink-0"><Bell className="w-4 h-4"/></div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">{notif.title}</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{notif.message}</p>
+                          <p className="text-xs font-bold text-gray-800 dark:text-slate-200">{notif.title}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">{notif.message}</p>
                         </div>
                       </div>
                     ))}
                     
                     {pendingUsersCount > 0 && currentUser.role === 'OWNER' && (
-                      <div className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
+                      <div className="px-4 py-3 hover:bg-slate-50 dark:bg-slate-800 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
                         <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0"><Users className="w-4 h-4"/></div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">Persetujuan Akun</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">Ada {pendingUsersCount} staf baru menunggu persetujuan (*Approve*) dari Owner.</p>
+                          <p className="text-xs font-bold text-gray-800 dark:text-slate-200">Persetujuan Akun</p>
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">Ada {pendingUsersCount} staf baru menunggu persetujuan (*Approve*) dari Owner.</p>
                         </div>
                       </div>
                     )}
                     {lowStockCount > 0 && (
-                      <div className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
+                      <div className="px-4 py-3 hover:bg-slate-50 dark:bg-slate-800 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
                         <div className="p-1.5 bg-red-100 text-red-700 rounded-lg shrink-0"><Database className="w-4 h-4"/></div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">Peringatan Stok Menipis</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{lowStockCount} barang telah mencapai batas minimum stok. Segera *restock*!</p>
+                          <p className="text-xs font-bold text-gray-800 dark:text-slate-200">Peringatan Stok Menipis</p>
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">{lowStockCount} barang telah mencapai batas minimum stok. Segera *restock*!</p>
                         </div>
                       </div>
                     )}
                     {expiringProducts.length > 0 && (
-                      <div className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
+                      <div className="px-4 py-3 hover:bg-slate-50 dark:bg-slate-800 border-b border-gray-50 flex items-start gap-3 cursor-pointer">
                         <div className="p-1.5 bg-purple-100 text-purple-700 rounded-lg shrink-0"><ShieldAlert className="w-4 h-4"/></div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">Peringatan Kedaluwarsa</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{expiringProducts.length} barang akan *expired* dalam 30 hari ke depan.</p>
+                          <p className="text-xs font-bold text-gray-800 dark:text-slate-200">Peringatan Kedaluwarsa</p>
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">{expiringProducts.length} barang akan *expired* dalam 30 hari ke depan.</p>
                         </div>
                       </div>
                     )}
                     {pendingOnlineOrdersCount > 0 && (
-                      <div className="px-4 py-3 hover:bg-slate-50 border-b border-gray-50 flex items-start gap-3 cursor-pointer" onClick={() => { setIsNotifOpen(false); window.location.hash = '#/online-orders'; }}>
+                      <div className="px-4 py-3 hover:bg-slate-50 dark:bg-slate-800 border-b border-gray-50 flex items-start gap-3 cursor-pointer" onClick={() => { setIsNotifOpen(false); window.location.hash = '#/online-orders'; }}>
                         <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg shrink-0"><ShoppingBag className="w-4 h-4"/></div>
                         <div>
-                          <p className="text-xs font-bold text-gray-800">Pesanan Online Baru</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">Ada {pendingOnlineOrdersCount} pesanan online baru yang menunggu diproses.</p>
+                          <p className="text-xs font-bold text-gray-800 dark:text-slate-200">Pesanan Online Baru</p>
+                          <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">Ada {pendingOnlineOrdersCount} pesanan online baru yang menunggu diproses.</p>
                         </div>
                       </div>
                     )}
@@ -316,18 +327,18 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                 setIsUserMenuOpen(!isUserMenuOpen);
                 setIsNotifOpen(false);
               }}
-              className="flex items-center space-x-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 p-1.5 px-3 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/20 cursor-pointer"
+              className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-1.5 px-3 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-green-500/20 cursor-pointer"
             >
               <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
                 <User className="w-3.5 h-3.5 text-green-800" />
               </div>
               <div className="text-left leading-tight hidden sm:block">
-                <p className="text-[10px] font-extrabold text-gray-800 font-sans tracking-wide uppercase">{currentUser.name}</p>
-                <p className="text-[8px] text-gray-500 font-mono italic">
+                <p className="text-[10px] font-extrabold text-gray-800 dark:text-slate-200 font-sans tracking-wide uppercase">{currentUser.name}</p>
+                <p className="text-[8px] text-gray-500 dark:text-slate-400 font-mono italic">
                   {currentUser.role} • {userBranchName}
                 </p>
                 {currentUser.phone && (
-                  <p className="text-[9px] text-gray-500 font-bold mt-0.5 tracking-wider">
+                  <p className="text-[9px] text-gray-500 dark:text-slate-400 font-bold mt-0.5 tracking-wider">
                     {currentUser.phone}
                   </p>
                 )}
@@ -342,10 +353,10 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                   className="fixed inset-0 z-40" 
                   onClick={() => setIsUserMenuOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                  <div className="px-4 py-3 border-b border-gray-50 bg-slate-50/50">
-                    <p className="text-xs font-bold text-gray-800 truncate">{currentUser.name}</p>
-                    <p className="text-[10px] text-gray-500 truncate">{currentUser.username}</p>
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="px-4 py-3 border-b border-gray-50 bg-slate-50 dark:bg-slate-800/50">
+                    <p className="text-xs font-bold text-gray-800 dark:text-slate-200 truncate">{currentUser.name}</p>
+                    <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{currentUser.username}</p>
                     <div className="mt-2 flex items-center space-x-1 text-[10px] text-green-700 font-semibold bg-green-50 px-2 py-1 rounded">
                       <Building className="w-3 h-3" />
                       <span>{userBranchName}</span>
@@ -356,7 +367,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                       setIsUserMenuOpen(false);
                       setIsPasswordModalOpen(true);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-slate-100 flex items-center space-x-2 transition-colors font-medium border-b border-gray-50 cursor-pointer"
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-slate-100 dark:bg-slate-800 flex items-center space-x-2 transition-colors font-medium border-b border-gray-50 cursor-pointer"
                   >
                     <KeyRound className="w-4 h-4 text-green-600" />
                     <span>Ubah Kata Sandi</span>
@@ -381,12 +392,12 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
         {/* Branch Selector (OWNER ONLY) */}
         {currentUser?.role === 'OWNER' && (
-          <div className="hidden lg:flex items-center space-x-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+          <div className="hidden lg:flex items-center space-x-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-2 py-1 shadow-sm">
             <Building className="w-3 h-3 text-green-700" />
             <select
               value={activeBranchId}
               onChange={(e) => setActiveBranchId(e.target.value)}
-              className="text-[10px] font-bold text-gray-700 bg-transparent outline-none focus:ring-0 cursor-pointer uppercase w-24"
+              className="text-[10px] font-bold text-gray-700 dark:text-slate-300 bg-transparent outline-none focus:ring-0 cursor-pointer uppercase w-24"
             >
               <option value="">SEMUA CABANG</option>
               {branches.map(b => (
@@ -398,12 +409,12 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
         {/* Clock display */}
         <div className="flex items-center space-x-3 text-right">
-          <div className="text-[10px] font-bold tracking-wider text-gray-700">
+          <div className="text-[10px] font-bold tracking-wider text-gray-700 dark:text-slate-300">
             <div className="flex items-center space-x-1 justify-end">
               <Calendar className="w-3.5 h-3.5 text-green-700" />
               <span>{time.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
             </div>
-            <div className="flex items-center space-x-1 justify-end text-gray-500 font-mono mt-0.5 font-semibold text-[9px]">
+            <div className="flex items-center space-x-1 justify-end text-gray-500 dark:text-slate-400 font-mono mt-0.5 font-semibold text-[9px]">
               <Clock className="w-3 h-3 text-green-600" />
               <span>{time.toLocaleTimeString('id-ID', { hour12: false })} WIB</span>
             </div>
@@ -414,7 +425,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
       {/* Change Password Modal */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
             <div className="bg-green-700 p-4 flex justify-between items-center text-white">
               <h3 className="font-bold flex items-center gap-2">
                 <KeyRound className="w-5 h-5" />
@@ -426,13 +437,13 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             </div>
             <form onSubmit={handlePasswordChange} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Kata Sandi Baru</label>
+                <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1">Kata Sandi Baru</label>
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                  className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
                   placeholder="Masukkan sandi baru..."
                   minLength={4}
                 />
@@ -441,7 +452,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                 <button
                   type="button"
                   onClick={() => setIsPasswordModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-lg transition-colors"
+                  className="px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 text-gray-700 dark:text-slate-300 text-sm font-bold rounded-lg transition-colors"
                 >
                   Batal
                 </button>
