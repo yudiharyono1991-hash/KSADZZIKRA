@@ -26,6 +26,13 @@ export interface Branch {
   createdAt: string;
 }
 
+export interface WorkShift {
+  id: string;
+  name: string; // e.g. "Shift Pagi"
+  startTime: string; // e.g. "07:00"
+  endTime: string; // e.g. "14:00"
+}
+
 export interface StoreSettings {
   tenantId: string;
   isTaxEnabled: boolean;
@@ -68,6 +75,8 @@ export interface StoreSettings {
     openTime: string; // e.g., '07:00'
     closeTime: string; // e.g., '21:00'
     closedMessage: string; // Custom message to show when closed
+    shifts?: WorkShift[]; // Daftar Shift (Pagi, Siang, dll)
+    shiftAssignments?: Record<string, Record<number, string>>; // Mapping userId -> { 0: shiftId/LIBUR, 1: shiftId, ... } (0=Sun, 1=Mon, ..., 6=Sat)
   };
   
   // Landing Page Config
@@ -164,9 +173,9 @@ export interface Attendance {
   userId: string;
   userName: string;
   date: string; // YYYY-MM-DD
-  clockIn: string; // ISO String
+  clockIn: string; // ISO String, can be dummy for leaves
   clockOut?: string; // ISO String
-  status: 'PRESENT' | 'LATE';
+  status: 'PRESENT' | 'LATE' | 'IZIN' | 'SAKIT' | 'CUTI' | 'ALFA';
   branchId?: string;
   photoUrl?: string;
   latitude?: number;
@@ -178,7 +187,8 @@ export interface Attendance {
   // Correction Request Fields
   correctionStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   correctionReason?: string;
-  correctionType?: 'CLOCK_IN' | 'CLOCK_OUT' | 'BOTH';
+  correctionType?: 'CLOCK_IN' | 'CLOCK_OUT' | 'BOTH' | 'LEAVE';
+  leaveType?: 'IZIN' | 'SAKIT' | 'CUTI_TAHUNAN' | 'CUTI';
   requestedClockIn?: string;
   requestedClockOut?: string;
   isRevised?: boolean;
@@ -237,7 +247,7 @@ export interface Transaction {
   }[];
   totalAmount: number;
   shippingFee?: number;
-  paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
+  paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON' | 'EWALLET' | 'BANK_LAIN';
   amountPaid: number;
   changeAmount: number;
   zakatContribution: number; // 2.5% on pure profit if applicable
@@ -253,12 +263,13 @@ export interface Transaction {
   voidReason?: string;
   voidRequestedBy?: string;
   taxAmount?: number;
-  splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
+  splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'EWALLET' | 'BANK_LAIN'; amount: number }[];
   pointsEarned?: number;
   pointsRedeemed?: number;
   pointsDiscount?: number;
   customerRating?: 'PUAS' | 'TIDAK_PUAS';
   customerFeedback?: string;
+  infaqContribution?: number;
 }
 
 export interface AuditLog {
@@ -320,6 +331,7 @@ export interface Expense {
   description: string;
   createdBy: string;
   branchId?: string;
+  coaId?: string;
 }
 
 export interface ClosingRecord {

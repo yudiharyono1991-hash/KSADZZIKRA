@@ -405,15 +405,22 @@ export default function KasirShiftPage() {
             </div>
             
             <div className="pt-4 space-y-2">
-              <label className="font-bold text-gray-800 dark:text-slate-200 text-sm">Uang Fisik di Laci (Rp) *</label>
+              <label className="font-bold text-gray-800 dark:text-slate-200 text-sm">Uang Fisik di Laci (Rp) <span className="text-red-500">*</span></label>
               <input 
                 type="text" 
                 inputMode="numeric"
                 required
                 value={actualCash}
-                onChange={(e) => setActualCash(e.target.value)}
+                onChange={(e) => {
+                  const rawValue = e.target.value.replace(/\./g, '').replace(/\D/g, '');
+                  if (rawValue) {
+                    setActualCash(parseInt(rawValue, 10).toLocaleString('id-ID'));
+                  } else {
+                    setActualCash('');
+                  }
+                }}
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-lg font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none"
-                placeholder="Ketikkan jumlah uang fisik di laci.."
+                placeholder="Ketikkan jumlah uang fisik di laci"
               />
             </div>
           </div>
@@ -801,6 +808,7 @@ export default function KasirShiftPage() {
                     <select value={izinType} onChange={e => setIzinType(e.target.value as any)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none">
                       <option value="IZIN">Izin Kepentingan Lain</option>
                       <option value="SAKIT">Sakit</option>
+                      <option value="CUTI_TAHUNAN">Cuti Tahunan</option>
                       <option value="CUTI">Cuti</option>
                     </select>
                   </div>
