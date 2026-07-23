@@ -433,20 +433,12 @@ export default function KasirShiftPage() {
             <div className="pt-4 space-y-2">
               <label className="font-bold text-gray-800 dark:text-slate-200 text-sm">Uang Fisik di Laci (Rp) <span className="text-red-500">*</span></label>
               <input 
-                type="text" 
-                inputMode="numeric"
+                type="number" 
                 required
                 value={actualCash}
-                onChange={(e) => {
-                  const rawValue = e.target.value.replace(/\./g, '').replace(/\D/g, '');
-                  if (rawValue) {
-                    setActualCash(parseInt(rawValue, 10).toLocaleString('id-ID'));
-                  } else {
-                    setActualCash('');
-                  }
-                }}
+                onChange={(e) => setActualCash(e.target.value)}
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-lg font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none"
-                placeholder="Ketikkan jumlah uang fisik di laci"
+                placeholder="Ketikkan jumlah uang fisik di laci.."
               />
             </div>
           </div>
