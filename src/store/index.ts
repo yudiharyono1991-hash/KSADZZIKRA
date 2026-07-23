@@ -2615,8 +2615,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       return sum;
     }, 0);
     const manualBalance = (journalEntries || []).reduce((sum, j) => {
-      if (j.referenceType === 'MANUAL' && j.account && j.account.toLowerCase().includes('kas kecil')) {
-        return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      if (j.referenceType === 'MANUAL' && j.account) {
+        const coa = get().coaList.find(c => c.code === j.account);
+        const accountName = coa ? coa.name.toLowerCase() : j.account.toLowerCase();
+        if (accountName.includes('kas kecil') || j.account === '1102') {
+          return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
+        }
       }
       return sum;
     }, 0);

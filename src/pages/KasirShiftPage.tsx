@@ -588,11 +588,13 @@ export default function KasirShiftPage() {
                   );
                   
                   const manualJournals = (journalEntries || [])
-                    .filter(j => 
-                      j.referenceType === 'MANUAL' && 
-                      j.account && j.account.toLowerCase().includes('kas kecil') &&
-                      j.date >= pettyCashStartDate && j.date <= pettyCashEndDate + 'T23:59:59'
-                    )
+                    .filter(j => {
+                      if (j.referenceType !== 'MANUAL' || !j.account) return false;
+                      const coa = useAppStore.getState().coaList.find(c => c.code === j.account);
+                      const accountName = coa ? coa.name.toLowerCase() : j.account.toLowerCase();
+                      if (!(accountName.includes('kas kecil') || j.account === '1102')) return false;
+                      return j.date >= pettyCashStartDate && j.date <= pettyCashEndDate + 'T23:59:59';
+                    })
                     .map(j => ({
                       id: j.id,
                       description: `[Jurnal Umum] ${j.description}`,
