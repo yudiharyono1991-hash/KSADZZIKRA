@@ -32,12 +32,16 @@ import {
   Wallet
 } from 'lucide-react';
 
-type DateRange = 'TODAY' | '7_DAYS' | '30_DAYS' | 'THIS_YEAR';
 
 export default function TrendPage() {
   const { transactions, expenses, products, activeBranchId } = useBranchData();
-  const { settings, addPettyCashDeposit } = useAppStore();
-  const [dateRange, setDateRange] = useState<DateRange>('7_DAYS');
+  const { settings, addPettyCashDeposit, journalEntries } = useAppStore();
+  const todayObj = new Date();
+  const firstDay = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = todayObj.toLocaleDateString('en-CA');
+  
+  const [startDateStr, setStartDateStr] = useState(firstDay);
+  const [endDateStr, setEndDateStr] = useState(currentDay);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState('');
   const [topUpDesc, setTopUpDesc] = useState('');
@@ -57,8 +61,10 @@ export default function TrendPage() {
     return transactions.filter(tx => !tx.isVoided && (!activeBranchId || tx.branchId === activeBranchId || !tx.branchId));
   }, [transactions, activeBranchId]);
 
+  const dynamicPettyCash = settings?.pettyCashBalance || 0;
+
   const { chartData, totals, comparisons, ratios } = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
     const todayTransactions = filteredTransactions.filter(tx => tx.timestamp.startsWith(today));
     
     // Summary Metrics
@@ -89,49 +95,38 @@ export default function TrendPage() {
     const totalMargin = calculateMargin(filteredTransactions);
     const todayMargin = calculateMargin(todayTransactions);
     
-    const now = new Date();
-    let startDate = new Date();
-    let prevStartDate = new Date();
-    let prevEndDate = new Date();
-    let label = '7 Hari Terakhir';
+    const startObj = new Date(startDateStr);
+    const endObj = new Date(endDateStr);
+    const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
+    const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const isYearly = daysCount > 90;
 
-    if (dateRange === 'TODAY') {
-      startDate.setHours(0, 0, 0, 0);
-      prevStartDate.setDate(now.getDate() - 1);
-      prevStartDate.setHours(0, 0, 0, 0);
-      prevEndDate.setDate(now.getDate() - 1);
-      prevEndDate.setHours(23, 59, 59, 999);
-      label = 'Hari Ini';
-    } else if (dateRange === '7_DAYS') {
-      startDate.setDate(now.getDate() - 6);
-      startDate.setHours(0, 0, 0, 0);
-      prevStartDate.setDate(now.getDate() - 13);
-      prevStartDate.setHours(0, 0, 0, 0);
-      prevEndDate.setDate(now.getDate() - 7);
-      prevEndDate.setHours(23, 59, 59, 999);
-      label = '7 Hari Terakhir';
-    } else if (dateRange === '30_DAYS') {
-      startDate.setDate(now.getDate() - 29);
-      startDate.setHours(0, 0, 0, 0);
-      prevStartDate.setDate(now.getDate() - 59);
-      prevStartDate.setHours(0, 0, 0, 0);
-      prevEndDate.setDate(now.getDate() - 30);
-      prevEndDate.setHours(23, 59, 59, 999);
-      label = '30 Hari Terakhir';
-    } else if (dateRange === 'THIS_YEAR') {
-      startDate = new Date(now.getFullYear(), 0, 1);
-      prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
-      prevEndDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-      label = 'Tahun Ini';
-    }
+    let startDate = new Date(startObj);
+    startDate.setHours(0, 0, 0, 0);
+    let endDate = new Date(endObj);
+    endDate.setHours(23, 59, 59, 999);
 
-    const currentTxs = filteredTransactions.filter(t => new Date(t.timestamp) >= startDate);
+    let prevStartDate = new Date(startObj);
+    prevStartDate.setDate(startObj.getDate() - daysCount);
+    let prevEndDate = new Date(startObj);
+    prevEndDate.setDate(startObj.getDate() - 1);
+    prevEndDate.setHours(23, 59, 59, 999);
+
+    let label = `${startDateStr} s/d ${endDateStr}`;
+
+    const currentTxs = filteredTransactions.filter(t => {
+      const d = new Date(t.timestamp);
+      return d >= startDate && d <= endDate;
+    });
     const prevTxs = filteredTransactions.filter(t => {
       const d = new Date(t.timestamp);
       return d >= prevStartDate && d <= prevEndDate;
     });
 
-    const currentExps = (expenses || []).filter(e => new Date(e.date) >= startDate);
+    const currentExps = (expenses || []).filter(e => {
+      const d = new Date(e.date);
+      return d >= startDate && d <= endDate;
+    });
     const prevExps = (expenses || []).filter(e => {
       const d = new Date(e.date);
       return d >= prevStartDate && d <= prevEndDate;
@@ -174,8 +169,8 @@ export default function TrendPage() {
     currentTxs.forEach(t => {
       const d = new Date(t.timestamp);
       let key = '';
-      if (dateRange === 'THIS_YEAR') {
-        key = d.toLocaleString('id-ID', { month: 'short' });
+      if (isYearly) {
+        key = d.toLocaleString('id-ID', { month: 'short', year: 'numeric' });
       } else {
         key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
       }
@@ -207,19 +202,20 @@ export default function TrendPage() {
     });
 
     let finalChartData = [];
-    if (dateRange !== 'THIS_YEAR') {
-      const daysCount = dateRange === 'TODAY' ? 1 : dateRange === '7_DAYS' ? 7 : 30;
-      for (let i = daysCount - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
+    if (!isYearly) {
+      for (let i = 0; i < daysCount; i++) {
+        const d = new Date(startObj);
+        d.setDate(startObj.getDate() + i);
         const key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
         finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
       }
     } else {
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(now.getFullYear(), i, 1);
-        const key = d.toLocaleString('id-ID', { month: 'short' });
+      let curr = new Date(startObj);
+      curr.setDate(1);
+      while (curr <= endDate) {
+        const key = curr.toLocaleString('id-ID', { month: 'short', year: 'numeric' });
         finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
+        curr.setMonth(curr.getMonth() + 1);
       }
     }
 
@@ -262,7 +258,7 @@ export default function TrendPage() {
         der
       }
     };
-  }, [filteredTransactions, dateRange, expenses, transactions, products]);
+  }, [filteredTransactions, startDateStr, endDateStr, expenses, transactions, products]);
 
   const categoryShare = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -314,19 +310,22 @@ export default function TrendPage() {
           </h1>
           <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Bandingkan performa omset, margin, dan zakat.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-400" />
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as DateRange)}
-            className="text-sm font-bold text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-green-500 outline-none"
-          >
-            <option value="TODAY">Hari Ini</option>
-            <option value="7_DAYS">7 Hari Terakhir</option>
-            <option value="30_DAYS">30 Hari Terakhir</option>
-            <option value="THIS_YEAR">Tahun Ini</option>
-          </select>
-        </div>
+          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
+            <Calendar className="w-4 h-4 text-slate-400" />
+            <input 
+              type="date" 
+              value={startDateStr} 
+              onChange={e => setStartDateStr(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+            <span className="text-slate-400 text-sm">s/d</span>
+            <input 
+              type="date" 
+              value={endDateStr} 
+              onChange={e => setEndDateStr(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+          </div>
       </div>
 
       {/* Saldo Kas Kecil Section */}
@@ -337,7 +336,7 @@ export default function TrendPage() {
           </div>
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Saldo Kas Kecil (Fisik)</p>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Rp {(settings?.pettyCashBalance || 0).toLocaleString('id-ID')}</h3>
+            <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Rp {dynamicPettyCash.toLocaleString('id-ID')}</h3>
           </div>
         </div>
         <button 
@@ -450,20 +449,20 @@ export default function TrendPage() {
           </div>
 
           <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOmset" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
+                    <stop offset="5%" stopColor="#059669" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#059669" stopOpacity={0.05}/>
                   </linearGradient>
                   <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05}/>
+                    <stop offset="5%" stopColor="#d97706" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#d97706" stopOpacity={0.05}/>
                   </linearGradient>
                   <linearGradient id="colorZakat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05}/>
+                    <stop offset="5%" stopColor="#0d9488" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#0d9488" stopOpacity={0.05}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -473,9 +472,9 @@ export default function TrendPage() {
                   contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
                 />
-                <Area type="monotone" dataKey="omset" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorOmset)" name="Omset Dagang" />
-                <Area type="monotone" dataKey="margin" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorMargin)" name="Margin Keuntungan" />
-                <Area type="monotone" dataKey="zakat" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorZakat)" name="Zakat Terkumpul" />
+                <Area type="monotone" dataKey="omset" stroke="#059669" strokeWidth={3} fillOpacity={1} fill="url(#colorOmset)" name="Omset Dagang" />
+                <Area type="monotone" dataKey="margin" stroke="#d97706" strokeWidth={3} fillOpacity={1} fill="url(#colorMargin)" name="Margin Keuntungan" />
+                <Area type="monotone" dataKey="zakat" stroke="#0d9488" strokeWidth={3} fillOpacity={1} fill="url(#colorZakat)" name="Zakat Terkumpul" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -489,7 +488,7 @@ export default function TrendPage() {
           </div>
 
           <div className="h-44 w-full flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
               <PieChart>
                 <Pie
                   data={categoryShare}
@@ -626,7 +625,7 @@ export default function TrendPage() {
         </div>
 
         <div className="h-60 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
@@ -635,7 +634,7 @@ export default function TrendPage() {
                 contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
               />
-              <Bar dataKey="zakat" fill="#10b981" radius={[4, 4, 0, 0]} name="Zakat Terkumpul (Rp)" barSize={25} />
+              <Bar dataKey="zakat" fill="#059669" radius={[4, 4, 0, 0]} name="Zakat Terkumpul (Rp)" barSize={25} />
             </BarChart>
           </ResponsiveContainer>
         </div>
