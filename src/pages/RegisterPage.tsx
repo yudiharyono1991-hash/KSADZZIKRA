@@ -191,7 +191,7 @@ export default function RegisterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Nama Usaha / Koperasi <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Nama Usaha / Koperasi <span className="text-red-700">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Store size={18} className="text-slate-400" />
@@ -207,7 +207,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Nama Pengelola / Pemilik <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Nama Pengelola / Pemilik <span className="text-red-700">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <User size={18} className="text-slate-400" />
@@ -226,7 +226,7 @@ export default function RegisterPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Email Utama <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Email Utama <span className="text-red-700">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Mail size={18} className="text-slate-400" />
@@ -242,7 +242,7 @@ export default function RegisterPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">No. WhatsApp <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">No. WhatsApp <span className="text-red-700">*</span></label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Phone size={18} className="text-slate-400" />

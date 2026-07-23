@@ -28,7 +28,7 @@ export default function KoperasiSHUPage() {
   const [porsiSosial, setPorsiSosial] = useState(10); // 10% Dana Sosial
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
   // Perhitungan Global

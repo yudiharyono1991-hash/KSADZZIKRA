@@ -35,7 +35,7 @@ export default function KoperasiAnggotaPage() {
   const [simpananWajib, setSimpananWajib] = useState(10000);
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
   const filtered = members.filter(m => 
@@ -50,7 +50,7 @@ export default function KoperasiAnggotaPage() {
       nia: `NIA-00${members.length + 1}`,
       name,
       phone,
-      joinDate: new Date().toISOString().split('T')[0],
+      joinDate: new Date().toLocaleDateString('en-CA'),
       points: 0,
       simpananPokok,
       simpananWajib,

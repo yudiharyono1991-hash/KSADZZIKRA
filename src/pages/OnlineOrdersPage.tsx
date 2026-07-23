@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { ShoppingCart, MessageSquare, Check, X, Clock, Send, Store } from 'lucide-react';
+import { ShoppingCart, MessageSquare, Check, X, Clock, Send, Store, Calendar } from 'lucide-react';
 
 export default function OnlineOrdersPage() {
   const { 
@@ -35,8 +35,12 @@ export default function OnlineOrdersPage() {
     }
   };
 
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
+  
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(currentDay);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -63,22 +67,23 @@ export default function OnlineOrdersPage() {
           Pesanan Online Masuk
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Kelola pesanan dari pelanggan aplikasi dan balas chat mereka.</p>
-        <div className="flex items-center gap-3 mt-4">
-          <input 
-            type="date" 
-            value={startDate} 
-            onChange={e => { setStartDate(e.target.value); setCurrentPage(1); }} 
-            className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
-            title="Dari Tanggal"
-          />
-          <span className="text-slate-400">-</span>
-          <input 
-            type="date" 
-            value={endDate} 
-            onChange={e => { setEndDate(e.target.value); setCurrentPage(1); }} 
-            className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
-            title="Sampai Tanggal"
-          />
+        <div className="mt-4 flex flex-col md:flex-row gap-2 md:items-center">
+          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 w-fit">
+            <Calendar className="w-4 h-4 text-slate-400" />
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={e => { setStartDate(e.target.value); setCurrentPage(1); }}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+            <span className="text-slate-400 text-sm">s/d</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={e => { setEndDate(e.target.value); setCurrentPage(1); }}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+          </div>
         </div>
       </div>
 

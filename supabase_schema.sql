@@ -387,5 +387,20 @@ CREATE POLICY "attendance_all" ON public.attendance FOR ALL USING (true) WITH CH
 
 
 -- ============================================================
+-- 14. TABEL: product_categories (Kategori Produk)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.product_categories (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "product_categories_select" ON public.product_categories;
+DROP POLICY IF EXISTS "product_categories_all" ON public.product_categories;
+CREATE POLICY "product_categories_select" ON public.product_categories FOR SELECT USING (true);
+CREATE POLICY "product_categories_all" ON public.product_categories FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================================
 -- SELESAI! Semua tabel KSA Mart - KSADZZIKRA sudah siap.
 -- ============================================================

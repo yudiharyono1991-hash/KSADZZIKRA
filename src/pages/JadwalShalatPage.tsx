@@ -146,7 +146,7 @@ export default function JadwalShalatPage() {
             ))}
           </div>
         ) : (
-          <div className="mt-8 text-center text-red-500 font-bold bg-red-50 p-4 rounded-xl">
+          <div className="mt-8 text-center text-red-700 font-bold bg-red-50 p-4 rounded-xl">
             Gagal memuat jadwal shalat.
           </div>
         )}

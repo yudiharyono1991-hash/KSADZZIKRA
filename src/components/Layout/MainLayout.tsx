@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RefreshCcw } from 'lucide-react';
 import Sidebar from './Sidebar';
@@ -27,6 +27,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
+  const handleCloseSidebar = useCallback(() => setIsSidebarOpen(false), []);
+  const handleExpandSidebar = useCallback(() => setIsSidebarCollapsed(false), []);
+  const handleToggleSidebar = useCallback(() => setIsSidebarOpen(prev => !prev), []);
+  const handleToggleDesktopSidebar = useCallback(() => setIsSidebarCollapsed(prev => !prev), []);
+  const handleOpenMenu = useCallback(() => setIsSidebarOpen(true), []);
+
   const [hasUpdate, setHasUpdate] = useState(false);
 
   useEffect(() => {
@@ -53,8 +59,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
       <Sidebar
         isOpen={isSidebarOpen}
         isCollapsed={isSidebarCollapsed}
-        onClose={() => setIsSidebarOpen(false)}
-        onExpand={() => setIsSidebarCollapsed(false)}
+        onClose={handleCloseSidebar}
+        onExpand={handleExpandSidebar}
       />
 
       {/* Main content panel */}
@@ -62,8 +68,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         {/* ─── STICKY HEADER ─────────────────────────────────────── */}
         <TopBar
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          onToggleDesktopSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onToggleSidebar={handleToggleSidebar}
+          onToggleDesktopSidebar={handleToggleDesktopSidebar}
         />
 
         {/* ─── SCROLLABLE CENTER ─────────────────────────────────── */}
@@ -86,7 +92,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       </div>
 
       {/* ─── MOBILE BOTTOM NAV BAR (STICKY FOOTER) ─────────────── */}
-      <BottomNavBar onOpenMenu={() => setIsSidebarOpen(true)} />
+      <BottomNavBar onOpenMenu={handleOpenMenu} />
 
       {/* Update notification banner */}
       {hasUpdate && (

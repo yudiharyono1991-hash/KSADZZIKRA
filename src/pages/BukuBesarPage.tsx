@@ -16,7 +16,7 @@ export default function BukuBesarPage() {
 
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(currentDay);
-  const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [selectedAccount, setSelectedAccount] = useState<string>('SEMUA');
   
   // Custom Searchable Dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -31,13 +31,6 @@ export default function BukuBesarPage() {
   const activeAccounts = useMemo(() => {
     return coaList.filter(c => c.isActive).sort((a, b) => a.code.localeCompare(b.code));
   }, [coaList]);
-
-  // Set default account on load
-  React.useEffect(() => {
-    if (!selectedAccount && activeAccounts.length > 0) {
-      setSelectedAccount(activeAccounts[0].code);
-    }
-  }, [activeAccounts, selectedAccount]);
 
   // Click outside to close dropdown
   React.useEffect(() => {
@@ -137,16 +130,22 @@ export default function BukuBesarPage() {
 
     // 3. Calculate running balance for current period
     let runningBalance = saldoAwal;
+    let totalDebit = 0;
+    let totalCredit = 0;
     const finalEntries = currentPeriodEntries.map(entry => {
+      const d = Number(entry.debit) || 0;
+      const c = Number(entry.credit) || 0;
+      totalDebit += d;
+      totalCredit += c;
       if (normalBalance === 'DEBIT') {
-        runningBalance += (Number(entry.debit) || 0) - (Number(entry.credit) || 0);
+        runningBalance += d - c;
       } else {
-        runningBalance += (Number(entry.credit) || 0) - (Number(entry.debit) || 0);
+        runningBalance += c - d;
       }
       return { ...entry, runningBalance };
     });
 
-    return { saldoAwal, entries: finalEntries, akhir: runningBalance, normalBalance };
+    return { saldoAwal, entries: finalEntries, akhir: runningBalance, normalBalance, totalDebit, totalCredit };
   }, [journalEntries, selectedAccount, startDate, endDate, activeAccounts]);
 
   const accInfo = selectedAccount === 'SEMUA' 
@@ -306,6 +305,13 @@ export default function BukuBesarPage() {
                   </tr>
                 ))
               )}
+              {/* Total Mutasi */}
+              <tr className="bg-slate-50 dark:bg-slate-800">
+                <td className="p-4 font-bold text-gray-700 dark:text-slate-300 uppercase text-right" colSpan={3}>Total Mutasi Periode</td>
+                <td className="p-4 text-right font-bold text-gray-700 dark:text-slate-300 whitespace-nowrap">Rp {processedEntries.totalDebit?.toLocaleString('id-ID') || 0}</td>
+                <td className="p-4 text-right font-bold text-gray-700 dark:text-slate-300 whitespace-nowrap">Rp {processedEntries.totalCredit?.toLocaleString('id-ID') || 0}</td>
+                <td></td>
+              </tr>
               {/* Saldo Akhir */}
               <tr className="bg-indigo-100/50 dark:bg-indigo-900/30">
                 <td className="p-4 font-black text-gray-800 dark:text-slate-200 uppercase tracking-wider text-right" colSpan={5}>Saldo Akhir</td>
@@ -385,9 +391,16 @@ export default function BukuBesarPage() {
                   </tr>
                 ))
               )}
-              <tr className="bg-indigo-100/50">
-                <td className="p-3 font-black text-gray-800 uppercase tracking-wider text-right" colSpan={5}>Saldo Akhir</td>
-                <td className="p-3 text-right font-black text-base text-indigo-700 whitespace-nowrap">Rp {processedEntries.akhir?.toLocaleString('id-ID') || 0}</td>
+              {/* Total Mutasi Print */}
+              <tr className="bg-slate-50 border-t-2 border-slate-300">
+                <td className="p-2 font-bold text-gray-700 text-right" colSpan={3}>Total Mutasi</td>
+                <td className="p-2 text-right font-bold text-gray-800 whitespace-nowrap">Rp {processedEntries.totalDebit?.toLocaleString('id-ID') || 0}</td>
+                <td className="p-2 text-right font-bold text-gray-800 whitespace-nowrap">Rp {processedEntries.totalCredit?.toLocaleString('id-ID') || 0}</td>
+                <td></td>
+              </tr>
+              <tr className="bg-indigo-50/50 border-t border-gray-200">
+                <td className="p-2 font-bold text-gray-800 text-right uppercase" colSpan={5}>Saldo Akhir</td>
+                <td className="p-2 text-right font-bold text-indigo-800 whitespace-nowrap">Rp {processedEntries.akhir?.toLocaleString('id-ID') || 0}</td>
               </tr>
             </tbody>
           </table>

@@ -43,6 +43,7 @@ import {
   PromoProdukPage,
   CustomerDisplayPage
 } from './pages';
+import BukuBesarPage from './pages/BukuBesarPage';
 
 // Komponen pembungkus untuk route yang membutuhkan otentikasi
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -115,6 +116,15 @@ export default function App() {
     let productsTimeoutId: any = null;
     let settingsTimeoutId: any = null;
     let ordersTimeoutId: any = null;
+    let generalTimeoutId: any = null;
+
+    const triggerGeneralSync = (tableName: string) => {
+      console.log(`[Realtime] ${tableName} updated, scheduling sync...`);
+      if (generalTimeoutId) clearTimeout(generalTimeoutId);
+      generalTimeoutId = setTimeout(() => {
+        initializeStore({ showLoading: false }).catch(e => console.warn(`Realtime general sync error from ${tableName}:`, e));
+      }, 4000);
+    };
 
     if (isSupabaseConfigured) {
       try {
@@ -139,6 +149,16 @@ export default function App() {
             fetchOnlineOrders().catch(e => console.warn('Realtime orders sync error:', e));
           }, 3000);
         }));
+
+        // Subscribe to other tables for general sync
+        const generalTables = [
+          'transactions', 'expenses', 'journal_entries', 'ksa_users', 
+          'ksa_branches', 'purchase_orders', 'suppliers', 
+          'zakat_records', 'zakat_distributions', 'product_categories', 'customers'
+        ];
+        generalTables.forEach(table => {
+          unsubscribers.push(subscribeToTable(table, () => triggerGeneralSync(table)));
+        });
       } catch (e) {
         console.warn('Realtime subscription setup failed:', e);
       }
@@ -158,7 +178,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-green-950 flex flex-col justify-center items-center text-white">
         <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-xs font-mono tracking-wider font-semibold">Mensinkronisasikan Data Supabase Syariah...</p>
+        <p className="text-xs font-mono tracking-wider font-semibold">Menyiapkan Sistem KSA Mart...</p>
       </div>
     );
   }
@@ -189,6 +209,7 @@ export default function App() {
         <Route path="/trend" element={<ProtectedRoute><TrendPage /></ProtectedRoute>} />
         <Route path="/laporan-penjualan" element={<ProtectedRoute><SalesReportPage /></ProtectedRoute>} />
         <Route path="/jurnal-umum" element={<ProtectedRoute><JurnalUmumPage /></ProtectedRoute>} />
+        <Route path="/buku-besar" element={<ProtectedRoute><BukuBesarPage /></ProtectedRoute>} />
         <Route path="/coa" element={<ProtectedRoute><CoAPage /></ProtectedRoute>} />
         <Route path="/arus-kas" element={<ProtectedRoute><ArusKasPage /></ProtectedRoute>} />
         <Route path="/neraca-rugi" element={<ProtectedRoute><NeracaRugiPage /></ProtectedRoute>} />

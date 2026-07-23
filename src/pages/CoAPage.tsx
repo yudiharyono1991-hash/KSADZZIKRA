@@ -138,9 +138,9 @@ export default function CoAPage() {
             <>
               <button
                 onClick={handleOpenAdd}
-                className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-extrabold text-sm px-4 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <Plus className="w-5 h-5" /> TAMBAH AKUN
+                <Plus className="w-4 h-4" /> Tambah Akun
               </button>
               <button onClick={() => {
                 const headers = ['Kode', 'Nama Akun', 'Kategori', 'Saldo Normal', 'Status'];
@@ -149,8 +149,8 @@ export default function CoAPage() {
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, 'Data CoA');
                 XLSX.writeFile(wb, 'Laporan_CoA_KSA_Mart.xlsx');
-              }} className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2">
-                <Download className="w-4 h-4" /> Unduh Data CoA
+              }} className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5" /> Unduh CoA
               </button>
               <button onClick={() => {
                 const headers = ['Kode', 'Nama Akun', 'Kategori', 'Saldo Normal', 'Saldo Awal', 'Status', 'Aksi'];
@@ -159,11 +159,11 @@ export default function CoAPage() {
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, 'Template CoA');
                 XLSX.writeFile(wb, 'template_coa_ksa_mart.xlsx');
-              }} className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 flex items-center gap-2">
+              }} className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5">
                 Template Import
               </button>
-              <label className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2 cursor-pointer">
-                <Upload className="w-4 h-4" /> Import
+              <label className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> Import
                 <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -230,8 +230,8 @@ export default function CoAPage() {
                   reader.readAsArrayBuffer(file);
                 }} style={{ display: 'none' }} />
               </label>
-              <button onClick={() => setIsDeleteAllOpen(true)} className="ml-2 bg-red-50 border border-red-200 px-3 py-2 rounded-lg text-sm font-bold text-red-600 hover:bg-red-100 flex items-center gap-2">
-                <Trash2 className="w-4 h-4" /> Hapus Semua
+              <button onClick={() => setIsDeleteAllOpen(true)} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5">
+                <Trash2 className="w-3.5 h-3.5" /> Hapus Semua
               </button>
             </>
           )}
@@ -458,7 +458,7 @@ export default function CoAPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-2">
-              <Trash2 className="w-6 h-6 text-red-500" /> Konfirmasi Hapus Semua Data
+              <Trash2 className="w-6 h-6 text-red-700" /> Konfirmasi Hapus Semua Data
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 bg-red-50 p-3 rounded-xl border border-red-100 font-medium text-red-800">
               PERINGATAN: Anda akan menghapus seluruh data Chart of Accounts. Data yang dihapus tidak dapat dikembalikan.
@@ -474,7 +474,7 @@ export default function CoAPage() {
                   placeholder="Password untuk konfirmasi"
                   autoFocus
                 />
-                {deleteError && <p className="text-xs text-red-500 mt-1 font-bold">{deleteError}</p>}
+                {deleteError && <p className="text-xs text-red-700 mt-1 font-bold">{deleteError}</p>}
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">

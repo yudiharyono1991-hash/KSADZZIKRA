@@ -3,7 +3,7 @@ import { useBranchData } from '../hooks/useBranchData';
 import { Award, Search, TrendingUp, Users, Gift, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function LoyaltyProgramPage() {
-  const { customers, transactions, currentUser } = useBranchData();
+  const { customers, transactions, currentUser, settings } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -142,11 +142,11 @@ export default function LoyaltyProgramPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span className="font-black text-fuchsia-600 bg-fuchsia-50 px-2 py-1 rounded-lg border border-fuchsia-100">
-                        {customer.points} Pts
+                        {customer.points.toLocaleString('id-ID')} Pts
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-slate-700 dark:text-slate-300">
-                      Rp {(customer.points * 10).toLocaleString('id-ID')}
+                      Rp {(customer.points * (settings?.pointRedemptionValue || 10)).toLocaleString('id-ID')}
                     </td>
                   </tr>
                   );

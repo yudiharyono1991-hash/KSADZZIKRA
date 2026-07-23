@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Shield, UserCog, Trash2, Edit, Check, X, ShieldAlert, Clock, CheckCircle, UserX, Users, Store, RefreshCw, UserPlus } from 'lucide-react';
+import { Shield, UserCog, Trash2, Edit, Check, X, ShieldAlert, Clock, CheckCircle, UserX, Users, Store, RefreshCw, UserPlus, Plus } from 'lucide-react';
 import { UserRole } from '../types';
 
-type Tab = 'ACTIVE' | 'PENDING';
+type Tab = 'STAFF' | 'PELANGGAN' | 'PENDING';
 
 export default function AdminManagementPage() {
-  const { users, currentUser, updateUser, deleteUser, approveUser, rejectUser, branches, initializeStore, isLoading } = useAppStore();
-  const [activeTab, setActiveTab] = useState<Tab>('ACTIVE');
+  const { users, currentUser, updateUser, deleteUser, approveUser, rejectUser, branches, initializeStore, isLoading, addJournalEntry, customers } = useAppStore();
+  const [activeTab, setActiveTab] = useState<Tab>('STAFF');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('CASHIER');
   const [editName, setEditName] = useState<string>('');
@@ -27,6 +29,95 @@ export default function AdminManagementPage() {
   const [newBranch, setNewBranch] = useState('');
   const [newEmployeeId, setNewEmployeeId] = useState('');
 
+  const [payoffModal, setPayoffModal] = useState<{isOpen: boolean, userId: string, userName: string, debtAmount: number, payAmount: number, isAddingDebt: boolean, paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'}>({
+    isOpen: false, userId: '', userName: '', debtAmount: 0, payAmount: 0, isAddingDebt: false, paymentMethod: 'CASH'
+  });
+
+  const handleProcessPayoff = () => {
+    const { userId, userName, debtAmount, payAmount, isAddingDebt, paymentMethod } = payoffModal;
+    if (payAmount <= 0) return;
+    if (!isAddingDebt && payAmount > debtAmount) {
+      alert('Nominal pelunasan tidak boleh lebih besar dari total piutang!');
+      return;
+    }
+
+    const newDebtAmount = isAddingDebt ? (debtAmount + payAmount) : (debtAmount - payAmount);
+    updateUser(userId, { debtAmount: newDebtAmount });
+
+    const now = new Date().toISOString();
+    
+    // Tentukan akun tujuan berdasarkan metode pembayaran
+    const getAccountForMethod = (method: string) => {
+      if (method === 'QRIS_SHARIAH') return 'QRIS_SYARIAH';
+      if (method === 'TRANSFER_BSI') return 'BANK_BSI';
+      return 'KAS';
+    };
+
+    const targetAccount = getAccountForMethod(paymentMethod);
+
+    if (isAddingDebt) {
+      // Kasbon Tunai: Uang KAS keluar, Piutang bertambah
+      if (addJournalEntry) {
+        addJournalEntry({
+          tenantId: currentUser?.tenantId || 'tenant_default',
+          date: now,
+          account: 'PIUTANG_KARYAWAN',
+          description: `[Auto] Penambahan Piutang (Kasbon Tunai) karyawan: ${userName}`,
+          debit: payAmount,
+          credit: 0,
+          referenceId: userId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name,
+          branchId: currentUser?.branchId
+        });
+        addJournalEntry({
+          tenantId: currentUser?.tenantId || 'tenant_default',
+          date: now,
+          account: targetAccount,
+          description: `[Auto] Pencairan Kasbon Tunai untuk: ${userName} via ${paymentMethod}`,
+          debit: 0,
+          credit: payAmount,
+          referenceId: userId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name,
+          branchId: currentUser?.branchId
+        });
+      }
+      alert(`Pencatatan kasbon berhasil. Total hutang sekarang: Rp ${newDebtAmount}`);
+    } else {
+      // Pelunasan: Uang masuk ke KAS, Piutang berkurang
+      if (addJournalEntry) {
+        addJournalEntry({
+          tenantId: currentUser?.tenantId || 'tenant_default',
+          date: now,
+          account: targetAccount,
+          description: `[Auto] Pelunasan piutang (kasbon) dari karyawan: ${userName} via ${paymentMethod}`,
+          debit: payAmount,
+          credit: 0,
+          referenceId: userId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name,
+          branchId: currentUser?.branchId
+        });
+        addJournalEntry({
+          tenantId: currentUser?.tenantId || 'tenant_default',
+          date: now,
+          account: 'PIUTANG_KARYAWAN',
+          description: `[Auto] Pengurangan piutang karyawan: ${userName}`,
+          debit: 0,
+          credit: payAmount,
+          referenceId: userId,
+          referenceType: 'MANUAL',
+          createdBy: currentUser?.name,
+          branchId: currentUser?.branchId
+        });
+      }
+      alert(`Pelunasan berhasil diproses. Sisa hutang: Rp ${newDebtAmount}`);
+    }
+
+    setPayoffModal({ isOpen: false, userId: '', userName: '', debtAmount: 0, payAmount: 0, isAddingDebt: false, paymentMethod: 'CASH' });
+  };
+
   // Prevent accessing if not admin, owner, or superadmin
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
     return (
@@ -40,10 +131,11 @@ export default function AdminManagementPage() {
 
   const isGlobalAdmin = !currentUser?.branchId || ['OWNER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '');
 
-  const activeUsers = users.filter(u => 
+  const activeStaff = users.filter(u => 
     u.isApproved && 
     u.isActive && 
     u.role !== 'SUPERADMIN' &&
+    u.role !== 'PELANGGAN' &&
     (isGlobalAdmin || u.branchId === currentUser?.branchId) &&
     (isGlobalAdmin || u.role !== 'OWNER')
   );
@@ -217,16 +309,16 @@ export default function AdminManagementPage() {
       {/* Tab Navigation */}
       <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-700 pb-0">
         <button
-          onClick={() => setActiveTab('ACTIVE')}
+          onClick={() => { setActiveTab('STAFF'); setCurrentPage(1); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-t-lg border-b-2 transition-colors ${
-            activeTab === 'ACTIVE'
+            activeTab === 'STAFF'
               ? 'border-green-600 text-green-700 bg-green-50'
               : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300'
           }`}
         >
-          <Users className="w-4 h-4" />
-          Pengguna Aktif
-          <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{activeUsers.length}</span>
+          <UserCog className="w-4 h-4" />
+          Petugas Toko
+          <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full">{activeStaff.length}</span>
         </button>
         <button
           onClick={() => setActiveTab('PENDING')}
@@ -244,14 +336,14 @@ export default function AdminManagementPage() {
         </button>
       </div>
 
-      {/* Tab Content: Pengguna Aktif */}
-      {activeTab === 'ACTIVE' && (
+      {/* Tab Content: Petugas Toko */}
+      {activeTab === 'STAFF' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
-                  <th className="p-4">Pengguna</th>
+                  <th className="p-4">Petugas</th>
                   <th className="p-4">Username</th>
                   <th className="p-4">Cabang</th>
                   <th className="p-4">Tanggal Daftar</th>
@@ -262,7 +354,7 @@ export default function AdminManagementPage() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {activeUsers.map((user) => (
+                {activeStaff.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((user) => (
                   <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
                     <td className="p-4">
                       {editingId === user.id ? (
@@ -393,21 +485,31 @@ export default function AdminManagementPage() {
                           title="Gunakan tombol Ubah untuk mengedit Kasbon"
                         />
                       ) : (
-                        <div className="flex items-center justify-end gap-2">
-                          Rp {Number(user.debtAmount || 0).toLocaleString('id-ID')}
-                          <button
-                            onClick={() => {
-                              const val = prompt(`Ubah Kasbon untuk ${user.name}:`, String(user.debtAmount || 0));
-                              if (val === null) return;
-                              const n = Number(val);
-                              if (isNaN(n)) return alert('Angka tidak valid');
-                              updateUser(user.id, { debtAmount: n });
-                            }}
-                            className="text-slate-400 hover:text-amber-600"
-                            title="Ubah Kasbon"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="mr-1 text-sm text-slate-800 dark:text-slate-200">
+                              Rp {Number((user.debtAmount || 0) + (customers.find(c => c.phone === user.username)?.debtAmount || 0)).toLocaleString('id-ID')}
+                            </span>
+                            <button
+                              onClick={() => setPayoffModal({ isOpen: true, userId: user.id, userName: user.name, debtAmount: user.debtAmount || 0, payAmount: 0, isAddingDebt: true, paymentMethod: 'CASH' })}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg"
+                              title="Tambah Pinjaman Tunai Karyawan"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                            {(user.debtAmount || 0) > 0 && (
+                              <button
+                                onClick={() => setPayoffModal({ isOpen: true, userId: user.id, userName: user.name, debtAmount: user.debtAmount || 0, payAmount: user.debtAmount || 0, isAddingDebt: false, paymentMethod: 'CASH' })}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded-lg"
+                                title="Lunasi Pinjaman Tunai"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="text-[9px] text-slate-400 font-medium">
+                            Tunai: Rp {Number(user.debtAmount || 0).toLocaleString('id-ID')} | Belanja: Rp {Number(customers.find(c => c.phone === user.username)?.debtAmount || 0).toLocaleString('id-ID')}
+                          </div>
                         </div>
                       )}
                     </td>
@@ -448,9 +550,30 @@ export default function AdminManagementPage() {
                 ))}
               </tbody>
             </table>
-            {activeUsers.length === 0 && (
-              <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">Belum ada pengguna aktif.</div>
+            {activeStaff.length === 0 && (
+              <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">Belum ada petugas toko aktif.</div>
             )}
+          </div>
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+            <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              Menampilkan {Math.min((currentPage - 1) * itemsPerPage + 1, activeStaff.length)} - {Math.min(currentPage * itemsPerPage, activeStaff.length)} dari {activeStaff.length} akun
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-[11px] uppercase tracking-wider font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+              >
+                Sebelumnya
+              </button>
+              <button 
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage * itemsPerPage >= activeStaff.length}
+                className="px-3 py-1.5 text-[11px] uppercase tracking-wider font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+              >
+                Selanjutnya
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -590,6 +713,72 @@ export default function AdminManagementPage() {
                 <button type="submit" className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 flex items-center gap-2"><Check className="w-4 h-4"/> Buat Akun & Setujui</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pelunasan / Tambah Kasbon */}
+      {payoffModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className={`p-4 flex justify-between items-center ${payoffModal.isAddingDebt ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'}`}>
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                {payoffModal.isAddingDebt ? <Plus className="w-5 h-5"/> : <Check className="w-5 h-5"/>}
+                {payoffModal.isAddingDebt ? 'Pencatatan Pinjaman (Kasbon Tunai)' : 'Pelunasan Kasbon (Piutang)'}
+              </h3>
+              <button onClick={() => setPayoffModal({ ...payoffModal, isOpen: false })} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Nama Karyawan</label>
+                <p className="font-bold text-slate-800 dark:text-slate-200">{payoffModal.userName}</p>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Total Piutang Berjalan</label>
+                <p className="font-black text-xl text-red-600">Rp {payoffModal.debtAmount.toLocaleString('id-ID')}</p>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Metode Pembayaran/Pencairan</label>
+                <select
+                  value={payoffModal.paymentMethod}
+                  onChange={(e) => setPayoffModal({ ...payoffModal, paymentMethod: e.target.value as any })}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="CASH">Tunai (Cash)</option>
+                  <option value="TRANSFER_BSI">Transfer BSI</option>
+                  <option value="QRIS_SHARIAH">QRIS Syariah</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {payoffModal.isAddingDebt 
+                    ? 'Pilih sumber dana yang dikeluarkan kepada staf.'
+                    : 'Pilih rekening/dompet tempat uang cicilan disetor staf.'}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Nominal {payoffModal.isAddingDebt ? 'Pinjaman' : 'Pelunasan'} (Rp)</label>
+                <input
+                  type="number"
+                  value={payoffModal.payAmount}
+                  onChange={(e) => setPayoffModal({ ...payoffModal, payAmount: Number(e.target.value) })}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xl font-bold focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                  max={!payoffModal.isAddingDebt ? payoffModal.debtAmount : undefined}
+                />
+              </div>
+
+              <div className="pt-4 border-t mt-6 flex justify-end gap-2">
+                <button type="button" onClick={() => setPayoffModal({ ...payoffModal, isOpen: false })} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 font-bold rounded-lg hover:bg-slate-200">Batal</button>
+                <button type="button" onClick={handleProcessPayoff} className={`px-4 py-2 text-white font-bold rounded-lg flex items-center gap-2 ${payoffModal.isAddingDebt ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                  {payoffModal.isAddingDebt ? 'Cairkan Pinjaman' : 'Proses Pelunasan'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth } from 'lucide-react';
+import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { printToBluetooth } from '../lib/bluetoothPrinter';
 
@@ -11,8 +11,12 @@ export default function KasirRiwayatPage() {
   const [txToVoid, setTxToVoid] = useState<any>(null);
   const [voidReason, setVoidReason] = useState('');
 
-  const [filterMode, setFilterMode] = useState('TODAY'); // TODAY, DAILY, MONTHLY, YEARLY, ALL
-  const [customDate, setCustomDate] = useState('');
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
+  
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(currentDay);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,19 +24,8 @@ export default function KasirRiwayatPage() {
 
   // Ambil transaksi berdasarkan filter
   const myTransactions = transactions.filter(tx => {
-    let isDateMatch = false;
-    if (filterMode === 'ALL') {
-      isDateMatch = true;
-    } else if (filterMode === 'TODAY') {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const localToday = `${year}-${month}-${day}`;
-      isDateMatch = tx.timestamp.startsWith(localToday);
-    } else {
-      isDateMatch = tx.timestamp.startsWith(customDate);
-    }
+    const txDate = tx.timestamp.split('T')[0];
+    const isDateMatch = (!startDate || txDate >= startDate) && (!endDate || txDate <= endDate);
 
     // Kasir hanya lihat transaksinya sendiri; Manager/Admin Cabang lihat semua di cabangnya; Owner lihat semua
     const isCashier = currentUser?.role === 'CASHIER';
@@ -79,7 +72,7 @@ export default function KasirRiwayatPage() {
     ws['!cols'] = colWidths;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Riwayat Transaksi");
-    XLSX.writeFile(wb, `Riwayat_Transaksi_${filterMode}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Riwayat_Transaksi_${startDate}_sd_${endDate}.xlsx`);
   };
 
   const totalOmset = filteredTx.reduce((sum, tx) => sum + (tx.isVoided ? 0 : tx.totalAmount), 0);
@@ -144,43 +137,22 @@ export default function KasirRiwayatPage() {
             />
           </div>
           <div className="w-full md:w-auto flex flex-col md:flex-row gap-2">
-            <select
-              value={filterMode}
-              onChange={(e) => {
-                const mode = e.target.value;
-                setFilterMode(mode);
-                if (mode === 'TODAY' || mode === 'ALL') setCustomDate('');
-                else if (mode === 'DAILY') {
-                  const now = new Date();
-                  setCustomDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
-                }
-                else if (mode === 'MONTHLY') {
-                  const now = new Date();
-                  setCustomDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-                }
-                else if (mode === 'YEARLY') {
-                  setCustomDate(`${new Date().getFullYear()}`);
-                }
-              }}
-              className="w-full md:w-36 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-gray-700 dark:text-slate-300"
-            >
-              <option value="TODAY">Shift Hari Ini</option>
-              <option value="DAILY">Harian</option>
-              <option value="MONTHLY">Bulanan</option>
-              <option value="YEARLY">Tahunan</option>
-              <option value="ALL">Semua Waktu</option>
-            </select>
-            
-            {filterMode === 'DAILY' && (
-              <input type="date" value={customDate} onChange={(e) => setCustomDate(e.target.value)} className="w-full md:w-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-            )}
-            {filterMode === 'MONTHLY' && (
-              <input type="month" value={customDate} onChange={(e) => setCustomDate(e.target.value)} className="w-full md:w-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-            )}
-            {filterMode === 'YEARLY' && (
-              <input type="number" min="2000" max="2100" value={customDate} onChange={(e) => setCustomDate(e.target.value)} placeholder="YYYY" className="w-full md:w-32 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-            )}
-            
+            <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
+              <Calendar className="w-4 h-4 text-slate-400" />
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={e => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+              />
+              <span className="text-slate-400 text-sm">s/d</span>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={e => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+              />
+            </div>  
             <button
               onClick={handleExportExcel}
               className="flex items-center justify-center space-x-1 w-full md:w-auto bg-green-600 hover:bg-green-700 active:scale-95 active:bg-green-800 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm hover:shadow transition-all"
@@ -198,6 +170,7 @@ export default function KasirRiwayatPage() {
                 <th className="px-6 py-4">Waktu</th>
                 <th className="px-6 py-4">No. Invoice</th>
                 <th className="px-6 py-4">Kasir</th>
+                <th className="px-6 py-4">Pelanggan</th>
                 <th className="px-6 py-4">Metode</th>
                 <th className="px-6 py-4 text-right">Total Belanja</th>
                 <th className="px-6 py-4 text-center">Aksi</th>
@@ -211,6 +184,9 @@ export default function KasirRiwayatPage() {
                   </td>
                   <td className="px-6 py-4 font-bold text-gray-800 dark:text-slate-200">{tx.invoiceNo}</td>
                   <td className="px-6 py-4 text-gray-600 dark:text-slate-400">{tx.cashierName}</td>
+                  <td className="px-6 py-4 text-gray-800 dark:text-slate-200 font-medium">
+                    {tx.customerName || 'Umum'}
+                  </td>
                   <td className="px-6 py-4">
                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
                       {tx.paymentMethod}
@@ -222,10 +198,10 @@ export default function KasirRiwayatPage() {
                   <td className="px-6 py-4 text-center space-x-2">
                     <button
                       onClick={() => handleReprint(tx)}
-                      className="p-1.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors inline-block border border-slate-200 dark:border-slate-700 shadow-xs"
-                      title="Cetak Ulang Struk"
+                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-slate-800 rounded-lg transition-colors inline-block border border-blue-200 dark:border-slate-700 shadow-xs"
+                      title="Lihat Detail Transaksi"
                     >
-                      <Printer className="w-4 h-4" />
+                      <span className="flex items-center gap-1 text-xs"><Printer className="w-4 h-4" /> Detail</span>
                     </button>
                     {!tx.isVoided && tx.voidStatus !== 'PENDING' && tx.voidStatus !== 'REJECTED' ? (
                       <button
@@ -274,7 +250,7 @@ export default function KasirRiwayatPage() {
             {filteredTx.length > 0 && (
               <tfoot className="bg-green-50/80 border-t border-green-100 font-bold sticky bottom-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-right text-green-900 uppercase text-xs tracking-wider whitespace-nowrap">
+                  <td colSpan={5} className="px-6 py-4 text-right text-green-900 uppercase text-xs tracking-wider whitespace-nowrap">
                     <div className="flex flex-col items-end">
                       <span>Total Transaksi ({filteredTx.filter(t => !t.isVoided).length} Struk)</span>
                       <span className="text-[10px] text-green-700 font-normal capitalize mt-0.5">{totalBarang} barang terjual</span>
@@ -329,15 +305,30 @@ export default function KasirRiwayatPage() {
             {/* Print CSS Injection */}
             <style>{`
             @media print {
+              @page { margin: 0; padding: 0; }
               body * { visibility: hidden; }
               .printable-thermal, .printable-thermal * { visibility: visible; }
-              .printable-thermal { position: absolute; left: 0; top: 0; width: 58mm; padding: 2mm; margin: 0; border: none; max-height: none; overflow: visible; font-size: 10px; }
+              .printable-thermal { 
+                position: absolute; 
+                left: 0; top: 0; 
+                width: 58mm !important; 
+                max-width: 58mm !important;
+                padding: 0 !important; 
+                margin: 0 !important; 
+                border: none !important; 
+                max-height: none !important; 
+                overflow: visible !important; 
+                font-size: 8pt !important; 
+                line-height: 1.1 !important;
+                color: black !important;
+              }
+              .no-print { display: none !important; }
             }
             `}</style>
 
             {/* Simulated Thermic strip content */}
-            <div id="printable-receipt" className="printable-thermal p-6 space-y-4 text-xs font-mono text-gray-700 dark:text-slate-300 border-b border-dashed border-gray-200 dark:border-slate-700 max-h-96 overflow-y-auto">
-              <div className="text-center space-y-0.5 border-b border-gray-100 dark:border-slate-800 pb-3 flex flex-col items-center">
+            <div id="printable-receipt" className="printable-thermal p-1 space-y-0.5 text-xs font-mono text-gray-700 dark:text-slate-300 border-b border-dashed border-gray-200 dark:border-slate-700 max-h-96 overflow-y-auto">
+              <div className="text-center space-y-0.5 border-b border-gray-100 dark:border-slate-800 pb-2 flex flex-col items-center">
                 <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-12 h-12 object-contain mb-1" />
                 <p className="font-bold text-gray-800 dark:text-slate-200 text-sm">{branches.find(b => b.id === activeBranchId)?.name || settings.storeName}</p>
                 <p className="text-slate-400 text-[10px] uppercase">{branches.find(b => b.id === activeBranchId)?.address || settings.storeAddress}</p>
@@ -349,6 +340,7 @@ export default function KasirRiwayatPage() {
                 <p><span className="text-slate-400">No Invoice:</span> {selectedTx.invoiceNo}</p>
                 <p><span className="text-slate-400">Waktu:</span> {new Date(selectedTx.timestamp).toLocaleString('id-ID')}</p>
                 <p><span className="text-slate-400">Kasir:</span> {selectedTx.cashierName}</p>
+                <p><span className="text-slate-400">Pelanggan:</span> {selectedTx.customerName || 'Umum'}</p>
                 <p><span className="text-slate-400">Metode:</span> {selectedTx.paymentMethod}</p>
               </div>
 
@@ -414,7 +406,7 @@ export default function KasirRiwayatPage() {
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 text-center border-b border-gray-100 dark:border-slate-800 bg-red-50">
-              <XOctagon className="w-12 h-12 text-red-500 mx-auto mb-2" />
+              <XOctagon className="w-12 h-12 text-red-700 mx-auto mb-2" />
               <h3 className="font-extrabold text-gray-800 dark:text-slate-200 text-md">Ajukan Batal Transaksi</h3>
               <p className="text-xs text-red-600 mt-1">Pengajuan akan dikirim ke Manager untuk persetujuan (Approval).</p>
             </div>

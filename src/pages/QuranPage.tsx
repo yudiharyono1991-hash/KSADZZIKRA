@@ -104,11 +104,13 @@ export default function QuranPage() {
   // Audio State
   const [playingAudio, setPlayingAudio] = useState<HTMLAudioElement | null>(null);
   const [currentPlayingAyat, setCurrentPlayingAyat] = useState<number | null>(null);
+  const [selectedQori, setSelectedQori] = useState("05");
+  const [autoNextSurah, setAutoNextSurah] = useState(true);
+  const [pendingAutoPlay, setPendingAutoPlay] = useState(false);
   
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [hoverDisplay, setHoverDisplay] = useState('Terjemahan (Indonesia)');
-  const [selectedQori, setSelectedQori] = useState("05");
 
   const QORI_LIST = [
     { id: "01", name: "Abdullah Al-Juhany" },
@@ -141,7 +143,7 @@ export default function QuranPage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSelectSurah = (nomor: number) => {
+  const handleSelectSurah = (nomor: number, autoPlay: boolean = false) => {
     setLoadingDetail(true);
     fetch(`https://equran.id/api/v2/surat/${nomor}`)
       .then(res => res.json())
@@ -150,6 +152,9 @@ export default function QuranPage() {
           setSelectedSurah(data.data);
           setSurahSearchText('');
           window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (autoPlay) {
+            setPendingAutoPlay(true);
+          }
         }
         setLoadingDetail(false);
       })
@@ -191,6 +196,9 @@ export default function QuranPage() {
       } else {
         setPlayingAudio(null);
         setCurrentPlayingAyat(null);
+        if (autoNextSurah && selectedSurah && selectedSurah.nomor < 114) {
+          handleSelectSurah(selectedSurah.nomor + 1, true);
+        }
       }
     };
     
@@ -202,6 +210,14 @@ export default function QuranPage() {
       handleScrollToAyat(ayatNumber);
     }, 100);
   };
+
+  useEffect(() => {
+    if (pendingAutoPlay && selectedSurah && selectedSurah.ayat && selectedSurah.ayat.length > 0) {
+      setPendingAutoPlay(false);
+      const firstAyat = selectedSurah.ayat[0];
+      handlePlayAudio(firstAyat.audio, firstAyat.nomorAyat, selectedSurah.ayat);
+    }
+  }, [pendingAutoPlay, selectedSurah]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredSurahs = surahs.filter(s => 
     s.namaLatin.toLowerCase().includes(search.toLowerCase()) ||
@@ -259,7 +275,7 @@ export default function QuranPage() {
                 {selectedSurah.namaLatin} <ChevronDown size={16}/>
               </button>
               {showSurahDropdown && (
-                <div className={`absolute top-full left-0 mt-1 w-64 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'} rounded-xl shadow-lg border overflow-hidden`}>
+                <div className={`absolute top-full left-0 mt-1 w-64 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'} rounded-xl shadow-lg border overflow-hidden z-50`}>
                   <div className={`p-2 border-b ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800'}`}>
                     <input 
                        type="text" 
@@ -267,6 +283,12 @@ export default function QuranPage() {
                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all"
                        value={surahSearchText}
                        onChange={(e) => setSurahSearchText(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === 'Enter' && filteredDropdownSurahs.length > 0) {
+                           handleSelectSurah(filteredDropdownSurahs[0].nomor);
+                           setShowSurahDropdown(false);
+                         }
+                       }}
                        autoFocus
                     />
                   </div>
@@ -274,7 +296,7 @@ export default function QuranPage() {
                      {filteredDropdownSurahs.map(s => (
                        <button 
                          key={s.nomor}
-                         onClick={() => { handleSelectSurah(s); setShowSurahDropdown(false); }}
+                         onClick={() => { handleSelectSurah(s.nomor); setShowSurahDropdown(false); }}
                          className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-green-50 text-slate-700 dark:text-slate-300'} ${selectedSurah.nomor === s.nomor ? (isDarkMode ? 'bg-green-900/50 text-green-400 font-bold' : 'bg-green-50 text-green-700 font-bold') : ''}`}
                        >
                          <div>
@@ -298,7 +320,7 @@ export default function QuranPage() {
                 Ayat 1 <ChevronDown size={16}/>
               </button>
               {showAyatDropdown && (
-                <div className={`absolute top-full left-0 mt-1 w-64 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'} rounded-xl shadow-lg border overflow-hidden`}>
+                <div className={`absolute top-full left-0 mt-1 w-64 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'} rounded-xl shadow-lg border overflow-hidden z-50`}>
                   <div className={`p-2 border-b ${isDarkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800'}`}>
                      {selectedSurah.ayat.map(a => (
                        <button 
@@ -321,6 +343,37 @@ export default function QuranPage() {
         {selectedSurah ? (
           /* SURAH DETAIL VIEW */
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Surah Info Bar */}
+            <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white'} p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700`}>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold font-['Amiri']">{selectedSurah.nama}</h2>
+                  <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-1 rounded-full">{selectedSurah.jumlahAyat} Ayat</span>
+                  <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs px-2 py-1 rounded-full">{selectedSurah.tempatTurun}</span>
+                </div>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer whitespace-nowrap bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <input 
+                      type="checkbox" 
+                      className="rounded text-green-600 focus:ring-green-500 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                      checked={autoNextSurah}
+                      onChange={(e) => setAutoNextSurah(e.target.checked)}
+                    />
+                    Auto-Next Surat
+                  </label>
+                  <select 
+                    value={selectedQori}
+                    onChange={(e) => setSelectedQori(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2 outline-none w-full sm:w-auto"
+                  >
+                    {QORI_LIST.map(q => (
+                      <option key={q.id} value={q.id}>{q.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
             {/* Bismillah Header */}
             {selectedSurah.nomor !== 9 && (
               <div className={`${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white dark:bg-slate-900 border-green-100'} rounded-2xl shadow-sm p-6 text-center border mt-2`}>

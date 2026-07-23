@@ -27,7 +27,31 @@
   --color-amber-700: #b45104;
   --color-amber-800: #923f0c;
   --color-amber-900: #78340f;
-  --color-amber-950: #451a03;
+  /* ALIAS RED -> DEEP ORANGE (To bypass hardware display limits) */
+  --color-red-50: #fff7ed;
+  --color-red-100: #ffedd5;
+  --color-red-200: #fed7aa;
+  --color-red-300: #fdba74;
+  --color-red-400: #fb923c;
+  --color-red-500: #f97316;
+  --color-red-600: #ea580c;
+  --color-red-700: #c2410c;
+  --color-red-800: #9a3412;
+  --color-red-900: #7c2d12;
+  --color-red-950: #431407;
+
+  /* ALIAS BLUE -> TEAL (To bypass hardware display limits) */
+  --color-blue-50: #f0fdfa;
+  --color-blue-100: #ccfbf1;
+  --color-blue-200: #99f6e4;
+  --color-blue-300: #5eead4;
+  --color-blue-400: #2dd4bf;
+  --color-blue-500: #14b8a6;
+  --color-blue-600: #0d9488;
+  --color-blue-700: #0f766e;
+  --color-blue-800: #115e59;
+  --color-blue-900: #134e4a;
+  --color-blue-950: #042f2e;
 }
 
 @media print {

@@ -16,7 +16,7 @@ export default function PromoProdukPage() {
 
   // Authorization check
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500 font-bold">Akses ditolak. Anda tidak memiliki izin untuk mengelola promo.</div>;
+    return <div className="p-6 text-red-700 font-bold">Akses ditolak. Anda tidak memiliki izin untuk mengelola promo.</div>;
   }
 
   const filteredProducts = useMemo(() => {

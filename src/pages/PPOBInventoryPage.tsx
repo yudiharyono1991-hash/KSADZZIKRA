@@ -23,6 +23,10 @@ export default function PPOBInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('ALL');
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Modals status
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -56,6 +60,9 @@ export default function PPOBInventoryPage() {
   });
 
   const totalPPOB = ppobProducts.length;
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const paginatedProducts = filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -215,7 +222,7 @@ export default function PPOBInventoryPage() {
       <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
           <button 
-            onClick={() => setSelectedProvider('ALL')}
+            onClick={() => { setSelectedProvider('ALL'); setCurrentPage(1); }}
             className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors ${selectedProvider === 'ALL' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200'}`}
           >
             Semua PPOB
@@ -223,7 +230,7 @@ export default function PPOBInventoryPage() {
           {activeProviders.map(prov => (
             <button 
               key={prov}
-              onClick={() => setSelectedProvider(prov)}
+              onClick={() => { setSelectedProvider(prov); setCurrentPage(1); }}
               className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors ${selectedProvider === prov ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 hover:bg-gray-200'}`}
             >
               {prov}
@@ -238,7 +245,7 @@ export default function PPOBInventoryPage() {
             placeholder="Cari Layanan PPOB / SKU..." 
             className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
           />
         </div>
       </div>
@@ -257,7 +264,7 @@ export default function PPOBInventoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredProducts.length === 0 ? (
+              {paginatedProducts.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500 dark:text-slate-400">
                     <Smartphone className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -265,7 +272,7 @@ export default function PPOBInventoryPage() {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map(product => (
+                paginatedProducts.map(product => (
                   <tr key={product.id} className="hover:bg-slate-50 dark:bg-slate-800/80 transition-colors">
                     <td className="p-4">
                       <div className="flex flex-col">
@@ -312,6 +319,31 @@ export default function PPOBInventoryPage() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="bg-slate-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 p-4 flex items-center justify-between">
+            <span className="text-sm text-gray-500 dark:text-slate-400">
+              Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} dari {filteredProducts.length} layanan
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className="px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                Sebelumnya
+              </button>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className="px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                Selanjutnya
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add / Edit PPOB Modal */}

@@ -12,12 +12,22 @@ export default function JurnalUmumPage() {
   const { journalEntries, addJournalEntry, deleteJournalEntryByRef, currentUser, coaList } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
+  
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(currentDay);
   const [isDebitDropdownOpen, setIsDebitDropdownOpen] = useState(false);
   const [isCreditDropdownOpen, setIsCreditDropdownOpen] = useState(false);
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
   // Form State
   const [editingRefId, setEditingRefId] = useState<string | null>(null);
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [description, setDescription] = useState('');
   const [debitAccount, setDebitAccount] = useState(() => {
     const activeAccounts = useAppStore.getState().coaList.filter(c => c.isActive);
@@ -34,7 +44,7 @@ export default function JurnalUmumPage() {
     setEditingRefId(null);
     setDescription('');
     setAmount(0);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(new Date().toLocaleDateString('en-CA'));
   };
 
   const handleOpenAdd = () => {
@@ -50,7 +60,7 @@ export default function JurnalUmumPage() {
       
       if (debitEntry && creditEntry) {
         setEditingRefId(refId);
-        setDate(new Date(debitEntry.date).toISOString().split('T')[0]);
+        setDate(new Date(debitEntry.date).toLocaleDateString('en-CA'));
         setDescription(debitEntry.description);
         const dCoa = coaList.find(c => c.code === debitEntry.account);
         const cCoa = coaList.find(c => c.code === creditEntry.account);
@@ -85,7 +95,7 @@ export default function JurnalUmumPage() {
     const refId = editingRefId || `MANUAL_${Date.now()}`;
     // Preserve current time if today, else use midnight
     const now = new Date();
-    const isToday = date === now.toISOString().split('T')[0];
+    const isToday = date === now.toLocaleDateString('en-CA');
     const isoDate = isToday ? now.toISOString() : new Date(`${date}T12:00:00Z`).toISOString();
 
     if (editingRefId) {
@@ -121,8 +131,6 @@ export default function JurnalUmumPage() {
     resetForm();
   };
 
-  const totalDebit = journalEntries.reduce((sum, e) => sum + e.debit, 0);
-  const totalCredit = journalEntries.reduce((sum, e) => sum + e.credit, 0);
 
   // Group Journals for view
   const groupedJournals = useMemo(() => {
@@ -134,9 +142,21 @@ export default function JurnalUmumPage() {
       entries: JournalEntry[];
     }> = {};
 
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth();
+    const todayDate = now.getDate();
+
     journalEntries.forEach(entry => {
       // Abaikan entri yang rusak/kosong dari sisa pengujian lama (debit 0, kredit 0, akun kosong)
       if (!entry.account && !entry.debit && !entry.credit) return;
+
+      const entryDateObj = new Date(entry.date);
+      if (isNaN(entryDateObj.getTime())) return; // invalid date
+
+      const txDate = entryDateObj.toLocaleDateString('en-CA');
+      if (startDate && txDate < startDate) return;
+      if (endDate && txDate > endDate) return;
 
       const ref = entry.referenceId || `UNCATEGORIZED_${entry.id}`;
       if (!groups[ref]) {
@@ -152,7 +172,13 @@ export default function JurnalUmumPage() {
     });
 
     return Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [journalEntries]);
+  }, [journalEntries, startDate, endDate]);
+
+  const totalDebit = groupedJournals.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + (e.debit || 0), 0), 0);
+  const totalCredit = groupedJournals.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + (e.credit || 0), 0), 0);
+
+  const totalPages = Math.ceil(groupedJournals.length / itemsPerPage);
+  const paginatedJournals = groupedJournals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getAccountName = (code: string) => {
     if (!code || !code.trim()) return "Tidak Diketahui / Kosong";
@@ -186,7 +212,7 @@ export default function JurnalUmumPage() {
 
   const handlePrint = useReactToPrint({
     contentRef: reportRef,
-    documentTitle: `Jurnal_Umum_KSA_Mart_${new Date().toISOString().split('T')[0]}`,
+    documentTitle: `Jurnal_Umum_KSA_Mart_${new Date().toLocaleDateString('en-CA')}`,
   });
 
   return (
@@ -194,7 +220,10 @@ export default function JurnalUmumPage() {
       {/* Header Print */}
       <PrintHeader title="Laporan Jurnal Umum" />
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 print:hidden">
+      {/* INTERACTIVE UI */}
+      <div className="print:hidden space-y-6">
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center space-x-3">
           <div className="p-3 bg-green-100 text-green-800 rounded-xl">
             <BookOpen className="w-6 h-6" />
@@ -205,7 +234,23 @@ export default function JurnalUmumPage() {
           </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap md:flex-nowrap">
+          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
+            <Calendar className="w-4 h-4 text-slate-400" />
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={e => setStartDate(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+            <span className="text-slate-400 text-sm">s/d</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={e => setEndDate(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+          </div>
           <button onClick={handleExportExcel} className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all active:scale-95 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800">
             <Download className="w-4 h-4"/> <span className="hidden sm:inline">Excel</span>
           </button>
@@ -359,13 +404,13 @@ export default function JurnalUmumPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Debit Seluruhnya</p>
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Debit Periode Ini</p>
                 <p className="text-xl font-mono font-bold text-green-700">Rp {totalDebit.toLocaleString('id-ID')}</p>
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Kredit Seluruhnya</p>
+                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Kredit Periode Ini</p>
                 <p className="text-xl font-mono font-bold text-green-700">Rp {totalCredit.toLocaleString('id-ID')}</p>
               </div>
             </div>
@@ -389,80 +434,112 @@ export default function JurnalUmumPage() {
                     <th className="p-4 border-b border-slate-100 dark:border-slate-800 print:border-slate-300 dark:border-slate-600">Tanggal & Ref</th>
                     <th className="p-4 border-b border-slate-100 dark:border-slate-800 print:border-slate-300 dark:border-slate-600">Keterangan / Transaksi</th>
                     <th className="p-4 border-b border-slate-100 dark:border-slate-800 print:border-slate-300 dark:border-slate-600">Akun (CoA)</th>
-                    <th className="p-4 border-b border-slate-100 dark:border-slate-800 print:border-slate-300 dark:border-slate-600">Jurnal Lawan</th>
                     <th className="p-4 border-b border-slate-100 dark:border-slate-800 text-right print:border-slate-300 dark:border-slate-600">Debit (Rp)</th>
                     <th className="p-4 border-b border-slate-100 dark:border-slate-800 text-right print:border-slate-300 dark:border-slate-600">Kredit (Rp)</th>
                     <th className="p-4 border-b border-slate-100 dark:border-slate-800 text-center print:hidden">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="text-sm divide-y divide-slate-100">
-                  {groupedJournals.length === 0 ? (
+                {groupedJournals.length === 0 ? (
+                  <tbody className="text-sm">
                     <tr>
-                      <td colSpan={7} className="p-12 text-center text-slate-500 dark:text-slate-400 font-medium">
+                      <td colSpan={6} className="p-12 text-center text-slate-500 dark:text-slate-400 font-medium">
                         <BookOpen className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                        Belum ada catatan jurnal sama sekali.
+                        Belum ada catatan jurnal pada periode ini.
                       </td>
                     </tr>
-                  ) : (
-                    groupedJournals.map((group) => {
-                      const isManual = group.type === 'MANUAL';
-                      return (
-                        <React.Fragment key={group.refId}>
-                          <tr className="bg-slate-50 dark:bg-slate-800/50">
-                            <td className="p-3 text-xs text-slate-500 dark:text-slate-400 align-top" rowSpan={group.entries.length}>
-                              <div className="font-bold text-slate-700 dark:text-slate-300">{new Date(group.date).toLocaleDateString('id-ID')}</div>
-                              <div className="font-mono text-[10px] mt-1 break-all">{group.refId}</div>
-                              {isManual && <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-bold rounded">MANUAL</span>}
+                  </tbody>
+                ) : (
+                  paginatedJournals.map((group) => {
+                    const isManual = group.type === 'MANUAL';
+                    return (
+                      <tbody key={group.refId} className="text-sm print:break-inside-avoid border-b border-slate-100 dark:border-slate-800">
+                        <tr className="bg-slate-50 dark:bg-slate-800/50">
+                          <td className="p-3 text-xs text-slate-500 dark:text-slate-400 align-top" rowSpan={group.entries.length}>
+                            <div className="font-bold text-slate-700 dark:text-slate-300">{new Date(group.date).toLocaleDateString('id-ID')}</div>
+                            <div className="font-mono text-[10px] mt-1 break-all">{group.refId}</div>
+                            {isManual && <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-bold rounded">MANUAL</span>}
+                          </td>
+                          <td className="p-3 text-slate-700 dark:text-slate-300 font-medium align-top" rowSpan={group.entries.length}>
+                            {group.description}
+                          </td>
+                          <td className="p-3 text-xs align-top border-l-2 border-slate-100 dark:border-slate-800 print:border-none">
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{getAccountName(group.entries[0].account)}</div>
+                            {group.entries.length > 1 && (
+                              <div className="text-[10px] text-slate-500 italic mt-0.5">
+                                Lawan: {getAccountName(group.entries.find(e => e.id !== group.entries[0].id)?.account || '')}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].debit > 0 ? group.entries[0].debit.toLocaleString('id-ID') : '-'}</td>
+                          <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].credit > 0 ? group.entries[0].credit.toLocaleString('id-ID') : '-'}</td>
+                          <td className="p-3 text-center align-top print:hidden" rowSpan={group.entries.length}>
+                            {isManual && (
+                              <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => handleEdit(group.refId)} className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors" title="Edit">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDelete(group.refId)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Hapus">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                        {group.entries.slice(1).map((entry, idx) => (
+                          <tr key={entry.id} className="bg-slate-50 dark:bg-slate-800/50">
+                            <td className="p-3 text-xs border-l-2 border-slate-100 dark:border-slate-800 print:border-none">
+                              <div className="font-medium text-slate-800 dark:text-slate-200">{getAccountName(entry.account)}</div>
+                              <div className="text-[10px] text-slate-500 italic mt-0.5">
+                                Lawan: {getAccountName(group.entries.find(e => e.id !== entry.id)?.account || '')}
+                              </div>
                             </td>
-                            <td className="p-3 text-slate-700 dark:text-slate-300 font-medium align-top" rowSpan={group.entries.length}>
-                              {group.description}
-                            </td>
-                            <td className="p-3 font-medium text-slate-800 dark:text-slate-200 text-xs">{getAccountName(group.entries[0].account)}</td>
-                            <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-xs italic border-l-2 border-slate-100 dark:border-slate-800 print:border-none">
-                              {group.entries.length > 1 
-                                ? getAccountName(group.entries.find(e => e.id !== group.entries[0].id)?.account || '') 
-                                : '-'}
-                            </td>
-                            <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].debit > 0 ? group.entries[0].debit.toLocaleString('id-ID') : '-'}</td>
-                            <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].credit > 0 ? group.entries[0].credit.toLocaleString('id-ID') : '-'}</td>
-                            <td className="p-3 text-center align-top print:hidden" rowSpan={group.entries.length}>
-                              {isManual && (
-                                <div className="flex items-center justify-center gap-2">
-                                  <button onClick={() => handleEdit(group.refId)} className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors" title="Edit">
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDelete(group.refId)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Hapus">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
-                            </td>
+                            <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{entry.debit > 0 ? entry.debit.toLocaleString('id-ID') : '-'}</td>
+                            <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{entry.credit > 0 ? entry.credit.toLocaleString('id-ID') : '-'}</td>
                           </tr>
-                          {group.entries.slice(1).map((entry, idx) => (
-                            <tr key={entry.id} className="bg-slate-50 dark:bg-slate-800/50">
-                              <td className="p-3 font-medium text-slate-800 dark:text-slate-200 text-xs border-l-2 border-slate-100 dark:border-slate-800 print:border-none">{getAccountName(entry.account)}</td>
-                              <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-xs italic border-l-2 border-slate-100 dark:border-slate-800 print:border-none">
-                                {getAccountName(group.entries.find(e => e.id !== entry.id)?.account || '')}
-                              </td>
-                              <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{entry.debit > 0 ? entry.debit.toLocaleString('id-ID') : '-'}</td>
-                              <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{entry.credit > 0 ? entry.credit.toLocaleString('id-ID') : '-'}</td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                        ))}
+                      </tbody>
+                    );
+                  })
+                )}
+
+                </table>
+              </div>
             </div>
-          </div>
+
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl mt-4 print:hidden">
+              <div className="text-xs font-medium text-slate-500">
+                Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, groupedJournals.length)} dari {groupedJournals.length} transaksi
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  Sebelumnya
+                </button>
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                  {currentPage} / {totalPages}
+                </div>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
           
           <PrintFooter />
         </div>
       )}
+      </div> {/* End of Interactive UI */}
 
       {/* Hidden Printable Area for react-to-print - always in DOM */}
-      <div style={{ display: 'none' }}>
+      <div className="hidden print:block">
         <div className="printable-a4 bg-white dark:bg-slate-900 p-8 text-black" ref={reportRef}>
           <PrintHeader title="Laporan Jurnal Umum" />
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', marginTop: '16px' }}>
@@ -475,38 +552,36 @@ export default function JurnalUmumPage() {
                 <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>Kredit (Rp)</th>
               </tr>
             </thead>
-            <tbody>
-              {groupedJournals.map((group) => (
-                <React.Fragment key={group.refId}>
-                  {group.entries.map((entry, idx) => (
-                    <tr key={entry.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      {idx === 0 && (
-                        <td rowSpan={group.entries.length} style={{ padding: '4px 8px', verticalAlign: 'top', fontSize: '9px', color: '#475569' }}>
-                          <div style={{ fontWeight: 'bold' }}>{new Date(group.date).toLocaleDateString('id-ID')}</div>
-                          <div style={{ fontFamily: 'monospace', fontSize: '8px', marginTop: '2px', wordBreak: 'break-all' }}>{group.refId.substring(0, 20)}</div>
-                        </td>
-                      )}
-                      {idx === 0 && (
-                        <td rowSpan={group.entries.length} style={{ padding: '4px 8px', verticalAlign: 'top', fontSize: '9px' }}>
-                          {group.description}
-                        </td>
-                      )}
-                      <td style={{ padding: '4px 8px', fontSize: '9px' }}>{getAccountName(entry.account)}</td>
-                      <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.debit > 0 ? entry.debit.toLocaleString('id-ID') : '-'}</td>
-                      <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.credit > 0 ? entry.credit.toLocaleString('id-ID') : '-'}</td>
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-            </tbody>
+            {groupedJournals.map((group) => (
+              <tbody key={group.refId} style={{ pageBreakInside: 'avoid' }}>
+                {group.entries.map((entry, idx) => (
+                  <tr key={entry.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    {idx === 0 && (
+                      <td rowSpan={group.entries.length} style={{ padding: '4px 8px', verticalAlign: 'top', fontSize: '9px', color: '#475569' }}>
+                        <div style={{ fontWeight: 'bold' }}>{new Date(group.date).toLocaleDateString('id-ID')}</div>
+                        <div style={{ fontFamily: 'monospace', fontSize: '8px', marginTop: '2px', wordBreak: 'break-all' }}>{group.refId.substring(0, 20)}</div>
+                      </td>
+                    )}
+                    {idx === 0 && (
+                      <td rowSpan={group.entries.length} style={{ padding: '4px 8px', verticalAlign: 'top', fontSize: '9px' }}>
+                        {group.description}
+                      </td>
+                    )}
+                    <td style={{ padding: '4px 8px', fontSize: '9px' }}>{getAccountName(entry.account)}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.debit > 0 ? entry.debit.toLocaleString('id-ID') : '-'}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{entry.credit > 0 ? entry.credit.toLocaleString('id-ID') : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
             <tfoot>
               <tr style={{ borderTop: '2px solid #374151', fontWeight: 'bold', backgroundColor: '#f8fafc' }}>
                 <td colSpan={3} style={{ padding: '6px 8px', textAlign: 'right' }}>TOTAL:</td>
                 <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace' }}>
-                  {journalEntries.reduce((s, e) => s + (e.debit || 0), 0).toLocaleString('id-ID')}
+                  {groupedJournals.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + (e.debit || 0), 0), 0).toLocaleString('id-ID')}
                 </td>
                 <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace' }}>
-                  {journalEntries.reduce((s, e) => s + (e.credit || 0), 0).toLocaleString('id-ID')}
+                  {groupedJournals.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + (e.credit || 0), 0), 0).toLocaleString('id-ID')}
                 </td>
               </tr>
             </tfoot>

@@ -184,6 +184,27 @@ export default function KatalogUmumPage() {
     );
   };
 
+  const handleDownloadQris = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!effectiveQrisUrl) return;
+    try {
+      const res = await fetch(effectiveQrisUrl);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = blobUrl;
+      a.download = 'QRIS_KSA_Mart.jpg';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Download failed', err);
+      window.open(effectiveQrisUrl, '_blank');
+    }
+  };
+
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
     if (customerCart.length === 0) return;
@@ -809,16 +830,22 @@ export default function KatalogUmumPage() {
             {selectedBranchData && (
               <p className="text-center text-xs text-fuchsia-600 font-bold mb-3">Cabang: {selectedBranchData.name}</p>
             )}
+            
+            <div className="text-center mb-3">
+              <p className="text-sm text-slate-600 dark:text-slate-400">Total Pembayaran</p>
+              <p className="text-2xl font-black text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</p>
+              <p className="text-[10px] text-slate-500 italic">* Belum termasuk Ongkos Kirim</p>
+            </div>
+
             <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 mb-4 flex justify-center">
               <img src={effectiveQrisUrl} alt="QRIS KSA Mart Besar" className="w-full h-auto object-contain" />
             </div>
-            <a 
-              href={effectiveQrisUrl} 
-              download="QRIS_KSA_Mart.jpg"
+            <button 
+              onClick={handleDownloadQris}
               className="w-full block text-center py-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl font-bold shadow-md transition-colors"
             >
               Unduh QRIS
-            </a>
+            </button>
           </div>
         </div>
       )}

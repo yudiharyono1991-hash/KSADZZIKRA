@@ -82,6 +82,15 @@ export default function InventoryPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+
+  const handleBulkDelete = () => {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedProductIds.length} produk yang dipilih?`)) {
+      selectedProductIds.forEach(id => deleteProduct(id));
+      alert(`${selectedProductIds.length} produk berhasil dihapus.`);
+      setSelectedProductIds([]);
+    }
+  };
 
   // Form Fields State
   const [sku, setSku] = useState('');
@@ -207,17 +216,6 @@ export default function InventoryPage() {
     }
   }, [debouncedQuery]);
 
-  // Debugging: occasional render log (not on every keystroke thanks to debounce)
-  useEffect(() => {
-    console.log('InventoryPage render:', {
-      productsLength: products.length,
-      categories,
-      currentUser,
-      activeBranchId,
-      selectedCategory,
-      searchQuery: debouncedQuery
-    });
-  }, [products.length, categories, currentUser, activeBranchId, selectedCategory, debouncedQuery]);
 
   // Stats Counters (memoized)
   const physicalProducts = useMemo(() => products.filter(p => !p.isPPOB), [products]);
@@ -581,32 +579,51 @@ export default function InventoryPage() {
         }
 
         if (newProducts.length > 0) {
-          const importedCategoryValues = Array.from(new Set(newProducts.map((product) => String(product.category || '').trim()).filter((c) => c.length > 0)));
-          if (importedCategoryValues.length > 0) {
-            setCategories(Array.from(new Set([...(savedCategories || []), ...importedCategoryValues])));
-          }
-          // Process import in batches to avoid blocking UI
-          const batchSize = 100;
-          const batches: any[][] = [];
-          for (let i = 0; i < newProducts.length; i += batchSize) {
-            batches.push(newProducts.slice(i, i + batchSize));
-          }
+          const toUpdate: any[] = [];
+          const toAdd: any[] = [];
 
-          setIsImporting(true);
-          setImportProgress({ done: 0, total: newProducts.length });
-
-          batches.forEach((batch, idx) => {
-            // schedule batches with small delay to keep UI responsive
-            setTimeout(() => {
-              addProductsBulk(batch);
-              setImportProgress(prev => ({ done: prev.done + batch.length, total: prev.total }));
-              // Last batch -> finish
-              if (idx === batches.length - 1) {
-                setIsImporting(false);
-                alert(`✅ Berhasil mengimpor ${newProducts.length} produk dari file Excel!`);
-              }
-            }, idx * 150);
+          newProducts.forEach(newP => {
+            const existing = products.find(p => p.sku === newP.sku && !p.isPPOB);
+            if (existing) {
+              toUpdate.push({ ...newP, id: existing.id });
+            } else {
+              toAdd.push(newP);
+            }
           });
+
+          // Update existing products synchronously (or one by one to avoid blocking)
+          toUpdate.forEach(p => updateProduct(p));
+
+          if (toAdd.length > 0) {
+            const importedCategoryValues = Array.from(new Set(toAdd.map((product) => String(product.category || '').trim()).filter((c) => c.length > 0)));
+            if (importedCategoryValues.length > 0) {
+              setCategories(Array.from(new Set([...(savedCategories || []), ...importedCategoryValues])));
+            }
+            // Process import in batches to avoid blocking UI
+            const batchSize = 100;
+            const batches: any[][] = [];
+            for (let i = 0; i < toAdd.length; i += batchSize) {
+              batches.push(toAdd.slice(i, i + batchSize));
+            }
+
+            setIsImporting(true);
+            setImportProgress({ done: 0, total: toAdd.length });
+
+            batches.forEach((batch, idx) => {
+              // schedule batches with small delay to keep UI responsive
+              setTimeout(() => {
+                addProductsBulk(batch);
+                setImportProgress(prev => ({ done: prev.done + batch.length, total: prev.total }));
+                // Last batch -> finish
+                if (idx === batches.length - 1) {
+                  setIsImporting(false);
+                  alert(`✅ Berhasil mengupdate ${toUpdate.length} produk dan mengimpor ${toAdd.length} produk baru dari file Excel!`);
+                }
+              }, idx * 150);
+            });
+          } else {
+            alert(`✅ Berhasil mengupdate ${toUpdate.length} produk dari file Excel! Tidak ada produk baru yang ditambahkan.`);
+          }
         } else {
           alert('❌ Tidak ada produk valid yang berhasil diimpor.');
         }
@@ -633,7 +650,7 @@ export default function InventoryPage() {
   const handleExportExcel = () => {
     const ws_data = [
       ["SKU", "NAMA_BARANG", "KATEGORI", "HARGA_MODAL", "HARGA_JUAL", "STOK_MINIMAL", "SISA_STOK", "UNIT", "EXPIRED_DATE"],
-      ...products.filter(p => !p.isPPOB).map(p => [
+      ...filteredProducts.filter(p => !p.isPPOB).map(p => [
         p.sku, p.name, p.category, p.costPrice, p.price, p.minStock, p.stock, p.unit, p.expiryDate || ''
       ])
     ];
@@ -662,7 +679,7 @@ export default function InventoryPage() {
             <p className="text-gray-400 text-xs font-semibold">Habis Pemesanan (0 Stok)</p>
             <h3 className="text-2xl font-black text-red-600 mt-1">{outOfStock} SKU</h3>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-500">
+          <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-700">
             <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
@@ -726,7 +743,7 @@ export default function InventoryPage() {
                       setSelectedCategory('ALL');
                     }
                   }}
-                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200 ml-1"
+                  className="p-1.5 text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-200 ml-1"
                   title="Hapus Kategori Ini"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -811,6 +828,16 @@ export default function InventoryPage() {
               <span>Hapus Semua Produk</span>
             </button>
 
+            {selectedProductIds.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-500 hover:bg-red-600 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Hapus Terpilih ({selectedProductIds.length})</span>
+              </button>
+            )}
+
             <button
               onClick={handleOpenAdd}
               className="bg-green-700 hover:bg-green-800 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
@@ -825,7 +852,15 @@ export default function InventoryPage() {
         <div className="overflow-x-auto">
           <div className="min-w-[1000px] text-left text-xs border-collapse">
             <div className="bg-slate-50 dark:bg-slate-800 uppercase tracking-widest text-[10px] text-gray-500 dark:text-slate-400 font-bold border-b border-gray-100 dark:border-slate-800 py-3 px-4 grid grid-cols-12 gap-3 items-center">
-              <div className="col-span-1 whitespace-nowrap">SKU / Code</div>
+              <div className="col-span-1 flex items-center gap-2 whitespace-nowrap">
+                <input 
+                  type="checkbox" 
+                  checked={selectedProductIds.length === filteredProducts.length && filteredProducts.length > 0} 
+                  onChange={(e) => setSelectedProductIds(e.target.checked ? filteredProducts.map(p => p.id) : [])} 
+                  className="rounded text-green-600 focus:ring-green-500 bg-white" 
+                />
+                SKU / Code
+              </div>
               <div className="col-span-2">Nama Barang</div>
               <div className="col-span-1">Kategori</div>
               <div className="col-span-1 text-right whitespace-nowrap">Harga Modal</div>
@@ -848,8 +883,19 @@ export default function InventoryPage() {
                   const isOutOfStock = p.stock === 0;
                   const isLowStock = p.stock > 0 && p.stock <= p.minStock;
                   return (
-                    <div key={p.id} className="px-4 py-2 border-b border-gray-100 dark:border-slate-800 grid grid-cols-12 gap-3 items-center text-xs hover:bg-slate-50 dark:bg-slate-800 transition-colors">
-                      <div className="col-span-1 font-mono text-gray-500 dark:text-slate-400 truncate" title={p.sku}>{p.sku}</div>
+                    <div key={p.id} className={`px-4 py-2 border-b border-gray-100 dark:border-slate-800 grid grid-cols-12 gap-3 items-center text-xs hover:bg-slate-50 dark:bg-slate-800 transition-colors ${selectedProductIds.includes(p.id) ? 'bg-green-50/50 dark:bg-green-900/20' : ''}`}>
+                      <div className="col-span-1 flex items-center gap-2 font-mono text-gray-500 dark:text-slate-400 truncate" title={p.sku}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedProductIds.includes(p.id)} 
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedProductIds([...selectedProductIds, p.id]);
+                            else setSelectedProductIds(selectedProductIds.filter(id => id !== p.id));
+                          }}
+                          className="rounded text-green-600 focus:ring-green-500 bg-white"
+                        />
+                        {p.sku}
+                      </div>
                       <div className="col-span-2 font-bold text-gray-900 dark:text-white truncate" title={p.name}>{p.name}</div>
                       <div className="col-span-1 truncate">
                         <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[9px] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{p.category}</span>
@@ -1262,7 +1308,7 @@ export default function InventoryPage() {
                       <button
                         type="button"
                         onClick={() => setImage('')}
-                        className="absolute top-1 right-1 bg-white dark:bg-slate-900/90 p-1.5 rounded-lg text-red-500 hover:bg-red-50 border border-red-100 shadow-xs"
+                        className="absolute top-1 right-1 bg-white dark:bg-slate-900/90 p-1.5 rounded-lg text-red-700 hover:bg-red-50 border border-red-100 shadow-xs"
                         title="Hapus Foto"
                       >
                         <Trash2 className="w-4 h-4" />

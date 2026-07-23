@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter } from 'lucide-react';
+import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter, Calendar } from 'lucide-react';
+
+const getLocalDateString = () => {
+  const date = new Date();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
 export default function StockOpnamePage() {
   const { products, stockMovements, adjustStock, addStockMovement, currentUser, activeBranchId, addLog } = useBranchData();
@@ -11,11 +19,24 @@ export default function StockOpnamePage() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
+  // Date Filters
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}-01`;
+  });
+  const [endDate, setEndDate] = useState(getLocalDateString);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
+  
   // Get unique categories dynamically from products
   const categories = Array.from(new Set(products.map(p => p.category))).sort();
   
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500 font-bold">Akses ditolak.</div>;
+    return <div className="p-6 text-red-700 font-bold">Akses ditolak.</div>;
   }
 
   const handleAdjust = () => {
@@ -45,9 +66,18 @@ export default function StockOpnamePage() {
     return matchBranch && matchCat && matchSearch;
   });
 
-  const filteredMovements = selectedProductId 
+  let filteredMovements = selectedProductId 
     ? stockMovements.filter(sm => sm.productId === selectedProductId && (!activeBranchId || sm.branchId === activeBranchId || !sm.branchId))
     : stockMovements.filter(sm => !activeBranchId || sm.branchId === activeBranchId || !sm.branchId);
+
+  // Apply date filter
+  filteredMovements = filteredMovements.filter(sm => {
+    const smDate = sm.date.split('T')[0];
+    return smDate >= startDate && smDate <= endDate;
+  });
+
+  const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
+  const paginatedMovements = filteredMovements.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -179,13 +209,28 @@ export default function StockOpnamePage() {
           )}
         </div>
 
-        {/* Stock Card Table */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
               Kartu Stok {selectedProductId ? 'Produk Terpilih' : 'Semua Produk'}
             </h3>
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-1 shadow-xs">
+              <Calendar className="w-4 h-4 text-slate-400 ml-2" />
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={e => { setStartDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none p-1 cursor-pointer"
+              />
+              <span className="text-slate-400 text-xs">-</span>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={e => { setEndDate(e.target.value); setCurrentPage(1); }}
+                className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none p-1 cursor-pointer"
+              />
+            </div>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-sm">
@@ -200,7 +245,7 @@ export default function StockOpnamePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredMovements.map(m => {
+                {paginatedMovements.map(m => {
                   const prod = products.find(p => p.id === m.productId);
                   return (
                     <tr key={m.id} className="hover:bg-slate-50 dark:bg-slate-800">
@@ -235,13 +280,38 @@ export default function StockOpnamePage() {
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
                       <History className="w-10 h-10 mx-auto mb-2 text-slate-200" />
-                      Belum ada riwayat pergerakan stok.
+                      Belum ada riwayat pergerakan stok pada periode ini.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-slate-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 p-4 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+                Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredMovements.length)} dari {filteredMovements.length} riwayat
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-bold disabled:opacity-50"
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-bold disabled:opacity-50"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -14,6 +14,7 @@ export default function BukuPanduanPage() {
     const role = currentUser?.role || 'KASIR';
     
     const kasirGuide = [
+      { id: 'k0', title: 'Sistem Absensi (Clock In/Out) & Izin', content: 'Masuk ke menu Tutup & Rekap Shift. Anda wajib melakukan Absen Masuk (Clock In) sebelum memulai shift, dan Absen Keluar (Clock Out) saat selesai. Jika ada kendala, gunakan tombol "Ajukan Izin / Lupa Absen" di halaman yang sama.' },
       { id: 'k1', title: 'Cara Memulai Shift Kasir', content: 'Masuk ke menu Belanja Produk (sebelumnya Kasir POS). Anda bisa langsung melayani transaksi.' },
       { id: 'k2', title: 'Cara Transaksi Penjualan & Pembayaran QRIS', content: 'Di menu Belanja Produk, scan barcode barang atau ketik nama/SKU di kolom pencarian. Pada saat Checkout, jika memilih metode pembayaran QRIS, layar Anda akan memunculkan gambar QRIS Toko secara otomatis. Anda dapat meminta pembeli untuk men-scan layar HP atau monitor Anda langsung. Tekan "Verifikasi Bukti QRIS Selesai" jika pelanggan sudah berhasil bayar.' },
       { id: 'k3', title: 'Cara Menukarkan Poin Pelanggan', content: 'Saat Checkout, pastikan Anda telah memilih Nama Pelanggan (Anggota) di bagian atas. Jika pelanggan memiliki saldo poin loyalitas, sistem akan memunculkan opsi potong poin secara otomatis. Anda tinggal memasukkan jumlah poin yang ingin ditukarkan untuk mendiskon total belanjanya.' }
@@ -21,23 +22,25 @@ export default function BukuPanduanPage() {
     
     const adminGuide = [
       { id: 'a1', title: 'Manajemen Data Barang', content: 'Masuk ke menu Inventory & Stok. Anda dapat menambah, mengedit, atau menghapus barang. Pastikan Barcode dan SKU unik. Anda juga bisa mengatur jumlah minimum stok untuk notifikasi.' },
-      { id: 'a2', title: 'Stock Opname Dasar', content: 'Masuk ke Stock Opname, lalu masukkan jumlah fisik barang yang ada di rak. Sistem akan otomatis menghitung selisih dan mencatatnya.' },
-      { id: 'a3', title: 'Manajemen Pelanggan & Poin', content: 'Gunakan menu Master Pelanggan untuk mengelola data member cabang Anda. Anda bisa menambah pelanggan, mengubah Total Point, dan mencatat piutang/ kasbon secara manual.' },
-      { id: 'a4', title: 'Pembatalan Transaksi (Void)', content: 'Jika terjadi kesalahan, Anda dapat menekan tombol Void pada Riwayat Transaksi. Pengajuan akan dikirim ke notifikasi Manager untuk disetujui.' }
+      { id: 'a2', title: 'Manajemen Pesanan Online', content: 'Masuk ke menu Pesanan Online untuk memantau pesanan yang masuk dari aplikasi pelanggan. Anda bisa mengubah status pesanan (Diproses, Dikirim, Selesai) dan membalas chat pelanggan secara real-time.' },
+      { id: 'a3', title: 'Stock Opname Dasar', content: 'Masuk ke Stock Opname, lalu masukkan jumlah fisik barang yang ada di rak. Sistem akan otomatis menghitung selisih dan mencatatnya.' },
+      { id: 'a4', title: 'Manajemen Pelanggan & Kasbon', content: 'Gunakan menu Master Pelanggan untuk mengelola pelanggan. Anda bisa menambah pelanggan, mengubah Total Point, dan mencatat pelunasan hutang (Kasbon) dengan menekan tombol dompet hijau.' },
+      { id: 'a5', title: 'Manajemen Karyawan & Kasbon Tunai', content: 'Di menu Manajemen Akun, Admin/Owner bisa menambahkan Pinjaman Tunai Karyawan (tombol + biru) atau mencatat Pelunasan cicilan karyawan (tombol centang hijau) pada kolom Piutang.' },
+      { id: 'a6', title: 'Pembatalan Transaksi (Void)', content: 'Jika terjadi kesalahan, Anda dapat menekan tombol Void pada Riwayat Transaksi. Pengajuan akan dikirim ke notifikasi Manager untuk disetujui.' }
     ];
 
     const managerGuide = [
       { id: 'm1', title: 'Laporan Keuangan', content: 'Masuk ke Dashboard & Laporan. Anda bisa melihat Jurnal Umum, Laporan Penjualan, dan Arus Kas. Anda bisa mencetak laporan ke PDF atau Excel dengan blok tanda tangan 3 tingkat (Admin, Manager, Ketua).' },
-      { id: 'm2', title: 'Manajemen CoA & Akun', content: 'Gunakan menu Daftar Akun (CoA) untuk menyesuaikan akun cabang dan struktur akuntansi syariah. Manager dapat menambah atau memperbarui akun yang terkait cabangnya.' },
-      { id: 'm3', title: 'Manajemen Pelanggan Cabang', content: 'Gunakan menu Master Pelanggan untuk melihat dan mengubah Total Point, memantau penggunaan poin, serta mencatat piutang kasbon untuk cabang Anda.' },
-      { id: 'm4', title: 'Approval Pembatalan (Void)', content: 'Setiap pengajuan pembatalan (Void) dari Kasir/Admin akan masuk ke ikon Lonceng (Notifikasi). Anda bisa langsung menuju Riwayat untuk Approve atau Reject.' },
-      { id: 'm5', title: 'Kasbon & Piutang Pelanggan', content: 'Saat pelanggan membayar dengan Kasbon, sistem mencatat Piutang dan menambah Piutang Pelanggan. Piutang ini bisa dilunasi di Master Pelanggan atau pada transaksi berikutnya.' }
+      { id: 'm2', title: 'Review & Persetujuan HR (Absensi)', content: 'Masuk ke menu Manajemen Karyawan (HR). Anda dapat memantau kehadiran karyawan harian dan me-review pengajuan Izin, Cuti, Sakit, atau Lupa Absen pada tab Permohonan Koreksi.' },
+      { id: 'm3', title: 'Manajemen CoA & Akun', content: 'Gunakan menu Daftar Akun (CoA) untuk menyesuaikan akun cabang dan struktur akuntansi syariah. Manager dapat menambah atau memperbarui akun yang terkait cabangnya.' },
+      { id: 'm4', title: 'Manajemen Pelanggan Cabang', content: 'Gunakan menu Master Pelanggan untuk melihat dan mengubah Total Point, memantau penggunaan poin, serta mencatat piutang kasbon untuk cabang Anda.' },
+      { id: 'm5', title: 'Approval Pembatalan (Void)', content: 'Setiap pengajuan pembatalan (Void) dari Kasir/Admin akan masuk ke ikon Lonceng (Notifikasi). Anda bisa langsung menuju Riwayat untuk Approve atau Reject.' }
     ];
 
       const ownerGuide = [
-      { id: 'o1', title: 'Konfigurasi Sistem & Jam Operasional', content: 'Masuk ke menu Tata Kelola > Pengaturan Toko. Anda dapat mengatur Jam Operasional Toko (hidup/mati serta pesan libur), Mode Pemeliharaan (memblokir sementara akses login staf), Batas Minimum Saldo Kas, Presentase Zakat Niaga (Default 2.5%), dan opsi Auto-Approval.' },
-      { id: 'o2', title: 'Standar Akuntansi Syariah (Laba Rugi & Neraca)', content: 'Akses menu Dashboard & Laporan > Laporan Laba Rugi. Laporan ini telah memisahkan antara Laba Bersih dan Zakat Niaga. Zakat ditarik otomatis dari surplus laba bersih, menyisakan SHU Bersih untuk dibagihasilkan secara Mudharabah. Fitur ini dirancang sesuai tinjauan dan standar kepatuhan syariah (Review Pak Grandis).' },
-      { id: 'o3', title: 'Manajemen Chart of Accounts (CoA)', content: 'Gunakan menu "Daftar Akun (CoA)" untuk menyesuaikan tata letak akuntansi (misal menambahkan pos Zakat, Infak, atau Bagi Hasil khusus).' },
+      { id: 'o1', title: 'Konfigurasi Sistem & Geofencing Lokasi', content: 'Masuk ke menu Tata Kelola > Pengaturan Toko. Anda dapat mengunci kordinat lokasi (Latitude & Longitude) toko dari GPS Anda, yang akan berfungsi ganda sebagai batas radius Absensi Karyawan dan batas maksimal pengiriman Pesanan Online.' },
+      { id: 'o2', title: 'Standar Akuntansi Syariah (Laba Rugi & Neraca)', content: 'Akses menu Dashboard & Laporan > Laporan Laba Rugi. Laporan ini telah memisahkan Laba Bersih dan Zakat Niaga (2.5%), menyisakan SHU Bersih untuk dibagihasilkan secara Mudharabah. Fitur ini dirancang sesuai standar kepatuhan syariah (Review Pak Grandis).' },
+      { id: 'o3', title: 'Manajemen Karyawan (HR) Menyeluruh', content: 'Pantau kehadiran, setujui permohonan cuti/izin/sakit, dan pantau kedisiplinan (Late/Alfa) karyawan seluruh cabang melalui menu Manajemen Karyawan (HR).' },
       { id: 'o4', title: 'Zakat Niaga Otomatis', content: 'Sistem mengkalkulasi kewajiban zakat (zakatReserve) otomatis sebesar 2.5% (atau sesuai pengaturan) dari netProfit berjalan jika usahanya untung. Transparan tanpa intervensi manual.' },
       { id: 'o5', title: 'Manajemen Pengguna Terpusat', content: 'Akses menu Manajemen Akun. Anda bisa melihat semua staf dari semua cabang. Manager hanya bisa melihat cabang mereka sendiri.' }
     ];

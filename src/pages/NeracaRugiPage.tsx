@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAppStore } from '../store';
 import { useBranchData } from '../hooks/useBranchData';
 import * as XLSX from 'xlsx';
 import { useReactToPrint } from 'react-to-print';
@@ -22,9 +24,12 @@ import {
 } from 'lucide-react';
 
 export default function NeracaRugiPage() {
-  const { transactions, products, expenses, journalEntries, currentUser, activeBranchId, branches, addLog, addNotification, settings } = useBranchData();
+  const navigate = useNavigate();
+  const { transactions, products, expenses, journalEntries, currentUser, activeBranchId, branches, addLog, addNotification, settings, customers } = useBranchData();
+  const users = useAppStore(state => state.users);
   const reportRef = useRef<HTMLDivElement>(null);
-  const isReadOnlyRole = currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'PENGURUS';
+  const isOwner = currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'PENGURUS';
+  const isReadOnlyRole = !isOwner && currentUser?.role !== 'MANAGER';
 
   // WIB (Asia/Jakarta) Date Initialization
   const getLocalDateString = (offsetDays = 0) => {
@@ -44,11 +49,71 @@ export default function NeracaRugiPage() {
   });
   const [endDate, setEndDate] = useState(() => getLocalDateString());
 
+  // Pagination for Customer Receivables
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Calculate historical debt dynamically for audit-readiness
+  const customerData = useMemo(() => {
+    return (customers || []).map(c => {
+      let futureDebits = 0;
+      let futureCredits = 0;
+      let hadActivityThisMonth = false;
+
+      (journalEntries || []).forEach(je => {
+        const isPiutang = je.account === 'PIUTANG_DAGANG' || (je.account && je.account.toLowerCase().includes('piutang'));
+        if (isPiutang) {
+          let isRelated = false;
+          if (je.referenceType === 'AUTO_TRANSAKSI') {
+            const tx = (transactions || []).find(t => t.id === je.referenceId);
+            if (tx && tx.customerId === c.id) isRelated = true;
+          } else if (je.referenceType === 'MANUAL') {
+            if (je.referenceId === c.id) isRelated = true;
+          }
+
+          if (isRelated) {
+            if (je.date > endDate) {
+              // Revert transactions that happened AFTER the endDate
+              futureDebits += (Number(je.debit) || 0);
+              futureCredits += (Number(je.credit) || 0);
+            } else if (je.date >= startDate && je.date <= endDate) {
+              // Track if they paid or borrowed during the active view period
+              hadActivityThisMonth = true;
+            }
+          }
+        }
+      });
+
+      // Current balance minus additions after endDate plus payments after endDate
+      const historicalDebt = (Number(c.debtAmount) || 0) - futureDebits + futureCredits;
+      
+      return { ...c, historicalDebt, hadActivityThisMonth };
+    });
+  }, [customers, journalEntries, transactions, startDate, endDate]);
+
+  const kasbonCustomers = useMemo(() => {
+    return customerData
+      .filter(c => c.historicalDebt > 0 || (c.historicalDebt <= 0 && c.hadActivityThisMonth))
+      .sort((a, b) => b.historicalDebt - a.historicalDebt);
+  }, [customerData]);
+
   // Persistent Input values for Balance Sheet (saves to localStorage)
+  const autoReceivablesVal = useMemo(() => {
+    return kasbonCustomers.reduce((sum, c) => sum + (c.historicalDebt > 0 ? c.historicalDebt : 0), 0);
+  }, [kasbonCustomers]);
+
+  const piutangKaryawanVal = useMemo(() => {
+    return users.reduce((sum, u) => sum + (u.debtAmount || 0), 0);
+  }, [users]);
+
   const [receivablesVal, setReceivablesVal] = useState(() => {
     const saved = localStorage.getItem('ksa_neraca_receivables');
     return saved ? Number(saved) : 0;
   });
+
+  // Sync auto if it changes (or just use it directly, but we want it to be part of totalAssets)
+  const activeReceivablesVal = autoReceivablesVal;
+
   const [accountsPayables, setAccountsPayables] = useState(() => {
     const saved = localStorage.getItem('ksa_neraca_payables');
     return saved ? Number(saved) : 0;
@@ -98,11 +163,14 @@ export default function NeracaRugiPage() {
     return txDate >= startDate && txDate <= endDate;
   });
 
-  const filteredExpenses = (expenses || []).filter(exp => {
+  const filteredAllExpenses = (expenses || []).filter(exp => {
     if (!exp || !exp.date) return false;
     const expDate = String(exp.date).split('T')[0];
     return expDate >= startDate && expDate <= endDate;
   });
+
+  const filteredExpenses = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0);
+  const filteredOtherIncome = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) < 0);
 
   const periodTransactionsRevenue = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
   const periodTransactionsHPP = filteredTransactions.reduce((sum, tx) => {
@@ -119,6 +187,7 @@ export default function NeracaRugiPage() {
     }, 0);
   }, 0);
   const periodTransactionsExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+  const periodOtherIncome = filteredOtherIncome.reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
 
   // Manual Journals
   const manualJournals = (journalEntries || []).filter(j => j.referenceType === 'MANUAL');
@@ -134,16 +203,17 @@ export default function NeracaRugiPage() {
 
   periodManualJournals.forEach(j => {
     if (!j.account) return;
-    if (j.account.startsWith('4-')) periodManualRevenue += (j.credit - j.debit);
-    else if (j.account.startsWith('5-')) periodManualHPP += (j.debit - j.credit);
-    else if (j.account.startsWith('6-')) periodManualExpenses += (j.debit - j.credit);
+    const acc = j.account.toLowerCase();
+    if (j.account.startsWith('4-') || j.account.startsWith('4')) periodManualRevenue += (j.credit - j.debit);
+    else if (j.account.startsWith('5-') || j.account.startsWith('5')) periodManualHPP += (j.debit - j.credit);
+    else if (j.account.startsWith('6-') || j.account.startsWith('6')) periodManualExpenses += (j.debit - j.credit);
   });
 
   const totalRevenue = periodTransactionsRevenue + periodManualRevenue;
   const totalHPP = periodTransactionsHPP + periodManualHPP;
   const grossProfit = totalRevenue - totalHPP;
   const totalExpenses = periodTransactionsExpenses + periodManualExpenses;
-  const netProfit = grossProfit - totalExpenses;
+  const netProfit = grossProfit + periodOtherIncome - totalExpenses;
   const zakatRateDecimal = (settings.charityZakatPercentage || 2.5) / 100;
   const zakatReserve = Math.round(Math.max(0, netProfit) * zakatRateDecimal); // Zakat Niaga berdasarkan Keuntungan Bersih, dibulatkan
 
@@ -188,10 +258,40 @@ export default function NeracaRugiPage() {
 
   cumulativeManualJournals.forEach(j => {
     if (!j.account) return;
-    if (j.account.startsWith('4-')) allTimeManualRevenue += (j.credit - j.debit);
-    else if (j.account.startsWith('5-')) allTimeManualHPP += (j.debit - j.credit);
-    else if (j.account.startsWith('6-')) allTimeManualExpenses += (j.debit - j.credit);
-    else if (j.account.startsWith('1-100') || j.account.startsWith('1-101')) allTimeManualCash += (j.debit - j.credit);
+    const acc = j.account.toLowerCase();
+    if (j.account.startsWith('4-') || j.account.startsWith('4')) allTimeManualRevenue += (j.credit - j.debit);
+    else if (j.account.startsWith('5-') || j.account.startsWith('5')) allTimeManualHPP += (j.debit - j.credit);
+    else if (j.account.startsWith('6-') || j.account.startsWith('6')) allTimeManualExpenses += (j.debit - j.credit);
+    else if (
+      j.account.startsWith('1-100') || 
+      j.account.startsWith('1-101') || 
+      acc.includes('kas kecil') || 
+      acc.includes('kas utama') ||
+      j.account.startsWith('1101') ||
+      j.account.startsWith('1102') ||
+      j.account.startsWith('1112')
+    ) {
+      allTimeManualCash += (j.debit - j.credit);
+    }
+  });
+
+  // Calculate separate cash balances directly from ALL journals
+  let balanceKasTunai = initialStoreCapital; // modal awal dianggap masuk ke kas tunai
+  let balanceKasKecil = 0;
+  let balanceBank = 0;
+
+  (journalEntries || []).forEach(j => {
+    const jd = j.date.split('T')[0];
+    if (jd <= endDate) {
+      const acc = j.account ? j.account.toLowerCase() : '';
+      if (acc.includes('1102') || acc.includes('kas kecil')) {
+        balanceKasKecil += (j.debit - j.credit);
+      } else if (acc.includes('1112') || acc.includes('bank') || acc.includes('qris')) {
+        balanceBank += (j.debit - j.credit);
+      } else if (acc.includes('1101') || acc.includes('1-1000') || acc.includes('kas tunai') || acc.includes('kas utama') || acc.startsWith('1-100')) {
+        balanceKasTunai += (j.debit - j.credit);
+      }
+    }
   });
 
   const allTimeRevenue = allTimeTransactionsRevenue + allTimeManualRevenue;
@@ -200,15 +300,15 @@ export default function NeracaRugiPage() {
 
   const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses;
 
-  // Sound liquid capital: initial seed + POS revenues cumulative - POS expenses cumulative + manual cash movements
-  const cashOnHand = initialStoreCapital + allTimeTransactionsRevenue - allTimeTransactionsExpenses + allTimeManualCash;
+  // Sound liquid capital: sum of the 3 separated cash accounts
+  const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank;
 
   // Unsold merchandise stock valuation (asset)
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
   const valueOfInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
 
   // Total Aktiva (Assets)
-  const totalAssets = cashOnHand + valueOfInventory + Number(receivablesVal);
+  const totalAssets = cashOnHand + valueOfInventory + activeReceivablesVal + Number(receivablesVal) + piutangKaryawanVal;
 
   // Dynamic automatic accounting balancer to lock difference at Rp 0
   const balancedCapitalValue = totalAssets - allTimeProfit - Number(accountsPayables);
@@ -269,6 +369,9 @@ export default function NeracaRugiPage() {
 
   return (
     <div className="space-y-6">
+      
+      {/* INTERACTIVE UI (Hidden during print) */}
+      <div className="print:hidden space-y-6">
 
       {/* HEADER CARD */}
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200 dark:border-slate-700/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -306,7 +409,7 @@ export default function NeracaRugiPage() {
             />
           </div>
 
-          {isReadOnlyRole ? (
+          {isOwner ? (
             <button
               onClick={() => {
                 addLog('REPORT_APPROVAL', 'FINANCE', `Owner menyetujui Laporan Neraca & Laba Rugi periode ${startDate} sd ${endDate}.`);
@@ -452,13 +555,34 @@ export default function NeracaRugiPage() {
 
               <div className="flex justify-between items-center pl-4 py-1.5 border-b border-dashed border-gray-100 dark:border-slate-800">
                 <span className="text-gray-500 dark:text-slate-400 font-medium">Beban Pokok Penjualan (HPP produk keluar)</span>
-                <span className="text-red-500 font-semibold font-mono">- Rp {totalHPP.toLocaleString('id-ID')}</span>
+                <span className="text-red-700 font-semibold font-mono">- Rp {totalHPP.toLocaleString('id-ID')}</span>
               </div>
 
               <div className="flex justify-between font-bold text-green-800 bg-green-50/40 px-3.5 py-2 rounded-lg border border-green-100/60">
                 <span>LABA KOTOR PENJUALAN (PSAK 102)</span>
                 <span className="font-mono">Rp {grossProfit.toLocaleString('id-ID')}</span>
               </div>
+
+              {filteredOtherIncome.length > 0 && (
+                <div className="pt-2 pb-1">
+                  <div className="flex justify-between items-center font-bold text-blue-800 border-b pb-1 mb-2">
+                    <span>PENDAPATAN LAINNYA (DARI KASIR)</span>
+                    <span className="text-[10px] text-gray-400 font-medium">{filteredOtherIncome.length} transaksi</span>
+                  </div>
+                  <div className="space-y-2 pl-4">
+                    {filteredOtherIncome.map((exp) => (
+                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400">
+                        <span className="truncate max-w-[240px]">• {exp.description.replace('Pemasukan Kas: ', '')}</span>
+                        <span className="text-blue-700 font-mono">+ Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between font-bold text-blue-700 pl-4 py-1.5 mt-1 border-t border-blue-100/50 text-[11px]">
+                    <span>Total Pendapatan Lainnya</span>
+                    <span className="font-mono">+ Rp {periodOtherIncome.toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2">
                 <div className="flex justify-between items-center font-bold text-slate-755 border-b pb-1 mb-2">
@@ -473,7 +597,7 @@ export default function NeracaRugiPage() {
                     filteredExpenses.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors">
                         <span className="truncate max-w-[240px]">• {exp.description} ({exp.category})</span>
-                        <span className="text-red-500 font-mono">- Rp {exp.amount.toLocaleString('id-ID')}</span>
+                        <span className="text-red-700 font-mono">- Rp {exp.amount.toLocaleString('id-ID')}</span>
                       </div>
                     ))
                   )}
@@ -481,7 +605,7 @@ export default function NeracaRugiPage() {
 
                 <div className="flex justify-between font-bold text-gray-500 dark:text-slate-400 pl-4 py-2 mt-2 border-t border-gray-100 dark:border-slate-800 text-[11px]">
                   <span>Total Kebutuhan Biaya Operasi</span>
-                  <span className="font-mono text-red-500">Rp {totalExpenses.toLocaleString('id-ID')}</span>
+                  <span className="font-mono text-red-700">Rp {totalExpenses.toLocaleString('id-ID')}</span>
                 </div>
               </div>
             </div>
@@ -536,8 +660,23 @@ export default function NeracaRugiPage() {
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium">Kas & Setara Kas (Saldo Bersih)</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {cashOnHand.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas Tunai Utama</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceKasTunai.toLocaleString('id-ID')}</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas Kecil</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceKasKecil.toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas di Bank / QRIS</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceBank.toLocaleString('id-ID')}</span>
+                </div>
+                
+                <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-slate-700/50">
+                  <span className="text-slate-800 dark:text-slate-200 font-bold">Total Kas & Setara Kas</span>
+                  <span className="font-mono font-black text-slate-900 dark:text-white">Rp {cashOnHand.toLocaleString('id-ID')}</span>
                 </div>
 
                 <div className="flex justify-between">
@@ -560,7 +699,42 @@ export default function NeracaRugiPage() {
                 </div>
 
                 <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
-                  <span className="text-gray-650 font-bold">Piutang Dagang:</span>
+                  <div className="flex flex-col">
+                    <span className="text-gray-650 font-bold">Piutang Kasbon Pelanggan:</span>
+                    <span className="text-[9px] text-green-600 font-bold tracking-wider">OTOMATIS TERSINKRON</span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
+                    <input
+                      type="text"
+                      value={activeReceivablesVal.toLocaleString('id-ID')}
+                      disabled={true}
+                      className="w-28 text-right bg-slate-100 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-xs font-bold text-slate-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
+                  <div className="flex flex-col">
+                    <span className="text-gray-650 font-bold">Piutang Kasbon Karyawan:</span>
+                    <span className="text-[9px] text-green-600 font-bold tracking-wider">OTOMATIS TERSINKRON</span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
+                    <input
+                      type="text"
+                      value={piutangKaryawanVal.toLocaleString('id-ID')}
+                      disabled={true}
+                      className="w-28 text-right bg-slate-100 dark:bg-slate-800/80 border border-gray-200 dark:border-slate-700 rounded px-1.5 py-1 font-mono text-xs font-bold text-slate-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+
+                <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">
+                  <div className="flex flex-col">
+                    <span className="text-gray-650 font-bold">Piutang Lainnya (Manual):</span>
+                  </div>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
                     <input
@@ -609,16 +783,21 @@ export default function NeracaRugiPage() {
                   </span>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 font-mono text-[10px]">Rp</span>
-                    <input
-                      type="number"
-                      value={activeEquityValue}
-                      disabled={isReadOnlyRole || isAutoBalanced}
-                      onChange={(e) => setEquityCapitalInput(Number(e.target.value))}
-                      className={`w-28 text-right border rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none ${isReadOnlyRole || isAutoBalanced
-                          ? 'bg-green-50/55 border-green-100 text-green-900 cursor-not-allowed font-black'
-                          : 'bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700'
-                        }`}
-                    />
+                    {isReadOnlyRole || isAutoBalanced ? (
+                      <input
+                        type="text"
+                        value={activeEquityValue.toLocaleString('id-ID')}
+                        disabled={true}
+                        className="w-28 text-right border rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none bg-green-50/55 border-green-100 text-green-900 cursor-not-allowed font-black"
+                      />
+                    ) : (
+                      <input
+                        type="number"
+                        value={activeEquityValue}
+                        onChange={(e) => setEquityCapitalInput(Number(e.target.value))}
+                        className="w-28 text-right border rounded px-1.5 py-1 font-mono text-xs font-bold focus:outline-none bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700"
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -665,8 +844,109 @@ export default function NeracaRugiPage() {
 
       </div>
 
+      {/* Rincian Piutang Kasbon Pelanggan */}
+      {(() => {
+        if (kasbonCustomers.length === 0) return null;
+
+        const totalPages = Math.ceil(kasbonCustomers.length / itemsPerPage);
+        const currentData = kasbonCustomers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+        const totalKasbon = kasbonCustomers.reduce((sum, c) => sum + (c.historicalDebt > 0 ? c.historicalDebt : 0), 0);
+
+        return (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden mt-6 mb-8">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                Daftar Piutang Kasbon Pelanggan
+              </h3>
+              <span className="text-xs font-bold text-slate-500 bg-white dark:bg-slate-700 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">
+                Total: {kasbonCustomers.length} Orang
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs uppercase bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Akun Pelanggan / No HP</th>
+                    <th className="px-4 py-3 text-right">Sisa Kasbon (Rp)</th>
+                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {currentData.map(customer => {
+                    const isLunas = customer.historicalDebt <= 0;
+                    return (
+                      <tr key={customer.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-800 dark:text-slate-200">{customer.name}</div>
+                          {customer.phone && <div className="text-xs text-slate-500">{customer.phone}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold text-amber-600">
+                          Rp {Math.max(0, customer.historicalDebt).toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {isLunas ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                              <CheckCircle2 className="w-3 h-3" />
+                              LUNAS
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              BELUM LUNAS
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button 
+                            onClick={() => navigate('/customers', { state: { selectedCustomerId: customer.id } })}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800"
+                          >
+                            Update Kasbon
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-slate-50 dark:bg-slate-800/80 font-bold">
+                    <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">TOTAL KASBON AKTIF:</td>
+                    <td className="px-4 py-3 text-right font-mono text-amber-700">
+                      Rp {totalKasbon.toLocaleString('id-ID')}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+                >
+                  Sebelumnya
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  Halaman {currentPage} dari {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+      </div> {/* End of Interactive UI */}
+
       {/* Printable Area - A4 Report */}
-      <div style={{ display: 'none' }}>
+      <div className="hidden print:block">
         <div className="printable-area printable-a4 space-y-6 bg-white dark:bg-slate-900 p-8 text-black" ref={reportRef}>
           <PrintHeader title="Laporan Neraca Laba Rugi" period={`${startDate} s/d ${endDate}`} />
 
@@ -727,7 +1007,15 @@ export default function NeracaRugiPage() {
                   <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {valueOfInventory.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>
-                  <td className="p-2 border border-gray-300 dark:border-slate-600">Piutang Dagang</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Piutang Kasbon Pelanggan (Otomatis)</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {activeReceivablesVal.toLocaleString('id-ID')}</td>
+                </tr>
+                <tr>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Piutang Kasbon Karyawan (Otomatis)</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {piutangKaryawanVal.toLocaleString('id-ID')}</td>
+                </tr>
+                <tr>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Piutang Dagang Lainnya (Manual)</td>
                   <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {receivablesVal.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr className="font-bold bg-gray-50 dark:bg-slate-800">
@@ -763,6 +1051,44 @@ export default function NeracaRugiPage() {
             </table>
           </div>
         </div>
+
+        {/* Kasbon Details Print Section */}
+        {kasbonCustomers.length > 0 && (
+          <div className="mt-8" style={{ pageBreakBefore: 'always' }}>
+            <h2 className="font-bold text-sm bg-gray-100 dark:bg-slate-800 p-2 border border-gray-300 dark:border-slate-600">
+              III. DAFTAR PIUTANG KASBON PELANGGAN
+            </h2>
+            <table className="w-full text-xs text-left border-collapse border border-gray-300 dark:border-slate-600 mt-4">
+              <thead className="bg-gray-50 dark:bg-slate-800">
+                <tr>
+                  <th className="p-2 border border-gray-300 dark:border-slate-600">No</th>
+                  <th className="p-2 border border-gray-300 dark:border-slate-600">Nama Pelanggan</th>
+                  <th className="p-2 border border-gray-300 dark:border-slate-600">No. HP</th>
+                  <th className="p-2 border border-gray-300 dark:border-slate-600 text-right">Sisa Kasbon (Rp)</th>
+                  <th className="p-2 border border-gray-300 dark:border-slate-600 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kasbonCustomers.map((customer, idx) => (
+                  <tr key={customer.id}>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 w-10 text-center">{idx + 1}</td>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 font-medium">{customer.name}</td>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600">{customer.phone || '-'}</td>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {Math.max(0, customer.historicalDebt).toLocaleString('id-ID')}</td>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 text-center font-bold">
+                      {customer.historicalDebt <= 0 ? 'LUNAS' : 'BELUM LUNAS'}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="font-bold bg-gray-50 dark:bg-slate-800">
+                  <td colSpan={3} className="p-2 border border-gray-300 dark:border-slate-600 text-right">TOTAL PIUTANG KASBON (AKTIF)</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-amber-700">Rp {kasbonCustomers.reduce((sum, c) => sum + Math.max(0, c.historicalDebt), 0).toLocaleString('id-ID')}</td>
+                  <td className="border border-gray-300 dark:border-slate-600"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
 
           <PrintFooter />
         </div>

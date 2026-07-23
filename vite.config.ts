@@ -12,7 +12,7 @@ export default defineConfig(() => {
     plugins: [
       react(), 
       tailwindcss(),
-      !isDev && VitePWA({
+      VitePWA({
         registerType: 'autoUpdate',
         devOptions: { enabled: false }, // disable service worker in dev to avoid reload/cache issues during local browser testing
         manifest: {

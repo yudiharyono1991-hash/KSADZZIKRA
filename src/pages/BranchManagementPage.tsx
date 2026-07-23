@@ -265,7 +265,7 @@ export default function BranchManagementPage() {
                 {activeSection === 'info' && (
                   <>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Nama Cabang <span className="text-red-500">*</span></label>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Nama Cabang <span className="text-red-700">*</span></label>
                       <input
                         type="text"
                         required
@@ -276,7 +276,7 @@ export default function BranchManagementPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Alamat Lengkap <span className="text-red-500">*</span></label>
+                      <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Alamat Lengkap <span className="text-red-700">*</span></label>
                       <textarea
                         required
                         rows={3}
@@ -288,7 +288,7 @@ export default function BranchManagementPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Nomor Telepon <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Nomor Telepon <span className="text-red-700">*</span></label>
                         <input
                           type="text"
                           required
@@ -388,7 +388,7 @@ export default function BranchManagementPage() {
                           <button
                             type="button"
                             onClick={() => setFormData(prev => ({ ...prev, qrisImageUrl: '' }))}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium"
+                            className="text-xs text-red-700 hover:text-red-700 font-medium"
                           >
                             Hapus QRIS ini
                           </button>

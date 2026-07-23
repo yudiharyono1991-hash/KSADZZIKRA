@@ -42,7 +42,7 @@ export default function KoperasiPembiayaanPage() {
       nominal: Number(formData.nominal) || 0,
       margin: Number(formData.margin) || 0,
       tenorBulan: Number(formData.tenorBulan) || 1,
-      tanggal: new Date().toISOString().split('T')[0],
+      tanggal: new Date().toLocaleDateString('en-CA'),
       status: 'Aktif'
     };
     saveToStorage([newRecord, ...data]);
@@ -154,7 +154,7 @@ export default function KoperasiPembiayaanPage() {
                     </span>
                   </td>
                   <td className="p-4 text-center">
-                    <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Hapus">
+                    <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-700 hover:bg-red-50 rounded-lg transition" title="Hapus">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { UserCheck, Clock, CheckCircle, Search, AlertTriangle, ThumbsUp, ThumbsDown, Banknote, Calculator, Printer, AlertCircle } from 'lucide-react';
+import { UserCheck, Clock, CheckCircle, Search, AlertTriangle, ThumbsUp, ThumbsDown, Banknote, Calculator, Printer, AlertCircle, Calendar } from 'lucide-react';
+import { useAppStore } from '../store';
 
 export default function StaffManagementPage() {
   const store = useBranchData();
@@ -10,12 +11,21 @@ export default function StaffManagementPage() {
   const addAttendanceCorrection = (store as any).addAttendanceCorrection || (() => {});
   const updateAttendanceCorrection = (store as any).updateAttendanceCorrection || (() => {});
   const reviewAttendanceCorrection = (store as any).reviewAttendanceCorrection || ((id: string, approve: boolean) => {});
+  const { settings, updateSettings } = useAppStore();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'LOG' | 'CORRECTIONS' | 'CASH_OPNAME'>('LOG');
+  
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
+  
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(currentDay);
+
+  const [activeTab, setActiveTab] = useState<'LOG' | 'CORRECTIONS' | 'CASH_OPNAME' | 'SCHEDULE'>('LOG');
 
   // Cash Opname State
-  const [opnameDate, setOpnameDate] = useState(new Date().toISOString().split('T')[0]);
+  const [opnameDate, setOpnameDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [physicalCash, setPhysicalCash] = useState('');
   const [opnameCashierName, setOpnameCashierName] = useState('');
   const [opnameNotes, setOpnameNotes] = useState('');
@@ -25,13 +35,31 @@ export default function StaffManagementPage() {
   }>>([]);
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
 
-  const filteredAttendances = attendances.filter(a => a.userName.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredAttendances = attendances.filter(a => {
+    const matchName = a.userName.toLowerCase().includes(searchTerm.toLowerCase());
+    let matchDate = true;
+    if (startDate && new Date(a.date).getTime() < new Date(startDate).setHours(0,0,0,0)) matchDate = false;
+    if (endDate && new Date(a.date).getTime() > new Date(endDate).setHours(23,59,59,999)) matchDate = false;
+    return matchName && matchDate;
+  });
+
+  const stats = {
+    present: filteredAttendances.filter(a => a.status === 'PRESENT').length,
+    late: filteredAttendances.filter(a => a.status === 'LATE').length,
+    izin: filteredAttendances.filter(a => a.status === 'IZIN').length,
+    sakit: filteredAttendances.filter(a => a.status === 'SAKIT').length,
+    cuti: filteredAttendances.filter(a => a.status === 'CUTI').length,
+    alfa: filteredAttendances.filter(a => a.status === 'ALFA').length,
+  };
 
   const pendingCorrections = attendances.filter(a => a.correctionStatus === 'PENDING');
+
+  // Hanya OWNER/SUPERADMIN/MANAGER yang boleh approve. ADMIN tidak boleh approve.
+  const canApproveHR = ['OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '');
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -59,7 +87,7 @@ export default function StaffManagementPage() {
           onClick={() => setActiveTab('CORRECTIONS')}
           className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CORRECTIONS' ? 'border-b-2 border-amber-500 text-amber-700 bg-amber-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
-          <AlertTriangle className="w-4 h-4" /> Permohonan Koreksi
+          <AlertTriangle className="w-4 h-4" /> Approval Absensi
           {pendingCorrections.length > 0 && (
             <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{pendingCorrections.length}</span>
           )}
@@ -69,6 +97,12 @@ export default function StaffManagementPage() {
           className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CASH_OPNAME' ? 'border-b-2 border-green-600 text-green-700 bg-green-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
           <Banknote className="w-4 h-4" /> Cash Opname
+        </button>
+        <button
+          onClick={() => setActiveTab('SCHEDULE')}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'SCHEDULE' ? 'border-b-2 border-blue-600 text-blue-700 bg-blue-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
+        >
+          <Calendar className="w-4 h-4" /> Jadwal Shift
         </button>
       </div>
 
@@ -80,9 +114,53 @@ export default function StaffManagementPage() {
               <h2 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-teal-600" /> Log Absensi
               </h2>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-slate-800">
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={e => setStartDate(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none w-28"
+                  />
+                  <span className="text-gray-400 text-xs">s/d</span>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={e => setEndDate(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none w-28"
+                  />
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 grid grid-cols-2 md:grid-cols-6 gap-3 bg-gray-50/50 dark:bg-slate-800/20 border-b border-gray-100 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tepat Waktu</div>
+                <div className="text-xl font-black text-green-600">{stats.present}</div>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Terlambat</div>
+                <div className="text-xl font-black text-amber-500">{stats.late}</div>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Sakit</div>
+                <div className="text-xl font-black text-blue-500">{stats.sakit}</div>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Izin</div>
+                <div className="text-xl font-black text-purple-500">{stats.izin}</div>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cuti</div>
+                <div className="text-xl font-black text-teal-500">{stats.cuti}</div>
+              </div>
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Alfa</div>
+                <div className="text-xl font-black text-red-700">{stats.alfa}</div>
               </div>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
@@ -117,9 +195,9 @@ export default function StaffManagementPage() {
                            <span className="text-[10px] text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-teal-600">{new Date(a.clockIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                      <td className="px-4 py-3 text-center text-teal-600">{new Date(a.clockIn).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</td>
                       <td className="px-4 py-3 text-center text-amber-600">
-                        {a.clockOut ? new Date(a.clockOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}
+                        {a.clockOut ? new Date(a.clockOut).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded border border-teal-100 text-[10px]">
@@ -146,18 +224,26 @@ export default function StaffManagementPage() {
           {pendingCorrections.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 border border-gray-100 dark:border-slate-800 shadow-sm text-center">
               <CheckCircle className="w-16 h-16 text-green-200 mx-auto mb-4" />
-              <h3 className="font-bold text-gray-700 dark:text-slate-300 text-lg">Tidak Ada Permohonan Koreksi</h3>
+              <h3 className="font-bold text-gray-700 dark:text-slate-300 text-lg">Tidak Ada Pengajuan</h3>
               <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">Semua absensi karyawan sudah berstatus normal.</p>
             </div>
           ) : (
-            pendingCorrections.map(a => (
+            pendingCorrections.map(a => {
+              // Larang approve/reject jika pengaju adalah diri sendiri
+              const isSelf = a.userName === currentUser?.name || a.userName === currentUser?.username;
+              const canAct = canApproveHR && !isSelf;
+
+              return (
               <div key={a.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
                 <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="font-bold text-gray-800 dark:text-slate-200 text-sm">{a.userName} — <span className="text-amber-700">{a.date}</span></p>
-                    <p className="text-xs text-gray-500 dark:text-slate-400">Memohon koreksi: <strong>{a.correctionType === 'CLOCK_IN' ? 'Jam Masuk' : a.correctionType === 'CLOCK_OUT' ? 'Jam Keluar' : 'Jam Masuk & Keluar'}</strong></p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Memohon: <strong>{a.correctionType === 'LEAVE' ? `Izin/Cuti (${a.leaveType})` : a.correctionType === 'CLOCK_IN' ? 'Koreksi Jam Masuk' : a.correctionType === 'CLOCK_OUT' ? 'Koreksi Jam Keluar' : 'Koreksi Jam Masuk & Keluar'}</strong></p>
                   </div>
+                  {isSelf && (
+                    <span className="text-[10px] font-black bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded-full">PENGAJUAN ANDA SENDIRI</span>
+                  )}
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-4 text-sm">
@@ -182,23 +268,33 @@ export default function StaffManagementPage() {
                     <p className="text-xs text-amber-600 font-bold mb-1">Alasan Karyawan:</p>
                     <p className="text-sm text-amber-900 italic">"{a.correctionReason}"</p>
                   </div>
+                  {!canAct && (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                      <p className="text-xs text-red-700 font-bold">
+                        {isSelf ? '🚫 Anda tidak dapat menyetujui pengajuan Anda sendiri.' : '🔒 Hanya Owner/Manager yang dapat memberikan persetujuan.'}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex gap-3 pt-1">
                     <button
-                      onClick={() => { reviewAttendanceCorrection(a.id, false); }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-sm transition-colors"
+                      onClick={() => { if (canAct) reviewAttendanceCorrection(a.id, false); }}
+                      disabled={!canAct}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 border rounded-xl font-bold text-sm transition-colors ${canAct ? 'border-red-200 text-red-600 hover:bg-red-50 cursor-pointer' : 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'}`}
                     >
                       <ThumbsDown className="w-4 h-4" /> Tolak
                     </button>
                     <button
-                      onClick={() => { reviewAttendanceCorrection(a.id, true); alert(`Koreksi absen ${a.userName} berhasil disetujui. Data jam absen telah diperbarui.`); }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm transition-colors"
+                      onClick={() => { if (canAct) { reviewAttendanceCorrection(a.id, true); alert(`Koreksi absen ${a.userName} berhasil disetujui. Data jam absen telah diperbarui.`); } }}
+                      disabled={!canAct}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-colors ${canAct ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                     >
                       <ThumbsUp className="w-4 h-4" /> Setujui Koreksi
                     </button>
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -381,6 +477,91 @@ export default function StaffManagementPage() {
           </div>
         );
       })()}
+
+      {activeTab === 'SCHEDULE' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-gray-800 dark:text-slate-200">Penugasan Shift Karyawan</h3>
+          </div>
+          
+          {(!settings.operationalHours?.shifts || settings.operationalHours.shifts.length === 0) ? (
+            <div className="text-center py-10 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Clock className="w-10 h-10 mx-auto text-slate-400 mb-3" />
+              <h4 className="font-bold text-slate-700 dark:text-slate-300">Belum Ada Shift</h4>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Anda belum mengatur shift operasional. Silakan atur shift di menu Pengaturan terlebih dahulu sebelum menugaskannya ke karyawan.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
+                    <th className="p-4 w-48 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Karyawan</th>
+                    <th className="p-2 text-center">Sen</th>
+                    <th className="p-2 text-center">Sel</th>
+                    <th className="p-2 text-center">Rab</th>
+                    <th className="p-2 text-center">Kam</th>
+                    <th className="p-2 text-center">Jum</th>
+                    <th className="p-2 text-center">Sab</th>
+                    <th className="p-2 text-center">Min</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {users.filter(u => u.isApproved && (u.role === 'CASHIER' || u.role.startsWith('STAFF'))).map((user) => (
+                    <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
+                      <td className="p-4 font-bold text-slate-800 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10">
+                        {user.name}
+                        <div className="text-xs font-normal text-slate-500">{user.role}</div>
+                      </td>
+                      {[1, 2, 3, 4, 5, 6, 0].map(dayIndex => (
+                        <td key={dayIndex} className="p-2">
+                          <select
+                            value={(settings.operationalHours?.shiftAssignments?.[user.id] as any)?.[dayIndex] || ''}
+                            onChange={(e) => {
+                              const currentAssignments = settings.operationalHours?.shiftAssignments || {};
+                              const userAssigns = (currentAssignments[user.id] as any) || {};
+                              const newAssignments = { ...currentAssignments };
+                              
+                              if (e.target.value) {
+                                newAssignments[user.id] = { ...userAssigns, [dayIndex]: e.target.value } as any;
+                              } else {
+                                const updatedUserAssigns = { ...userAssigns };
+                                delete updatedUserAssigns[dayIndex];
+                                if (Object.keys(updatedUserAssigns).length === 0) {
+                                  delete newAssignments[user.id];
+                                } else {
+                                  newAssignments[user.id] = updatedUserAssigns as any;
+                                }
+                              }
+                              
+                              updateSettings({
+                                operationalHours: {
+                                  ...(settings.operationalHours || { isOpen: true, openTime: '07:00', closeTime: '21:00', closedMessage: '' }),
+                                  shiftAssignments: newAssignments
+                                }
+                              });
+                            }}
+                            className={`border border-slate-300 dark:border-slate-600 text-[11px] font-medium rounded p-1 w-full outline-none focus:ring-1 focus:ring-blue-500
+                              ${(settings.operationalHours?.shiftAssignments?.[user.id] as any)?.[dayIndex] === 'LIBUR' 
+                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200' 
+                                : 'bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-300'}
+                            `}
+                          >
+                            <option value="">-- Reg --</option>
+                            <option value="LIBUR">LIBUR</option>
+                            {settings.operationalHours?.shifts?.map(s => (
+                              <option key={s.id} value={s.id}>{s.name.substring(0, 5)}</option>
+                            ))}
+                          </select>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

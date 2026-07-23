@@ -57,7 +57,7 @@ type MenuGroup = {
 type MenuData = (MenuItem | MenuGroup)[];
 
 export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, onExpand }: SidebarProps) {
-  const { currentUser, logout, users, settings, onlineOrders, products } = useAppStore();
+  const { currentUser, logout, users, settings, onlineOrders, products, attendances } = useAppStore();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [isHovered, setIsHovered] = useState(false);
@@ -67,6 +67,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
   const pendingOrdersCount = onlineOrders?.filter(o => o.status === 'PENDING').length || 0;
   const lowStockCount = products?.filter(p => !p.isPPOB && p.stock <= p.minStock).length || 0;
+  const pendingCorrectionsCount = (attendances as any[])?.filter(a => a.correctionStatus === 'PENDING').length || 0;
 
   const notifications = useAppStore(state => state.notifications);
   const currentUserLocal = useAppStore(state => state.currentUser);
@@ -120,6 +121,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: BookOpen,
         items: [
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
+          { path: '/buku-besar', label: 'Buku Besar', icon: BookOpen },
           { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
         ]
       },
@@ -150,7 +152,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
-          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck },
+          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck, badge: pendingCorrectionsCount },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
@@ -191,6 +193,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: BookOpen,
         items: [
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
+          { path: '/buku-besar', label: 'Buku Besar', icon: BookOpen },
           { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
         ]
       },
@@ -220,7 +223,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
-          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck },
+          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck, badge: pendingCorrectionsCount },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },

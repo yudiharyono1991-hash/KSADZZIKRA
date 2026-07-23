@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useBranchData } from '../../hooks/useBranchData';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { 
@@ -32,6 +32,8 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   const [time, setTime] = useState(new Date());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -52,6 +54,19 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const now = new Date();
@@ -230,7 +245,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
         {/* Notification Bell */}
         {currentUser && (
-          <div className="relative">
+          <div className="relative" ref={notifRef}>
             <button 
               onClick={() => {
                 setIsNotifOpen(!isNotifOpen);
@@ -246,7 +261,6 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             
             {isNotifOpen && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsNotifOpen(false)} />
                 <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-lg z-50 py-2 animate-in fade-in slide-in-from-top-2">
                   <div className="px-4 py-2 border-b border-gray-50 flex justify-between items-center">
                     <h3 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Notifikasi</h3>
@@ -321,7 +335,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
         {/* User Identity Display */}
         {currentUser && (
-          <div className="relative">
+          <div className="relative" ref={userMenuRef}>
             <button 
               onClick={() => {
                 setIsUserMenuOpen(!isUserMenuOpen);
@@ -349,10 +363,6 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             {/* Dropdown Menu */}
             {isUserMenuOpen && (
               <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setIsUserMenuOpen(false)}
-                />
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-lg z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2">
                   <div className="px-4 py-3 border-b border-gray-50 bg-slate-50 dark:bg-slate-800/50">
                     <p className="text-xs font-bold text-gray-800 dark:text-slate-200 truncate">{currentUser.name}</p>

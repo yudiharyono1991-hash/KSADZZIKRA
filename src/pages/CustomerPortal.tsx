@@ -52,6 +52,7 @@ export default function CustomerPortal() {
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [checkoutNotes, setCheckoutNotes] = useState('');
   const [deliveryPeriod, setDeliveryPeriod] = useState('Periode 1 (08.00-09.00)');
+  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<'TRANSFER' | 'KASBON' | 'POIN'>('TRANSFER');
   const [selectedCheckoutBranch, setSelectedCheckoutBranch] = useState<string>('');
   const [customerDistanceKm, setCustomerDistanceKm] = useState<number | null>(null);
     const [isCheckingLocation, setIsCheckingLocation] = useState(false);
@@ -65,7 +66,11 @@ export default function CustomerPortal() {
 
   // Compute effective payment methods based on selected branch or global settings
   const selectedBranchData = branches.find(b => b.id === selectedCheckoutBranch);
-  const effectivePaymentMethods = selectedBranchData?.paymentMethods || settings.paymentMethods;
+  const branchHasPayments = selectedBranchData?.paymentMethods && (
+    (selectedBranchData.paymentMethods.bankTransfer && selectedBranchData.paymentMethods.bankTransfer.length > 0) || 
+    (selectedBranchData.paymentMethods.ewallet && selectedBranchData.paymentMethods.ewallet.length > 0)
+  );
+  const effectivePaymentMethods = branchHasPayments ? selectedBranchData.paymentMethods : settings.paymentMethods;
   const effectiveQrisUrl = selectedBranchData?.qrisImageUrl || settings.qrisImageUrl;
 
   React.useEffect(() => {
@@ -112,6 +117,34 @@ export default function CustomerPortal() {
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredProducts.slice(start, start + PAGE_SIZE);
   }, [filteredProducts, currentPage]);
+
+  React.useEffect(() => {
+    if (activeTab !== 'CATALOG') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab]);
+
+  const handleDownloadQris = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const url = effectiveQrisUrl || settings.qrisImageUrl;
+    if (!url) return;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = blobUrl;
+      a.download = 'QRIS_KSA_Mart.jpg';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Download failed', err);
+      window.open(url, '_blank');
+    }
+  };
 
   // Unique categories based on active tab
   const categories = React.useMemo(() => {
@@ -235,10 +268,11 @@ export default function CustomerPortal() {
       return;
     }
     
-    // Asumsikan semua pesanan di portal pelanggan menggunakan transfer/QRIS untuk simplicity mock
+    // Tentukan payment method dari pilihan pelanggan
     const paymentCode = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
+    const paymentMethodString = checkoutPaymentMethod === 'TRANSFER' ? 'Transfer/QRIS' : (checkoutPaymentMethod === 'POIN' ? 'Potong Poin' : 'Kasbon (Bayar Nanti)');
     
-    const finalNotes = `[WAKTU PENGIRIMAN: ${deliveryPeriod}] ${checkoutNotes ? checkoutNotes : ''}`;
+    const finalNotes = `[WAKTU PENGIRIMAN: ${deliveryPeriod}] [PEMBAYARAN: ${paymentMethodString}] ${checkoutNotes ? checkoutNotes : ''}`;
     submitOnlineOrder(currentUser.username, currentUser.name, currentUser.username || "08xxxx", finalNotes, undefined, paymentCode, customerDistanceKm || undefined, selectedCheckoutBranch);
     
     let savedAmount = 0;
@@ -708,7 +742,7 @@ export default function CustomerPortal() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Pilih Cabang Tujuan <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Pilih Cabang Tujuan <span className="text-red-700">*</span></label>
                     <select 
                       value={selectedCheckoutBranch}
                       onChange={e => setSelectedCheckoutBranch(e.target.value)}
@@ -745,10 +779,55 @@ export default function CustomerPortal() {
                     />
                   </div>
                   
-                  {/* Panduan Pembayaran */}
+                  {/* Opsi Metode Pembayaran Lengkap */}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-3">
+                    <p className="font-bold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800 pb-2">Pilih Metode Pembayaran</p>
+                    
+                    <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
+                      <input 
+                        type="radio" 
+                        name="paymentMethod" 
+                        value="TRANSFER" 
+                        checked={checkoutPaymentMethod === 'TRANSFER'} 
+                        onChange={() => setCheckoutPaymentMethod('TRANSFER')}
+                        className="w-4 h-4 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">💳 Transfer Bank / QRIS</span>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
+                      <input 
+                        type="radio" 
+                        name="paymentMethod" 
+                        value="POIN" 
+                        checked={checkoutPaymentMethod === 'POIN'} 
+                        onChange={() => setCheckoutPaymentMethod('POIN')}
+                        className="w-4 h-4 text-green-600 focus:ring-green-500"
+                        disabled={points < cartTotal}
+                      />
+                      <span className={`font-semibold ${points < cartTotal ? 'text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                        💰 Potong Saldo Poin (Tersedia: {points} Poin)
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
+                      <input 
+                        type="radio" 
+                        name="paymentMethod" 
+                        value="KASBON" 
+                        checked={checkoutPaymentMethod === 'KASBON'} 
+                        onChange={() => setCheckoutPaymentMethod('KASBON')}
+                        className="w-4 h-4 text-green-600 focus:ring-green-500"
+                      />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">📝 Bayar Nanti (Kasbon)</span>
+                    </label>
+                  </div>
+
+                  {/* Panduan Pembayaran (Hanya jika Transfer) */}
+                  {checkoutPaymentMethod === 'TRANSFER' && (
                   <div className="bg-green-50/50 border border-green-200/50 rounded-xl p-3 text-xs space-y-2">
                     <p className="font-bold text-green-800 flex items-center gap-1.5">
-                      <CreditCard className="w-4 h-4 text-green-700"/> Metode Pembayaran {selectedBranchData ? `(${selectedBranchData.name})` : ''}
+                      <CreditCard className="w-4 h-4 text-green-700"/> Instruksi Transfer {selectedBranchData ? `(${selectedBranchData.name})` : ''}
                     </p>
                     <div className="space-y-1.5 text-gray-700 dark:text-slate-300">
                       {(!effectivePaymentMethods?.bankTransfer || effectivePaymentMethods.bankTransfer.length === 0) && 
@@ -796,6 +875,7 @@ export default function CustomerPortal() {
                       </p>
                     </div>
                   </div>
+                  )}
 
                   <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-slate-700">
                     <span className="font-bold text-slate-600 dark:text-slate-400">Total Pembayaran</span>
@@ -1047,16 +1127,22 @@ export default function CustomerPortal() {
               <X className="w-5 h-5"/>
             </button>
             <h3 className="text-center font-bold text-slate-800 dark:text-slate-200 mb-4">Scan QRIS KSA Mart</h3>
+            
+            <div className="text-center mb-3">
+              <p className="text-sm text-slate-600 dark:text-slate-400">Total Pembayaran</p>
+              <p className="text-2xl font-black text-green-700">Rp {cartTotal.toLocaleString('id-ID')}</p>
+              <p className="text-[10px] text-slate-500 italic">* Belum termasuk Ongkos Kirim</p>
+            </div>
+
             <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 mb-4 flex justify-center">
               <img src={effectiveQrisUrl || settings.qrisImageUrl} alt="QRIS KSA Mart Besar" className="w-full h-auto object-contain" />
             </div>
-            <a 
-              href={effectiveQrisUrl || settings.qrisImageUrl} 
-              download="QRIS_KSA_Mart.jpg"
-              className="w-full block text-center py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md transition-colors"
+            <button 
+              onClick={handleDownloadQris}
+              className="w-full block text-center py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md transition-colors mt-4"
             >
               Unduh QRIS
-            </a>
+            </button>
           </div>
         </div>
       )}

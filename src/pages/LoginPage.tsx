@@ -423,7 +423,7 @@ export default function LoginPage() {
                   <div className={`h-full ${pwdStrength >= 5 ? strengthColor : 'bg-transparent'} transition-all duration-300`} style={{ width: '20%' }}></div>
                 </div>
                 <div className="flex items-start gap-1.5 text-xs text-gray-500 dark:text-slate-400 font-medium">
-                  <AlertCircle className={`w-4 h-4 ${pwdStrength <= 2 ? 'text-red-500' : pwdStrength <= 4 ? 'text-amber-500' : 'text-green-500'} flex-shrink-0 mt-0.5`} />
+                  <AlertCircle className={`w-4 h-4 ${pwdStrength <= 2 ? 'text-red-700' : pwdStrength <= 4 ? 'text-amber-500' : 'text-green-500'} flex-shrink-0 mt-0.5`} />
                   <span className="leading-tight">
                     Kekuatan: <span className={`font-bold uppercase tracking-wider mr-1 ${pwdStrength <= 2 ? 'text-red-600' : pwdStrength <= 4 ? 'text-amber-600' : 'text-green-600'}`}>{strengthLabel}</span> 
                     - {strengthText}

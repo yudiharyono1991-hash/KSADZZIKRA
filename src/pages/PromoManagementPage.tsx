@@ -16,7 +16,7 @@ export default function PromoManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
   const filtered = promos.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));

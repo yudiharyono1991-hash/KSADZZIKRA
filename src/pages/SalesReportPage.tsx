@@ -27,8 +27,8 @@ export default function SalesReportPage() {
   
   // Date filters defaulting to current month
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-  const currentDay = today.toISOString().split('T')[0];
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
   
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(currentDay);
@@ -393,7 +393,7 @@ export default function SalesReportPage() {
       </div>
 
       {/* Printable Area - Hidden in UI, shown by react-to-print */}
-      <div style={{ display: 'none' }}>
+      <div className="hidden print:block">
       <div className="printable-a4 space-y-6 bg-white dark:bg-slate-900 p-8 text-black" ref={reportRef}>
         <div className="flex items-center justify-center gap-4 border-b-2 border-gray-800 pb-4">
           <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-16 h-16 object-contain" />

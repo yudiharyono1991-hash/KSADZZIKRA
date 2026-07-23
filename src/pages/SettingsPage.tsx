@@ -55,12 +55,36 @@ export default function SettingsPage() {
   const [ownerWhatsapp, setOwnerWhatsapp] = useState(settings.ownerWhatsapp || '');
   
   // Operational Hours
+  // Operational Hours
   const [operationalHours, setOperationalHours] = useState(settings.operationalHours || {
     isOpen: true,
     openTime: '07:00',
     closeTime: '21:00',
-    closedMessage: 'Maaf, toko sedang tutup.'
+    closedMessage: 'Maaf, toko sedang tutup.',
+    shifts: [],
+    shiftAssignments: {}
   });
+
+  const handleAddShift = () => {
+    const newShifts = [...(operationalHours.shifts || [])];
+    newShifts.push({
+      id: `shift_${Date.now()}`,
+      name: `Shift ${newShifts.length + 1}`,
+      startTime: '07:00',
+      endTime: '14:00'
+    });
+    setOperationalHours({ ...operationalHours, shifts: newShifts });
+  };
+
+  const handleRemoveShift = (id: string) => {
+    const newShifts = (operationalHours.shifts || []).filter(s => s.id !== id);
+    setOperationalHours({ ...operationalHours, shifts: newShifts });
+  };
+
+  const handleUpdateShift = (id: string, key: string, value: string) => {
+    const newShifts = (operationalHours.shifts || []).map(s => s.id === id ? { ...s, [key]: value } : s);
+    setOperationalHours({ ...operationalHours, shifts: newShifts });
+  };
   const [businessType, setBusinessType] = useState<'KOPERASI' | 'UMUM'>(settings.businessType || 'KOPERASI');
   const [ownerUsername, setOwnerUsername] = useState(currentUser?.username || '');
   const [ownerPassword, setOwnerPassword] = useState('');
@@ -155,8 +179,8 @@ export default function SettingsPage() {
         charityTitle,
         charityDescription,
         enablePoints,
-        pointEarningRate: Number(pointEarningRate) || 1000,
-        pointRedemptionValue: Number(pointRedemptionValue) || 10,
+        pointEarningRate: pointEarningRate !== '' ? Number(pointEarningRate) : 1000,
+        pointRedemptionValue: pointRedemptionValue !== '' ? Number(pointRedemptionValue) : 10,
         enablePpobIntegration,
         ppobProviderUrl,
         ppobApiKey,
@@ -219,7 +243,7 @@ export default function SettingsPage() {
       addSheet(customers, 'Customers');
       addSheet(suppliers, 'Suppliers');
 
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = new Date().toLocaleDateString('en-CA');
       XLSX.writeFile(wb, `Backup_KSAMart_${dateStr}.xlsx`);
     } catch (e: any) {
       alert("Gagal mengekspor database: " + e.message);
@@ -235,7 +259,7 @@ export default function SettingsPage() {
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbDump, null, 2));
       const downloadAnchorNode = document.createElement('a');
       downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", `Full_Backup_KSAMart_${new Date().toISOString().split('T')[0]}.json`);
+      downloadAnchorNode.setAttribute("download", `Full_Backup_KSAMart_${new Date().toLocaleDateString('en-CA')}.json`);
       document.body.appendChild(downloadAnchorNode);
       downloadAnchorNode.click();
       downloadAnchorNode.remove();
@@ -285,7 +309,7 @@ export default function SettingsPage() {
   if (currentUser?.role !== 'OWNER' && currentUser?.role !== 'SUPERADMIN') {
     return (
       <div className="p-6 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[50vh] text-center space-y-4">
-        <Lock className="w-16 h-16 text-red-500" />
+        <Lock className="w-16 h-16 text-red-700" />
         <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Akses Ditolak</h2>
         <p className="text-gray-500 dark:text-slate-400">Halaman Pengaturan Toko khusus dikelola oleh Ketua (Owner) atau Superadmin.</p>
       </div>
@@ -660,6 +684,76 @@ export default function SettingsPage() {
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none h-20 text-sm"
               placeholder="Contoh: Maaf, toko sedang tutup libur Idul Fitri..."
             />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-700 dark:text-slate-300">Pengaturan Shift (Opsional)</h3>
+              <button 
+                onClick={handleAddShift} 
+                disabled={!isOwner}
+                className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-3 py-1.5 rounded-lg hover:bg-blue-200"
+              >
+                <Plus className="w-3 h-3"/> Tambah Shift
+              </button>
+            </div>
+            
+            {(!operationalHours.shifts || operationalHours.shifts.length === 0) ? (
+              <div className="text-sm text-gray-500 italic p-4 bg-slate-50 dark:bg-slate-800 rounded-lg text-center">
+                Belum ada shift yang diatur. Jika kosong, sistem akan menggunakan "Jam Buka" toko sebagai patokan keterlambatan absen karyawan.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {operationalHours.shifts.map(shift => (
+                  <div key={shift.id} className="flex flex-col md:flex-row gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 items-start md:items-center">
+                    <div className="flex-1 w-full">
+                      <label className="text-xs font-bold text-slate-500 mb-1 block">Nama Shift</label>
+                      <input 
+                        type="text" 
+                        value={shift.name} 
+                        onChange={(e) => handleUpdateShift(shift.id, 'name', e.target.value)} 
+                        disabled={!isOwner}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                    <div className="flex gap-3 w-full md:w-auto">
+                      <div className="flex-1 md:w-24">
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Mulai</label>
+                        <input 
+                          type="text" 
+                          value={shift.startTime} 
+                          onChange={(e) => handleUpdateShift(shift.id, 'startTime', e.target.value.replace('.', ':'))} 
+                          disabled={!isOwner}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                      <div className="flex-1 md:w-24">
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Selesai</label>
+                        <input 
+                          type="text" 
+                          value={shift.endTime} 
+                          onChange={(e) => handleUpdateShift(shift.id, 'endTime', e.target.value.replace('.', ':'))} 
+                          disabled={!isOwner}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-1.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                      <div className="flex items-end pb-0.5">
+                        <button 
+                          onClick={() => handleRemoveShift(shift.id)}
+                          disabled={!isOwner}
+                          className="p-1.5 text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4"/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4">
             <p className="text-xs text-gray-500 mt-1">
               Catatan: Jika tombol "Buka" (di kanan atas kotak ini) dimatikan, pesan ini akan muncul untuk pelanggan yang mencoba berbelanja.
             </p>
@@ -714,7 +808,7 @@ export default function SettingsPage() {
             <h2 className="font-bold text-gray-800 dark:text-slate-200">Program Loyalitas (Poin)</h2>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" className="sr-only peer" checked={enablePoints} onChange={(e) => setEnablePoints(e.target.checked)} disabled={!isOwner} />
+            <input type="checkbox" className="sr-only peer" checked={enablePoints} onChange={(e) => setEnablePoints(e.target.checked)} />
             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-900 after:border-gray-300 dark:border-slate-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-fuchsia-600"></div>
           </label>
         </div>
@@ -723,22 +817,20 @@ export default function SettingsPage() {
           <div className="p-6 space-y-4 bg-fuchsia-50/30">
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-slate-400">Nilai Belanja untuk 1 Poin (Rp)</label>
-              <input type="number" value={pointEarningRate} onChange={(e) => setPointEarningRate(e.target.value)} disabled={!isOwner} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 1000" />
+              <input type="number" value={pointEarningRate} onChange={(e) => setPointEarningRate(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 1000" />
               <p className="text-xs text-slate-500 mt-1">Setiap pelanggan berbelanja senilai ini, mereka akan mendapat 1 Poin.</p>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-slate-400">Nilai Diskon per 1 Poin (Rp)</label>
-              <input type="number" value={pointRedemptionValue} onChange={(e) => setPointRedemptionValue(e.target.value)} disabled={!isOwner} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 10" />
+              <input type="number" value={pointRedemptionValue} onChange={(e) => setPointRedemptionValue(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 10" />
               <p className="text-xs text-slate-500 mt-1">Saat poin ditukarkan, 1 poin akan mengurangi total belanja sebesar nilai ini.</p>
             </div>
-            {isOwner && (
-              <button
-                onClick={handleSave}
-                className="mt-2 w-full flex items-center justify-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
-              >
-                Simpan Pengaturan Poin
-              </button>
-            )}
+            <button
+              onClick={handleSave}
+              className="mt-2 w-full flex items-center justify-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-2.5 rounded-xl transition-colors shadow-md cursor-pointer"
+            >
+              Simpan Pengaturan Poin
+            </button>
           </div>
         )}
       </div>
@@ -844,13 +936,17 @@ export default function SettingsPage() {
         <div className="mt-2 space-y-4">
           <div className="flex items-center gap-2 border-b pb-3 mt-8">
             <MapPin className="w-5 h-5 text-rose-600" />
-            <h2 className="font-bold text-gray-800 dark:text-slate-200">Lokasi & Jarak Pengiriman Maksimal</h2>
+            <h2 className="font-bold text-gray-800 dark:text-slate-200">Lokasi, Jarak Pengiriman, & Zona Absensi</h2>
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
             <div className="p-6 space-y-4">
               <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm mb-4">
-                Fitur ini digunakan untuk mengunci batas maksimal jarak pelanggan yang bisa melakukan pemesanan (Checkout). Sistem akan menghitung jarak otomatis menggunakan GPS.
+                Fitur ini memiliki fungsi ganda:
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li><strong>Zona Absensi Karyawan:</strong> Mengunci area absensi (Geofencing). Karyawan hanya bisa absen jika berada dalam Radius Absen. <em>(Kosongkan koordinat untuk mematikan fitur Geofencing absen)</em>.</li>
+                  <li><strong>Jarak Pengiriman:</strong> Membatasi jarak maksimal bagi pelanggan yang memesan secara online.</li>
+                </ul>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
