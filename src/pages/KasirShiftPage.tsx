@@ -22,8 +22,9 @@ export default function KasirShiftPage() {
   const [coaAccount, setCoaAccount] = useState('');
   
   const todayDate = new Date().toISOString().split('T')[0];
+  const firstDayOfMonth = todayDate.substring(0, 8) + '01';
   const [pettyCashDate, setPettyCashDate] = useState(todayDate);
-  const [pettyCashStartDate, setPettyCashStartDate] = useState(todayDate);
+  const [pettyCashStartDate, setPettyCashStartDate] = useState(firstDayOfMonth);
   const [pettyCashEndDate, setPettyCashEndDate] = useState(todayDate);
 
   const [actualCash, setActualCash] = useState<string>('');
@@ -502,16 +503,18 @@ export default function KasirShiftPage() {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA)</label>
-                <select
+                <input
+                  list="coa-options"
                   value={coaAccount}
                   onChange={(e) => setCoaAccount(e.target.value)}
+                  placeholder="Pilih Akun (Otomatis jika kosong)"
                   className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
-                >
-                  <option value="">Pilih Akun (Otomatis jika kosong)</option>
+                />
+                <datalist id="coa-options">
                   {useAppStore.getState().coaList?.filter((c: any) => c.isActive).map((c: any) => (
-                    <option key={c.id} value={`${c.code} - ${c.name}`}>{c.code} - {c.name}</option>
+                    <option key={c.id} value={`${c.code} - ${c.name}`} />
                   ))}
-                </select>
+                </datalist>
               </div>
               <button 
                 type="submit"
