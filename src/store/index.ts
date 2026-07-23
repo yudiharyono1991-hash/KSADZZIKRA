@@ -1393,6 +1393,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       newQty = Math.min(quantity, maxQty);
     }
     
+    if (newQty <= 0) {
+      get().removeFromCart(productId, isBox);
+      return;
+    }
+    
     const newCart = [...cart];
     newCart[itemIndex] = { ...item, quantity: newQty };
     set({ cart: newCart });
@@ -1732,6 +1737,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     // Dynamic pricing for wholesale
     const getDynamicPrice = (item: CartItem) => {
+      if (item.isBox && item.product.hasBoxUnit) {
+        return item.product.boxPrice || item.product.price;
+      }
       if (item.product.isPromoActive && item.product.promoPrice) {
         return item.product.promoPrice;
       }
