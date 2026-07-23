@@ -12,12 +12,12 @@ try {
     if (parsed.supabaseUrl) SUPABASE_URL = parsed.supabaseUrl;
     if (parsed.supabaseAnonKey) SUPABASE_ANON_KEY = parsed.supabaseAnonKey;
   }
-} catch (e) {}
+} catch (e) { }
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'https://your-project.supabase.co');
 
-export const supabase = isSupabaseConfigured 
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
+export const supabase = isSupabaseConfigured
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
 // Clean logging helper
@@ -29,28 +29,25 @@ const logSync = (message: string, isError = false) => {
   }
 };
 
-// Realtime subscription helper (best-effort: supports v1 and v2 APIs)
 export function subscribeToTable(table: string, onEvent: (payload: any) => void) {
-  if (!supabase) return () => {};
+  if (!supabase) return () => { };
 
   try {
-    // Try v1 style
-    // @ts-ignore
-    const sub = (supabase as any).from(`${table}`).on('*', (payload: any) => {
-      try { onEvent(payload); } catch (e) {}
-    }).subscribe();
-    return () => { try { (supabase as any).removeSubscription(sub); } catch (e) {} };
-  } catch (e) {
-    try {
-      // Try v2 channel style
-      // @ts-ignore
-      const channel = (supabase as any).channel(`${table}-changes`).on('postgres_changes', { event: '*', schema: 'public', table }, (payload: any) => {
-        try { onEvent(payload); } catch (err) {}
-      }).subscribe();
-      return () => { try { (supabase as any).removeChannel(channel); } catch (err) {} };
-    } catch (err) {
-      return () => {};
-    }
+    const channel = supabase.channel(`public:${table}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: table },
+        (payload: any) => {
+          try { onEvent(payload); } catch (err) { }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch (err) { }
+    };
+  } catch (err) {
+    return () => { };
   }
 }
 
@@ -161,7 +158,7 @@ export const supabaseService = {
         const user = JSON.parse(userStr);
         return user.tenantId || 'tenant_default';
       }
-    } catch (e) {}
+    } catch (e) { }
     return 'tenant_default';
   },
 
@@ -194,7 +191,7 @@ export const supabaseService = {
         offset += pageSize;
       }
 
-      try { console.log(`[Supabase] getProducts() tenantId=${tenantId} returned ${fetched.length} rows after pagination`); } catch (e) {}
+      try { console.log(`[Supabase] getProducts() tenantId=${tenantId} returned ${fetched.length} rows after pagination`); } catch (e) { }
       return fetched;
     } catch (err: any) {
       logSync(`Failed to fetch products: ${err.message}`, true);
@@ -219,6 +216,7 @@ export const supabaseService = {
         unit: product.unit,
         barcode: product.barcode || null,
         is_halal: product.isHalal,
+        is_ppob: Boolean(product.isPPOB),
         image: product.image || null,
         wholesale_price: product.wholesalePrice || null,
         wholesale_min_qty: product.wholesaleMinQty || null,
@@ -250,6 +248,7 @@ export const supabaseService = {
             unit: product.unit,
             barcode: product.barcode || null,
             is_halal: product.isHalal,
+            is_ppob: Boolean(product.isPPOB),
             image: product.image || null
           };
           const { error: retryError } = await supabase
@@ -286,6 +285,7 @@ export const supabaseService = {
         unit: p.unit,
         barcode: p.barcode || null,
         is_halal: p.isHalal ?? true,
+        is_ppob: Boolean(p.isPPOB),
         image: p.image || null,
         wholesale_price: p.wholesalePrice || null,
         wholesale_min_qty: p.wholesaleMinQty || null,
@@ -391,6 +391,7 @@ export const supabaseService = {
         change_amount: Number(tx.changeAmount),
         zakat_contribution: Number(tx.zakatContribution),
         margin_contribution: Number(tx.marginContribution),
+        infaq_contribution: Number(tx.infaqContribution || 0),
         customer_id: tx.customerId || null,
         branch_id: tx.branchId || null,
         points_earned: Number(tx.pointsEarned || 0),
@@ -610,6 +611,235 @@ export const supabaseService = {
     }
   },
 
+  // Expenses API
+  async getExpenses(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map((e: any) => ({
+        id: e.id,
+        tenantId: e.tenant_id,
+        date: e.date,
+        category: e.category,
+        amount: Number(e.amount),
+        description: e.description,
+        createdBy: e.created_by,
+        branchId: e.branch_id,
+        coaId: e.coa_id
+      }));
+    } catch (err: any) {
+      logSync(`Failed to fetch expenses: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async saveExpense(expense: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: expense.id,
+        tenant_id: expense.tenantId || this.getTenantId(),
+        date: expense.date,
+        category: expense.category,
+        amount: Number(expense.amount),
+        description: expense.description,
+        created_by: expense.createdBy,
+        branch_id: expense.branchId || null,
+        coa_id: expense.coaId || null
+      };
+      const { error } = await supabase.from('expenses').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save expense: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async deleteExpense(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('expenses').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete expense: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  // Promos API
+  async getPromos(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('promos').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map((p: any) => ({
+        id: p.id,
+        tenantId: p.tenant_id,
+        code: p.code,
+        description: p.description,
+        discountType: p.discount_type,
+        discountValue: Number(p.discount_value),
+        minPurchase: Number(p.min_purchase),
+        validFrom: p.valid_from,
+        validUntil: p.valid_until,
+        isActive: p.is_active,
+        branchId: p.branch_id
+      }));
+    } catch (err: any) {
+      logSync(`Failed to fetch promos: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async savePromo(promo: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: promo.id,
+        tenant_id: promo.tenantId || this.getTenantId(),
+        code: promo.code,
+        description: promo.description,
+        discount_type: promo.discountType,
+        discount_value: Number(promo.discountValue),
+        min_purchase: Number(promo.minPurchase),
+        valid_from: promo.validFrom,
+        valid_until: promo.validUntil,
+        is_active: promo.isActive,
+        branch_id: promo.branchId || null
+      };
+      const { error } = await supabase.from('promos').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save promo: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async deletePromo(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('promos').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete promo: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  // Closings API
+  async getClosings(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('closings').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map((c: any) => ({
+        id: c.id,
+        tenantId: c.tenant_id,
+        date: c.date,
+        shiftName: c.shift_name,
+        cashierName: c.cashier_name,
+        totalExpected: Number(c.total_expected),
+        totalActual: Number(c.total_actual),
+        difference: Number(c.difference),
+        transactionsCount: Number(c.transactions_count),
+        expensesTotal: Number(c.expenses_total),
+        notes: c.notes,
+        branchId: c.branch_id
+      }));
+    } catch (err: any) {
+      logSync(`Failed to fetch closings: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async saveClosing(closing: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: closing.id,
+        tenant_id: closing.tenantId || this.getTenantId(),
+        date: closing.date,
+        shift_name: closing.shiftName,
+        cashier_name: closing.cashierName,
+        total_expected: Number(closing.totalExpected),
+        total_actual: Number(closing.totalActual),
+        difference: Number(closing.difference),
+        transactions_count: Number(closing.transactionsCount),
+        expenses_total: Number(closing.expensesTotal),
+        notes: closing.notes,
+        branch_id: closing.branchId || null
+      };
+      const { error } = await supabase.from('closings').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save closing: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  // Stock Movements API
+  async getStockMovements(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('stock_movements').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map((s: any) => ({
+        id: s.id,
+        tenantId: s.tenant_id,
+        productId: s.product_id,
+        productName: s.product_name,
+        type: s.type,
+        quantity: Number(s.quantity),
+        previousStock: Number(s.previous_stock),
+        newStock: Number(s.new_stock),
+        date: s.date,
+        referenceId: s.reference_id,
+        notes: s.notes,
+        createdBy: s.created_by,
+        branchId: s.branch_id
+      }));
+    } catch (err: any) {
+      logSync(`Failed to fetch stock movements: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async saveStockMovement(movement: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: movement.id,
+        tenant_id: movement.tenantId || this.getTenantId(),
+        product_id: movement.productId,
+        product_name: movement.productName,
+        type: movement.type,
+        quantity: Number(movement.quantity),
+        previous_stock: Number(movement.previousStock),
+        new_stock: Number(movement.newStock),
+        date: movement.date,
+        reference_id: movement.referenceId,
+        notes: movement.notes,
+        created_by: movement.createdBy,
+        branch_id: movement.branchId || null
+      };
+      const { error } = await supabase.from('stock_movements').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save stock movement: ${err.message}`, true);
+      return false;
+    }
+  },
+
   // Users API
   async getUsers(): Promise<any[] | null> {
     if (!supabase) return null;
@@ -619,7 +849,7 @@ export const supabaseService = {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      
+
       // Map DB snake_case to app camelCase
       return data.map((u: any) => ({
         id: u.id,
@@ -634,7 +864,8 @@ export const supabaseService = {
         approvedAt: u.approved_at,
         phone: u.phone,
         branchId: u.branch_id,
-        debtAmount: Number(u.debt_amount || 0)
+        debtAmount: Number(u.debt_amount || 0),
+        employeeId: u.employee_id || null
       }));
     } catch (err: any) {
       logSync(`Failed to fetch users: ${err.message}`, true);
@@ -660,7 +891,8 @@ export const supabaseService = {
         approved_at: user.approvedAt,
         phone: user.phone,
         branch_id: user.branchId,
-        debt_amount: Number(user.debtAmount || 0)
+        debt_amount: Number(user.debtAmount || 0),
+        employee_id: user.employeeId || null
       };
 
       const { error } = await supabase
@@ -736,7 +968,24 @@ export const supabaseService = {
       return false;
     }
   },
-  
+
+  async deleteCustomer(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      logSync(`Deleted customer with ID ${id}.`);
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete customer ${id}: ${err.message}`, true);
+      return false;
+    }
+  },
+
   // NEW APIS
   async getCustomers(): Promise<any[] | null> {
     if (!supabase) return null;
@@ -759,7 +1008,7 @@ export const supabaseService = {
         : query.eq('tenant_id', tenantId);
       const { data, error } = await accountQuery;
       if (error) throw error;
-      try { console.log(`[Supabase] getCoaAccounts() tenantId=${tenantId} returned ${Array.isArray(data) ? data.length : 0} rows`); } catch (e) {}
+      try { console.log(`[Supabase] getCoaAccounts() tenantId=${tenantId} returned ${Array.isArray(data) ? data.length : 0} rows`); } catch (e) { }
       return data;
     } catch (err: any) {
       logSync(`Failed to fetch coa_accounts: ${err.message}`, true);
@@ -853,11 +1102,27 @@ export const supabaseService = {
         qris_image_url: settings.qrisImageUrl || null,
         maintenance_mode: Boolean(settings.maintenanceMode),
         minimum_cash_balance: Number(settings.minimumCashBalance) || 1000000,
+        petty_cash_balance: Number(settings.pettyCashBalance) || 0,
         zakat_rate: Number(settings.zakatRate) || 2.5,
         auto_approve_transactions: Boolean(settings.autoApproveTransactions),
         owner_bank_name: settings.ownerBankName || null,
         owner_bank_account: settings.ownerBankAccount || null,
-        payment_methods: settings.paymentMethods || { bankTransfer: [], ewallet: [] }
+        payment_methods: settings.paymentMethods || { bankTransfer: [], ewallet: [] },
+        operational_hours: settings.operationalHours || null,
+        enable_charity_zakat: Boolean(settings.enableCharityZakat),
+        charity_zakat_percentage: Number(settings.charityZakatPercentage) || 2.5,
+        charity_title: settings.charityTitle || null,
+        charity_description: settings.charityDescription || null,
+        enable_points: Boolean(settings.enablePoints),
+        point_earning_rate: Number(settings.pointEarningRate) || 1000,
+        point_redemption_value: Number(settings.pointRedemptionValue) || 10,
+        enable_ppob_integration: Boolean(settings.enablePpobIntegration),
+        ppob_provider_url: settings.ppobProviderUrl || null,
+        ppob_api_key: settings.ppobApiKey || null,
+        default_ppob_admin_fee: Number(settings.defaultPpobAdminFee) || 0,
+        landing_page_config: settings.landingPageConfig || null,
+        upload_password: settings.uploadPassword || null,
+        upload_password_roles: settings.uploadPasswordRoles || null
       };
       const { error } = await supabase.from('store_settings').upsert(mapped);
       if (error) throw error;
@@ -941,6 +1206,17 @@ export const supabaseService = {
       return false;
     }
   },
+  async deleteJournalEntry(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('journal_entries').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete journal_entry: ${err.message}`, true);
+      return false;
+    }
+  },
   async clearAllDatabase(tenantId: string): Promise<boolean> {
     if (!supabase) return false;
     try {
@@ -950,7 +1226,7 @@ export const supabaseService = {
         'journal_entries', 'customers', 'suppliers', 'promos', 'attendances',
         'stock_movements'
       ];
-      
+
       for (const table of tables) {
         if (tenantId === 'tenant_default' || !tenantId) {
           await supabase.from(table).delete().or(`tenant_id.is.null,tenant_id.eq.${tenantId}`);
@@ -972,7 +1248,7 @@ export const supabaseService = {
     try {
       const tenantId = this.getTenantId();
       const query = supabase.from('attendance').select('*').order('date', { ascending: false });
-      const { data, error } = tenantId === 'tenant_default' 
+      const { data, error } = tenantId === 'tenant_default'
         ? await query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
         : await query.eq('tenant_id', tenantId);
       if (error) throw error;
@@ -986,7 +1262,7 @@ export const supabaseService = {
     if (!supabase) return false;
     try {
       const tenantId = this.getTenantId();
-      const payload = {
+      const payload: any = {
         id: attendance.id,
         tenant_id: attendance.tenantId || tenantId,
         user_id: attendance.userId,
@@ -997,14 +1273,202 @@ export const supabaseService = {
         status: attendance.status,
         branch_id: attendance.branchId,
         photo_url: attendance.photoUrl,
+        clock_out_photo_url: attendance.clockOutPhotoUrl || null,
         latitude: attendance.latitude,
-        longitude: attendance.longitude
+        longitude: attendance.longitude,
+        clock_out_latitude: attendance.clockOutLatitude || null,
+        clock_out_longitude: attendance.clockOutLongitude || null,
+        correction_status: attendance.correctionStatus || null,
+        correction_reason: attendance.correctionReason || null,
+        correction_type: attendance.correctionType || null,
+        requested_clock_in: attendance.requestedClockIn || null,
+        requested_clock_out: attendance.requestedClockOut || null,
+        leave_type: attendance.leaveType || null,
+        reviewed_by: attendance.reviewedBy || null,
+        reviewed_at: attendance.reviewedAt || null,
+        is_revised: attendance.isRevised || false
       };
       const { error } = await supabase.from('attendance').upsert(payload);
       if (error) throw error;
       return true;
     } catch (err: any) {
       logSync(`Failed to save attendance: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async getBranches(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase.from('ksa_branches').select('*').eq('tenant_id', tenantId);
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch branches: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveBranch(branch: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: branch.id,
+        tenant_id: branch.tenantId,
+        name: branch.name,
+        address: branch.address,
+        phone: branch.phone,
+        whatsapp: branch.whatsapp || null,
+        is_active: branch.isActive,
+        qris_image_url: branch.qrisImageUrl || null
+      };
+      const { error } = await supabase.from('ksa_branches').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save branch: ${err.message}`, true);
+      return false;
+    }
+  },
+  async deleteBranch(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('ksa_branches').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete branch ${id}: ${err.message}`, true);
+      return false;
+    }
+  },
+  async getSuppliers(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase.from('suppliers').select('*').eq('tenant_id', tenantId);
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch suppliers: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveSupplier(supplier: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: supplier.id,
+        tenant_id: supplier.tenantId,
+        name: supplier.name,
+        contact_person: supplier.contactPerson,
+        phone: supplier.phone,
+        address: supplier.address,
+        debt_amount: supplier.debtAmount,
+        branch_id: supplier.branchId || null
+      };
+      const { error } = await supabase.from('suppliers').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save supplier: ${err.message}`, true);
+      return false;
+    }
+  },
+  async deleteSupplier(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('suppliers').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete supplier ${id}: ${err.message}`, true);
+      return false;
+    }
+  },
+  async getPurchaseOrders(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase.from('purchase_orders').select('*').eq('tenant_id', tenantId);
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch purchase orders: ${err.message}`, true);
+      return null;
+    }
+  },
+  async savePurchaseOrder(po: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: po.id,
+        tenant_id: po.tenantId,
+        po_number: po.poNumber,
+        date: po.date,
+        supplier: po.supplier,
+        items: po.items,
+        total_amount: po.totalAmount,
+        status: po.status,
+        created_by: po.createdBy,
+        notes: po.notes || null,
+        branch_id: po.branchId || null,
+        invoice_supplier: po.invoiceSupplier || null
+      };
+      const { error } = await supabase.from('purchase_orders').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save purchase order: ${err.message}`, true);
+      return false;
+    }
+  },
+  async deletePurchaseOrder(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete purchase order ${id}: ${err.message}`, true);
+      return false;
+    }
+  },
+  async getProductCategories(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase.from('product_categories').select('*').eq('tenant_id', tenantId);
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch product categories: ${err.message}`, true);
+      return null;
+    }
+  },
+  async saveProductCategory(category: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const payload = {
+        id: category.id,
+        tenant_id: category.tenantId,
+        name: category.name
+      };
+      const { error } = await supabase.from('product_categories').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save product category: ${err.message}`, true);
+      return false;
+    }
+  },
+  async deleteProductCategory(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('product_categories').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete product category ${id}: ${err.message}`, true);
       return false;
     }
   }
