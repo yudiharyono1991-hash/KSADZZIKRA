@@ -129,6 +129,9 @@ export default function BukuBesarPage() {
     });
 
     // 3. Calculate running balance for current period
+    // Sort ascending by date for correct running balance calculation
+    currentPeriodEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     let runningBalance = saldoAwal;
     let totalDebit = 0;
     let totalCredit = 0;
