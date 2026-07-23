@@ -32,6 +32,7 @@ export default function KasirShiftPage() {
   const [pettyCashDate, setPettyCashDate] = useState(todayDate);
   const [pettyCashStartDate, setPettyCashStartDate] = useState(firstDayOfMonth);
   const [pettyCashEndDate, setPettyCashEndDate] = useState(todayDate);
+  const [pettyCashFilter, setPettyCashFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
 
   const [actualCash, setActualCash] = useState<string>('');
   const [isShiftClosed, setIsShiftClosed] = useState(false);
@@ -607,38 +608,70 @@ export default function KasirShiftPage() {
                   const filteredPettyCash = [...baseExpenses, ...manualJournals]
                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-                  return filteredPettyCash.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-4 italic">Belum ada transaksi kas kecil.</p>
-                  ) : (
-                    filteredPettyCash.map(exp => (
-                      <div key={exp.id} className="min-w-[320px] flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 rounded text-xs transition-colors border-b border-slate-100 dark:border-slate-700/50">
+                  const totalIn = filteredPettyCash.reduce((sum, exp) => exp.amount < 0 ? sum + Math.abs(exp.amount) : sum, 0);
+                  const totalOut = filteredPettyCash.reduce((sum, exp) => exp.amount > 0 ? sum + exp.amount : sum, 0);
+
+                  const displayedPettyCash = filteredPettyCash.filter(exp => {
+                    if (pettyCashFilter === 'IN') return exp.amount < 0;
+                    if (pettyCashFilter === 'OUT') return exp.amount > 0;
+                    return true;
+                  });
+
+                  return (
+                    <div className="flex flex-col h-full">
+                      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-2">
+                        <button onClick={() => setPettyCashFilter('ALL')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'ALL' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>Semua</button>
+                        <button onClick={() => setPettyCashFilter('IN')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'IN' ? 'bg-white dark:bg-slate-700 shadow-sm text-green-600' : 'text-slate-500 hover:text-green-600'}`}>Pemasukan</button>
+                        <button onClick={() => setPettyCashFilter('OUT')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'OUT' ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600' : 'text-slate-500 hover:text-rose-600'}`}>Pengeluaran</button>
+                      </div>
+
+                      <div className="space-y-1 overflow-y-auto max-h-60 mb-2">
+                        {displayedPettyCash.length === 0 ? (
+                          <p className="text-xs text-slate-400 text-center py-4 italic">Belum ada transaksi.</p>
+                        ) : (
+                          displayedPettyCash.map(exp => (
+                            <div key={exp.id} className="min-w-[320px] flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 rounded text-xs transition-colors border-b border-slate-100 dark:border-slate-700/50">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-700 dark:text-slate-300">{exp.description}</span>
+                                <span className="text-[9px] text-slate-400">{new Date(exp.date).toLocaleDateString("id-ID")}</span>
+                              </div>
+                              <div className="flex items-center space-x-3">
+                                <span className={`font-bold whitespace-nowrap ${exp.amount < 0 ? "text-green-600" : "text-rose-600"}`}>
+                                  {exp.amount < 0 ? "+" : "-"} Rp {Math.abs(exp.amount).toLocaleString("id-ID")}
+                                </span>
+                                <button 
+                                  onClick={() => {
+                                    if ((exp as any).isManual) {
+                                      alert("Transaksi ini diinput manual dari Jurnal Umum. Harap hapus melalui menu Jurnal Umum.");
+                                      return;
+                                    }
+                                    if (window.confirm("Hapus riwayat kas ini? Jurnal terkait juga akan dihapus.")) {
+                                      useAppStore.getState().deleteExpense(exp.id);
+                                      useAppStore.getState().deleteJournalEntryByRef(exp.id);
+                                    }
+                                  }}
+                                  className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                  title="Hapus riwayat kas"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex justify-between items-center text-xs mt-auto">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-700 dark:text-slate-300">{exp.description}</span>
-                          <span className="text-[9px] text-slate-400">{new Date(exp.date).toLocaleDateString("id-ID")}</span>
+                          <span className="text-[9px] text-slate-500 font-bold uppercase">Tot Pemasukan</span>
+                          <span className="text-green-600 font-black">+ Rp {totalIn.toLocaleString('id-ID')}</span>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <span className={`font-bold ${exp.amount < 0 ? "text-green-600" : "text-rose-600"}`}>
-                            {exp.amount < 0 ? "+" : "-"} Rp {Math.abs(exp.amount).toLocaleString("id-ID")}
-                          </span>
-                          <button 
-                            onClick={() => {
-                              if ((exp as any).isManual) {
-                                alert("Transaksi ini diinput manual dari Jurnal Umum. Harap hapus melalui menu Jurnal Umum.");
-                                return;
-                              }
-                              if (window.confirm("Hapus riwayat kas ini? Jurnal terkait juga akan dihapus.")) {
-                                useAppStore.getState().deleteExpense(exp.id);
-                                useAppStore.getState().deleteJournalEntryByRef(exp.id);
-                              }
-                            }}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                            title="Hapus riwayat kas"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                          </button>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase">Tot Pengeluaran</span>
+                          <span className="text-rose-600 font-black">- Rp {totalOut.toLocaleString('id-ID')}</span>
                         </div>
                       </div>
-                    ))
+                    </div>
                   );
                 })()}
              </div>
