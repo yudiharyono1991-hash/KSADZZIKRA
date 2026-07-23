@@ -14,6 +14,11 @@ const getDistanceFromLatLonInM = (lat1: number, lon1: number, lat2: number, lon2
   return Math.round(R * c);
 };
 
+const getLocalTodayDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export default function KasirShiftPage() {
   const { transactions, currentUser, addExpense, expenses, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
@@ -21,8 +26,9 @@ export default function KasirShiftPage() {
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [coaAccount, setCoaAccount] = useState('');
   
-  const todayDate = new Date().toISOString().split('T')[0];
+  const [todayDate, setTodayDate] = useState(getLocalTodayDate());
   const firstDayOfMonth = todayDate.substring(0, 8) + '01';
+  
   const [pettyCashDate, setPettyCashDate] = useState(todayDate);
   const [pettyCashStartDate, setPettyCashStartDate] = useState(firstDayOfMonth);
   const [pettyCashEndDate, setPettyCashEndDate] = useState(todayDate);
@@ -44,10 +50,30 @@ export default function KasirShiftPage() {
   const [modalTab, setModalTab] = useState<'IZIN' | 'LUPA_ABSEN'>('IZIN');
   const [izinStartDate, setIzinStartDate] = useState(todayDate);
   const [izinEndDate, setIzinEndDate] = useState(todayDate);
-  const [izinType, setIzinType] = useState<'IZIN' | 'SAKIT' | 'CUTI'>('IZIN');
+  const [izinType, setIzinType] = useState<'IZIN' | 'SAKIT' | 'CUTI' | 'CUTI_TAHUNAN'>('IZIN');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Auto-update date if user leaves app open overnight
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      const freshDate = getLocalTodayDate();
+      setTodayDate(prev => {
+        if (prev !== freshDate) {
+          // Day rolled over, update defaults
+          setPettyCashDate(freshDate);
+          setPettyCashEndDate(freshDate);
+          setPettyCashStartDate(freshDate.substring(0, 8) + '01');
+          setIzinStartDate(freshDate);
+          setIzinEndDate(freshDate);
+          return freshDate;
+        }
+        return prev;
+      });
+    }, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const startCamera = async () => {
     setIsCameraActive(true);
@@ -86,7 +112,7 @@ export default function KasirShiftPage() {
 
 
   // Filter Today's data for this cashier
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayDate;
   const myTransactions = (transactions || []).filter(tx => 
     tx.timestamp.startsWith(today) && tx.cashierName === currentUser?.name
   );
@@ -885,12 +911,12 @@ export default function KasirShiftPage() {
                       if (!attId && currentUser) {
                         // Buat record absen dummy untuk hari ini karena lupa absen
                         attId = Date.now().toString();
-                        const today = new Date().toISOString().split('T')[0];
+                        const todayLocal = getLocalTodayDate();
                         const newAtt = {
                           id: attId,
                           userId: currentUser.username,
                           userName: currentUser.name,
-                          date: today,
+                          date: todayLocal,
                           clockIn: new Date().toISOString(),
                           photoUrl: '',
                           latitude: 0,
