@@ -2519,7 +2519,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newEntry: JournalEntry = {
       tenantId: get().currentUser?.tenantId || 'tenant_default',
       ...entryData,
-      id: `je_${Date.now()}`
+      id: `je_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
     };
     const updated = [newEntry, ...get().journalEntries];
     set({ journalEntries: updated });
