@@ -1,33 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useBranchData } from '../hooks/useBranchData';
+import { useAppStore } from '../store';
 import { Users, Plus, Search, Trash2, Edit, CreditCard, Download, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function CustomerManagementPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry, settings } = useBranchData();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry, settings, users, updateUser, transactions } = useBranchData();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+  const registerUser = useAppStore(state => state.registerUser);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [customId, setCustomId] = useState('');
+
+  const [resetPwdModal, setResetPwdModal] = useState<{isOpen: boolean, userId: string, userName: string, newPwd: ''}>({
+    isOpen: false, userId: '', userName: '', newPwd: ''
+  });
+  
+  const [createAccountModal, setCreateAccountModal] = useState<{isOpen: boolean, customerId: string, customerName: string, phone: string, initialPwd: ''}>({
+    isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''
+  });
+  
+  const [payoffModal, setPayoffModal] = useState<{isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI', notes: string}>({
+    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', notes: ''
+  });
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [totalPointsEarned, setTotalPointsEarned] = useState(0);
   const [totalPointsRedeemed, setTotalPointsRedeemed] = useState(0);
   const [points, setPoints] = useState(0);
-  const [lastPointsUpdate, setLastPointsUpdate] = useState(new Date().toISOString().split('T')[0]);
+  const [lastPointsUpdate, setLastPointsUpdate] = useState(new Date().toLocaleDateString('en-CA'));
   const [debtAmount, setDebtAmount] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'SEMUA' | 'PUNYA_AKUN' | 'BELUM_ADA' | 'KASBON' | 'POIN_TERPAKAI'>('SEMUA');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
-  const filtered = customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Calculate actual historical points if missing from backend
+  // Calculate actual historical points if missing from backend
+  const enrichedCustomers = customers.map(c => {
+    const customerTxs = transactions.filter(tx => tx.customerId === c.id);
+    const redeemed = Math.max(c.totalPointsRedeemed || 0, customerTxs.reduce((sum, tx) => sum + (Number(tx.pointsRedeemed) || 0), 0));
+    const earnedTx = customerTxs.reduce((sum, tx) => sum + (Number(tx.pointsEarned) || 0), 0);
+    
+    // Logika matematika murni: Total Poin yang pernah didapat = Sisa Saat Ini + Total Terpakai
+    const earnedLogic = (Number(c.points) || 0) + redeemed;
+    const earned = Math.max(c.totalPointsEarned || 0, earnedTx, earnedLogic);
+
+    return {
+      ...c,
+      totalPointsEarned: earned,
+      totalPointsRedeemed: redeemed,
+    };
+  });
+
+  const filtered = enrichedCustomers.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.phone.includes(searchTerm);
+    const linkedUser = users.find(u => u.role === 'PELANGGAN' && u.username === c.phone);
+    if (filterType === 'PUNYA_AKUN') return matchesSearch && linkedUser;
+    if (filterType === 'BELUM_ADA') return matchesSearch && !linkedUser;
+    if (filterType === 'KASBON') return matchesSearch && (c.debtAmount || 0) > 0;
+    if (filterType === 'POIN_TERPAKAI') return matchesSearch && (c.totalPointsRedeemed || 0) > 0;
+    return matchesSearch;
+  });
   
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -37,6 +81,7 @@ export default function CustomerManagementPage() {
   const totalPointsRedeemedSum = filtered.reduce((sum, c) => sum + (c.totalPointsRedeemed || 0), 0);
   const totalRemainingPointsSum = filtered.reduce((sum, c) => sum + (c.points || 0), 0);
   const totalValueSum = filtered.reduce((sum, c) => sum + ((c.points || 0) * (settings?.pointRedemptionValue || 10)), 0);
+  const totalDebtSum = filtered.reduce((sum, c) => sum + (c.debtAmount || 0), 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,66 +101,102 @@ export default function CustomerManagementPage() {
     setTotalPointsEarned(0);
     setTotalPointsRedeemed(0);
     setPoints(0);
-    setLastPointsUpdate(new Date().toISOString().split('T')[0]);
+    setLastPointsUpdate(new Date().toLocaleDateString('en-CA'));
     setDebtAmount(0);
     setIsAdding(false);
     setEditingId(null);
   };
 
   const handleEdit = (c: any) => {
-    setCustomId(c.id);
-    setName(c.name);
-    setPhone(c.phone);
-    setTotalPointsEarned(c.totalPointsEarned || c.points || 0);
-    setTotalPointsRedeemed(c.totalPointsRedeemed || 0);
-    setPoints(c.points || 0);
-    setLastPointsUpdate(c.lastPointsUpdate || (c.createdAt ? c.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]));
-    setDebtAmount(c.debtAmount || 0);
-    setEditingId(c.id);
-    setIsAdding(true);
+    try {
+      setCustomId(c.id || '');
+      setName(c.name || '');
+      setPhone(c.phone || '');
+      setTotalPointsEarned(Number(c.totalPointsEarned) || Number(c.points) || 0);
+      setTotalPointsRedeemed(Number(c.totalPointsRedeemed) || 0);
+      setPoints(Number(c.points) || 0);
+      setLastPointsUpdate(c.lastPointsUpdate || (c.createdAt ? String(c.createdAt).split('T')[0] : new Date().toLocaleDateString('en-CA')));
+      setDebtAmount(Number(c.debtAmount) || 0);
+      setEditingId(c.id);
+      setIsAdding(true);
+      
+      setTimeout(() => {
+        const formEl = document.getElementById('form-pelanggan');
+        if (formEl) {
+          formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          const mainContainer = document.getElementById('main-scroll-container');
+          if (mainContainer) mainContainer.scrollTo({ top: 0, behavior: 'smooth' });
+          else window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
+    } catch (err: any) {
+      alert('Gagal edit: ' + err.message);
+    }
   };
 
-  const handlePayDebt = (c: any) => {
-    const payStr = prompt(`Masukkan nominal pelunasan piutang untuk ${c.name} (Total Piutang: Rp ${c.debtAmount}):`, '0');
-    if (!payStr) return;
-    const amount = Number(payStr);
-    if (isNaN(amount) || amount <= 0) return;
+  useEffect(() => {
+    if (location.state?.selectedCustomerId && customers.length > 0) {
+      const targetId = location.state.selectedCustomerId;
+      const customer = customers.find((c: any) => c.id === targetId);
+      if (customer) {
+        setSearchTerm(customer.name); // Filter the list to easily see the customer
+        
+        // Clear the state properly using React Router
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, customers]);
 
-    if (amount > c.debtAmount) {
+  const handleProcessPayoff = () => {
+    const { customerId, customerName, debtAmount, payAmount, paymentMethod } = payoffModal;
+    if (payAmount <= 0) return;
+    if (payAmount > debtAmount) {
       alert('Nominal pelunasan tidak boleh lebih besar dari total piutang!');
       return;
     }
 
-    updateCustomer(c.id, { debtAmount: c.debtAmount - amount });
+    updateCustomer(customerId, { debtAmount: debtAmount - payAmount });
 
-    // Add auto journal for debt payment
     const now = new Date().toISOString();
+    
+    // Tentukan akun tujuan berdasarkan metode pembayaran
+    const getAccountForMethod = (method: string) => {
+      if (method === 'QRIS_SHARIAH') return '1-1020';
+      if (method === 'TRANSFER_BSI') return '1-1010';
+      return '1-1000';
+    };
+
+    const targetAccount = getAccountForMethod(paymentMethod);
+
     addJournalEntry({
       tenantId: currentUser?.tenantId || 'tenant_default',
       date: now,
-      account: 'KAS',
-      description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${c.name}`,
-      debit: amount,
+      account: targetAccount,
+      description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${customerName} via ${paymentMethod}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
+      debit: payAmount,
       credit: 0,
-      referenceId: c.id,
+      referenceId: customerId,
       referenceType: 'MANUAL',
       createdBy: currentUser?.name,
       branchId: currentUser?.branchId
     });
+    
     addJournalEntry({
       tenantId: currentUser?.tenantId || 'tenant_default',
       date: now,
-      account: 'PIUTANG_DAGANG',
-      description: `[Auto] Pengurangan piutang pelanggan: ${c.name}`,
+      account: '1-1030', // Piutang Kasbon Pelanggan
+      description: `[Auto] Pengurangan piutang pelanggan: ${customerName}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
       debit: 0,
-      credit: amount,
-      referenceId: c.id,
+      credit: payAmount,
+      referenceId: customerId,
       referenceType: 'MANUAL',
       createdBy: currentUser?.name,
       branchId: currentUser?.branchId
     });
 
-    alert(`Pelunasan berhasil diproses. Sisa piutang: Rp ${c.debtAmount - amount}`);
+    alert(`Pelunasan berhasil diproses. Sisa piutang: Rp ${debtAmount - payAmount}`);
+    setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH' });
   };
 
   return (
@@ -220,8 +301,13 @@ export default function CustomerManagementPage() {
       )}
 
       {isAdding && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 mb-6">
-          <h2 className="text-lg font-bold mb-4">{editingId ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}</h2>
+        <div id="form-pelanggan" className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 mb-6 animate-in fade-in slide-in-from-top-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold">{editingId ? 'Edit Pelanggan' : 'Tambah Pelanggan Baru'}</h2>
+            <button onClick={() => { resetForm(); setIsAdding(false); }} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold">
+              Tutup Form
+            </button>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
             <div>
               <label className="block text-xs font-bold text-gray-600 dark:text-slate-400 mb-1">id</label>
@@ -271,18 +357,123 @@ export default function CustomerManagementPage() {
               <label className="block text-xs font-bold text-red-600 dark:text-red-400 mb-1">Piutang / Kasbon (Rp)</label>
               <input type="number" min={0} value={debtAmount} onChange={e => setDebtAmount(Number(e.target.value) || 0)} className="w-full border border-red-200 dark:border-red-900/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none font-bold text-red-600 dark:text-red-400 bg-red-50/50 dark:bg-red-900/10" />
             </div>
+            {editingId && (
+              <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
+                {users.find(u => u.role === 'PELANGGAN' && u.username === phone) ? (
+                  <button type="button" onClick={() => setResetPwdModal({ isOpen: true, userId: users.find(u => u.role === 'PELANGGAN' && u.username === phone)!.id, userName: name, newPwd: '' as any })} className="w-full bg-amber-100 text-amber-700 font-bold py-2 rounded-lg text-sm border border-amber-200 hover:bg-amber-200">Ubah Sandi Login</button>
+                ) : (
+                  <button type="button" onClick={() => setCreateAccountModal({ isOpen: true, customerId: editingId, customerName: name, phone: phone, initialPwd: '' as any })} className="w-full bg-blue-100 text-blue-700 font-bold py-2 rounded-lg text-sm border border-blue-200 hover:bg-blue-200">Buatkan Akun Login</button>
+                )}
+              </div>
+            )}
             <button type="submit" className="w-full bg-green-600 text-white font-bold py-2 rounded-lg mt-2">Simpan Data</button>
           </form>
         </div>
       )}
 
+      {/* Reset Password Modal */}
+      {resetPwdModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-4 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="font-bold text-gray-800 dark:text-slate-200">Reset Sandi Pelanggan</h3>
+              <p className="text-[10px] text-gray-500">{resetPwdModal.userName}</p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Sandi Baru</label>
+                <input 
+                  type="text" 
+                  value={resetPwdModal.newPwd} 
+                  onChange={e => setResetPwdModal(prev => ({...prev, newPwd: e.target.value as any}))} 
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                  placeholder="Ketik sandi baru..." 
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setResetPwdModal({isOpen: false, userId: '', userName: '', newPwd: ''})} className="px-3 py-1.5 text-xs font-bold text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg">Batal</button>
+                <button onClick={() => {
+                  if(!resetPwdModal.newPwd) return alert('Sandi tidak boleh kosong');
+                  updateUser(resetPwdModal.userId, { password: resetPwdModal.newPwd });
+                  alert('Sandi berhasil direset!');
+                  setResetPwdModal({isOpen: false, userId: '', userName: '', newPwd: ''});
+                }} className="px-3 py-1.5 text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 rounded-lg">Simpan Sandi Baru</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Account Modal */}
+      {createAccountModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95">
+            <div className="p-4 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="font-bold text-gray-800 dark:text-slate-200">Buatkan Akun Pelanggan</h3>
+              <p className="text-[10px] text-gray-500">{createAccountModal.customerName}</p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Nomor Handphone (Username)</label>
+                <input 
+                  type="text" 
+                  value={createAccountModal.phone} 
+                  onChange={e => setCreateAccountModal(prev => ({...prev, phone: e.target.value}))} 
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                  placeholder="Contoh: 08123..." 
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Sandi Awal (Sementara)</label>
+                <input 
+                  type="text" 
+                  value={createAccountModal.initialPwd} 
+                  onChange={e => setCreateAccountModal(prev => ({...prev, initialPwd: e.target.value as any}))} 
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                  placeholder="Ketik sandi awal..." 
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setCreateAccountModal({isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''})} className="px-3 py-1.5 text-xs font-bold text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg">Batal</button>
+                <button onClick={() => {
+                  if(!createAccountModal.phone) return alert('Nomor HP wajib diisi');
+                  if(!createAccountModal.initialPwd) return alert('Sandi tidak boleh kosong');
+                  
+                  // Check if phone already registered
+                  const existingUser = users.find(u => u.username === createAccountModal.phone);
+                  if (existingUser) return alert('Nomor HP sudah terdaftar sebagai pengguna lain!');
+
+                  // Update phone in customer data if changed
+                  if (createAccountModal.phone !== customers.find(c => c.id === createAccountModal.customerId)?.phone) {
+                    updateCustomer(createAccountModal.customerId, { phone: createAccountModal.phone });
+                  }
+
+                  // Create user
+                  registerUser({
+                    name: createAccountModal.customerName,
+                    username: createAccountModal.phone,
+                    password: createAccountModal.initialPwd,
+                    role: 'PELANGGAN',
+                    branchId: currentUser?.branchId,
+                    tenantId: currentUser?.tenantId
+                  });
+                  
+                  alert('Akun pelanggan berhasil dibuat!');
+                  setCreateAccountModal({isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''});
+                }} className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white hover:bg-green-700 rounded-lg">Buat Akun</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input 
               type="text" 
-              placeholder="Cari pelanggan..." 
+              placeholder="Cari pelanggan (nama/hp)..." 
               value={searchTerm} 
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -291,23 +482,35 @@ export default function CustomerManagementPage() {
               className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm outline-none" 
             />
           </div>
+          <select 
+            value={filterType}
+            onChange={(e) => { setFilterType(e.target.value as any); setCurrentPage(1); }}
+            className="w-full sm:w-auto bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-gray-700 dark:text-slate-300 font-bold"
+          >
+            <option value="SEMUA">Semua Pelanggan</option>
+            <option value="PUNYA_AKUN">Punya Akun Login</option>
+            <option value="BELUM_ADA">Belum Ada Akun</option>
+            <option value="KASBON">Punya Kasbon</option>
+            <option value="POIN_TERPAKAI">Poin Terpakai</option>
+          </select>
         </div>
 
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-xs sm:text-sm">
+          <table className="w-full text-left text-[10px] sm:text-xs">
             <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap">
               <tr>
-                <th className="px-2 py-3 align-middle">No</th>
-                <th className="px-2 py-3 align-middle">ID</th>
-                <th className="px-2 py-3 align-middle">Phone</th>
-                <th className="px-2 py-3 align-middle min-w-[120px]">Name</th>
-                <th className="px-2 py-3 text-right align-middle">Piutang (Kasbon)</th>
-                <th className="px-2 py-3 text-center align-middle">Tot. Poin</th>
-                <th className="px-2 py-3 text-center align-middle">Terpakai</th>
-                <th className="px-2 py-3 text-center align-middle">Sisa</th>
-                <th className="px-2 py-3 align-middle hidden sm:table-cell">Tgl Update</th>
-                <th className="px-2 py-3 text-right align-middle">Nilai (Rp)</th>
-                <th className="px-2 py-3 text-center align-middle">Aksi</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle text-center">No</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle">ID</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle">Phone</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle min-w-[120px]">Name</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Akses Login</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle">Piutang (Kasbon)</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Tot. Poin</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Terpakai</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Sisa</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle hidden sm:table-cell">Tgl Update</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle">Nilai (Rp)</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 whitespace-nowrap">
@@ -320,34 +523,58 @@ export default function CustomerManagementPage() {
 
                 return (
                   <tr key={c.id} className="hover:bg-gray-50 dark:bg-slate-800">
-                    <td className="px-2 py-3 text-gray-600 dark:text-slate-400 align-middle">{startIndex + index + 1}</td>
-                    <td className="px-2 py-3 text-gray-500 dark:text-slate-400 font-mono text-[10px] sm:text-xs align-middle">{c.id.substring(0, 8)}</td>
-                    <td className="px-2 py-3 text-gray-600 dark:text-slate-400 align-middle text-[10px] sm:text-xs">{c.phone}</td>
-                    <td className="px-2 py-3 font-bold text-gray-800 dark:text-slate-200 align-middle whitespace-normal break-words">{c.name}</td>
-                    <td className="px-2 py-3 text-right text-red-600 dark:text-red-400 font-bold align-middle">
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-center text-gray-600 dark:text-slate-400 align-middle">{startIndex + index + 1}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-gray-500 dark:text-slate-400 font-mono text-[9px] sm:text-[10px] align-middle">{c.id.substring(0, 8)}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-gray-600 dark:text-slate-400 align-middle text-[9px] sm:text-[10px]">{c.phone}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 font-bold text-gray-800 dark:text-slate-200 align-middle whitespace-normal break-words leading-tight">{c.name}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">
+                      {(() => {
+                        const linkedUser = users.find(u => u.role === 'PELANGGAN' && u.username === c.phone);
+                        if (linkedUser) {
+                          return (
+                            <div className="flex flex-col items-center gap-0.5 cursor-pointer group" onClick={() => setResetPwdModal({ isOpen: true, userId: linkedUser.id, userName: c.name, newPwd: '' })} title="Klik untuk Reset Sandi">
+                              <span className="bg-green-100 text-green-700 text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Punya Akun</span>
+                              <span className="text-[8px] text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">Reset Sandi?</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-col items-center gap-0.5 cursor-pointer group" onClick={() => setCreateAccountModal({ isOpen: true, customerId: c.id, customerName: c.name, phone: c.phone, initialPwd: '' })} title="Klik untuk Buatkan Akun">
+                            <span className="bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Belum Ada</span>
+                            <span className="text-[8px] text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">Buat Akun?</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-right text-red-600 dark:text-red-400 font-bold align-middle">
                       Rp {Number(c.debtAmount || 0).toLocaleString('id-ID')}
                     </td>
-                    <td className="px-2 py-3 text-center align-middle">{totalPoint}</td>
-                    <td className="px-2 py-3 text-center align-middle">{pointTerpakai}</td>
-                    <td className="px-2 py-3 text-center align-middle">
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{totalPoint}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{pointTerpakai}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">
                       <button onClick={() => {
                         const val = prompt(`Ubah poin untuk ${c.name}:`, String(c.points));
                         if (val === null) return;
                         const n = Number(val);
                         if (isNaN(n)) { alert('Masukkan angka valid'); return; }
                         updateCustomer(c.id, { points: n });
-                      }} className="px-2 py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-[10px] sm:text-xs hover:opacity-80">
+                      }} className="px-1.5 py-0.5 sm:px-2 sm:py-1 bg-amber-100 text-amber-800 font-bold rounded-full text-[9px] sm:text-[10px] hover:opacity-80">
                         {sisaPoint}
                       </button>
                     </td>
-                    <td className="px-2 py-3 text-gray-500 dark:text-slate-400 text-[10px] align-middle hidden sm:table-cell">{updateDate}</td>
-                    <td className="px-2 py-3 text-right font-bold text-green-700 align-middle">Rp {nilaiRp.toLocaleString('id-ID')}</td>
-                    <td className="px-2 py-3 text-center space-x-1 align-middle">
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-gray-500 dark:text-slate-400 text-[9px] align-middle hidden sm:table-cell">{updateDate}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-right font-bold text-green-700 align-middle">Rp {nilaiRp.toLocaleString('id-ID')}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-center space-x-1 align-middle">
+                      {c.debtAmount > 0 && (
+                        <button onClick={() => setPayoffModal({ isOpen: true, customerId: c.id, customerName: c.name, debtAmount: c.debtAmount || 0, payAmount: c.debtAmount || 0, paymentMethod: 'CASH', notes: '' })} className="p-1 text-green-600 hover:bg-green-50 rounded-lg" title="Lunasi Kasbon">
+                          <CreditCard className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button onClick={() => handleEdit(c)} className="p-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 rounded-lg" title="Edit">
-                        <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => deleteCustomer(c.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-lg" title="Hapus">
-                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -361,11 +588,12 @@ export default function CustomerManagementPage() {
             </tbody>
             <tfoot className="bg-gray-100 dark:bg-slate-800 font-bold text-gray-800 dark:text-slate-200 border-t border-gray-200 dark:border-slate-700 whitespace-nowrap text-[10px] sm:text-xs">
               <tr>
-                <td colSpan={4} className="px-2 py-3 text-right align-middle">TOTAL</td>
-                <td className="px-2 py-3 text-center align-middle">{totalPointsEarnedSum}</td>
-                <td className="px-2 py-3 text-center align-middle">{totalPointsRedeemedSum}</td>
-                <td className="px-2 py-3 text-center align-middle">{totalRemainingPointsSum}</td>
-                <td className="px-2 py-3 align-middle hidden sm:table-cell"></td>
+                <td colSpan={5} className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle pr-4">TOTAL</td>
+                <td className="px-1 py-2 sm:px-2 sm:py-3 text-right text-red-600 dark:text-red-400 align-middle">Rp {totalDebtSum.toLocaleString('id-ID')}</td>
+                <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{totalPointsEarnedSum.toLocaleString('id-ID')}</td>
+                <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{totalPointsRedeemedSum.toLocaleString('id-ID')}</td>
+                <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{totalRemainingPointsSum.toLocaleString('id-ID')}</td>
+                <td className="px-1 py-2 sm:px-2 sm:py-3 align-middle hidden sm:table-cell"></td>
                 <td className="px-2 py-3 text-right text-green-700 align-middle">Rp {totalValueSum.toLocaleString('id-ID')}</td>
                 <td className="px-2 py-3 align-middle"></td>
               </tr>
@@ -420,6 +648,82 @@ export default function CustomerManagementPage() {
           </div>
         )}
       </div>
+
+      {payoffModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-6 shadow-xl border border-gray-100 dark:border-slate-800">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              Lunasi Kasbon Pelanggan
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Nama Pelanggan</label>
+                <div className="font-bold text-gray-800 dark:text-slate-200">{payoffModal.customerName}</div>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Total Piutang (Kasbon)</label>
+                <div className="font-bold text-red-600 text-lg">Rp {payoffModal.debtAmount.toLocaleString('id-ID')}</div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Metode Pembayaran</label>
+                <select
+                  value={payoffModal.paymentMethod}
+                  onChange={(e) => setPayoffModal({ ...payoffModal, paymentMethod: e.target.value as any })}
+                  className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="CASH">Tunai (Cash)</option>
+                  <option value="TRANSFER_BSI">Transfer BSI</option>
+                  <option value="QRIS_SHARIAH">QRIS Syariah</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Nominal Pelunasan (Rp)</label>
+                <input
+                  type="number"
+                  value={payoffModal.payAmount}
+                  onChange={(e) => setPayoffModal({ ...payoffModal, payAmount: Number(e.target.value) })}
+                  className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xl font-bold"
+                  min="0"
+                  max={payoffModal.debtAmount}
+                />
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Keterangan (Opsional)</label>
+                <textarea 
+                  className="w-full border border-gray-300 dark:border-slate-600 rounded-lg p-3 text-sm bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500"
+                  placeholder="Misal: Potong Gaji Bulan Juli"
+                  rows={2}
+                  value={payoffModal.notes}
+                  onChange={(e) => setPayoffModal(prev => ({...prev, notes: e.target.value}))}
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setPayoffModal({ ...payoffModal, isOpen: false })}
+                  className="px-4 py-2 text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl font-bold"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProcessPayoff}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-md"
+                >
+                  Proses Pelunasan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

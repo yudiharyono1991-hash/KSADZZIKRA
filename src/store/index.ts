@@ -1862,9 +1862,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (paymentMethod === 'KASBON' && customerId) {
       get().updateCustomer(customerId, { debtAmount: (currentCustomer?.debtAmount || 0) + totalAmount });
     }
-    // Handle Customer Points (+1 point per 1.000 spent)
+    // Handle Customer Points
     if (customerId) {
-      const earnedPoints = paymentMethod !== 'KASBON' ? Math.floor(totalAmount / 1000) : 0;
+      const earnedPoints = (paymentMethod !== 'KASBON' && settings.enablePoints !== false) ? Math.floor(totalAmount / (settings.pointEarningRate || 1000)) : 0;
       get().updateCustomer(customerId, {
         points: Math.max(0, (currentCustomer?.points || 0) - redeemed + earnedPoints),
         totalPointsEarned: (currentCustomer?.totalPointsEarned || 0) + earnedPoints,
@@ -2272,7 +2272,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().addJournalEntry({
           tenantId,
           date: now,
-          account: 'BEBAN POKOK PENDAPATAN',
+          account: '5-1000',
           description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
           debit: totalValue,
           credit: 0,
@@ -2283,7 +2283,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().addJournalEntry({
           tenantId,
           date: now,
-          account: 'PERSEDIAAN BARANG DAGANG',
+          account: '1-1040',
           description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
           debit: 0,
           credit: totalValue,
@@ -2296,7 +2296,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().addJournalEntry({
           tenantId,
           date: now,
-          account: 'PERSEDIAAN BARANG DAGANG',
+          account: '1-1040',
           description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
           debit: totalValue,
           credit: 0,
@@ -2307,7 +2307,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().addJournalEntry({
           tenantId,
           date: now,
-          account: 'PENDAPATAN LAINNYA',
+          account: '4-1000',
           description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
           debit: 0,
           credit: totalValue,

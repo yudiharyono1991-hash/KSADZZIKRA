@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
+import { useAppStore } from '../store';
 import { Truck, Plus, Search, Trash2, Edit, CreditCard } from 'lucide-react';
 
 export default function SupplierManagementPage() {
   const { suppliers, addSupplier, updateSupplier, deleteSupplier, currentUser } = useBranchData();
+  const { addJournalEntry } = useAppStore();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -15,7 +17,7 @@ export default function SupplierManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
   const filtered = suppliers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -60,6 +62,33 @@ export default function SupplierManagementPage() {
     }
 
     updateSupplier(s.id, { debtAmount: s.debtAmount - amount });
+    
+    const now = new Date().toISOString();
+    // 2-1000 = Utang Dagang ke Supplier
+    // 1-1000 = Kas Tunai Toko
+    addJournalEntry({
+      tenantId: currentUser?.tenantId || 'tenant_default',
+      date: now,
+      account: '2-1000',
+      description: `[Auto] Pembayaran hutang usaha ke Pemasok: ${s.name}`,
+      debit: amount,
+      credit: 0,
+      referenceId: s.id,
+      referenceType: 'MANUAL',
+      createdBy: currentUser?.name
+    });
+    addJournalEntry({
+      tenantId: currentUser?.tenantId || 'tenant_default',
+      date: now,
+      account: '1-1000',
+      description: `[Auto] Pembayaran hutang usaha ke Pemasok: ${s.name}`,
+      debit: 0,
+      credit: amount,
+      referenceId: s.id,
+      referenceType: 'MANUAL',
+      createdBy: currentUser?.name
+    });
+
     alert(`Pelunasan berhasil diproses. Sisa hutang toko ke ${s.name}: Rp ${s.debtAmount - amount}`);
   };
 
