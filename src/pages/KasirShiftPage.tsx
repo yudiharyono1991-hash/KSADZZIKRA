@@ -772,12 +772,25 @@ export default function KasirShiftPage() {
 
           <div className="space-y-2 border-b border-dashed border-black pb-3 mb-3">
             <p className="font-bold">Transaksi Kas Kecil:</p>
-            {myExpenses.length === 0 ? <p>- Nihil -</p> : myExpenses.map(exp => (
-              <div key={exp.id} className="flex justify-between pl-2">
-                <span>{exp.description.replace('Kas Kecil: ', '').replace('Pemasukan Kas: ', '[+] ')}</span>
-                <span>{exp.amount < 0 ? '+' : '-'} Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
-              </div>
-            ))}
+            {myExpenses.length === 0 && manualJournalsToday.length === 0 ? <p>- Nihil -</p> : (
+              <>
+                {myExpenses.map(exp => (
+                  <div key={exp.id} className="flex justify-between pl-2">
+                    <span>{exp.description.replace('Kas Kecil: ', '').replace('Pemasukan Kas: ', '[+] ')}</span>
+                    <span>{exp.amount < 0 ? '+' : '-'} Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+                {manualJournalsToday.map(j => {
+                  const amt = (j.credit || 0) - (j.debit || 0);
+                  return (
+                    <div key={j.id} className="flex justify-between pl-2">
+                      <span>[Jurnal] {j.description}</span>
+                      <span>{amt < 0 ? '+' : '-'} Rp {Math.abs(amt).toLocaleString('id-ID')}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
             <div className="flex justify-between font-bold pt-1 border-t border-black mt-1">
               <span>Total Bersih:</span>
               <span>Rp {totalPettyCash.toLocaleString('id-ID')}</span>
@@ -788,6 +801,14 @@ export default function KasirShiftPage() {
             <div className="flex justify-between">
               <span>ESTIMASI TUNAI DI LACI:</span>
               <span>Rp {expectedCash.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>FISIK TUNAI DI LACI:</span>
+              <span>Rp {Number(actualCash).toLocaleString('id-ID')}</span>
+            </div>
+            <div className={`flex justify-between ${(Number(actualCash) - expectedCash) < 0 ? 'text-rose-600' : ''}`}>
+              <span>SELISIH:</span>
+              <span>Rp {(Number(actualCash) - expectedCash).toLocaleString('id-ID')}</span>
             </div>
             <p className="text-center mt-6 text-[10px] font-normal italic">
               "Semoga lelah menjadi lillah, harta menjadi berkah"
