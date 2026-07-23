@@ -2536,6 +2536,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ journalEntries: updated });
     saveStorage('ksa_journal_entries', updated, currentUser?.tenantId);
     addLog('JOURNAL_ENTRY', 'FINANCE', `Menghapus Group Jurnal: ${refId}`);
+
+    if (isSupabaseConfigured) {
+      supabaseService.deleteJournalEntryByRef(refId);
+    }
   },
 
   addExpense: (expenseData) => {

@@ -1217,6 +1217,17 @@ export const supabaseService = {
       return false;
     }
   },
+  async deleteJournalEntryByRef(refId: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('journal_entries').delete().eq('reference_id', refId);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete journal_entries by ref: ${err.message}`, true);
+      return false;
+    }
+  },
   async clearAllDatabase(tenantId: string): Promise<boolean> {
     if (!supabase) return false;
     try {
