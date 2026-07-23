@@ -87,13 +87,13 @@ export default function KasirShiftPage() {
 
   // Filter Today's data for this cashier
   const today = new Date().toISOString().split('T')[0];
-  const myTransactions = transactions.filter(tx => 
+  const myTransactions = (transactions || []).filter(tx => 
     tx.timestamp.startsWith(today) && tx.cashierName === currentUser?.name
   );
 
   const myAttendance = currentUser ? attendances.find(a => a.userId === currentUser.username && a.date === today) : undefined;
 
-  const myExpenses = expenses.filter(exp => 
+  const myExpenses = (expenses || []).filter(exp => 
     exp.date.startsWith(today) && exp.createdBy === currentUser?.name && exp.category === 'OPERASIONAL'
   );
 
@@ -161,7 +161,7 @@ export default function KasirShiftPage() {
 
   const [historyFilter, setHistoryFilter] = useState<'ALL' | '7_DAYS' | '1_MONTH' | '1_YEAR'>('7_DAYS');
 
-  const filteredHistory = attendances.filter(a => {
+  const filteredHistory = (attendances || []).filter(a => {
     if (a.userId !== currentUser?.username) return false;
     if (historyFilter === 'ALL') return true;
     
@@ -556,7 +556,7 @@ export default function KasirShiftPage() {
              </div>
              <div className="p-2 space-y-1 max-h-60 overflow-y-auto overflow-x-auto">
                 {(() => {
-                  const filteredPettyCash = expenses.filter(exp => 
+                  const filteredPettyCash = (expenses || []).filter(exp => 
                     exp.createdBy === currentUser?.name && 
                     exp.category === 'OPERASIONAL' &&
                     exp.date >= pettyCashStartDate && exp.date <= pettyCashEndDate + 'T23:59:59'
