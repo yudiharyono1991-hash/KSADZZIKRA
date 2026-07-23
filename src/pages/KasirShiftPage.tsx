@@ -20,7 +20,7 @@ const getLocalTodayDate = () => {
 };
 
 export default function KasirShiftPage() {
-  const { transactions, currentUser, addExpense, expenses, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings } = useAppStore();
+  const { transactions, currentUser, addExpense, expenses, journalEntries, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
@@ -120,7 +120,14 @@ export default function KasirShiftPage() {
   const myAttendance = currentUser ? attendances.find(a => a.userId === currentUser.username && a.date === today) : undefined;
 
   const myExpenses = (expenses || []).filter(exp => 
-    exp.date.startsWith(today) && exp.createdBy === currentUser?.name && exp.category === 'OPERASIONAL'
+    exp.date.startsWith(today) && exp.category === 'OPERASIONAL'
+  );
+
+  const manualJournalsToday = (journalEntries || []).filter(j => 
+    j.date.startsWith(today) && 
+    j.referenceType === 'MANUAL' && 
+    j.account && 
+    j.account.toLowerCase().includes('kas kecil')
   );
 
   const totalTunai = myTransactions
@@ -139,7 +146,8 @@ export default function KasirShiftPage() {
     .filter(t => t.paymentMethod === 'KASBON' && !t.isVoided)
     .reduce((sum, t) => sum + t.totalAmount, 0);
 
-  const totalPettyCash = myExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const totalPettyCash = myExpenses.reduce((sum, exp) => sum + exp.amount, 0) + 
+    manualJournalsToday.reduce((sum, j) => sum + (j.credit || 0) - (j.debit || 0), 0);
 
   // Fisik Tunai yang Diharapkan
   const expectedCash = totalTunai - totalPettyCash;
@@ -574,11 +582,28 @@ export default function KasirShiftPage() {
              </div>
              <div className="p-2 space-y-1 max-h-60 overflow-y-auto overflow-x-auto">
                 {(() => {
-                  const filteredPettyCash = (expenses || []).filter(exp => 
-                    exp.createdBy === currentUser?.name && 
+                  const baseExpenses = (expenses || []).filter(exp => 
                     exp.category === 'OPERASIONAL' &&
                     exp.date >= pettyCashStartDate && exp.date <= pettyCashEndDate + 'T23:59:59'
-                  ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                  );
+                  
+                  const manualJournals = (journalEntries || [])
+                    .filter(j => 
+                      j.referenceType === 'MANUAL' && 
+                      j.account && j.account.toLowerCase().includes('kas kecil') &&
+                      j.date >= pettyCashStartDate && j.date <= pettyCashEndDate + 'T23:59:59'
+                    )
+                    .map(j => ({
+                      id: j.id,
+                      description: `[Jurnal Umum] ${j.description}`,
+                      date: j.date,
+                      amount: (j.credit || 0) - (j.debit || 0),
+                      isManual: true,
+                      createdBy: j.createdBy
+                    } as any));
+
+                  const filteredPettyCash = [...baseExpenses, ...manualJournals]
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                   return filteredPettyCash.length === 0 ? (
                     <p className="text-xs text-slate-400 text-center py-4 italic">Belum ada transaksi kas kecil.</p>
