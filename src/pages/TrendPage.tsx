@@ -35,7 +35,7 @@ import {
 
 export default function TrendPage() {
   const { transactions, expenses, products, activeBranchId } = useBranchData();
-  const { settings, addPettyCashDeposit, journalEntries } = useAppStore();
+  const { settings, addPettyCashDeposit, journalEntries, getCalculatedPettyCash } = useAppStore();
   const todayObj = new Date();
   const firstDay = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toLocaleDateString('en-CA');
   const currentDay = todayObj.toLocaleDateString('en-CA');
@@ -61,7 +61,7 @@ export default function TrendPage() {
     return transactions.filter(tx => !tx.isVoided && (!activeBranchId || tx.branchId === activeBranchId || !tx.branchId));
   }, [transactions, activeBranchId]);
 
-  const dynamicPettyCash = settings?.pettyCashBalance || 0;
+  const dynamicPettyCash = getCalculatedPettyCash();
 
   const { chartData, totals, comparisons, ratios } = useMemo(() => {
     const today = new Date().toLocaleDateString('en-CA');

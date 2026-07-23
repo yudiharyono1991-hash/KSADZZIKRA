@@ -20,7 +20,7 @@ const getLocalTodayDate = () => {
 };
 
 export default function KasirShiftPage() {
-  const { transactions, currentUser, addExpense, expenses, journalEntries, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings } = useAppStore();
+  const { transactions, currentUser, addExpense, expenses, journalEntries, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
@@ -479,7 +479,7 @@ export default function KasirShiftPage() {
             </p>
             <div className="mb-4 bg-amber-100/50 p-2 rounded-lg border border-amber-200/50 flex justify-between items-center">
               <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Saldo Kas Fisik</span>
-              <span className="text-sm font-black text-amber-900">Rp {(settings?.pettyCashBalance || 0).toLocaleString('id-ID')}</span>
+              <span className="text-sm font-black text-amber-900">Rp {getCalculatedPettyCash().toLocaleString('id-ID')}</span>
             </div>
             <form onSubmit={handleAddPettyCash} className="space-y-3 relative z-10">
               <div className="flex bg-amber-100 rounded-lg p-1">

@@ -257,6 +257,7 @@ interface AppState {
   // Expenses & Closing Actions
   addExpense: (expense: Omit<Expense, 'id' | 'createdBy'>) => void;
   deleteExpense: (id: string) => void;
+  getCalculatedPettyCash: () => number;
   addPettyCashDeposit: (amount: number, description: string) => void;
   addClosing: (closing: Omit<ClosingRecord, 'id' | 'timestamp' | 'createdBy'>) => void;
   clearAllData: () => void;
@@ -2524,12 +2525,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ journalEntries: updated });
     saveStorage('ksa_journal_entries', updated, get().currentUser?.tenantId);
     get().addLog('JOURNAL_ENTRY', 'FINANCE', `Mencatat Jurnal: ${newEntry.description}`);
-    
-    // Auto-update pettyCashBalance if this journal affects Kas Kecil
-    if (entryData.account && entryData.account.toLowerCase().includes('kas kecil')) {
-      const currentBalance = get().settings.pettyCashBalance || 0;
-      get().updateSettings({ pettyCashBalance: currentBalance + (entryData.debit || 0) - (entryData.credit || 0) });
-    }
 
     if (isSupabaseConfigured) {
       supabaseService.saveJournalEntry(newEntry);
@@ -2537,25 +2532,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteJournalEntryByRef: (refId) => {
-    const { journalEntries, currentUser, addLog, settings, updateSettings } = get();
-    
-    const deletedEntries = journalEntries.filter(j => j.referenceId === refId);
-    let pettyCashDelta = 0;
-    deletedEntries.forEach(entry => {
-      if (entry.account && entry.account.toLowerCase().includes('kas kecil')) {
-        // Reverse effect: add credit, subtract debit
-        pettyCashDelta += (entry.credit || 0) - (entry.debit || 0);
-      }
-    });
-
+    const { journalEntries, currentUser, addLog } = get();
     const updated = journalEntries.filter(j => j.referenceId !== refId);
     set({ journalEntries: updated });
     saveStorage('ksa_journal_entries', updated, currentUser?.tenantId);
     addLog('JOURNAL_ENTRY', 'FINANCE', `Menghapus Group Jurnal: ${refId}`);
-
-    if (pettyCashDelta !== 0) {
-      updateSettings({ pettyCashBalance: (settings.pettyCashBalance || 0) + pettyCashDelta });
-    }
 
     if (isSupabaseConfigured) {
       supabaseService.deleteJournalEntryByRef(refId);
@@ -2575,12 +2556,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
     get().addLog('EXPENSE_ADD', 'FINANCE', `Mencatat pengeluaran: ${newExpense.description} Rp ${newExpense.amount.toLocaleString('id-ID')} oleh ${newExpense.createdBy}`);
 
-    // Update Petty Cash Balance if applicable
-    if (newExpense.category === 'OPERASIONAL' && (newExpense.description.startsWith('Kas Kecil:') || newExpense.description.startsWith('Pemasukan Kas:'))) {
-      const currentSettings = get().settings;
-      const currentBalance = currentSettings.pettyCashBalance || 0;
-      get().updateSettings({ pettyCashBalance: currentBalance - newExpense.amount });
-    }
+    // Jurnal Otomatis handled below
 
     // === JURNAL OTOMATIS dari Pengeluaran ===
     const now = new Date().toISOString();
@@ -2627,20 +2603,53 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (exp) {
       get().addLog('EXPENSE_DELETE', 'FINANCE', `Menghapus pengeluaran: ${exp.description}`);
-      
-      // Refund Petty Cash Balance if applicable
-      if (exp.category === 'OPERASIONAL' && (exp.description.startsWith('Kas Kecil:') || exp.description.startsWith('Pemasukan Kas:'))) {
-        const currentSettings = get().settings;
-        const currentBalance = currentSettings.pettyCashBalance || 0;
-        get().updateSettings({ pettyCashBalance: currentBalance + exp.amount });
-      }
     }
   },
 
+  getCalculatedPettyCash: () => {
+    const { expenses, journalEntries } = get();
+    const expenseBalance = (expenses || []).reduce((sum, exp) => {
+      if (exp.category === 'OPERASIONAL' && (exp.description.startsWith('Kas Kecil:') || exp.description.startsWith('Pemasukan Kas:'))) {
+        return sum - exp.amount; // pengeluaran > 0 (mengurangi saldo), pemasukan < 0 (menambah saldo)
+      }
+      return sum;
+    }, 0);
+    const manualBalance = (journalEntries || []).reduce((sum, j) => {
+      if (j.referenceType === 'MANUAL' && j.account && j.account.toLowerCase().includes('kas kecil')) {
+        return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      }
+      return sum;
+    }, 0);
+    return expenseBalance + manualBalance;
+  },
+
   addPettyCashDeposit: (amount, description) => {
-    const { currentUser, settings, addLog, updateSettings } = get();
-    const currentBalance = settings.pettyCashBalance || 0;
-    updateSettings({ pettyCashBalance: currentBalance + amount });
+    const { currentUser, addLog, addJournalEntry } = get();
+    const refId = `TOPUP_${Date.now()}`;
+    const isoDate = new Date().toISOString();
+    
+    addJournalEntry({
+      date: isoDate,
+      account: '1102 - Kas Kecil',
+      description: `[Top Up] ${description}`,
+      debit: amount,
+      credit: 0,
+      referenceId: refId,
+      referenceType: 'MANUAL',
+      createdBy: currentUser?.name || 'System'
+    });
+    
+    addJournalEntry({
+      date: isoDate,
+      account: '3100 - Modal Anggota',
+      description: `[Top Up] ${description}`,
+      debit: 0,
+      credit: amount,
+      referenceId: refId,
+      referenceType: 'MANUAL',
+      createdBy: currentUser?.name || 'System'
+    });
+
     addLog('PETTY_CASH_TOPUP', 'FINANCE', `Top Up Kas Kecil: ${description} (Rp ${amount.toLocaleString('id-ID')}) oleh ${currentUser?.name || 'System'}`);
   },
 
