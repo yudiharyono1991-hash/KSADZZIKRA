@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet, Download, Printer } from 'lucide-react';
+import { DollarSign, ArrowDownLeft, ArrowUpRight, Wallet, Download, Printer, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useReactToPrint } from 'react-to-print';
 import PrintHeader from '../components/Print/PrintHeader';
@@ -10,7 +10,22 @@ export default function ArusKasPage() {
   const { transactions, expenses, journalEntries, currentUser, activeBranchId, addLog, addNotification, branches, settings } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
+  
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(currentDay);
   const itemsPerPage = 20;
+
+  const dynamicPettyCash = React.useMemo(() => {
+    return (journalEntries || [])
+      .filter(j => {
+        const acc = j.account?.toLowerCase() || '';
+        return acc === '1102' || acc.includes('kas kecil');
+      })
+      .reduce((sum, j) => sum + (Number(j.debit) || 0) - (Number(j.credit) || 0), 0);
+  }, [journalEntries]);
 
   const cashMovements: any[] = [];
   
@@ -46,9 +61,9 @@ export default function ArusKasPage() {
     ...expenses.map(e => ({
       id: e.id,
       date: e.date,
-      description: `Pengeluaran: ${e.description}`,
-      type: 'OUT' as const,
-      amount: e.amount,
+      description: `Kas Kecil: ${e.description}`,
+      type: (e.amount < 0 ? 'IN' : 'OUT') as 'IN' | 'OUT',
+      amount: Math.abs(e.amount),
       method: 'CASH'
     })),
     ...journalEntries
@@ -61,20 +76,34 @@ export default function ArusKasPage() {
         amount: je.debit,
         method: 'CASH'
       }))
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  ];
 
-  const totalInTunai = allMovements.filter(m => m.type === 'IN' && m.method === 'CASH').reduce((sum, m) => sum + m.amount, 0);
-  const totalInBank = allMovements.filter(m => m.type === 'IN' && m.method !== 'CASH').reduce((sum, m) => sum + m.amount, 0);
-  const totalOut = allMovements.filter(m => m.type === 'OUT').reduce((sum, m) => sum + m.amount, 0);
+  const now = new Date();
+  const todayYear = now.getFullYear();
+  const todayMonth = now.getMonth();
+  const todayDate = now.getDate();
+
+  const filteredMovements = allMovements.filter(m => {
+    const d = new Date(m.date);
+    if (isNaN(d.getTime())) return false;
+    const txDate = d.toLocaleDateString('en-CA');
+    if (startDate && txDate < startDate) return false;
+    if (endDate && txDate > endDate) return false;
+    return true;
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const totalInTunai = filteredMovements.filter(m => m.type === 'IN' && m.method === 'CASH').reduce((sum, m) => sum + m.amount, 0);
+  const totalInBank = filteredMovements.filter(m => m.type === 'IN' && m.method !== 'CASH').reduce((sum, m) => sum + m.amount, 0);
+  const totalOut = filteredMovements.filter(m => m.type === 'OUT').reduce((sum, m) => sum + m.amount, 0);
   const netCash = totalInTunai + totalInBank - totalOut;
 
-  const totalPages = Math.ceil(allMovements.length / itemsPerPage);
-  const paginatedMovements = allMovements.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
+  const paginatedMovements = filteredMovements.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleExportExcel = () => {
     addLog('EXPORT_EXCEL', 'FINANCE', `Export Excel Laporan Arus Kas`);
     
-    const excelData = allMovements.map((m, i) => ({
+    const excelData = filteredMovements.map((m, i) => ({
       'No': i + 1,
       'Tanggal': new Date(m.date).toLocaleString('id-ID'),
       'Keterangan': m.description,
@@ -95,12 +124,12 @@ export default function ArusKasPage() {
     ws['!cols'] = colWidths;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Arus Kas");
-    XLSX.writeFile(wb, `Laporan_Arus_Kas_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `Laporan_Arus_Kas_${new Date().toLocaleDateString('en-CA')}.xlsx`);
   };
 
   const handlePrint = useReactToPrint({
     contentRef: reportRef,
-    documentTitle: `Laporan_Arus_Kas_${new Date().toISOString().split('T')[0]}`,
+    documentTitle: `Laporan_Arus_Kas_${new Date().toLocaleDateString('en-CA')}`,
     onAfterPrint: () => addLog('PRINT_REPORT', 'FINANCE', `Mencetak Laporan Arus Kas`)
   });
 
@@ -120,7 +149,23 @@ export default function ArusKasPage() {
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Pantau pergerakan uang masuk (Tunai & Non-Tunai) dan keluar.</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap md:flex-nowrap">
+          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
+            <Calendar className="w-4 h-4 text-slate-400" />
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={e => setStartDate(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+            <span className="text-slate-400 text-sm">s/d</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={e => setEndDate(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+          </div>
           <button
             onClick={() => {
               addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Arus Kas untuk persetujuan Owner.`);
@@ -147,7 +192,7 @@ export default function ArusKasPage() {
           </button>
           <button
             onClick={() => handlePrint()}
-            className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition flex items-center gap-2"
+            className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition flex items-center gap-2"
           >
             <Printer className="w-4 h-4" />
             Cetak PDF
@@ -182,14 +227,14 @@ export default function ArusKasPage() {
             <p className="text-lg font-mono font-bold text-red-600">Rp {totalOut.toLocaleString('id-ID')}</p>
           </div>
           <div className="p-3 bg-red-50 rounded-full flex-shrink-0">
-            <ArrowUpRight className="w-5 h-5 text-red-500" />
+            <ArrowUpRight className="w-5 h-5 text-red-700" />
           </div>
         </div>
         
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl flex items-center justify-between shadow-sm">
           <div>
             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Saldo Kas Kecil</p>
-            <p className="text-lg font-mono font-bold text-amber-600">Rp {(settings?.pettyCashBalance || 0).toLocaleString('id-ID')}</p>
+            <p className="text-lg font-mono font-bold text-amber-600">Rp {dynamicPettyCash.toLocaleString('id-ID')}</p>
           </div>
           <div className="p-3 bg-amber-50 rounded-full flex-shrink-0">
             <Wallet className="w-5 h-5 text-amber-500" />
@@ -221,8 +266,16 @@ export default function ArusKasPage() {
                 <th className="p-4 text-right">Nominal (Rp)</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
-              {paginatedMovements.map((movement) => (
+            <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredMovements.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-12 text-center text-slate-500 dark:text-slate-400 font-medium">
+                        <Wallet className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                        Belum ada pergerakan kas pada periode ini.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedMovements.map((movement) => (
                 <tr key={movement.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
                   <td className="p-4 text-xs text-slate-500 dark:text-slate-400">
                     {new Date(movement.date).toLocaleString('id-ID')}
@@ -242,14 +295,9 @@ export default function ArusKasPage() {
                     {movement.type === 'IN' ? '+' : '-'}{movement.amount.toLocaleString('id-ID')}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
-          {allMovements.length === 0 && (
-            <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">
-              Belum ada pergerakan kas.
-            </div>
-          )}
         </div>
         
         {/* Pagination UI */}
@@ -275,29 +323,28 @@ export default function ArusKasPage() {
       </div>
       </div>
       {/* Printable Report Section - Hidden in UI */}
-      <div style={{ display: 'none' }}>
+      <div className="hidden print:block">
         <div className="printable-a4 space-y-6 bg-white dark:bg-slate-900 p-8 text-black" ref={reportRef}>
           <PrintHeader title="Laporan Arus Kas" />
-        
           <table className="w-full text-left border-collapse text-sm mb-8">
-          <thead>
-            <tr className="bg-gray-100 dark:bg-slate-800 border-y border-gray-300 dark:border-slate-600">
-              <th className="py-2 px-2">Tanggal</th>
-              <th className="py-2 px-2">Keterangan</th>
-              <th className="py-2 px-2 text-center">Tipe</th>
-              <th className="py-2 px-2 text-right">Nominal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allMovements.map((movement) => (
-              <tr key={movement.id} className="border-b border-gray-200 dark:border-slate-700">
-                <td className="py-1 px-2">{new Date(movement.date).toLocaleDateString('id-ID')}</td>
-                <td className="py-1 px-2">{movement.description}</td>
-                <td className="py-1 px-2 text-center">{movement.type === 'IN' ? 'MASUK' : 'KELUAR'}</td>
-                <td className="py-1 px-2 text-right whitespace-nowrap">{movement.amount.toLocaleString('id-ID')}</td>
+            <thead>
+              <tr className="bg-gray-100 dark:bg-slate-800 border-y border-gray-300 dark:border-slate-600">
+                <th className="py-2 px-2">Tanggal</th>
+                <th className="py-2 px-2">Keterangan</th>
+                <th className="py-2 px-2 text-center">Tipe</th>
+                <th className="py-2 px-2 text-right">Nominal</th>
               </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody style={{ pageBreakInside: 'avoid' }}>
+              {filteredMovements.map((movement) => (
+                <tr key={movement.id} className="border-b border-gray-200 dark:border-slate-700">
+                  <td className="py-1 px-2">{new Date(movement.date).toLocaleDateString('id-ID')}</td>
+                  <td className="py-1 px-2">{movement.description}</td>
+                  <td className="py-1 px-2 text-center">{movement.type === 'IN' ? 'MASUK' : 'KELUAR'}</td>
+                  <td className="py-1 px-2 text-right whitespace-nowrap">{movement.amount.toLocaleString('id-ID')}</td>
+                </tr>
+              ))}
+            </tbody>
           <tfoot>
             <tr className="font-bold border-t-2 border-gray-800">
               <td colSpan={3} className="py-2 px-2 text-right">SALDO BERSIH:</td>
