@@ -230,6 +230,14 @@ export default function KasirShiftPage() {
                     <Camera className="w-4 h-4"/> Mulai Absen Keluar
                   </button>
                 )}
+                {!clockingMode && (
+                  <button 
+                    onClick={() => setCorrectionModal({open: true, attendanceId: myAttendance?.id || null})}
+                    className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                  >
+                    Pengajuan Izin / Lupa Absen
+                  </button>
+                )}
               </div>
             </div>
 
@@ -781,16 +789,42 @@ export default function KasirShiftPage() {
                 <button
                   disabled={!corrReason || ((corrType === 'CLOCK_IN' || corrType === 'BOTH') && !corrReqClockIn) || ((corrType === 'CLOCK_OUT' || corrType === 'BOTH') && !corrReqClockOut)}
                   onClick={() => {
-                    if (!correctionModal.attendanceId) return;
-                    requestAttendanceCorrection(
-                      correctionModal.attendanceId,
-                      corrType,
-                      corrReason,
-                      corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
-                      corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
-                    );
+                    let attId = correctionModal.attendanceId;
+                    if (!attId && currentUser) {
+                      // Buat record absen dummy untuk hari ini karena lupa absen
+                      attId = Date.now().toString();
+                      const today = new Date().toISOString().split('T')[0];
+                      const newAtt = {
+                        id: attId,
+                        userId: currentUser.username,
+                        userName: currentUser.name,
+                        date: today,
+                        clockIn: new Date().toISOString(),
+                        photoUrl: '',
+                        latitude: 0,
+                        longitude: 0,
+                        correctionStatus: 'PENDING',
+                        correctionReason: corrReason,
+                        correctionType: corrType,
+                        requestedClockIn: corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
+                        requestedClockOut: corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
+                      };
+                      
+                      useAppStore.setState(state => ({
+                        attendances: [...state.attendances, newAtt as any]
+                      }));
+                      useAppStore.getState().addLog('ATTENDANCE', 'SYSTEM', `Permohonan izin/lupa absen diajukan untuk ID baru: ${attId}`);
+                    } else if (attId) {
+                      requestAttendanceCorrection(
+                        attId,
+                        corrType,
+                        corrReason,
+                        corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
+                        corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
+                      );
+                    }
                     setCorrectionModal({open: false, attendanceId: null});
-                    alert('Permohonan koreksi absen berhasil diajukan. Mohon tunggu persetujuan Admin/Owner.');
+                    alert('Permohonan koreksi/izin berhasil diajukan. Mohon tunggu persetujuan Admin/Owner.');
                   }}
                   className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
