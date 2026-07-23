@@ -404,7 +404,18 @@ const getSavedPurchaseOrders = (): PurchaseOrder[] => {
 
 const getSavedJournalEntries = (): JournalEntry[] => {
   const saved = getStorage('ksa_journal_entries');
-  if (saved) { try { return saved as JournalEntry[]; } catch (e) {} }
+  if (saved) { 
+    try { 
+      const entries = saved as JournalEntry[];
+      let changed = false;
+      entries.forEach(e => {
+        if (e.account === 'KAS') { e.account = '1-1000'; changed = true; }
+        if (e.account === 'BEBAN') { e.account = '5-2020'; changed = true; }
+      });
+      if (changed) setStorage('ksa_journal_entries', entries);
+      return entries; 
+    } catch (e) {} 
+  }
   return [];
 };
 
@@ -2554,7 +2565,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addExpense: (expenseData) => {
-    const { currentUser, expenses } = get();
+    const { currentUser, expenses, coaList } = get();
     const newExpense: Expense = {
       tenantId: currentUser?.tenantId || 'tenant_default',
       ...expenseData,
@@ -2566,31 +2577,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
     get().addLog('EXPENSE_ADD', 'FINANCE', `Mencatat pengeluaran: ${newExpense.description} Rp ${newExpense.amount.toLocaleString('id-ID')} oleh ${newExpense.createdBy}`);
 
-    // Jurnal Otomatis handled below
-
     // === JURNAL OTOMATIS dari Pengeluaran ===
     const now = new Date().toISOString();
+    const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
+    const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
+    const bebanAccount = (expenseData as any).coaId || '5-2020';
+    
+    const isIncome = newExpense.amount < 0;
+    const absAmount = Math.abs(newExpense.amount);
+
     const expJournals: JournalEntry[] = [
       {
-        id: `je_${Date.now()}_exp1`,
+        id: `je_${Date.now()}_exp1_${Math.random().toString(36).substring(2,8)}`,
         tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
-        account: 'BEBAN',
+        account: bebanAccount,
         description: `[Auto] Beban ${newExpense.category}: ${newExpense.description}`,
-        debit: newExpense.amount,
-        credit: 0,
+        debit: isIncome ? 0 : absAmount,
+        credit: isIncome ? absAmount : 0,
         referenceId: newExpense.id,
         referenceType: 'AUTO_BEBAN' as JournalSourceType,
         createdBy: newExpense.createdBy
       },
       {
-        id: `je_${Date.now()}_exp2`,
+        id: `je_${Date.now()}_exp2_${Math.random().toString(36).substring(2,8)}`,
         tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
-        account: 'KAS',
-        description: `[Auto] Kas keluar untuk ${newExpense.description}`,
-        debit: 0,
-        credit: newExpense.amount,
+        account: kasAccount,
+        description: `[Auto] Kas ${isIncome ? 'masuk dari' : 'keluar untuk'} ${newExpense.description}`,
+        debit: isIncome ? absAmount : 0,
+        credit: isIncome ? 0 : absAmount,
         referenceId: newExpense.id,
         referenceType: 'AUTO_BEBAN' as JournalSourceType,
         createdBy: newExpense.createdBy
