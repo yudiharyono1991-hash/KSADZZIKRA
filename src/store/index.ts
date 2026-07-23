@@ -2641,24 +2641,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   getCalculatedPettyCash: () => {
-    const { expenses, journalEntries } = get();
-    const expenseBalance = (expenses || []).reduce((sum, exp) => {
-      if (exp.category === 'OPERASIONAL' && (exp.description.startsWith('Kas Kecil:') || exp.description.startsWith('Pemasukan Kas:'))) {
-        return sum - exp.amount; // pengeluaran > 0 (mengurangi saldo), pemasukan < 0 (menambah saldo)
+    const { journalEntries, coaList } = get();
+    // Kas Kecil is functionally the main cash drawer (1-1000)
+    const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
+    const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
+
+    return (journalEntries || []).reduce((sum, j) => {
+      // Allow exact match with Kas account
+      const entryAccCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
+      if (entryAccCode === kasAccount) {
+        return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
       }
       return sum;
     }, 0);
-    const manualBalance = (journalEntries || []).reduce((sum, j) => {
-      if (j.referenceType === 'MANUAL' && j.account) {
-        const coa = get().coaList.find(c => c.code === j.account);
-        const accountName = coa ? coa.name.toLowerCase() : j.account.toLowerCase();
-        if (accountName.includes('kas kecil') || j.account === '1102') {
-          return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        }
-      }
-      return sum;
-    }, 0);
-    return expenseBalance + manualBalance;
   },
 
   addPettyCashDeposit: (amount, description) => {

@@ -153,8 +153,8 @@ export default function KasirShiftPage() {
   const totalPettyCash = myExpenses.reduce((sum, exp) => sum + exp.amount, 0) + 
     manualJournalsToday.reduce((sum, j) => sum + (j.credit || 0) - (j.debit || 0), 0);
 
-  // Fisik Tunai yang Diharapkan
-  const expectedCash = totalTunai - totalPettyCash;
+  // Fisik Tunai yang Diharapkan adalah SISA SALDO BENAR di Jurnal Kas (1-1000)
+  const expectedCash = getCalculatedPettyCash();
 
   const handleAddPettyCash = (e: React.FormEvent) => {
     e.preventDefault();
@@ -679,9 +679,10 @@ export default function KasirShiftPage() {
                   const manualJournals = (journalEntries || [])
                     .filter(j => {
                       if (j.referenceType !== 'MANUAL' || !j.account) return false;
-                      const coa = useAppStore.getState().coaList.find(c => c.code === j.account);
-                      const accountName = coa ? coa.name.toLowerCase() : j.account.toLowerCase();
-                      if (!(accountName.includes('kas kecil') || j.account === '1102')) return false;
+                      const kasKecilCoa = useAppStore.getState().coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || useAppStore.getState().coaList.find(c => c.code === '1-1000');
+                      const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
+                      const entryAccCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
+                      if (entryAccCode !== kasAccount) return false;
                       return j.date >= pettyCashStartDate && j.date <= pettyCashEndDate + 'T23:59:59';
                     })
                     .map(j => ({
