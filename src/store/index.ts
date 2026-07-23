@@ -232,13 +232,14 @@ interface AppState {
   
   // Transaction Actions
   checkout: (options: {
-    paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
+    paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON' | 'EWALLET' | 'BANK_LAIN';
     amountPaid: number;
     shippingFee?: number;
     customerId?: string;
     promoId?: string;
     pointsToRedeem?: number;
-    splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
+    splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'EWALLET' | 'BANK_LAIN'; amount: number }[];
+    infaqContribution?: number;
   }) => Transaction | null;
   
   // Product/Stock actions
@@ -2597,6 +2598,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updated = expenses.filter(e => e.id !== id);
     set({ expenses: updated });
     saveStorage('ksa_expenses', updated, get().currentUser?.tenantId);
+    if (isSupabaseConfigured) {
+      supabaseService.deleteExpense(id);
+    }
     if (exp) {
       get().addLog('EXPENSE_DELETE', 'FINANCE', `Menghapus pengeluaran: ${exp.description}`);
       
