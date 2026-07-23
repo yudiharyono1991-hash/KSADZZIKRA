@@ -2525,17 +2525,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_journal_entries', updated, get().currentUser?.tenantId);
     get().addLog('JOURNAL_ENTRY', 'FINANCE', `Mencatat Jurnal: ${newEntry.description}`);
     
+    // Auto-update pettyCashBalance if this journal affects Kas Kecil
+    if (entryData.account && entryData.account.toLowerCase().includes('kas kecil')) {
+      const currentBalance = get().settings.pettyCashBalance || 0;
+      get().updateSettings({ pettyCashBalance: currentBalance + (entryData.debit || 0) - (entryData.credit || 0) });
+    }
+
     if (isSupabaseConfigured) {
       supabaseService.saveJournalEntry(newEntry);
     }
   },
 
   deleteJournalEntryByRef: (refId) => {
-    const { journalEntries, currentUser, addLog } = get();
+    const { journalEntries, currentUser, addLog, settings, updateSettings } = get();
+    
+    const deletedEntries = journalEntries.filter(j => j.referenceId === refId);
+    let pettyCashDelta = 0;
+    deletedEntries.forEach(entry => {
+      if (entry.account && entry.account.toLowerCase().includes('kas kecil')) {
+        // Reverse effect: add credit, subtract debit
+        pettyCashDelta += (entry.credit || 0) - (entry.debit || 0);
+      }
+    });
+
     const updated = journalEntries.filter(j => j.referenceId !== refId);
     set({ journalEntries: updated });
     saveStorage('ksa_journal_entries', updated, currentUser?.tenantId);
     addLog('JOURNAL_ENTRY', 'FINANCE', `Menghapus Group Jurnal: ${refId}`);
+
+    if (pettyCashDelta !== 0) {
+      updateSettings({ pettyCashBalance: (settings.pettyCashBalance || 0) + pettyCashDelta });
+    }
 
     if (isSupabaseConfigured) {
       supabaseService.deleteJournalEntryByRef(refId);
