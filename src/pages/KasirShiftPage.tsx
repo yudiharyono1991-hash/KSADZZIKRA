@@ -35,6 +35,9 @@ export default function KasirShiftPage() {
   const [pettyCashFilter, setPettyCashFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
 
   const [actualCash, setActualCash] = useState<string>('');
+  const [digitalBalances, setDigitalBalances] = useState({
+    radar: '', kemenkuota: '', bosspulsa: '', tokopedia: '', dana: ''
+  });
   const [isShiftClosed, setIsShiftClosed] = useState(false);
   const [clockingMode, setClockingMode] = useState<'IN' | 'OUT' | null>(null);
   const [selfieData, setSelfieData] = useState<string>('');
@@ -183,6 +186,58 @@ export default function KasirShiftPage() {
       return;
     }
     const variance = Number(actualCash) - expectedCash;
+    
+    // Process Digital Balances
+    const processDigital = (code: string, actualStr: string, name: string) => {
+      if (!actualStr) return;
+      const actualNum = Number(actualStr);
+      // Calculate current balance
+      const currentBal = (journalEntries || []).reduce((sum, j) => {
+        if (j.account === code) {
+          return sum + (j.debit || 0) - (j.credit || 0);
+        }
+        return sum;
+      }, 0);
+      const diff = actualNum - currentBal;
+      
+      if (diff !== 0) {
+        const isIncome = diff > 0;
+        const amount = Math.abs(diff);
+        const dateStr = new Date().toISOString();
+        const refId = `shift_${Date.now()}_${code}`;
+        
+        // Debit Leg
+        addJournalEntry({
+          tenantId: currentUser?.tenantId || 'tenant_default',
+          date: dateStr,
+          account: isIncome ? code : '5-2020',
+          debit: amount,
+          credit: 0,
+          description: `Penyesuaian Tutup Shift: ${name}`,
+          referenceType: 'MANUAL',
+          referenceId: refId
+        });
+        
+        // Credit Leg
+        addJournalEntry({
+          tenantId: currentUser?.tenantId || 'tenant_default',
+          date: dateStr,
+          account: isIncome ? '3-1000' : code,
+          debit: 0,
+          credit: amount,
+          description: `Penyesuaian Tutup Shift: ${name}`,
+          referenceType: 'MANUAL',
+          referenceId: refId
+        });
+      }
+    };
+
+    processDigital('1-1050', digitalBalances.radar, 'Radar Pulsa');
+    processDigital('1-1051', digitalBalances.kemenkuota, 'Kemenkuota');
+    processDigital('1-1052', digitalBalances.bosspulsa, 'Boss Pulsa');
+    processDigital('1-1053', digitalBalances.tokopedia, 'Tokopedia');
+    processDigital('1-1054', digitalBalances.dana, 'Dana');
+
     addLog(
       'SHIFT_CLOSED',
       'SYSTEM',
@@ -449,6 +504,39 @@ export default function KasirShiftPage() {
                 className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-lg font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none"
                 placeholder="Ketikkan jumlah uang fisik di laci.."
               />
+            </div>
+            
+            <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-4 space-y-3">
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-orange-500"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>
+                Laporan Saldo Digital Akhir Shift
+              </h3>
+              <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+                Opsional: Isi saldo sisa di masing-masing aplikasi untuk dicocokkan otomatis oleh sistem. Kosongkan jika tidak ada perubahan.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Radar Pulsa</label>
+                  <input type="number" value={digitalBalances.radar} onChange={e => setDigitalBalances(d => ({...d, radar: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Kemenkuota</label>
+                  <input type="number" value={digitalBalances.kemenkuota} onChange={e => setDigitalBalances(d => ({...d, kemenkuota: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Boss Pulsa</label>
+                  <input type="number" value={digitalBalances.bosspulsa} onChange={e => setDigitalBalances(d => ({...d, bosspulsa: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Tokopedia</label>
+                  <input type="number" value={digitalBalances.tokopedia} onChange={e => setDigitalBalances(d => ({...d, tokopedia: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Dana</label>
+                  <input type="number" value={digitalBalances.dana} onChange={e => setDigitalBalances(d => ({...d, dana: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
+                </div>
+              </div>
             </div>
           </div>
           

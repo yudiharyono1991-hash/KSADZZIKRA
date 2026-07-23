@@ -295,7 +295,11 @@ const DEFAULT_COA: CoaAccount[] = [
   { id: 'coa_3', tenantId: 'tenant_default', code: '1-1020', name: 'QRIS Syariah Dana', category: 'ASSET', isActive: true },
   { id: 'coa_4', tenantId: 'tenant_default', code: '1-1030', name: 'Piutang Kasbon Pelanggan', category: 'ASSET', isActive: true },
   { id: 'coa_5', tenantId: 'tenant_default', code: '1-1040', name: 'Persediaan Barang Dagang', category: 'ASSET', isActive: true },
-  { id: 'coa_6', tenantId: 'tenant_default', code: '1-1050', name: 'Saldo Radar Pulsa / Digital', category: 'ASSET', isActive: true },
+  { id: 'coa_6', tenantId: 'tenant_default', code: '1-1050', name: 'Saldo Radar Pulsa', category: 'ASSET', isActive: true },
+  { id: 'coa_kemenkuota', tenantId: 'tenant_default', code: '1-1051', name: 'Saldo Kemenkuota', category: 'ASSET', isActive: true },
+  { id: 'coa_bosspulsa', tenantId: 'tenant_default', code: '1-1052', name: 'Saldo Boss Pulsa', category: 'ASSET', isActive: true },
+  { id: 'coa_tokopedia', tenantId: 'tenant_default', code: '1-1053', name: 'Saldo Tokopedia', category: 'ASSET', isActive: true },
+  { id: 'coa_dana', tenantId: 'tenant_default', code: '1-1054', name: 'Saldo Dana', category: 'ASSET', isActive: true },
   { id: 'coa_6', tenantId: 'tenant_default', code: '2-1000', name: 'Utang Dagang ke Supplier', category: 'LIABILITY', isActive: true },
   { id: 'coa_7', tenantId: 'tenant_default', code: '2-1010', name: 'Utang Zakat Niaga Terhutang', category: 'LIABILITY', isActive: true },
   { id: 'coa_8', tenantId: 'tenant_default', code: '3-1000', name: 'Modal Awal KSA Mart', category: 'EQUITY', isActive: true },
@@ -315,12 +319,18 @@ const getSavedCoaList = (): CoaAccount[] => {
     try { 
       let parsed = saved as CoaAccount[];
       // Migrate missing PPOB COAs for existing users
-      const requiredCodes = ['1-1050', '4-1010', '5-1010'];
+      const requiredCodes = ['1-1050', '1-1051', '1-1052', '1-1053', '1-1054', '4-1010', '5-1010'];
       const missing = requiredCodes.filter(code => !parsed.some(c => c.code === code));
       if (missing.length > 0) {
         const toAdd = DEFAULT_COA.filter(c => missing.includes(c.code));
         parsed = [...parsed, ...toAdd];
         // Note: this will only update memory initially, but it will be saved back on next COA modification
+      }
+      
+      // Update existing name for 1-1050
+      const radarIndex = parsed.findIndex(c => c.code === '1-1050');
+      if (radarIndex !== -1 && parsed[radarIndex].name === 'Saldo Radar Pulsa / Digital') {
+        parsed[radarIndex].name = 'Saldo Radar Pulsa';
       }
       return parsed; 
     } catch (e) {} 
