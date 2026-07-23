@@ -40,6 +40,11 @@ export default function KasirShiftPage() {
   const [corrReqClockOut, setCorrReqClockOut] = useState('');
   const [corrReason, setCorrReason] = useState('');
   
+  const [modalTab, setModalTab] = useState<'IZIN' | 'LUPA_ABSEN'>('IZIN');
+  const [izinStartDate, setIzinStartDate] = useState(todayDate);
+  const [izinEndDate, setIzinEndDate] = useState(todayDate);
+  const [izinType, setIzinType] = useState<'IZIN' | 'SAKIT' | 'CUTI'>('IZIN');
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -756,79 +761,159 @@ export default function KasirShiftPage() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setCorrectionModal({open: false, attendanceId: null})}>
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-slate-800 dark:text-slate-200 text-lg flex items-center gap-2"><Edit2 className="w-5 h-5 text-blue-500"/>Ajukan Koreksi Absen</h3>
+              <h3 className="font-bold text-slate-800 dark:text-slate-200 text-lg flex items-center gap-2"><Edit2 className="w-5 h-5 text-teal-600"/>Pengajuan Izin / Lupa Absen</h3>
               <button onClick={() => setCorrectionModal({open: false, attendanceId: null})} className="p-1 hover:bg-slate-100 dark:bg-slate-800 rounded-lg"><X className="w-5 h-5 text-slate-500 dark:text-slate-400"/></button>
             </div>
+            
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4">
+              <button 
+                onClick={() => setModalTab('IZIN')}
+                className={`flex-1 text-sm font-bold py-2 rounded-lg transition-all ${modalTab === 'IZIN' ? 'bg-white dark:bg-slate-700 shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+              >
+                Izin / Cuti
+              </button>
+              <button 
+                onClick={() => setModalTab('LUPA_ABSEN')}
+                className={`flex-1 text-sm font-bold py-2 rounded-lg transition-all ${modalTab === 'LUPA_ABSEN' ? 'bg-white dark:bg-slate-700 shadow-sm text-teal-600' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+              >
+                Lupa Absen
+              </button>
+            </div>
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bagian yang Perlu Dikoreksi *</label>
-                <select value={corrType} onChange={e => setCorrType(e.target.value as any)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="CLOCK_IN">Jam Masuk</option>
-                  <option value="CLOCK_OUT">Jam Keluar</option>
-                  <option value="BOTH">Keduanya</option>
-                </select>
-              </div>
-              {(corrType === 'CLOCK_IN' || corrType === 'BOTH') && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jam Masuk yang Seharusnya *</label>
-                  <input type="datetime-local" value={corrReqClockIn} onChange={e => setCorrReqClockIn(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
-                </div>
+              {modalTab === 'IZIN' ? (
+                <>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Mulai Tanggal *</label>
+                      <input type="date" value={izinStartDate} onChange={e => setIzinStartDate(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"/>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Sampai Tanggal *</label>
+                      <input type="date" value={izinEndDate} onChange={e => setIzinEndDate(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"/>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jenis Izin *</label>
+                    <select value={izinType} onChange={e => setIzinType(e.target.value as any)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                      <option value="IZIN">Izin Kepentingan Lain</option>
+                      <option value="SAKIT">Sakit</option>
+                      <option value="CUTI">Cuti</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alasan *</label>
+                    <textarea value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Tuliskan keterangan detail..." className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none h-20"></textarea>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Bagian yang Perlu Dikoreksi *</label>
+                    <select value={corrType} onChange={e => setCorrType(e.target.value as any)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none">
+                      <option value="CLOCK_IN">Jam Masuk</option>
+                      <option value="CLOCK_OUT">Jam Keluar</option>
+                      <option value="BOTH">Keduanya</option>
+                    </select>
+                  </div>
+                  {(corrType === 'CLOCK_IN' || corrType === 'BOTH') && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jam Masuk yang Seharusnya *</label>
+                      <input type="datetime-local" value={corrReqClockIn} onChange={e => setCorrReqClockIn(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"/>
+                    </div>
+                  )}
+                  {(corrType === 'CLOCK_OUT' || corrType === 'BOTH') && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jam Keluar yang Seharusnya *</label>
+                      <input type="datetime-local" value={corrReqClockOut} onChange={e => setCorrReqClockOut(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none"/>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alasan Permohonan Koreksi *</label>
+                    <textarea value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Jelaskan alasan koreksi absen Anda..." className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-teal-500 outline-none h-20"></textarea>
+                  </div>
+                </>
               )}
-              {(corrType === 'CLOCK_OUT' || corrType === 'BOTH') && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Jam Keluar yang Seharusnya *</label>
-                  <input type="datetime-local" value={corrReqClockOut} onChange={e => setCorrReqClockOut(e.target.value)} className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"/>
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alasan Permohonan Koreksi *</label>
-                <textarea value={corrReason} onChange={e => setCorrReason(e.target.value)} placeholder="Jelaskan alasan koreksi absen Anda..." className="w-full border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-20"></textarea>
-              </div>
+              
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setCorrectionModal({open: false, attendanceId: null})} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-600 dark:text-slate-400 font-bold text-sm hover:bg-slate-50 dark:bg-slate-800">Batal</button>
                 <button
-                  disabled={!corrReason || ((corrType === 'CLOCK_IN' || corrType === 'BOTH') && !corrReqClockIn) || ((corrType === 'CLOCK_OUT' || corrType === 'BOTH') && !corrReqClockOut)}
+                  disabled={!corrReason || (modalTab === 'LUPA_ABSEN' && (((corrType === 'CLOCK_IN' || corrType === 'BOTH') && !corrReqClockIn) || ((corrType === 'CLOCK_OUT' || corrType === 'BOTH') && !corrReqClockOut)))}
                   onClick={() => {
-                    let attId = correctionModal.attendanceId;
-                    if (!attId && currentUser) {
-                      // Buat record absen dummy untuk hari ini karena lupa absen
-                      attId = Date.now().toString();
-                      const today = new Date().toISOString().split('T')[0];
-                      const newAtt = {
-                        id: attId,
-                        userId: currentUser.username,
-                        userName: currentUser.name,
-                        date: today,
-                        clockIn: new Date().toISOString(),
-                        photoUrl: '',
-                        latitude: 0,
-                        longitude: 0,
-                        correctionStatus: 'PENDING',
-                        correctionReason: corrReason,
-                        correctionType: corrType,
-                        requestedClockIn: corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
-                        requestedClockOut: corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
-                      };
-                      
-                      useAppStore.setState(state => ({
-                        attendances: [...state.attendances, newAtt as any]
-                      }));
-                      useAppStore.getState().addLog('ATTENDANCE', 'SYSTEM', `Permohonan izin/lupa absen diajukan untuk ID baru: ${attId}`);
-                    } else if (attId) {
-                      requestAttendanceCorrection(
-                        attId,
-                        corrType,
-                        corrReason,
-                        corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
-                        corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
-                      );
+                    if (modalTab === 'IZIN') {
+                      if (currentUser) {
+                        const start = new Date(izinStartDate);
+                        const end = new Date(izinEndDate);
+                        const newLeaves = [];
+                        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                          const dateStr = d.toISOString().split('T')[0];
+                          const newAtt = {
+                            id: Date.now().toString() + '-' + dateStr,
+                            userId: currentUser.username,
+                            userName: currentUser.name,
+                            date: dateStr,
+                            clockIn: d.toISOString(),
+                            photoUrl: '',
+                            latitude: 0,
+                            longitude: 0,
+                            status: izinType,
+                            correctionStatus: 'PENDING',
+                            correctionReason: corrReason,
+                            correctionType: 'LEAVE',
+                            leaveType: izinType
+                          };
+                          newLeaves.push(newAtt);
+                        }
+                        useAppStore.setState(state => ({
+                          attendances: [...state.attendances, ...newLeaves as any]
+                        }));
+                        useAppStore.getState().addLog('ATTENDANCE', 'SYSTEM', `Pengajuan Izin/Cuti diajukan dari ${izinStartDate} s/d ${izinEndDate}`);
+                      }
+                    } else {
+                      let attId = correctionModal.attendanceId;
+                      if (!attId && currentUser) {
+                        // Buat record absen dummy untuk hari ini karena lupa absen
+                        attId = Date.now().toString();
+                        const today = new Date().toISOString().split('T')[0];
+                        const newAtt = {
+                          id: attId,
+                          userId: currentUser.username,
+                          userName: currentUser.name,
+                          date: today,
+                          clockIn: new Date().toISOString(),
+                          photoUrl: '',
+                          latitude: 0,
+                          longitude: 0,
+                          status: 'PRESENT',
+                          correctionStatus: 'PENDING',
+                          correctionReason: corrReason,
+                          correctionType: corrType,
+                          requestedClockIn: corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
+                          requestedClockOut: corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
+                        };
+                        
+                        useAppStore.setState(state => ({
+                          attendances: [...state.attendances, newAtt as any]
+                        }));
+                        useAppStore.getState().addLog('ATTENDANCE', 'SYSTEM', `Permohonan lupa absen diajukan untuk ID baru: ${attId}`);
+                      } else if (attId) {
+                        requestAttendanceCorrection(
+                          attId,
+                          corrType,
+                          corrReason,
+                          corrReqClockIn ? new Date(corrReqClockIn).toISOString() : undefined,
+                          corrReqClockOut ? new Date(corrReqClockOut).toISOString() : undefined
+                        );
+                      }
                     }
+                    
                     setCorrectionModal({open: false, attendanceId: null});
-                    alert('Permohonan koreksi/izin berhasil diajukan. Mohon tunggu persetujuan Admin/Owner.');
+                    setCorrReason('');
+                    alert('Pengajuan berhasil dikirim. Mohon tunggu persetujuan Admin/Owner.');
                   }}
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Kirim Permohonan
+                  Kirim Pengajuan
                 </button>
               </div>
             </div>
