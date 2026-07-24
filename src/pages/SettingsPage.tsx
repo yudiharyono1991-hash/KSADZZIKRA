@@ -221,23 +221,34 @@ export default function SettingsPage() {
     if (!confirm('Apakah Anda yakin ingin melakukan Force Sync Jurnal?\\n\\nTindakan ini akan mengambil seluruh data jurnal utuh dari perangkat lokal ini dan menimpakannya ke server Cloud (Supabase) secara massal. Pastikan koneksi internet stabil.')) return;
     
     try {
-      const { journalEntries } = useAppStore.getState();
-      if (!journalEntries || journalEntries.length === 0) {
-        alert('Tidak ada data jurnal lokal untuk disinkronkan.');
+      const { currentUser, supabaseService, isSupabaseConfigured } = useAppStore.getState();
+      
+      // BACA LANGSUNG DARI LOCAL STORAGE KARENA STATE MEMORI MUNGKIN SUDAH DITIMPA OLEH SUPABASE SAAT STARTUP
+      const localDataStr = localStorage.getItem(currentUser?.tenantId ? `ksa_journal_entries_${currentUser.tenantId}` : 'ksa_journal_entries');
+      let localJournals = [];
+      if (localDataStr) {
+        try {
+          localJournals = JSON.parse(localDataStr);
+        } catch(e) {}
+      }
+
+      if (!localJournals || localJournals.length === 0) {
+        alert('Tidak ada data jurnal lokal (di browser ini) untuk disinkronkan.');
         return;
       }
       
-      const { supabaseService, isSupabaseConfigured } = useAppStore.getState();
       if (!isSupabaseConfigured) {
         alert('Supabase belum dikonfigurasi!');
         return;
       }
 
-      alert(`Memulai sinkronisasi massal untuk ${journalEntries.length} baris jurnal... Mohon tunggu dan jangan tutup halaman ini.`);
+      alert(`Memulai sinkronisasi massal untuk ${localJournals.length} baris jurnal murni dari Local Storage... Mohon tunggu dan jangan tutup halaman ini.`);
       
-      const success = await (supabaseService as any).saveJournalEntriesBulk(journalEntries);
+      const success = await (supabaseService as any).saveJournalEntriesBulk(localJournals);
       if (success) {
         alert('SUKSES! Seluruh data jurnal lokal berhasil ditimpakan ke Cloud secara utuh dan seimbang.');
+        // Sinkronkan kembali state memori dengan local storage yang benar
+        useAppStore.setState({ journalEntries: localJournals });
       } else {
         alert('Gagal mensinkronisasi jurnal ke Cloud. Silakan periksa koneksi internet Anda.');
       }
