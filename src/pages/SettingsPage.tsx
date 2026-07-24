@@ -217,6 +217,35 @@ export default function SettingsPage() {
     }
   };
 
+  const handleForceSyncJournals = async () => {
+    if (!confirm('Apakah Anda yakin ingin melakukan Force Sync Jurnal?\\n\\nTindakan ini akan mengambil seluruh data jurnal utuh dari perangkat lokal ini dan menimpakannya ke server Cloud (Supabase) secara massal. Pastikan koneksi internet stabil.')) return;
+    
+    try {
+      const { journalEntries } = useAppStore.getState();
+      if (!journalEntries || journalEntries.length === 0) {
+        alert('Tidak ada data jurnal lokal untuk disinkronkan.');
+        return;
+      }
+      
+      const { supabaseService, isSupabaseConfigured } = useAppStore.getState();
+      if (!isSupabaseConfigured) {
+        alert('Supabase belum dikonfigurasi!');
+        return;
+      }
+
+      alert(`Memulai sinkronisasi massal untuk ${journalEntries.length} baris jurnal... Mohon tunggu dan jangan tutup halaman ini.`);
+      
+      const success = await (supabaseService as any).saveJournalEntriesBulk(journalEntries);
+      if (success) {
+        alert('SUKSES! Seluruh data jurnal lokal berhasil ditimpakan ke Cloud secara utuh dan seimbang.');
+      } else {
+        alert('Gagal mensinkronisasi jurnal ke Cloud. Silakan periksa koneksi internet Anda.');
+      }
+    } catch (error: any) {
+      alert(`Terjadi kesalahan: ${error.message}`);
+    }
+  };
+
   const handleExportDatabase = () => {
     try {
       const wb = XLSX.utils.book_new();
@@ -1315,6 +1344,21 @@ export default function SettingsPage() {
                   <input type="file" accept=".json" className="hidden" onChange={handleImportRawJson} />
                 </label>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="font-bold text-amber-900">Perbaiki & Timpa Jurnal Cloud</h3>
+                <p className="text-xs text-amber-700 mt-1">Gunakan tombol ini jika Jurnal Umum di Cloud pincang akibat masalah internet. Ini akan mengirim ulang (Bulk Insert) seluruh jurnal utuh dari perangkat ini ke Cloud.</p>
+              </div>
+              <button
+                onClick={handleForceSyncJournals}
+                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl shadow-sm transition flex items-center gap-2 justify-center shrink-0"
+              >
+                <RefreshCw className="w-4 h-4" /> Timpa Jurnal Cloud
+              </button>
             </div>
           </div>
 
