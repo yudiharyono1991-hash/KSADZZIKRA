@@ -1174,9 +1174,26 @@ export const supabaseService = {
   async getJournalEntries(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase.from('journal_entries').select('*').limit(10000);
-      if (error) throw error;
-      return data;
+      const pageSize = 1000;
+      let offset = 0;
+      const fetched: any[] = [];
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('journal_entries')
+          .select('*')
+          .range(offset, offset + pageSize - 1);
+          
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+
+        fetched.push(...data);
+        if (data.length < pageSize) break;
+
+        offset += pageSize;
+      }
+
+      return fetched;
     } catch (err: any) {
       logSync(`Failed to fetch journal_entries: ${err.message}`, true);
       return null;
