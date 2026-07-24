@@ -352,6 +352,19 @@ export default function SettingsPage() {
         <Lock className="w-16 h-16 text-red-700" />
         <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Akses Ditolak</h2>
         <p className="text-gray-500 dark:text-slate-400">Halaman Pengaturan Toko khusus dikelola oleh Ketua (Owner) atau Superadmin.</p>
+        
+        <div className="mt-8 pt-8 border-t border-gray-200 dark:border-slate-800 max-w-md w-full">
+          <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
+            <h3 className="font-bold text-amber-900 mb-2">Perbaikan Jurnal Khusus Admin</h3>
+            <p className="text-xs text-amber-700 mb-4">Meskipun Anda tidak bisa mengubah pengaturan toko, Anda tetap bisa melakukan perbaikan (sinkronisasi ulang) Jurnal Umum yang pincang akibat masalah internet.</p>
+            <button
+              onClick={handleForceSyncJournals}
+              className="w-full px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" /> Timpa Jurnal Cloud
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
