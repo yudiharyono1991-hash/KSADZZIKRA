@@ -2623,6 +2623,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedJournals = [...expJournals, ...get().journalEntries];
     set({ journalEntries: updatedJournals });
     saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
+    
+    if (isSupabaseConfigured) {
+      supabaseService.saveExpense(newExpense);
+      expJournals.forEach(j => supabaseService.saveJournalEntry(j));
+    }
     // === END JURNAL OTOMATIS ===
   },
 
@@ -2642,7 +2647,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getCalculatedPettyCash: () => {
     const { journalEntries, coaList } = get();
-    // Kas Kecil is functionally the main cash drawer (1-1000)
+    // Kas Kecil is functionally the main cash drawer (1-1000 or 1102)
     const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
     const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
 
@@ -2894,6 +2899,25 @@ export const useAppStore = create<AppState>((set, get) => ({
               }
             });
             set({ users: merged });
+          }
+        }));
+
+        tasks.push(runSupabaseTask('getExpenses', async () => {
+          return await supabaseService.getExpenses();
+        }, (remoteExpenses) => {
+          if (remoteExpenses && remoteExpenses.length > 0) {
+            const mapped = remoteExpenses.map(e => ({
+              id: e.id,
+              tenantId: e.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+              date: e.date,
+              category: e.category,
+              amount: Number(e.amount),
+              description: e.description,
+              createdBy: e.created_by,
+              branchId: e.branch_id,
+              coaId: e.coa_id
+            }));
+            set({ expenses: mapped });
           }
         }));
 
