@@ -212,6 +212,7 @@ interface AppState {
   addPurchaseOrder: (po: Omit<PurchaseOrder, 'id'>) => void;
   updatePurchaseOrder: (id: string, updates: Partial<PurchaseOrder>) => void;
   addJournalEntry: (entry: Omit<JournalEntry, 'id'>) => void;
+  addJournalEntries: (entries: Omit<JournalEntry, 'id'>[]) => void;
   deleteJournalEntryByRef: (refId: string) => void;
 
   // Cart Actions (Admin)
@@ -1703,7 +1704,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     if (isSupabaseConfigured) {
       supabaseService.saveTransaction(newTx);
-      newJournals.forEach(j => supabaseService.saveJournalEntry(j));
+      (supabaseService as any).saveJournalEntriesBulk(newJournals);
       order.items.forEach(item => {
         const prod = updatedProducts.find(p => p.id === item.productId);
         if (prod) supabaseService.saveProduct(prod);
@@ -2557,6 +2558,26 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     if (isSupabaseConfigured) {
       supabaseService.saveJournalEntry(newEntry);
+    }
+  },
+
+  addJournalEntries: (entriesData) => {
+    if (!entriesData || entriesData.length === 0) return;
+    
+    const tenantId = get().currentUser?.tenantId || 'tenant_default';
+    const newEntries: JournalEntry[] = entriesData.map((data, idx) => ({
+      ...data,
+      tenantId,
+      id: `je_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 8)}`
+    }));
+    
+    const updated = [...newEntries, ...get().journalEntries];
+    set({ journalEntries: updated });
+    saveStorage('ksa_journal_entries', updated, tenantId);
+    get().addLog('JOURNAL_ENTRY', 'FINANCE', `Mencatat ${newEntries.length} Jurnal secara massal`);
+
+    if (isSupabaseConfigured) {
+      (supabaseService as any).saveJournalEntriesBulk(newEntries);
     }
   },
 

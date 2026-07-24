@@ -168,32 +168,31 @@ export default function CustomerManagementPage() {
     };
 
     const targetAccount = getAccountForMethod(paymentMethod);
-
-    addJournalEntry({
-      tenantId: currentUser?.tenantId || 'tenant_default',
-      date: now,
-      account: targetAccount,
-      description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${customerName} via ${paymentMethod}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
-      debit: payAmount,
-      credit: 0,
-      referenceId: customerId,
-      referenceType: 'MANUAL',
-      createdBy: currentUser?.name,
-      branchId: currentUser?.branchId
-    });
     
-    addJournalEntry({
-      tenantId: currentUser?.tenantId || 'tenant_default',
-      date: now,
-      account: '1-1030', // Piutang Kasbon Pelanggan
-      description: `[Auto] Pengurangan piutang pelanggan: ${customerName}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
-      debit: 0,
-      credit: payAmount,
-      referenceId: customerId,
-      referenceType: 'MANUAL',
-      createdBy: currentUser?.name,
-      branchId: currentUser?.branchId
-    });
+    // Gunakan bulk insert agar tidak terjadi jurnal pincang jika terputus internet
+    const { addJournalEntries } = useAppStore.getState();
+    addJournalEntries([
+      {
+        account: targetAccount,
+        description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${customerName} via ${paymentMethod}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
+        debit: payAmount,
+        credit: 0,
+        referenceId: customerId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name,
+        branchId: currentUser?.branchId
+      },
+      {
+        account: '1-1030', // Piutang Kasbon Pelanggan
+        description: `[Auto] Pengurangan piutang pelanggan: ${customerName}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
+        debit: 0,
+        credit: payAmount,
+        referenceId: customerId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name,
+        branchId: currentUser?.branchId
+      }
+    ]);
 
     alert(`Pelunasan berhasil diproses. Sisa piutang: Rp ${debtAmount - payAmount}`);
     setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH' });

@@ -1206,6 +1206,31 @@ export const supabaseService = {
       return false;
     }
   },
+  async saveJournalEntriesBulk(entries: any[]): Promise<boolean> {
+    if (!supabase || entries.length === 0) return false;
+    try {
+      const tenantId = this.getTenantId();
+      const payload = entries.map(entry => ({
+        id: entry.id,
+        tenant_id: tenantId,
+        date: entry.date,
+        description: entry.description,
+        account: entry.account,
+        debit: entry.debit,
+        credit: entry.credit,
+        reference_id: entry.referenceId,
+        reference_type: entry.referenceType,
+        created_by: entry.createdBy,
+        branch_id: entry.branchId
+      }));
+      const { error } = await supabase.from('journal_entries').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save journal_entries bulk: ${err.message}`, true);
+      return false;
+    }
+  },
   async deleteJournalEntry(id: string): Promise<boolean> {
     if (!supabase) return false;
     try {

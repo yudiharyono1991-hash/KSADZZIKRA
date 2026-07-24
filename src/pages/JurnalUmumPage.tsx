@@ -102,31 +102,27 @@ export default function JurnalUmumPage() {
       deleteJournalEntryByRef(editingRefId);
     }
 
-    // Insert Debit Leg
-    addJournalEntry({
-      tenantId,
-      date: isoDate,
-      account: actDebit,
-      description,
-      debit: amount,
-      credit: 0,
-      referenceId: refId,
-      referenceType: 'MANUAL',
-      createdBy: currentUser?.name
-    });
-
-    // Insert Credit Leg
-    addJournalEntry({
-      tenantId,
-      date: isoDate,
-      account: actCredit,
-      description,
-      debit: 0,
-      credit: amount,
-      referenceId: refId,
-      referenceType: 'MANUAL',
-      createdBy: currentUser?.name
-    });
+    const { addJournalEntries } = useAppStore.getState();
+    addJournalEntries([
+      {
+        account: actDebit,
+        description,
+        debit: amount,
+        credit: 0,
+        referenceId: refId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name
+      },
+      {
+        account: actCredit,
+        description,
+        debit: 0,
+        credit: amount,
+        referenceId: refId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name
+      }
+    ]);
 
     resetForm();
   };
