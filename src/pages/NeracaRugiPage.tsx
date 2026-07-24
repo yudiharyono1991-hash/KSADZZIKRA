@@ -193,8 +193,8 @@ export default function NeracaRugiPage() {
   const manualJournals = (journalEntries || []).filter(j => j.referenceType === 'MANUAL');
   
   const periodManualJournals = manualJournals.filter(j => {
-    const jd = j.date.split('T')[0];
-    return jd >= startDate && jd <= endDate;
+    const jd = String(j.date || '').split('T')[0];
+    return jd && jd >= startDate && jd <= endDate;
   });
 
   let periodManualRevenue = 0;
@@ -247,8 +247,8 @@ export default function NeracaRugiPage() {
     );
 
   const cumulativeManualJournals = manualJournals.filter(j => {
-    const jd = j.date.split('T')[0];
-    return jd <= endDate;
+    const jd = String(j.date || '').split('T')[0];
+    return jd && jd <= endDate;
   });
 
   let allTimeManualRevenue = 0;
@@ -281,8 +281,8 @@ export default function NeracaRugiPage() {
   let balanceBank = 0;
 
   (journalEntries || []).forEach(j => {
-    const jd = j.date.split('T')[0];
-    if (jd <= endDate) {
+    const jd = String(j.date || '').split('T')[0];
+    if (jd && jd <= endDate) {
       const acc = j.account ? j.account.toLowerCase() : '';
       if (acc.includes('1102') || acc.includes('kas kecil')) {
         balanceKasKecil += (j.debit - j.credit);

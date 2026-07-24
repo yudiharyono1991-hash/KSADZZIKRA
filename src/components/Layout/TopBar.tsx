@@ -77,12 +77,12 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
 
   // Today's total sales
   const todaySales = transactions
-    .filter(tx => tx.timestamp.startsWith(todayDateStr))
+    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr))
     .reduce((sum, tx) => sum + tx.totalAmount, 0);
 
   // Today's margin
   const todayMargin = transactions
-    .filter(tx => tx.timestamp.startsWith(todayDateStr))
+    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr))
     .reduce((sum, tx) => sum + tx.marginContribution, 0);
 
   // Check how many items low stock

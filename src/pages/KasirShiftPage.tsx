@@ -118,17 +118,17 @@ export default function KasirShiftPage() {
   // Filter Today's data for this cashier
   const today = todayDate;
   const myTransactions = (transactions || []).filter(tx => 
-    tx.timestamp.startsWith(today) && tx.cashierName === currentUser?.name
+    String(tx.timestamp || '').startsWith(today) && tx.cashierName === currentUser?.name
   );
 
   const myAttendance = currentUser ? attendances.find(a => a.userId === currentUser.username && a.date === today) : undefined;
 
   const myExpenses = (expenses || []).filter(exp => 
-    exp.date.startsWith(today) && exp.category === 'OPERASIONAL'
+    String(exp.date || '').startsWith(today) && exp.category === 'OPERASIONAL'
   );
 
   const manualJournalsToday = (journalEntries || []).filter(j => 
-    j.date.startsWith(today) && 
+    String(j.date || '').startsWith(today) && 
     j.referenceType === 'MANUAL' && 
     j.account && 
     j.account.toLowerCase().includes('kas kecil')

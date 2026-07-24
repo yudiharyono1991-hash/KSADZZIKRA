@@ -65,7 +65,7 @@ export default function TrendPage() {
 
   const { chartData, totals, comparisons, ratios } = useMemo(() => {
     const today = new Date().toLocaleDateString('en-CA');
-    const todayTransactions = filteredTransactions.filter(tx => tx.timestamp.startsWith(today));
+    const todayTransactions = filteredTransactions.filter(tx => String(tx.timestamp || '').startsWith(today));
     
     // Summary Metrics
     const totalOmset = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
