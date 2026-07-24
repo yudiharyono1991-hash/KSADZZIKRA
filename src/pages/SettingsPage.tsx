@@ -224,12 +224,22 @@ export default function SettingsPage() {
       const { currentUser, supabaseService, isSupabaseConfigured } = useAppStore.getState();
       
       // BACA LANGSUNG DARI LOCAL STORAGE KARENA STATE MEMORI MUNGKIN SUDAH DITIMPA OLEH SUPABASE SAAT STARTUP
-      const localDataStr = localStorage.getItem(currentUser?.tenantId ? `ksa_journal_entries_${currentUser.tenantId}` : 'ksa_journal_entries');
+      const localDataStr = localStorage.getItem(currentUser?.tenantId ? `ksa_journal_entries__${currentUser.tenantId}` : 'ksa_journal_entries');
       let localJournals = [];
       if (localDataStr) {
         try {
           localJournals = JSON.parse(localDataStr);
         } catch(e) {}
+      }
+
+      // Fallback if scoped is not found
+      if (!localJournals || localJournals.length === 0) {
+        const fallbackData = localStorage.getItem('ksa_journal_entries');
+        if (fallbackData) {
+          try {
+            localJournals = JSON.parse(fallbackData);
+          } catch(e) {}
+        }
       }
 
       if (!localJournals || localJournals.length === 0) {
