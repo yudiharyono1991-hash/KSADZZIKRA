@@ -1174,7 +1174,7 @@ export const supabaseService = {
   async getJournalEntries(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase.from('journal_entries').select('*');
+      const { data, error } = await supabase.from('journal_entries').select('*').limit(10000);
       if (error) throw error;
       return data;
     } catch (err: any) {
