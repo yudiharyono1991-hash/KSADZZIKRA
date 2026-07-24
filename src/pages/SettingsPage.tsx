@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw, Globe, Clock, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { supabaseService, isSupabaseConfigured } from '../lib/supabase';
 
 export default function SettingsPage() {
   const {
@@ -221,7 +222,7 @@ export default function SettingsPage() {
     if (!confirm('Apakah Anda yakin ingin melakukan Force Sync Jurnal?\\n\\nTindakan ini akan mengambil seluruh data jurnal utuh dari perangkat lokal ini dan menimpakannya ke server Cloud (Supabase) secara massal. Pastikan koneksi internet stabil.')) return;
     
     try {
-      const { currentUser, supabaseService, isSupabaseConfigured } = useAppStore.getState();
+      const { currentUser } = useAppStore.getState();
       
       // BACA LANGSUNG DARI LOCAL STORAGE KARENA STATE MEMORI MUNGKIN SUDAH DITIMPA OLEH SUPABASE SAAT STARTUP
       const localDataStr = localStorage.getItem(currentUser?.tenantId ? `ksa_journal_entries__${currentUser.tenantId}` : 'ksa_journal_entries');
