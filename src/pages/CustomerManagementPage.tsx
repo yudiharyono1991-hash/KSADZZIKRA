@@ -171,25 +171,32 @@ export default function CustomerManagementPage() {
     
     // Gunakan bulk insert agar tidak terjadi jurnal pincang jika terputus internet
     const { addJournalEntries } = useAppStore.getState();
+    const dateStr = new Date().toISOString();
+    const tenantIdStr = currentUser?.tenantId || 'tenant_default';
+
     addJournalEntries([
       {
+        tenantId: tenantIdStr,
+        date: dateStr,
         account: targetAccount,
         description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${customerName} via ${paymentMethod}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
         debit: payAmount,
         credit: 0,
         referenceId: customerId,
         referenceType: 'MANUAL',
-        createdBy: currentUser?.name,
+        createdBy: currentUser?.name || 'System',
         branchId: currentUser?.branchId
       },
       {
+        tenantId: tenantIdStr,
+        date: dateStr,
         account: '1-1030', // Piutang Kasbon Pelanggan
         description: `[Auto] Pengurangan piutang pelanggan: ${customerName}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
         debit: 0,
         credit: payAmount,
         referenceId: customerId,
         referenceType: 'MANUAL',
-        createdBy: currentUser?.name,
+        createdBy: currentUser?.name || 'System',
         branchId: currentUser?.branchId
       }
     ]);

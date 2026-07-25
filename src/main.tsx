@@ -13,7 +13,7 @@ console.warn = (...args) => {
 };
 
 // Unregister any stale service workers in development mode to fix dev-sw.js MIME errors
-if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+if ((import.meta as any).env.DEV && 'serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     for (const registration of registrations) {
       registration.unregister();

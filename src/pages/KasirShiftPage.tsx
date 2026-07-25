@@ -20,7 +20,7 @@ const getLocalTodayDate = () => {
 };
 
 export default function KasirShiftPage() {
-  const { transactions, currentUser, addExpense, expenses, journalEntries, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash } = useAppStore();
+  const { transactions, currentUser, addExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');

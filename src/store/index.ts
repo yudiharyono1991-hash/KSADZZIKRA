@@ -91,7 +91,7 @@ const chunkArray = <T,>(array: T[], chunkSize: number): T[][] => {
   return chunks;
 };
 
-const runSupabaseTask = async <T>(label: string, task: () => Promise<T>, onSuccess: (result: T) => void, timeoutMs = 30000) => {
+const runSupabaseTask = async <T>(label: string, task: () => Promise<T>, onSuccess: (result: T) => void, timeoutMs = 60000) => {
   try {
     const result = await new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
@@ -413,7 +413,7 @@ const getSavedJournalEntries = (): JournalEntry[] => {
         if (e.account === 'KAS') { e.account = '1-1000'; changed = true; }
         if (e.account === 'BEBAN') { e.account = '5-2020'; changed = true; }
       });
-      if (changed) setStorage('ksa_journal_entries', entries);
+      if (changed) localStorage.setItem('ksa_journal_entries', JSON.stringify(entries));
       return entries; 
     } catch (e) {} 
   }
@@ -611,6 +611,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   cart: getStorage('ksa_cart') || [],
   lastTransactionId: getStorage('ksa_last_transaction') || null,
   customerCart: [], 
+  transactions: getSavedTransactions(),
   onlineOrders: getSavedOnlineOrders(),
   chatMessages: getSavedChatMessages(),
   auditLogs: getSavedAuditLogs(),
@@ -2688,6 +2689,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const isoDate = new Date().toISOString();
     
     addJournalEntry({
+      tenantId: currentUser?.tenantId || 'tenant_default',
       date: isoDate,
       account: '1102 - Kas Kecil',
       description: `[Top Up] ${description}`,
@@ -2699,6 +2701,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     
     addJournalEntry({
+      tenantId: currentUser?.tenantId || 'tenant_default',
       date: isoDate,
       account: '3100 - Modal Anggota',
       description: `[Top Up] ${description}`,
@@ -2916,7 +2919,6 @@ export const useAppStore = create<AppState>((set, get) => ({
             defaultUsers.forEach(du => {
               if (!merged.some(ru => ru.username === du.username)) {
                 merged.push(du);
-                supabaseService.saveUser(du);
               }
             });
             set({ users: merged });

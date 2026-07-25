@@ -103,24 +103,31 @@ export default function JurnalUmumPage() {
     }
 
     const { addJournalEntries } = useAppStore.getState();
+    const dateStr = new Date().toISOString();
+    const tenantIdStr = currentUser?.tenantId || 'tenant_default';
+
     addJournalEntries([
       {
+        tenantId: tenantIdStr,
+        date: dateStr,
         account: actDebit,
         description,
         debit: amount,
         credit: 0,
         referenceId: refId,
         referenceType: 'MANUAL',
-        createdBy: currentUser?.name
+        createdBy: currentUser?.name || 'System'
       },
       {
+        tenantId: tenantIdStr,
+        date: dateStr,
         account: actCredit,
         description,
         debit: 0,
         credit: amount,
         referenceId: refId,
         referenceType: 'MANUAL',
-        createdBy: currentUser?.name
+        createdBy: currentUser?.name || 'System'
       }
     ]);
 
