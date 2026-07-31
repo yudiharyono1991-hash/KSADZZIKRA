@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { ShoppingBag, CheckCircle, Smile, Frown, Send, MonitorPlay } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -25,6 +25,19 @@ export default function CustomerDisplayPage() {
   };
 
   const lastTx = lastTransactionId ? transactions.find(t => t.id === lastTransactionId) : null;
+
+  useEffect(() => {
+    let timer: any;
+    if (lastTransactionId && !isSubmitted) {
+      // Otomatis bersihkan layar setelah 15 detik jika tidak ada interaksi (tidak memberi rating)
+      timer = setTimeout(() => {
+        useAppStore.setState({ lastTransactionId: null });
+      }, 15000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [lastTransactionId, isSubmitted]);
 
   const handleFeedback = (rating: 'PUAS' | 'TIDAK_PUAS') => {
     if (!lastTransactionId) return;

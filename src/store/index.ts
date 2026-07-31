@@ -39,16 +39,16 @@ const getStorage = (key: string, tenantId?: string) => {
       const scopedKey = `${key}__${tid}`;
       const scoped = localStorage.getItem(scopedKey);
       if (scoped) {
-        try { return JSON.parse(scoped); } catch (e) {}
+        try { return JSON.parse(scoped); } catch (e) { }
       }
     }
 
     // Fallback to global key
     const saved = localStorage.getItem(key);
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try { return JSON.parse(saved); } catch (e) { }
     }
-  } catch (err) {}
+  } catch (err) { }
   return null;
 };
 
@@ -134,7 +134,7 @@ interface AppState {
   zakatDistributions: ZakatDistribution[];
   currentUser: CurrentUser | null;
   isLoading: boolean;
-  
+
   // Custom accounting features
   expenses: Expense[];
   closings: ClosingRecord[];
@@ -153,7 +153,7 @@ interface AppState {
   imageQueue: string[];
   enqueueImageGeneration: (productId: string) => void;
   processImageQueue: () => Promise<void>;
-  
+
   // Phase 2 features
   settings: StoreSettings;
   stockMovements: StockMovement[];
@@ -162,17 +162,17 @@ interface AppState {
 
   // Settings
   updateSettings: (settings: Partial<StoreSettings>) => void;
-  
+
   // Stock Movement
   addStockMovement: (movement: Omit<StockMovement, 'id' | 'date' | 'userId'>) => void;
-  
+
   // Branch Filter
   setActiveBranchId: (branchId: string) => void;
-  
+
   // Void
   requestVoidTransaction: (txId: string, reason: string) => void;
   approveVoidTransaction: (txId: string, isApproved: boolean) => void;
-  
+
   // Notifications
   addNotification: (notif: Omit<import('../types').AppNotification, 'id' | 'createdAt' | 'isRead' | 'tenantId'>) => void;
   markNotificationAsRead: (id: string) => void;
@@ -230,7 +230,7 @@ interface AppState {
   updateOrderStatus: (orderId: string, status: OnlineOrder['status']) => void;
   sendChatMessage: (orderId: string, senderId: string, senderName: string, text: string) => void;
   processOnlineOrderPayment: (orderId: string, paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI') => void;
-  
+
   // Transaction Actions
   checkout: (options: {
     paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON' | 'EWALLET' | 'BANK_LAIN';
@@ -242,7 +242,7 @@ interface AppState {
     splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'EWALLET' | 'BANK_LAIN'; amount: number }[];
     infaqContribution?: number;
   }) => Transaction | null;
-  
+
   // Product/Stock actions
   addProduct: (product: Omit<Product, 'id'>) => void;
   addProductsBulk: (newProds: Omit<Product, 'id'>[]) => void;
@@ -250,11 +250,11 @@ interface AppState {
   deleteProduct: (id: string) => void;
   clearProducts: () => void;
   adjustStock: (productId: string, amount: number) => void;
-  
+
   // Zakat Actions
   addZakatRecord: (record: Omit<ZakatCalculation, 'id' | 'timestamp'>) => void;
   addZakatDistribution: (dist: Omit<ZakatDistribution, 'id' | 'timestamp'>) => void;
-  
+
   // Expenses & Closing Actions
   addExpense: (expense: Omit<Expense, 'id' | 'createdBy'>) => void;
   deleteExpense: (id: string) => void;
@@ -270,7 +270,7 @@ interface AppState {
   // System Log API
   addLog: (action: string, category: AuditLog['category'], details: string) => void;
   deleteAuditLogs: (startDateStr: string, endDateStr: string) => Promise<void>;
-  
+
   // Supabase Initial Sync
   initializeStore: (options?: { showLoading?: boolean; catalogOnly?: boolean }) => Promise<void>;
   fetchProducts: () => Promise<void>;
@@ -316,8 +316,8 @@ const DEFAULT_COA: CoaAccount[] = [
 
 const getSavedCoaList = (): CoaAccount[] => {
   const saved = getStorage('ksa_coa_list');
-  if (saved) { 
-    try { 
+  if (saved) {
+    try {
       let parsed = saved as CoaAccount[];
       // Migrate missing PPOB COAs for existing users
       const requiredCodes = ['1-1050', '1-1051', '1-1052', '1-1053', '1-1054', '4-1010', '5-1010'];
@@ -327,14 +327,14 @@ const getSavedCoaList = (): CoaAccount[] => {
         parsed = [...parsed, ...toAdd];
         // Note: this will only update memory initially, but it will be saved back on next COA modification
       }
-      
+
       // Update existing name for 1-1050
       const radarIndex = parsed.findIndex(c => c.code === '1-1050');
       if (radarIndex !== -1 && parsed[radarIndex].name === 'Saldo Radar Pulsa / Digital') {
         parsed[radarIndex].name = 'Saldo Radar Pulsa';
       }
-      return parsed; 
-    } catch (e) {} 
+      return parsed;
+    } catch (e) { }
   }
   return DEFAULT_COA;
 };
@@ -358,8 +358,8 @@ const getSavedUsers = (): UserAccount[] => {
       const hasOwner = parsed.some((u: any) => u.username === 'owner' || u.id === 'usr_3');
       let updatedUsers = parsed.map((u: any) => {
         if (u.username === 'owner' || u.id === 'usr_3') {
-          return { 
-            ...u, 
+          return {
+            ...u,
             id: 'usr_3',
             name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.',
             username: 'owner',
@@ -386,7 +386,7 @@ const getSavedUsers = (): UserAccount[] => {
         });
       }
       return updatedUsers;
-    } catch (e) {}
+    } catch (e) { }
   }
   return [
     { id: 'usr_0', tenantId: '', name: 'Platform Admin', username: 'superadmin.platform', password: 'superadmin123!', role: 'SUPERADMIN', createdAt: new Date().toISOString(), isActive: true, isApproved: true },
@@ -399,14 +399,14 @@ const getSavedUsers = (): UserAccount[] => {
 
 const getSavedPurchaseOrders = (): PurchaseOrder[] => {
   const saved = getStorage('ksa_purchase_orders');
-  if (saved) { try { return saved as PurchaseOrder[]; } catch (e) {} }
+  if (saved) { try { return saved as PurchaseOrder[]; } catch (e) { } }
   return [];
 };
 
 const getSavedJournalEntries = (): JournalEntry[] => {
   const saved = getStorage('ksa_journal_entries');
-  if (saved) { 
-    try { 
+  if (saved) {
+    try {
       const entries = saved as JournalEntry[];
       let changed = false;
       entries.forEach(e => {
@@ -414,21 +414,21 @@ const getSavedJournalEntries = (): JournalEntry[] => {
         if (e.account === 'BEBAN') { e.account = '5-2020'; changed = true; }
       });
       if (changed) localStorage.setItem('ksa_journal_entries', JSON.stringify(entries));
-      return entries; 
-    } catch (e) {} 
+      return entries;
+    } catch (e) { }
   }
   return [];
 };
 
 const getSavedExpenses = (): Expense[] => {
   const saved = getStorage('ksa_expenses');
-  if (saved) { try { return saved as Expense[]; } catch (e) {} }
+  if (saved) { try { return saved as Expense[]; } catch (e) { } }
   return [];
 };
 
 const getSavedClosings = (): ClosingRecord[] => {
   const saved = getStorage('ksa_closings');
-  if (saved) { try { return saved as ClosingRecord[]; } catch (e) {} }
+  if (saved) { try { return saved as ClosingRecord[]; } catch (e) { } }
   return [];
 };
 
@@ -438,7 +438,7 @@ const getSavedProducts = (): Product[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed) && parsed.length > 0) return parsed as Product[];
-    } catch (e) {}
+    } catch (e) { }
   }
   return DEFAULT_PRODUCTS;
 };
@@ -449,7 +449,7 @@ const getSavedTransactions = (): Transaction[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed)) return parsed as Transaction[];
-    } catch (e) {}
+    } catch (e) { }
   }
   return DEFAULT_TRANSACTIONS;
 };
@@ -460,7 +460,7 @@ const getSavedAuditLogs = (): AuditLog[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed)) return parsed as AuditLog[];
-    } catch (e) {}
+    } catch (e) { }
   }
   return DEFAULT_AUDIT_LOGS;
 };
@@ -471,7 +471,7 @@ const getSavedZakatRecords = (): ZakatCalculation[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed)) return parsed as ZakatCalculation[];
-    } catch (e) {}
+    } catch (e) { }
   }
   return DEFAULT_ZAKAT_RECORDS;
 };
@@ -482,14 +482,14 @@ const getSavedZakatDistributions = (): ZakatDistribution[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed)) return parsed as ZakatDistribution[];
-    } catch (e) {}
+    } catch (e) { }
   }
   return DEFAULT_ZAKAT_DISTRIBUTIONS;
 };
 
 const getSavedBranches = (): Branch[] => {
   const saved = getStorage('ksa_branches');
-  if (saved) { try { const parsed = saved as any[]; if (Array.isArray(parsed)) return parsed as Branch[]; } catch (e) {} }
+  if (saved) { try { const parsed = saved as any[]; if (Array.isArray(parsed)) return parsed as Branch[]; } catch (e) { } }
   return [
     { id: 'br_1', tenantId: 'tenant_default', name: 'KSA Mart Pusat', address: 'Koperasi Syariah ADZ-ZIKRA', phone: '08123456789', whatsapp: '628123456789', isActive: true, createdAt: new Date().toISOString() }
   ];
@@ -507,41 +507,41 @@ const getSavedCategories = (tenantId?: string): string[] => {
           .filter((item) => item.length > 0 && !dummyList.includes(item));
         return filtered;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   return [];
 };
 
 const getSavedCustomers = (): Customer[] => {
   const saved = getStorage('ksa_customers');
-  if (saved) { try { return saved as Customer[]; } catch (e) {} }
+  if (saved) { try { return saved as Customer[]; } catch (e) { } }
   return [];
 };
 
 const getSavedSuppliers = (): Supplier[] => {
   const saved = getStorage('ksa_suppliers');
-  if (saved) { try { return saved as Supplier[]; } catch (e) {} }
+  if (saved) { try { return saved as Supplier[]; } catch (e) { } }
   return [];
 };
 
 const getSavedPromos = (): Promo[] => {
   const saved = getStorage('ksa_promos');
-  if (saved) { try { return saved as Promo[]; } catch (e) {} }
+  if (saved) { try { return saved as Promo[]; } catch (e) { } }
   return [];
 };
 
 const getSavedAttendances = (): Attendance[] => {
   const saved = getStorage('ksa_attendances');
-  if (saved) { try { return saved as Attendance[]; } catch (e) {} }
+  if (saved) { try { return saved as Attendance[]; } catch (e) { } }
   return [];
 };
 
 const getSavedSettings = (): StoreSettings => {
   const saved = getStorage('ksa_settings');
-  if (saved) { try { return saved as StoreSettings; } catch (e) {} }
-  return { 
+  if (saved) { try { return saved as StoreSettings; } catch (e) { } }
+  return {
     tenantId: 'tenant_default',
-    isTaxEnabled: false, 
+    isTaxEnabled: false,
     taxRate: 11,
     ownerBankName: 'BSI (Bank Syariah Indonesia)',
     ownerBankAccount: '7182938495',
@@ -554,19 +554,19 @@ const getSavedSettings = (): StoreSettings => {
 
 const getSavedStockMovements = (): StockMovement[] => {
   const saved = getStorage('ksa_stock_movements');
-  if (saved) { try { return saved as StockMovement[]; } catch (e) {} }
+  if (saved) { try { return saved as StockMovement[]; } catch (e) { } }
   return [];
 };
 
 const getSavedOnlineOrders = (): OnlineOrder[] => {
   const saved = getStorage('ksa_online_orders');
-  if (saved) { try { return saved as OnlineOrder[]; } catch (e) {} }
+  if (saved) { try { return saved as OnlineOrder[]; } catch (e) { } }
   return [];
 };
 
 const getSavedChatMessages = (): ChatMessage[] => {
   const saved = getStorage('ksa_chat_messages');
-  if (saved) { try { return saved as ChatMessage[]; } catch (e) {} }
+  if (saved) { try { return saved as ChatMessage[]; } catch (e) { } }
   return [];
 };
 
@@ -580,7 +580,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tenants: (() => {
     const saved = localStorage.getItem('ksa_tenants');
     const parsed = saved ? JSON.parse(saved) : [];
-    
+
     // Force update owner name in default tenant for Dr. Grandis
     const withUpdatedOwner = parsed.map((t: any) => {
       if (t.id === 'tenant_default') {
@@ -610,7 +610,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   products: getStorage('ksa_products') || [],
   cart: getStorage('ksa_cart') || [],
   lastTransactionId: getStorage('ksa_last_transaction') || null,
-  customerCart: [], 
+  customerCart: [],
   transactions: getSavedTransactions(),
   onlineOrders: getSavedOnlineOrders(),
   chatMessages: getSavedChatMessages(),
@@ -626,7 +626,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...parsed,
           tenantId: parsed.tenantId || 'tenant_default'
         };
-      } catch(e) {}
+      } catch (e) { }
     }
     return null;
   })(),
@@ -644,7 +644,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         const parsed = JSON.parse(savedUser);
         tenantId = parsed.tenantId || tenantId;
-      } catch (e) {}
+      } catch (e) { }
     }
     return getSavedCategories(tenantId);
   })(),
@@ -719,9 +719,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               if (k === 'ksa_zakat_records') set({ zakatRecords: parsed });
             }
           }
-        } catch (err) {}
+        } catch (err) { }
       });
-    } catch (e) {}
+    } catch (e) { }
     return {} as any;
   })() : {}),
 
@@ -741,7 +741,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ coaList: updated });
     saveStorage('ksa_coa_list', updated);
     get().addLog('COA_ADD', 'FINANCE', `Menambah akun CoA baru: ${newAccount.code} - ${newAccount.name}`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveCoaAccount(newAccount);
     }
@@ -760,7 +760,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ coaList: updated });
     saveStorage('ksa_coa_list', updated);
     get().addLog('COA_IMPORT', 'FINANCE', `Mengimpor ${newAccounts.length} akun CoA baru`);
-    
+
     if (isSupabaseConfigured) {
       (supabaseService as any).saveCoaAccountsBulk(newAccounts);
     }
@@ -772,7 +772,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ coaList: updated });
     saveStorage('ksa_coa_list', updated);
     get().addLog('COA_UPDATE', 'FINANCE', `Mengubah akun CoA: ${updatedAccount.code} - ${updatedAccount.name}`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveCoaAccount(updatedAccount);
     }
@@ -790,7 +790,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ coaList: updated });
     saveStorage('ksa_coa_list', updated);
     get().addLog('COA_DELETE', 'FINANCE', `Menghapus akun CoA permanen: ${account.code} - ${account.name}`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.deleteCoaAccount(id);
     }
@@ -802,7 +802,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ settings: updated });
     saveStorage('ksa_settings', updated, get().currentUser?.tenantId);
     get().addLog('SETTINGS_UPDATE', 'SYSTEM', 'Update pengaturan toko (Pajak)');
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveStoreSettings(updated);
     }
@@ -852,7 +852,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const updatedTx = { ...tx, voidStatus: 'PENDING' as const, voidReason: reason, voidRequestedBy: currentUser.name };
     const updatedTransactions = transactions.map(t => t.id === txId ? updatedTx : t);
-    
+
     set({ transactions: updatedTransactions });
     saveStorage('ksa_transactions', updatedTransactions, currentUser.tenantId);
     get().addLog('TRANSACTION_VOID_REQUEST', 'POS', `Pengajuan void transaksi ${tx.invoiceNo}: ${reason}`);
@@ -869,19 +869,19 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateTransactionFeedback: (id: string, rating: 'PUAS' | 'TIDAK_PUAS', feedback?: string) => {
     const { transactions, currentUser } = get();
-    const updated = transactions.map(t => 
+    const updated = transactions.map(t =>
       t.id === id ? { ...t, customerRating: rating, customerFeedback: feedback } : t
     );
     set({ transactions: updated });
     saveStorage('ksa_transactions', updated, currentUser?.tenantId);
-    
+
     // Sync to Supabase in background
     runSupabaseTask('Update Feedback', async () => {
       const tx = updated.find(t => t.id === id);
       if (tx) {
         await (supabaseService as any).saveTransaction(tx);
       }
-    }, () => {}).catch(() => {});
+    }, () => { }).catch(() => { });
   },
 
   approveVoidTransaction: (txId, isApproved) => {
@@ -926,7 +926,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const now = new Date().toISOString();
     const jId = `je_void_${Date.now()}`;
     const reversingJournals: import('../types').JournalEntry[] = [];
-    
+
     // Find all journals related to this tx
     const relatedJournals = journalEntries.filter(j => j.referenceId === tx.id);
     relatedJournals.forEach((j, i) => {
@@ -1034,7 +1034,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ suppliers: updated });
     saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);
     get().addLog('SUPPLIER_ADD', 'SYSTEM', `Menambah supplier: ${newSupplier.name}`);
-    
+
     if (isSupabaseConfigured) {
       (supabaseService as any).saveSupplier(newSupplier);
     }
@@ -1105,7 +1105,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().addLog('ATTENDANCE', 'SYSTEM', `${userName} Clock-In Shift`);
   },
   clockOut: (attendanceId, photoUrl, latitude, longitude) => {
-    const updated = get().attendances.map(a => 
+    const updated = get().attendances.map(a =>
       a.id === attendanceId ? { ...a, clockOut: new Date().toISOString(), clockOutPhotoUrl: photoUrl, clockOutLatitude: latitude, clockOutLongitude: longitude } : a
     );
     set({ attendances: updated });
@@ -1158,7 +1158,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Authentication logic
-  
+
   registerTenant: (tenantData) => {
     const newTenant: import('../types').Tenant = {
       ...tenantData,
@@ -1192,7 +1192,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       isActive: true,
       isApproved: true
     };
-    
+
     const users = getStorage('ksa_users') || [];
     users.push(ownerAccount);
     saveStorage('ksa_users', users);
@@ -1289,15 +1289,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!foundUser) return 'INVALID';
     if (!foundUser.isApproved) return 'PENDING';
 
-    const authUser: CurrentUser = { 
-      name: foundUser.name, 
-      username: foundUser.username, 
-      role: foundUser.role, 
+    const authUser: CurrentUser = {
+      name: foundUser.name,
+      username: foundUser.username,
+      role: foundUser.role,
       branchId: foundUser.branchId,
       tenantId: foundUser.tenantId || 'tenant_default',
       phone: foundUser.phone || ''
     };
-    
+
     // Set user and CLEAR customerCart so it doesn't leak between sessions
     set({ currentUser: authUser, activeBranchId: foundUser.branchId || '', customerCart: [] });
 
@@ -1306,7 +1306,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (foundUser.role !== 'SUPERADMIN') {
       get().loadTenantData(authTenantId);
     }
-    
+
     const log: AuditLog = {
       id: `log_${Date.now()}`,
       tenantId: authUser.tenantId || 'tenant_default',
@@ -1319,10 +1319,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     set(state => ({ auditLogs: [log, ...state.auditLogs] }));
     if (isSupabaseConfigured) { supabaseService.saveAuditLog(log); }
-    
+
     // Save to localStorage for persistence
     localStorage.setItem('ksa_current_user', JSON.stringify(authUser));
-    
+
     return 'SUCCESS';
   },
 
@@ -1341,19 +1341,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { cart } = get();
     // For box, we will check if stock >= pcsPerBox. We assume stock is always in pieces.
     const requiredQty = isBox ? (product.pcsPerBox || 1) : 1;
-    
+
     // Bypass stock check for PPOB
     if (!product.isPPOB && product.stock < requiredQty) return;
-    
+
     // We will use a unique key for the cart item: product.id + isBox + targetNumber.
     const existingIndex = cart.findIndex(item => item.product.id === product.id && !!item.isBox === isBox && item.targetNumber === targetNumber);
-    
+
     if (existingIndex >= 0) {
       const existing = cart[existingIndex];
       const newQuantity = existing.quantity + 1;
-      
+
       if (!product.isPPOB && (newQuantity * requiredQty) > product.stock) return;
-      
+
       const newCart = [...cart];
       newCart[existingIndex] = { ...existing, quantity: newQuantity };
       set({ cart: newCart });
@@ -1364,48 +1364,48 @@ export const useAppStore = create<AppState>((set, get) => ({
       saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
     }
   },
-  
+
   removeFromCart: (productId: string, isBox?: boolean) => {
     let newCart;
     if (isBox === undefined) {
-       newCart = get().cart.filter(item => item.product.id !== productId);
+      newCart = get().cart.filter(item => item.product.id !== productId);
     } else {
-       newCart = get().cart.filter(item => !(item.product.id === productId && !!item.isBox === isBox));
+      newCart = get().cart.filter(item => !(item.product.id === productId && !!item.isBox === isBox));
     }
     set({ cart: newCart });
     saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
   },
-  
+
   updateCartQuantity: (productId: string, quantity: number, isBox: boolean = false) => {
     const { cart } = get();
     const itemIndex = cart.findIndex(i => i.product.id === productId && !!i.isBox === isBox);
     if (itemIndex < 0) return;
-    
+
     if (quantity <= 0) {
       get().removeFromCart(productId, isBox);
       return;
     }
-    
+
     const item = cart[itemIndex];
     const requiredQty = isBox ? (item.product.pcsPerBox || 1) : 1;
-    
+
     let newQty = quantity;
     if (!item.product.isPPOB) {
       const maxQty = Math.floor(item.product.stock / requiredQty);
       newQty = Math.min(quantity, maxQty);
     }
-    
+
     if (newQty <= 0) {
       get().removeFromCart(productId, isBox);
       return;
     }
-    
+
     const newCart = [...cart];
     newCart[itemIndex] = { ...item, quantity: newQty };
     set({ cart: newCart });
     saveStorage('ksa_cart', newCart, get().currentUser?.tenantId);
   },
-  
+
   clearCart: () => {
     set({ cart: [] });
     saveStorage('ksa_cart', [], get().currentUser?.tenantId);
@@ -1415,7 +1415,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addToCustomerCart: (product: Product) => {
     const { customerCart } = get();
     if (product.stock <= 0) return;
-    
+
     const existing = customerCart.find(item => item.product.id === product.id);
     if (existing) {
       if (existing.quantity >= product.stock) return;
@@ -1430,21 +1430,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ customerCart: [...customerCart, { product, quantity: 1 }] });
     }
   },
-  
+
   removeFromCustomerCart: (productId: string) => {
     set({ customerCart: get().customerCart.filter(item => item.product.id !== productId) });
   },
-  
+
   updateCustomerCartQuantity: (productId: string, quantity: number) => {
     const { customerCart } = get();
     const item = customerCart.find(i => i.product.id === productId);
     if (!item) return;
-    
+
     if (quantity <= 0) {
       get().removeFromCustomerCart(productId);
       return;
     }
-    
+
     const newQty = Math.min(quantity, item.product.stock);
     set({
       customerCart: customerCart.map(i =>
@@ -1452,7 +1452,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       )
     });
   },
-  
+
   clearCustomerCart: () => set({ customerCart: [] }),
 
   submitOnlineOrder: (customerId, customerName, customerPhone, notes, customerAddress, paymentCode, distanceKm, branchId) => {
@@ -1489,7 +1489,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedOrders = [newOrder, ...get().onlineOrders];
     set({ onlineOrders: updatedOrders, customerCart: [] });
     saveStorage('ksa_online_orders', updatedOrders, get().currentUser?.tenantId);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveOnlineOrder(newOrder);
     }
@@ -1499,12 +1499,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateOrderStatus: (orderId, status) => {
-    const updatedOrders = get().onlineOrders.map(o => 
+    const updatedOrders = get().onlineOrders.map(o =>
       o.id === orderId ? { ...o, status, updatedAt: new Date().toISOString() } : o
     );
     set({ onlineOrders: updatedOrders });
     saveStorage('ksa_online_orders', updatedOrders, get().currentUser?.tenantId);
-    
+
     if (isSupabaseConfigured) {
       const updatedOrder = updatedOrders.find(o => o.id === orderId);
       if (updatedOrder) supabaseService.saveOnlineOrder(updatedOrder);
@@ -1514,16 +1514,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   processOnlineOrderPayment: (orderId, paymentMethod) => {
     const { onlineOrders, currentUser, products, journalEntries, transactions } = get();
     if (!currentUser) return;
-    
+
     const order = onlineOrders.find(o => o.id === orderId);
     if (!order || order.status === 'COMPLETED') return;
 
     // Build Transaction
     const invoiceNo = `INV-OL-${Date.now()}`;
     const totalAmount = order.totalAmount;
-    
+
     let totalCost = 0;
-    
+
     // Decrease Stock & Calc Cost
     let updatedProducts = [...products];
     order.items.forEach(item => {
@@ -1560,7 +1560,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         productName: i.productName,
         quantity: i.quantity,
         price: i.price,
-        costPrice: 0 
+        costPrice: 0
       })),
       totalAmount,
       shippingFee: order.shippingFee,
@@ -1584,11 +1584,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       return fuzzy ? fuzzy.code : fallback;
     };
 
-    const kasCode = paymentMethod === 'TRANSFER_BSI' 
-      ? resolveCoa('bank', '1-1010 Bank Syariah Indonesia (BSI)') 
+    const kasCode = paymentMethod === 'TRANSFER_BSI'
+      ? resolveCoa('bank', '1-1010 Bank Syariah Indonesia (BSI)')
       : paymentMethod === 'QRIS_SHARIAH'
-      ? resolveCoa('qris', '1-1020 QRIS Syariah Dana')
-      : resolveCoa('kas', '1-1000 Kas Tunai Toko');
+        ? resolveCoa('qris', '1-1020 QRIS Syariah Dana')
+        : resolveCoa('kas', '1-1000 Kas Tunai Toko');
 
     const newJournals: JournalEntry[] = [
       {
@@ -1613,16 +1613,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       const prod = products.find(p => p.id === item.productId);
       const sCoa = prod?.salesCoaCode || resolveCoa('pendapatan online', resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan'));
       const cCoa = prod?.cogsCoaCode || resolveCoa('hpp online', resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)'));
-      
+
       const rev = item.price * item.quantity;
       const cogs = (prod?.costPrice || 0) * item.quantity;
-      
+
       revenueGroups[sCoa] = (revenueGroups[sCoa] || 0) + rev;
-      
-      const invCoa = prod?.isPPOB 
+
+      const invCoa = prod?.isPPOB
         ? resolveCoa('radar', '1-1050 Saldo Radar Pulsa / Digital')
         : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
-        
+
       const key = `${cCoa}|${invCoa}`;
       cogsGroups[key] = (cogsGroups[key] || 0) + cogs;
     });
@@ -1693,16 +1693,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    set({ 
-      products: updatedProducts, 
+    set({
+      products: updatedProducts,
       transactions: updatedTxs,
       journalEntries: updatedJournals
     });
-    
+
     saveStorage('ksa_products', updatedProducts, get().currentUser?.tenantId);
     saveStorage('ksa_transactions', updatedTxs, get().currentUser?.tenantId);
     saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveTransaction(newTx);
       (supabaseService as any).saveJournalEntriesBulk(newJournals);
@@ -1730,13 +1730,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ chatMessages: updatedMsgs });
     saveStorage('ksa_chat_messages', updatedMsgs, get().currentUser?.tenantId);
   },
-  
+
   // Checkout Implementation
   checkout: (options) => {
     const { paymentMethod, amountPaid, shippingFee = 0, customerId, promoId, pointsToRedeem, splitPayments } = options;
     const { cart, currentUser, products, customers, promos, settings, addStockMovement } = get();
     if (cart.length === 0 || !currentUser) return null;
-    
+
     // Dynamic pricing for wholesale
     const getDynamicPrice = (item: CartItem) => {
       if (item.isBox && item.product.hasBoxUnit) {
@@ -1753,7 +1753,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const baseTotal = cart.reduce((sum, item) => sum + (getDynamicPrice(item) * item.quantity), 0);
     const totalCost = cart.reduce((sum, item) => sum + (item.product.costPrice * item.quantity), 0);
-    
+
     // Apply promo
     const selectedPromo = promos.find(p => p.id === promoId);
     let discountAmount = 0;
@@ -1779,21 +1779,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     const marginContribution = totalAmount - taxAmount - totalCost; // Tax is not profit
-    
+
     let zakatContribution = 0;
     if (settings.enableCharityZakat !== false) {
       const zakatPct = (settings.charityZakatPercentage ?? 2.5) / 100;
       zakatContribution = marginContribution > 0 ? Math.round(marginContribution * zakatPct) : 0;
     }
-    
+
     let actualPaid = splitPayments ? splitPayments.reduce((s, p) => s + p.amount, 0) : amountPaid;
     if (paymentMethod === 'KASBON') {
       actualPaid = 0;
     }
     const changeAmount = actualPaid > totalAmount ? actualPaid - totalAmount : 0;
-    
+
     if (paymentMethod !== 'KASBON' && actualPaid < totalAmount) return null;
-    
+
     const invoiceNo = `INV-20260607-${Math.floor(100 + Math.random() * 900)}`;
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
@@ -1827,12 +1827,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       pointsRedeemed: redeemed,
       pointsDiscount: pointsDiscount
     };
-    
+
     // Deduct stocks
     const updatedProducts = products.map(prod => {
       // PPOB does not use stock
       if (prod.isPPOB) return prod;
-      
+
       const relatedCartItems = cart.filter(c => c.product.id === prod.id);
       if (relatedCartItems.length > 0) {
         let totalDeductQty = 0;
@@ -1846,14 +1846,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return prod;
     });
-    
+
     set({
       products: updatedProducts,
       transactions: [newTx, ...get().transactions],
       cart: [],
       lastTransactionId: newTx.id
     });
-    
+
     // Save to localStorage immediately
     saveStorage('ksa_products', updatedProducts, get().currentUser?.tenantId);
     saveStorage('ksa_transactions', [newTx, ...get().transactions], get().currentUser?.tenantId);
@@ -1879,9 +1879,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const now = new Date().toISOString();
     const jId = `je_${Date.now()}`;
     const journalEntries = get().journalEntries;
-    
+
     let autoJournals: JournalEntry[] = [];
-    
+
     const resolveCoa = (keyword: string, fallback: string) => {
       const coas = get().coaList;
       const exact = coas.find(c => c.code === fallback || c.code.includes(fallback.split(' ')[0]));
@@ -1890,11 +1890,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       return fuzzy ? fuzzy.code : fallback;
     };
 
+    const getPrimaryCashCoa = () => {
+      const kasKecilCoa = get().coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || get().coaList.find(c => c.code === '1-1000');
+      return kasKecilCoa ? kasKecilCoa.code : '1-1000';
+    };
+
     if (splitPayments && splitPayments.length > 0) {
       splitPayments.forEach((sp, i) => {
-        const akunKas = sp.method === 'CASH' ? resolveCoa('kas', 'KAS') : sp.method === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : resolveCoa('bank', 'BANK_BSI');
+        const akunKas = sp.method === 'CASH' ? getPrimaryCashCoa() : sp.method === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : resolveCoa('bank', 'BANK_BSI');
         autoJournals.push({
-          id: `${jId}_${i+1}`,
+          id: `${jId}_${i + 1}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
           account: akunKas,
@@ -1908,7 +1913,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       });
     } else {
-      const akunKas = paymentMethod === 'CASH' ? resolveCoa('kas', 'KAS') : paymentMethod === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : paymentMethod === 'KASBON' ? resolveCoa('piutang', 'PIUTANG_DAGANG') : resolveCoa('bank', 'BANK_BSI');
+      const akunKas = paymentMethod === 'CASH' ? getPrimaryCashCoa() : paymentMethod === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : paymentMethod === 'KASBON' ? resolveCoa('piutang', 'PIUTANG_DAGANG') : resolveCoa('bank', 'BANK_BSI');
       autoJournals.push({
         id: `${jId}_1`,
         tenantId: currentUser.tenantId || 'tenant_default',
@@ -1932,12 +1937,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const prod = productList.find(p => p.id === item.product.id) || item.product;
       const sCoa = prod.salesCoaCode || resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan');
       const cCoa = prod.cogsCoaCode || resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)');
-      
+
       const rev = getDynamicPrice(item) * item.quantity;
       const cogs = (item.isBox ? (prod.boxCostPrice || 0) : prod.costPrice) * item.quantity;
-      
+
       revenueGroups[sCoa] = (revenueGroups[sCoa] || 0) + rev;
-      const invCoa = prod.isPPOB 
+      const invCoa = prod.isPPOB
         ? resolveCoa('radar', '1-1050 Saldo Radar Pulsa / Digital')
         : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
       const key = `${cCoa}|${invCoa}`;
@@ -2003,7 +2008,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       }
     });
-      
+
     if (taxAmount > 0) {
       autoJournals.push({
         id: `${jId}_tax`,
@@ -2024,7 +2029,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ journalEntries: updatedJournals });
     saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
     // === END JURNAL OTOMATIS ===
-    
+
     get().addLog(
       'POS_TRANSACTION',
       'POS',
@@ -2034,7 +2039,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured) { supabaseService.saveTransaction(newTx); }
     return newTx;
   },
-  
+
   // CRUD Products/Stock
   addProduct: (newProd) => {
     const id = `prod_${Date.now()}`;
@@ -2043,7 +2048,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ products: updated });
     saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_ADD', 'INVENTORY', `Menambah produk baru: ${product.name} [SKU: ${product.sku}]`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(product);
     }
@@ -2066,7 +2071,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     })();
   },
-  
+
   addProductsBulk: (newProds) => {
     const startId = Date.now();
     const products: Product[] = newProds.map((p, idx) => ({
@@ -2092,11 +2097,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       saveStorage(queueKey, newQueue, tenant);
       // schedule processor shortly
       setTimeout(() => {
-        try { get().processImageQueue(); } catch (e) {}
+        try { get().processImageQueue(); } catch (e) { }
       }, 200);
-    } catch (e) {}
+    } catch (e) { }
   },
-  
+
   updateProduct: (updatedProd) => {
     const oldProd = get().products.find(p => p.id === updatedProd.id);
     const updated = get().products.map(p => p.id === updatedProd.id ? updatedProd : p);
@@ -2105,7 +2110,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     saveStorage('ksa_products', updated, get().currentUser?.tenantId);
     get().addLog('PRODUCT_UPDATE', 'INVENTORY', `Ubah informasi produk: ${updatedProd.name}`);
-    
+
     // Check for Restock Notification
     if (oldProd && oldProd.stock <= 0 && updatedProd.stock > 0) {
       get().addNotification({
@@ -2115,7 +2120,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         link: '/inventory'
       });
     }
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(updatedProd);
     }
@@ -2132,9 +2137,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         const updatedQ = [...q, productId];
         saveStorage(qKey, updatedQ, tenant);
         set({ imageQueue: updatedQ });
-        setTimeout(() => { try { get().processImageQueue(); } catch (e) {} }, 200);
+        setTimeout(() => { try { get().processImageQueue(); } catch (e) { } }, 200);
       }
-    } catch (e) {}
+    } catch (e) { }
   },
 
   processImageQueue: async () => {
@@ -2200,7 +2205,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       imageWorkerRunning = false;
     }
   },
-  
+
   deleteProduct: (id) => {
     const prod = get().products.find(p => p.id === id);
     const updated = get().products.filter(p => p.id !== id);
@@ -2209,7 +2214,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (prod) {
       get().addLog('PRODUCT_DELETE', 'INVENTORY', `Menghapus produk: ${prod.name}`);
     }
-    
+
     if (isSupabaseConfigured) {
       supabaseService.deleteProduct(id);
     }
@@ -2227,7 +2232,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       supabaseService.deleteProductsByTenant(tenantId);
     }
   },
-  
+
   adjustStock: (productId, amount) => {
     const prod = get().products.find(p => p.id === productId);
     if (!prod) return;
@@ -2238,7 +2243,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       products: updatedList
     });
     saveStorage('ksa_products', updatedList, get().currentUser?.tenantId);
-    
+
     // Check for Restock Notification
     if (prod.stock <= 0 && updated.stock > 0) {
       get().addNotification({
@@ -2267,7 +2272,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const now = new Date().toISOString();
       const currentUser = get().currentUser;
       const refId = `opname_${Date.now()}`;
-      
+
       const tenantId = prod.tenantId || currentUser?.tenantId || 'tenant_default';
       if (amount < 0) {
         // Stock reduced (loss/shrinkage)
@@ -2319,12 +2324,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       }
     }
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveProduct(updated);
     }
   },
-  
+
   // Zakat Calculator Records
   addZakatRecord: (record) => {
     const newRecord: ZakatCalculation = {
@@ -2384,7 +2389,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updated = [...users, newUser];
     set({ users: updated });
     saveStorage('ksa_users', updated);
-    
+
     const statusText = isPelanggan ? 'AKTIF' : 'PENDING';
     get().addLog('USER_REGISTER', 'SYSTEM', `Pendaftaran akun baru (${statusText}): ${newUser.name} (@${newUser.username})`);
 
@@ -2411,7 +2416,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
     }
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveUser(newUser);
     }
@@ -2430,7 +2435,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveStorage('ksa_users', updated);
     const approvedUser = updated.find(u => u.id === id);
     get().addLog('USER_APPROVE', 'SYSTEM', `Akun disetujui: ${approvedUser?.name} (@${approvedUser?.username}) oleh ${approverName}`);
-    
+
     if (isSupabaseConfigured && approvedUser) {
       supabaseService.saveUser(approvedUser);
     }
@@ -2443,7 +2448,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updated });
     saveStorage('ksa_users', updated);
     get().addLog('USER_REJECT', 'SYSTEM', `Pendaftaran ditolak: ${rejected?.name} (@${rejected?.username})`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.deleteUser(id);
     }
@@ -2455,14 +2460,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updated });
     saveStorage('ksa_users', updated);
     get().addLog('USER_UPDATE', 'SYSTEM', `Update data akun ID: ${id}`);
-    
+
     const modifiedUser = updated.find(u => u.id === id);
     if (currentUser && modifiedUser && currentUser.username === modifiedUser.username) {
       const newCurrentUser = { name: modifiedUser.name, username: modifiedUser.username, role: modifiedUser.role, branchId: modifiedUser.branchId, tenantId: modifiedUser.tenantId };
       set({ currentUser: newCurrentUser });
       localStorage.setItem('ksa_current_user', JSON.stringify(newCurrentUser));
     }
-    
+
     if (isSupabaseConfigured && modifiedUser) {
       supabaseService.saveUser(modifiedUser);
     }
@@ -2474,7 +2479,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updated });
     saveStorage('ksa_users', updated);
     get().addLog('USER_DELETE', 'SYSTEM', `Penghapusan akun ID: ${id}`);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.deleteUser(id);
     }
@@ -2527,7 +2532,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedJournals = [...poJournals, ...get().journalEntries];
     set({ journalEntries: updatedJournals });
     saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
-    
+
     if (isSupabaseConfigured) {
       poJournals.forEach(j => (supabaseService as any).saveJournalEntry(j));
     }
@@ -2564,14 +2569,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addJournalEntries: (entriesData) => {
     if (!entriesData || entriesData.length === 0) return;
-    
+
     const tenantId = get().currentUser?.tenantId || 'tenant_default';
     const newEntries: JournalEntry[] = entriesData.map((data, idx) => ({
       ...data,
       tenantId,
       id: `je_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 8)}`
     }));
-    
+
     const updated = [...newEntries, ...get().journalEntries];
     set({ journalEntries: updated });
     saveStorage('ksa_journal_entries', updated, tenantId);
@@ -2612,13 +2617,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
     const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
     const bebanAccount = (expenseData as any).coaId || '5-2020';
-    
+
     const isIncome = newExpense.amount < 0;
     const absAmount = Math.abs(newExpense.amount);
 
     const expJournals: JournalEntry[] = [
       {
-        id: `je_${Date.now()}_exp1_${Math.random().toString(36).substring(2,8)}`,
+        id: `je_${Date.now()}_exp1_${Math.random().toString(36).substring(2, 8)}`,
         tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
         account: bebanAccount,
@@ -2630,7 +2635,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         createdBy: newExpense.createdBy
       },
       {
-        id: `je_${Date.now()}_exp2_${Math.random().toString(36).substring(2,8)}`,
+        id: `je_${Date.now()}_exp2_${Math.random().toString(36).substring(2, 8)}`,
         tenantId: currentUser?.tenantId || 'tenant_default',
         date: now,
         account: kasAccount,
@@ -2645,7 +2650,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedJournals = [...expJournals, ...get().journalEntries];
     set({ journalEntries: updatedJournals });
     saveStorage('ksa_journal_entries', updatedJournals, get().currentUser?.tenantId);
-    
+
     if (isSupabaseConfigured) {
       supabaseService.saveExpense(newExpense);
       expJournals.forEach(j => supabaseService.saveJournalEntry(j));
@@ -2687,7 +2692,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { currentUser, addLog, addJournalEntry } = get();
     const refId = `TOPUP_${Date.now()}`;
     const isoDate = new Date().toISOString();
-    
+
     addJournalEntry({
       tenantId: currentUser?.tenantId || 'tenant_default',
       date: isoDate,
@@ -2699,7 +2704,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       referenceType: 'MANUAL',
       createdBy: currentUser?.name || 'System'
     });
-    
+
     addJournalEntry({
       tenantId: currentUser?.tenantId || 'tenant_default',
       date: isoDate,
@@ -2733,7 +2738,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearAllData: () => {
     const tenantId = get().currentUser?.tenantId;
-    
+
     // Clear only transactional and product data
     const emptyState = {
       products: [],
@@ -2753,9 +2758,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       attendances: [],
       stockMovements: []
     };
-    
+
     set(emptyState);
-    
+
     // Update local storage
     const keysToClear = [
       'ksa_products', 'ksa_transactions', 'ksa_online_orders', 'ksa_chat_messages',
@@ -2763,7 +2768,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       'ksa_closings', 'ksa_purchase_orders', 'ksa_journal_entries', 'ksa_customers',
       'ksa_suppliers', 'ksa_promos', 'ksa_attendances', 'ksa_stock_movements'
     ];
-    
+
     keysToClear.forEach(key => {
       saveStorage(key, [], tenantId);
     });
@@ -2774,7 +2779,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       supabaseService.clearAllDatabase(tenantId);
     }
   },
-  
+
   // Add Log implementation
   addLog: (action, category, details) => {
     const { currentUser } = get();
@@ -2804,7 +2809,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Keep logs that are OUTSIDE the date range
       return log.timestamp < startDateStr || log.timestamp > endDateStr;
     });
-    
+
     set({ auditLogs: updatedLogs });
     saveStorage('ksa_audit_logs', updatedLogs, get().currentUser?.tenantId);
 
@@ -2833,7 +2838,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       const tasks: Promise<void>[] = [];
-      
+
       if (!isCatalogOnly) {
         tasks.push(runSupabaseTask('getCustomers', async () => {
           return await supabaseService.getCustomers();
@@ -2907,7 +2912,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       tasks.push(runSupabaseTask('fetchProducts', async () => {
         await get().fetchProducts();
-      }, () => {}));
+      }, () => { }));
 
       if (!isCatalogOnly) {
         tasks.push(runSupabaseTask('getUsers', async () => {
@@ -3045,7 +3050,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       tasks.push(runSupabaseTask('fetchStoreSettings', async () => {
         await get().fetchStoreSettings();
-      }, () => {}));
+      }, () => { }));
 
       if (!isCatalogOnly) {
         tasks.push(runSupabaseTask('getJournalEntries', async () => {
@@ -3112,7 +3117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
         tasks.push(runSupabaseTask('fetchOnlineOrders', async () => {
           await get().fetchOnlineOrders();
-        }, () => {}));
+        }, () => { }));
       }
 
       // Execute tasks in background without blocking the UI
@@ -3161,7 +3166,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
         set({ products: productsMap });
         saveStorage('ksa_products', productsMap, tenantId);
-        
+
         // Expiry Date Check Notification (Once per day)
         const todayStr = new Date().toISOString().split('T')[0];
         const lastCheck = localStorage.getItem('ksa_last_expiry_check');
@@ -3171,7 +3176,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             const daysToExpiry = (new Date(prod.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
             return daysToExpiry >= 0 && daysToExpiry <= 30;
           });
-          
+
           if (nearExpired.length > 0) {
             get().addNotification({
               title: 'Peringatan Stok Mendekati Expired',
