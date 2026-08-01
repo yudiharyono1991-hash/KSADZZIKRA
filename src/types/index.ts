@@ -115,6 +115,38 @@ export interface StoreSettings {
   ppobApiKey?: string;
 }
 
+export interface KasbonPaymentRecord {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  customerName: string;
+  paymentDate: string;
+  amountPaid: number;
+  remainingDebt: number;
+  paymentMethod: string;
+  cashierName: string;
+  isFullyPaid: boolean;
+  notes?: string;
+}
+
+export interface StockOpnameRequest {
+  id: string;
+  tenantId: string;
+  productId: string;
+  productName: string;
+  branchId?: string;
+  systemStock: number;
+  physicalStock: number;
+  variance: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedBy: string;
+  requestDate: string;
+  approvalReason?: string;
+  approvedBy?: string;
+  approvalDate?: string;
+}
+
 export interface StockMovement {
   id: string;
   tenantId: string;
@@ -309,7 +341,7 @@ export interface ZakatDistribution {
   description: string;
 }
 
-export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'MANAGER' | 'PENGURUS' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'PELANGGAN';
+export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'MANAGER' | 'PENGURUS' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'CLEANING_SERVICE' | 'PELANGGAN';
 
 export interface CurrentUser {
   name: string;

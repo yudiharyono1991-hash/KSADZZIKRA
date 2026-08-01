@@ -37,8 +37,8 @@ export default function SettingsPage() {
   
   // Loyalty Points
   const [enablePoints, setEnablePoints] = useState(settings.enablePoints ?? true);
-  const [pointEarningRate, setPointEarningRate] = useState(settings.pointEarningRate?.toString() || '1000');
-  const [pointRedemptionValue, setPointRedemptionValue] = useState(settings.pointRedemptionValue?.toString() || '10');
+  const [pointEarningRate, setPointEarningRate] = useState(settings.pointEarningRate != null ? settings.pointEarningRate.toString() : '1000');
+  const [pointRedemptionValue, setPointRedemptionValue] = useState(settings.pointRedemptionValue != null ? settings.pointRedemptionValue.toString() : '10');
 
   // PPOB Integration Settings
   const [enablePpobIntegration, setEnablePpobIntegration] = useState(settings.enablePpobIntegration ?? false);
@@ -131,11 +131,12 @@ export default function SettingsPage() {
     setCharityTitle(settings.charityTitle || 'Kewajiban Zakat Niaga');
     setCharityDescription(settings.charityDescription || 'Zakat Kontribusi Sebesar Rp {amount} dari transaksi ini dicadangkan untuk kaum Dhuafa.');
     setEnablePoints(settings.enablePoints ?? true);
-    setPointEarningRate(settings.pointEarningRate?.toString() || '1000');
-    setPointRedemptionValue(settings.pointRedemptionValue?.toString() || '10');
+    setPointEarningRate(settings.pointEarningRate != null ? settings.pointEarningRate.toString() : '1000');
+    setPointRedemptionValue(settings.pointRedemptionValue != null ? settings.pointRedemptionValue.toString() : '10');
     setEnablePpobIntegration(settings.enablePpobIntegration ?? false);
     setPpobProviderUrl(settings.ppobProviderUrl || '');
     setPpobApiKey(settings.ppobApiKey || '');
+    setDefaultPpobAdminFee(settings.defaultPpobAdminFee?.toString() || '2000');
     setAutoApproveTransactions(settings.autoApproveTransactions ?? false);
     setStorePhone(settings.storePhone || '');
     setOwnerWhatsapp(settings.ownerWhatsapp || '');
@@ -868,12 +869,12 @@ export default function SettingsPage() {
           <div className="p-6 space-y-4 bg-fuchsia-50/30">
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-slate-400">Nilai Belanja untuk 1 Poin (Rp)</label>
-              <input type="number" value={pointEarningRate} onChange={(e) => setPointEarningRate(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 1000" />
+              <input type="number" value={pointEarningRate} onChange={(e) => setPointEarningRate(e.target.value)} onBlur={(e) => updateSettings({ pointEarningRate: e.target.value ? Number(e.target.value) : 1000 })} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 1000" />
               <p className="text-xs text-slate-500 mt-1">Setiap pelanggan berbelanja senilai ini, mereka akan mendapat 1 Poin.</p>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-slate-400">Nilai Diskon per 1 Poin (Rp)</label>
-              <input type="number" value={pointRedemptionValue} onChange={(e) => setPointRedemptionValue(e.target.value)} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 10" />
+              <input type="number" value={pointRedemptionValue} onChange={(e) => setPointRedemptionValue(e.target.value)} onBlur={(e) => updateSettings({ pointRedemptionValue: e.target.value ? Number(e.target.value) : 10 })} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none" placeholder="Contoh: 10" />
               <p className="text-xs text-slate-500 mt-1">Saat poin ditukarkan, 1 poin akan mengurangi total belanja sebesar nilai ini.</p>
             </div>
             <button

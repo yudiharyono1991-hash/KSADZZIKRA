@@ -75,15 +75,30 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   const day = String(now.getDate()).padStart(2, '0');
   const todayDateStr = `${year}-${month}-${day}`;
 
-  // Today's total sales
+  // Today's total sales (Excluding PPOB)
   const todaySales = transactions
-    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr))
-    .reduce((sum, tx) => sum + tx.totalAmount, 0);
+    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
+    .reduce((sum, tx) => {
+      const physicalSales = tx.items.reduce((itemSum, item) => {
+        const prod = products.find(p => p.id === item.productId);
+        if (prod?.isPPOB) return itemSum; // Skip PPOB
+        return itemSum + (item.price * item.quantity);
+      }, 0);
+      return sum + physicalSales;
+    }, 0);
 
-  // Today's margin
+  // Today's margin (Excluding PPOB)
   const todayMargin = transactions
-    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr))
-    .reduce((sum, tx) => sum + tx.marginContribution, 0);
+    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
+    .reduce((sum, tx) => {
+      const physicalMargin = tx.items.reduce((itemSum, item) => {
+        const prod = products.find(p => p.id === item.productId);
+        if (prod?.isPPOB) return itemSum; // Skip PPOB
+        const cogs = item.costPrice || prod?.costPrice || 0;
+        return itemSum + ((item.price - cogs) * item.quantity);
+      }, 0);
+      return sum + physicalMargin;
+    }, 0);
 
   // Check how many items low stock
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;

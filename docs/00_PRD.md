@@ -167,3 +167,10 @@ Menyediakan infrastruktur digital yang memungkinkan koperasi syariah beroperasi 
 ---
 
 *KSA Mart Syariah — Halal. Amanah. Berkah. 🕌✨*
+
+## Changelog Update (1 Agustus 2026)
+- **Cetak PO Resmi**: PO kini dapat dicetak lengkap dengan Kop Surat Toko, Logo, Total Harga, dan 3 tier Tanda Tangan (Pembuat, Manajer, Supplier).
+- **Kasbon Rekap**: Export laporan menggunakan format asli Excel (.xlsx) dengan auto-size column, serta fungsi Import data via Excel.
+- **Settings Geofencing**: Penambahan batas radius 5 KM untuk pesanan online beserta validasi dari Customer Portal.
+- **Reminder Backup Data**: Notifikasi H-3 sebelum akhir bulan berjalan.
+- **PPOB & Profit Breakdown**: Pemisahan sumber dana DANA dan Radar Pulsa di laba/rugi.

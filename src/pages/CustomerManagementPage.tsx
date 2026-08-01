@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useBranchData } from '../hooks/useBranchData';
 import { useAppStore } from '../store';
-import { Users, Plus, Search, Trash2, Edit, CreditCard, Download, Upload } from 'lucide-react';
+import { Users, Plus, Search, Trash2, Edit, CreditCard, Download, Upload, Printer, Bluetooth, MessageCircle, ClipboardList, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 
 export default function CustomerManagementPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry, settings, users, updateUser, transactions } = useBranchData();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry, settings, users, updateUser, transactions, addKasbonPayment, kasbonPayments } = useBranchData();
   const location = useLocation();
   const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
@@ -24,9 +25,19 @@ export default function CustomerManagementPage() {
     isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''
   });
   
-  const [payoffModal, setPayoffModal] = useState<{isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI', notes: string}>({
-    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', notes: ''
+  const [payoffModal, setPayoffModal] = useState<{ isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: string, notes?: string }>({
+    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH'
   });
+
+  const [receiptModal, setReceiptModal] = useState<{ isOpen: boolean, record: import('../types').KasbonPaymentRecord | null }>({
+    isOpen: false, record: null
+  });
+
+  const [kasbonHistoryModal, setKasbonHistoryModal] = useState<{isOpen: boolean, customerId: string, customerName: string}>({
+    isOpen: false, customerId: '', customerName: ''
+  });
+
+  const [waNumber, setWaNumber] = useState('');
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -156,11 +167,9 @@ export default function CustomerManagementPage() {
       return;
     }
 
-    updateCustomer(customerId, { debtAmount: debtAmount - payAmount });
+    const newDebt = debtAmount - payAmount;
+    updateCustomer(customerId, { debtAmount: newDebt });
 
-    const now = new Date().toISOString();
-    
-    // Tentukan akun tujuan berdasarkan metode pembayaran
     const getAccountForMethod = (method: string) => {
       if (method === 'QRIS_SHARIAH') return '1-1020';
       if (method === 'TRANSFER_BSI') return '1-1010';
@@ -168,8 +177,6 @@ export default function CustomerManagementPage() {
     };
 
     const targetAccount = getAccountForMethod(paymentMethod);
-    
-    // Gunakan bulk insert agar tidak terjadi jurnal pincang jika terputus internet
     const { addJournalEntries } = useAppStore.getState();
     const dateStr = new Date().toISOString();
     const tenantIdStr = currentUser?.tenantId || 'tenant_default';
@@ -201,8 +208,110 @@ export default function CustomerManagementPage() {
       }
     ]);
 
-    alert(`Pelunasan berhasil diproses. Sisa piutang: Rp ${debtAmount - payAmount}`);
+    const newPaymentRecord = {
+      tenantId: tenantIdStr,
+      customerId,
+      customerName,
+      amountPaid: payAmount,
+      remainingDebt: newDebt,
+      paymentMethod,
+      cashierName: currentUser?.name || 'Kasir',
+      isFullyPaid: newDebt <= 0,
+      notes: payoffModal.notes
+    };
+    addKasbonPayment(newPaymentRecord);
+    
+    // Find customer to prefill WA
+    const cust = customers.find(c => c.id === customerId);
+    if (cust && cust.phone) setWaNumber(cust.phone);
+    else setWaNumber('');
+
     setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH' });
+    setReceiptModal({ isOpen: true, record: { ...newPaymentRecord, id: `kp_${Date.now()}`, paymentDate: dateStr } });
+  };
+
+  const handleBluetoothPrint = async () => {
+    if (!receiptModal.record) return;
+    try {
+      await printKasbonPaymentToBluetooth(
+        receiptModal.record,
+        settings.storeName || 'KSA Mart',
+        settings.storeAddress || '',
+        settings.storePhone || ''
+      );
+    } catch (err: any) {
+      alert(err.message || 'Gagal terhubung ke printer Bluetooth.');
+    }
+  };
+
+  const handleSendWA = () => {
+    if (!receiptModal.record) return;
+    if (!waNumber) {
+      alert("Silakan masukkan nomor WhatsApp pelanggan terlebih dahulu.");
+      return;
+    }
+    
+    let formattedPhone = waNumber.replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62' + formattedPhone.slice(1);
+    }
+    
+    const rec = receiptModal.record;
+    const title = rec.isFullyPaid ? 'BUKTI KASBON LUNAS' : 'BUKTI PEMBAYARAN KASBON';
+    const textMessage = `🕌 *${settings.storeName || 'KSA Mart'}* 🕌\n` +
+      `${settings.storeAddress || ''}\n` +
+      `Telp: ${settings.storePhone || ''}\n` +
+      `===============================\n` +
+      `📄 *${title}*\n` +
+      `⏰ *Waktu:* ${new Date(rec.paymentDate).toLocaleString('id-ID')}\n` +
+      `👤 *Pelanggan:* ${rec.customerName}\n` +
+      `🧑‍💼 *Kasir:* ${rec.cashierName}\n` +
+      `💳 *Metode:* ${rec.paymentMethod}\n` +
+      `===============================\n` +
+      `💰 *Dibayar:* Rp ${rec.amountPaid.toLocaleString('id-ID')}\n` +
+      `💵 *Sisa Kasbon:* Rp ${rec.remainingDebt.toLocaleString('id-ID')}\n` +
+      (rec.notes ? `📝 *Catatan:* ${rec.notes}\n` : '') +
+      `===============================\n` +
+      (rec.isFullyPaid ? `✅ *L U N A S*\n` : '') +
+      `\nTerima kasih atas kepercayaannya.`;
+
+    const encodedText = encodeURIComponent(textMessage);
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const getKasbonHistory = (customerId: string) => {
+    const debits = transactions
+      .filter(tx => tx.customerId === customerId && tx.paymentMethod === 'KASBON')
+      .map(tx => ({
+        date: new Date(tx.timestamp),
+        type: 'PEMBELIAN',
+        ref: tx.id,
+        amount: tx.totalAmount,
+        cashier: tx.cashierName
+      }));
+      
+    const credits = (kasbonPayments || [])
+      .filter(kp => kp.customerId === customerId)
+      .map(kp => ({
+        date: new Date(kp.paymentDate),
+        type: 'PELUNASAN',
+        ref: kp.id,
+        amount: kp.amountPaid,
+        cashier: kp.cashierName
+      }));
+      
+    const history = [...debits, ...credits].sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    let runningBalance = 0;
+    return history.map(item => {
+      if (item.type === 'PEMBELIAN') {
+        runningBalance += item.amount;
+      } else {
+        runningBalance -= item.amount;
+      }
+      return { ...item, balance: Math.max(0, runningBalance) };
+    });
   };
 
   return (
@@ -514,7 +623,7 @@ export default function CustomerManagementPage() {
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Tot. Poin</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Terpakai</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Sisa</th>
-                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle hidden sm:table-cell">Tgl Update</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle hidden sm:table-cell">Tgl Update Poin</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle">Nilai (Rp)</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Aksi</th>
               </tr>
@@ -574,6 +683,11 @@ export default function CustomerManagementPage() {
                       {c.debtAmount > 0 && (
                         <button onClick={() => setPayoffModal({ isOpen: true, customerId: c.id, customerName: c.name, debtAmount: c.debtAmount || 0, payAmount: c.debtAmount || 0, paymentMethod: 'CASH', notes: '' })} className="p-1 text-green-600 hover:bg-green-50 rounded-lg" title="Lunasi Kasbon">
                           <CreditCard className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {(c.debtAmount > 0 || transactions.some(tx => tx.customerId === c.id && tx.paymentMethod === 'KASBON')) && (
+                        <button onClick={() => setKasbonHistoryModal({isOpen: true, customerId: c.id, customerName: c.name})} className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg" title="Buku Riwayat Kasbon">
+                          <ClipboardList className="w-3.5 h-3.5" />
                         </button>
                       )}
                       <button onClick={() => handleEdit(c)} className="p-1 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:bg-slate-800 rounded-lg" title="Edit">
@@ -730,6 +844,163 @@ export default function CustomerManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Receipt Modal */}
+      {receiptModal.isOpen && receiptModal.record && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-green-50 border-b border-green-100 flex justify-between items-center no-print">
+              <h3 className="font-extrabold text-green-800 text-sm flex items-center gap-2">
+                <Printer className="w-5 h-5" /> Cetak Struk
+              </h3>
+              <button onClick={() => setReceiptModal({ isOpen: false, record: null })} className="text-gray-500 hover:text-gray-700">Tutup</button>
+            </div>
+            
+            <div className="p-6 bg-white flex-1 overflow-y-auto text-sm text-gray-800 dark:text-gray-800 print-area relative" id="print-area">
+              <div className="text-center mb-6">
+                <h2 className="font-extrabold text-xl">{settings.storeName || 'KSA Mart'}</h2>
+                <p className="text-xs text-gray-500">{settings.storeAddress || ''}</p>
+                <p className="text-xs text-gray-500">Telp: {settings.storePhone || ''}</p>
+              </div>
+
+              <div className="border-t border-b border-dashed border-gray-300 py-3 mb-4 text-center">
+                <p className="font-bold uppercase tracking-widest">{receiptModal.record.isFullyPaid ? 'BUKTI KASBON LUNAS' : 'BUKTI PEMBAYARAN KASBON'}</p>
+              </div>
+
+              <div className="space-y-1 mb-4 text-xs">
+                <p><span className="text-slate-400">Tanggal:</span> {new Date(receiptModal.record.paymentDate).toLocaleString('id-ID')}</p>
+                <p><span className="text-slate-400">Pelanggan:</span> {receiptModal.record.customerName}</p>
+                <p><span className="text-slate-400">Kasir:</span> {receiptModal.record.cashierName}</p>
+                <p><span className="text-slate-400">Metode:</span> {receiptModal.record.paymentMethod}</p>
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 py-3 mb-4 space-y-2 text-right">
+                <div className="flex justify-between font-bold text-sm">
+                  <span>Nominal Bayar:</span>
+                  <span>Rp {receiptModal.record.amountPaid.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-xs text-amber-700 font-bold border-t border-gray-200 pt-2">
+                  <span>Sisa Kasbon:</span>
+                  <span>Rp {receiptModal.record.remainingDebt.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              {receiptModal.record.isFullyPaid && (
+                <div className="border-t border-green-900/20 pt-3 text-center text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 mt-4">
+                  <p className="font-extrabold uppercase tracking-widest text-lg">LUNAS</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 flex flex-col gap-2 no-print">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Printer className="w-4 h-4" /> Cetak Biasa
+                </button>
+                <button
+                  onClick={handleBluetoothPrint}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Bluetooth className="w-4 h-4" /> Print Bluetooth
+                </button>
+              </div>
+              <div className="mt-2 border-t border-gray-200 dark:border-slate-700 pt-3">
+                <p className="text-xs font-bold text-gray-600 dark:text-slate-400 mb-2 flex items-center gap-1">
+                  <MessageCircle className="w-4 h-4" /> Kirim Struk via WhatsApp
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={waNumber}
+                    onChange={(e) => setWaNumber(e.target.value)}
+                    placeholder="No WA (misal: 0812...)"
+                    className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    onClick={handleSendWA}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
+                  >
+                    Kirim WA
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Kasbon History Modal */}
+      {kasbonHistoryModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 rounded-lg">
+                  <ClipboardList className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-slate-200">Buku Riwayat Kasbon</h2>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Pelanggan: {kasbonHistoryModal.customerName}</p>
+                </div>
+              </div>
+              <button onClick={() => setKasbonHistoryModal({ isOpen: false, customerId: '', customerName: '' })} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50 dark:bg-slate-900/50">
+              <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 font-bold border-b border-gray-200 dark:border-slate-700">
+                    <tr>
+                      <th className="px-4 py-3">Tanggal & Waktu</th>
+                      <th className="px-4 py-3">Ref ID</th>
+                      <th className="px-4 py-3">Keterangan</th>
+                      <th className="px-4 py-3 text-right">Debit (Penambahan)</th>
+                      <th className="px-4 py-3 text-right">Kredit (Pelunasan)</th>
+                      <th className="px-4 py-3 text-right text-blue-600 dark:text-blue-400">Saldo Akhir</th>
+                      <th className="px-4 py-3">Kasir</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {getKasbonHistory(kasbonHistoryModal.customerId).map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="px-4 py-3 text-gray-600 dark:text-slate-400 whitespace-nowrap">{item.date.toLocaleString('id-ID')}</td>
+                        <td className="px-4 py-3 text-xs font-mono text-gray-400">{item.ref.substring(0, 8)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                            item.type === 'PEMBELIAN' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {item.type === 'PEMBELIAN' ? 'Kasbon Baru' : 'Pelunasan Kasbon'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-rose-600 dark:text-rose-400">
+                          {item.type === 'PEMBELIAN' ? `Rp ${item.amount.toLocaleString('id-ID')}` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                          {item.type === 'PELUNASAN' ? `Rp ${item.amount.toLocaleString('id-ID')}` : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">
+                          Rp {item.balance.toLocaleString('id-ID')}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs">{item.cashier}</td>
+                      </tr>
+                    ))}
+                    {getKasbonHistory(kasbonHistoryModal.customerId).length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400 italic">Belum ada riwayat kasbon untuk pelanggan ini.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

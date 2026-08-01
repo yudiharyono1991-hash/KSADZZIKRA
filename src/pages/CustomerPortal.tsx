@@ -227,7 +227,7 @@ export default function CustomerPortal() {
 
   
     const handleCheckLocation = () => {
-      if (!settings.storeLocationLat || !settings.storeLocationLng) {
+      if (settings.storeLocationLat === undefined || settings.storeLocationLng === undefined) {
         alert("Mohon maaf, lokasi toko belum diatur oleh admin. Silakan hubungi admin KSA Mart.");
         return;
       }

@@ -15,6 +15,33 @@ export default function OnlineOrdersPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [chatText, setChatText] = useState('');
 
+  const handleSendWAReceipt = (order: import('../types').OnlineOrder) => {
+    let formattedPhone = order.customerPhone.replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62' + formattedPhone.slice(1);
+    }
+    
+    let itemsText = order.items.map((it: any) => 
+      `- ${it.productName} x${it.quantity} (Rp ${it.price.toLocaleString('id-ID')}) = Rp ${(it.price * it.quantity).toLocaleString('id-ID')}`
+    ).join('\n');
+
+    const textMessage = `🕌 *Pesanan Online KSA Mart* 🕌\n` +
+      `===============================\n` +
+      `📄 *BUKTI PEMBAYARAN*\n` +
+      `Order No: ${order.orderNo}\n` +
+      `Waktu: ${new Date().toLocaleString('id-ID')}\n` +
+      `Pelanggan: ${order.customerName}\n` +
+      `===============================\n` +
+      `${itemsText}\n` +
+      `===============================\n` +
+      `💰 *Total Belanja:* Rp ${order.totalAmount.toLocaleString('id-ID')}\n` +
+      `✅ *Status:* LUNAS\n` +
+      `\nTerima kasih telah berbelanja!`;
+
+    const encodedText = encodeURIComponent(textMessage);
+    window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`, '_blank');
+  };
+
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrderId || !chatText.trim() || !currentUser) return;
@@ -199,6 +226,9 @@ export default function OnlineOrdersPage() {
                     )}
                     {(order.status === 'COMPLETED' || order.status === 'CANCELLED') && (
                       <button onClick={() => { if(confirm('Reset status pesanan ke PENDING?')) handleStatusChange(order.id, 'PENDING'); }} className="bg-slate-200 hover:bg-slate-300 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-bold w-full text-center">Reset ke Pending</button>
+                    )}
+                    {order.status === 'COMPLETED' && (
+                      <button onClick={() => handleSendWAReceipt(order)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 mt-1">Kirim Struk WA</button>
                     )}
                   </div>
                 </div>

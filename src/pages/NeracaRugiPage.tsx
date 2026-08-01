@@ -59,9 +59,35 @@ export default function NeracaRugiPage() {
       let futureDebits = 0;
       let futureCredits = 0;
       let hadActivityThisMonth = false;
+      let lastActivityDate: string | null = null;
 
+      // 1. Direct check from POS Transactions (Most robust for Kasbon sales)
+      (transactions || []).forEach(tx => {
+        if (tx.customerId === c.id && tx.paymentMethod === 'KASBON') {
+          if (!lastActivityDate || tx.timestamp > lastActivityDate) {
+            lastActivityDate = tx.timestamp;
+          }
+          const txDateOnly = String(tx.timestamp).split('T')[0];
+          if (txDateOnly >= startDate && txDateOnly <= endDate) {
+            hadActivityThisMonth = true;
+          }
+        }
+      });
+
+      // 2. Journal Entries check (For manual payments/adjustments)
       (journalEntries || []).forEach(je => {
-        const isPiutang = je.account === 'PIUTANG_DAGANG' || (je.account && je.account.toLowerCase().includes('piutang'));
+        // Also update date for manual payments
+        if (je.referenceType === 'MANUAL' && je.referenceId === c.id) {
+          if (!lastActivityDate || je.date > lastActivityDate) {
+            lastActivityDate = je.date;
+          }
+          const jeDateOnlyManual = String(je.date).split('T')[0];
+          if (jeDateOnlyManual >= startDate && jeDateOnlyManual <= endDate) {
+            hadActivityThisMonth = true;
+          }
+        }
+
+        const isPiutang = je.account === 'PIUTANG_DAGANG' || (je.account && (je.account.toLowerCase().includes('piutang') || je.account === '1-1030'));
         if (isPiutang) {
           let isRelated = false;
           if (je.referenceType === 'AUTO_TRANSAKSI') {
@@ -72,12 +98,13 @@ export default function NeracaRugiPage() {
           }
 
           if (isRelated) {
-            if (je.date > endDate) {
+            const jeDateOnly = String(je.date).split('T')[0];
+            if (jeDateOnly > endDate) {
               // Revert transactions that happened AFTER the endDate
               futureDebits += (Number(je.debit) || 0);
               futureCredits += (Number(je.credit) || 0);
-            } else if (je.date >= startDate && je.date <= endDate) {
-              // Track if they paid or borrowed during the active view period
+            } else if (jeDateOnly >= startDate && jeDateOnly <= endDate) {
+              // Ensure hadActivityThisMonth is set if there is related piutang activity
               hadActivityThisMonth = true;
             }
           }
@@ -87,7 +114,7 @@ export default function NeracaRugiPage() {
       // Current balance minus additions after endDate plus payments after endDate
       const historicalDebt = (Number(c.debtAmount) || 0) - futureDebits + futureCredits;
       
-      return { ...c, historicalDebt, hadActivityThisMonth };
+      return { ...c, historicalDebt, hadActivityThisMonth, lastActivityDate };
     });
   }, [customers, journalEntries, transactions, startDate, endDate]);
 
@@ -279,6 +306,8 @@ export default function NeracaRugiPage() {
   let balanceKasTunai = initialStoreCapital; // modal awal dianggap masuk ke kas tunai
   let balanceKasKecil = 0;
   let balanceBank = 0;
+  let balanceRadar = 0;
+  let balanceDana = 0;
 
   (journalEntries || []).forEach(j => {
     const jd = String(j.date || '').split('T')[0];
@@ -288,6 +317,10 @@ export default function NeracaRugiPage() {
         balanceKasKecil += (j.debit - j.credit);
       } else if (acc.includes('1112') || acc.includes('bank') || acc.includes('qris')) {
         balanceBank += (j.debit - j.credit);
+      } else if (acc.includes('1-1050') || acc.includes('radar pulsa')) {
+        balanceRadar += (j.debit - j.credit);
+      } else if (acc.includes('1-1054') || acc.includes('saldo dana')) {
+        balanceDana += (j.debit - j.credit);
       } else if (acc.includes('1101') || acc.includes('1-1000') || acc.includes('kas tunai') || acc.includes('kas utama') || acc.startsWith('1-100')) {
         balanceKasTunai += (j.debit - j.credit);
       }
@@ -300,8 +333,8 @@ export default function NeracaRugiPage() {
 
   const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses;
 
-  // Sound liquid capital: sum of the 3 separated cash accounts
-  const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank;
+  // Sound liquid capital: sum of the separated cash accounts
+  const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank + balanceRadar + balanceDana;
 
   // Unsold merchandise stock valuation (asset)
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
@@ -572,7 +605,10 @@ export default function NeracaRugiPage() {
                   <div className="space-y-2 pl-4">
                     {filteredOtherIncome.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400">
-                        <span className="truncate max-w-[240px]">• {exp.description.replace('Pemasukan Kas: ', '')}</span>
+                        <span className="truncate max-w-[240px]">
+                          <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span>
+                          • {exp.description.replace('Pemasukan Kas: ', '')}
+                        </span>
                         <span className="text-blue-700 font-mono">+ Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
                       </div>
                     ))}
@@ -596,7 +632,10 @@ export default function NeracaRugiPage() {
                   ) : (
                     filteredExpenses.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors">
-                        <span className="truncate max-w-[240px]">• {exp.description} ({exp.category})</span>
+                        <span className="truncate max-w-[240px]">
+                          <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span> 
+                          • {exp.description} ({exp.category})
+                        </span>
                         <span className="text-red-700 font-mono">- Rp {exp.amount.toLocaleString('id-ID')}</span>
                       </div>
                     ))
@@ -672,6 +711,16 @@ export default function NeracaRugiPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas di Bank / QRIS</span>
                   <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceBank.toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Saldo Radar Pulsa</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceRadar.toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Saldo Aplikasi DANA</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceDana.toLocaleString('id-ID')}</span>
                 </div>
                 
                 <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-slate-700/50">
@@ -868,6 +917,7 @@ export default function NeracaRugiPage() {
                 <thead className="text-xs uppercase bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3">Akun Pelanggan / No HP</th>
+                    <th className="px-4 py-3 text-center">Update Terakhir</th>
                     <th className="px-4 py-3 text-right">Sisa Kasbon (Rp)</th>
                     <th className="px-4 py-3 text-center">Status</th>
                     <th className="px-4 py-3 text-center">Aksi</th>
@@ -881,6 +931,9 @@ export default function NeracaRugiPage() {
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-800 dark:text-slate-200">{customer.name}</div>
                           {customer.phone && <div className="text-xs text-slate-500">{customer.phone}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-center text-xs text-slate-500">
+                          {customer.lastActivityDate ? new Date(customer.lastActivityDate).toLocaleDateString('id-ID') : '-'}
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-bold text-amber-600">
                           Rp {Math.max(0, customer.historicalDebt).toLocaleString('id-ID')}
@@ -909,7 +962,7 @@ export default function NeracaRugiPage() {
                     );
                   })}
                   <tr className="bg-slate-50 dark:bg-slate-800/80 font-bold">
-                    <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">TOTAL KASBON AKTIF:</td>
+                    <td colSpan={2} className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">TOTAL KASBON AKTIF:</td>
                     <td className="px-4 py-3 text-right font-mono text-amber-700">
                       Rp {totalKasbon.toLocaleString('id-ID')}
                     </td>

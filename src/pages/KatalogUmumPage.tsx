@@ -161,7 +161,7 @@ export default function KatalogUmumPage() {
   const cartCount = customerCart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckLocation = () => {
-    if (!settings.storeLocationLat || !settings.storeLocationLng) {
+    if (settings.storeLocationLat === undefined || settings.storeLocationLng === undefined) {
       alert("Mohon maaf, lokasi toko belum diatur oleh admin.");
       return;
     }

@@ -9,6 +9,7 @@ export default function StrukturOrganisasiPage() {
   const userBranchId = currentUser?.branchId;
 
   const getRoleUsers = (role: string) => users.filter(u => {
+    if (!u.isActive) return false;
     if (u.role !== role) return false;
     // For operational staff, filter by branch if not global admin
     if (!isGlobalAdmin && (role === 'MANAGER' || role === 'ADMIN' || role === 'CASHIER')) {

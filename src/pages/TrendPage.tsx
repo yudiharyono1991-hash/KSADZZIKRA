@@ -4,6 +4,9 @@ import { useAppStore } from '../store';
 import { 
   AreaChart, 
   Area, 
+  ComposedChart,
+  Line,
+  LabelList,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -35,7 +38,7 @@ import {
 
 export default function TrendPage() {
   const { transactions, expenses, products, activeBranchId } = useBranchData();
-  const { settings, addPettyCashDeposit, journalEntries, getCalculatedPettyCash } = useAppStore();
+  const { settings, addPettyCashDeposit, journalEntries, getCalculatedPettyCash, customers } = useAppStore();
   const todayObj = new Date();
   const firstDay = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toLocaleDateString('en-CA');
   const currentDay = todayObj.toLocaleDateString('en-CA');
@@ -67,9 +70,15 @@ export default function TrendPage() {
     const today = new Date().toLocaleDateString('en-CA');
     const todayTransactions = filteredTransactions.filter(tx => String(tx.timestamp || '').startsWith(today));
     
-    // Summary Metrics
-    const totalOmset = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
-    const todayOmset = todayTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+    // Summary Metrics (Excluding PPOB)
+    const calculatePhysicalOmset = (txs: any[]) => txs.reduce((sum, tx) => sum + (tx.items?.reduce((s: number, it: any) => {
+      const prod = products.find((p: any) => p.id === it.productId);
+      if (prod?.isPPOB) return s;
+      return s + ((Number(it.price) || 0) * (Number(it.quantity) || 0));
+    }, 0) || 0), 0);
+    
+    const totalOmset = calculatePhysicalOmset(filteredTransactions);
+    const todayOmset = calculatePhysicalOmset(todayTransactions);
     const totalTransactions = filteredTransactions.length;
     const todayTransactionsCount = todayTransactions.length;
     
@@ -100,6 +109,7 @@ export default function TrendPage() {
     const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
     const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     const isYearly = daysCount > 90;
+    const isWeekly = daysCount > 14 && daysCount <= 90;
 
     let startDate = new Date(startObj);
     startDate.setHours(0, 0, 0, 0);
@@ -133,28 +143,22 @@ export default function TrendPage() {
     });
 
     const aggregate = (txs, exps) => {
-      const acc = txs.reduce((a, t) => {
-        const tMargin = t.items?.reduce((s: number, it: any) => {
-          let cp = Number(it.costPrice || 0);
-          if (!cp) {
-            const productData = products?.find((p: any) => p.id === it.productId);
-            if (productData) {
-              const isBox = it.productName?.toLowerCase().includes('(box)');
-              cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
-            }
-          }
-          return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
+      const grouped = txs.reduce((a, t) => {
+        const physicalOmset = t.items?.reduce((s: number, it: any) => {
+          const prod = products.find((p: any) => p.id === it.productId);
+          if (prod?.isPPOB) return s;
+          return s + ((Number(it.price) || 0) * (Number(it.quantity) || 0));
         }, 0) || 0;
-
-        a.omset += t.totalAmount;
-        a.margin += tMargin;
+        
+        a.omset += physicalOmset;
+        a.margin += (t.marginContribution || 0);
         a.count += 1;
         return a;
       }, { omset: 0, margin: 0, count: 0 });
       
       const totalExp = exps.reduce((a, e) => a + (Number(e.amount) || 0), 0);
-      const zakat = acc.margin > 0 ? Math.round(acc.margin * 0.025) : 0;
-      return { ...acc, zakat, expenses: totalExp, netProfit: acc.margin - totalExp };
+      const zakat = grouped.margin > 0 ? Math.round(grouped.margin * 0.025) : 0;
+      return { ...grouped, zakat, expenses: totalExp, netProfit: grouped.margin - totalExp };
     };
 
     const curTotals = aggregate(currentTxs, currentExps);
@@ -171,6 +175,16 @@ export default function TrendPage() {
       let key = '';
       if (isYearly) {
         key = d.toLocaleString('id-ID', { month: 'short', year: 'numeric' });
+      } else if (isWeekly) {
+        const diff = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        const weekNum = Math.floor(diff / 7);
+        const weekStart = new Date(startDate);
+        weekStart.setDate(weekStart.getDate() + (weekNum * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
+        
+        key = `${weekStart.getDate()} - ${weekEnd.getDate()} ${weekEnd.toLocaleString('id-ID', { month: 'short' })}`;
       } else {
         key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
       }
@@ -192,7 +206,13 @@ export default function TrendPage() {
         return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
       }, 0) || 0;
 
-      existing.omset += t.totalAmount;
+      const physicalOmset = t.items?.reduce((s: number, it: any) => {
+        const prod = products.find((p: any) => p.id === it.productId);
+        if (prod?.isPPOB) return s;
+        return s + ((Number(it.price) || 0) * (Number(it.quantity) || 0));
+      }, 0) || 0;
+      
+      existing.omset += physicalOmset;
       existing.margin += tMargin;
     });
 
@@ -202,20 +222,32 @@ export default function TrendPage() {
     });
 
     let finalChartData = [];
-    if (!isYearly) {
-      for (let i = 0; i < daysCount; i++) {
-        const d = new Date(startObj);
-        d.setDate(startObj.getDate() + i);
-        const key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
-        finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
-      }
-    } else {
+    if (isYearly) {
       let curr = new Date(startObj);
       curr.setDate(1);
       while (curr <= endDate) {
         const key = curr.toLocaleString('id-ID', { month: 'short', year: 'numeric' });
         finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
         curr.setMonth(curr.getMonth() + 1);
+      }
+    } else if (isWeekly) {
+      const numWeeks = Math.ceil(daysCount / 7);
+      for (let i = 0; i < numWeeks; i++) {
+        const weekStart = new Date(startObj);
+        weekStart.setDate(weekStart.getDate() + (i * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
+        
+        const key = `${weekStart.getDate()} - ${weekEnd.getDate()} ${weekEnd.toLocaleString('id-ID', { month: 'short' })}`;
+        finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
+      }
+    } else {
+      for (let i = 0; i < daysCount; i++) {
+        const d = new Date(startObj);
+        d.setDate(startObj.getDate() + i);
+        const key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
+        finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
       }
     }
 
@@ -262,36 +294,101 @@ export default function TrendPage() {
 
   const categoryShare = useMemo(() => {
     const counts: Record<string, number> = {};
+    const qtyCounts: Record<string, number> = {};
     let totalSales = 0;
-    filteredTransactions.forEach(tx => {
+    
+    // Vibrant colors for dynamic categories
+    const palette = ['#047857', '#fbbf24', '#34d399', '#3b82f6', '#f43f5e', '#8b5cf6', '#f97316', '#06b6d4', '#10b981', '#ec4899', '#6366f1'];
+    
+    const startObj = new Date(startDateStr);
+    startObj.setHours(0, 0, 0, 0);
+    const endObj = new Date(endDateStr);
+    endObj.setHours(23, 59, 59, 999);
+
+    const currentTxs = filteredTransactions.filter(t => {
+      const d = new Date(t.timestamp);
+      return d >= startObj && d <= endObj;
+    });
+
+    currentTxs.forEach(tx => {
       tx.items.forEach(item => {
-        // Simplified category mapping since we don't store category in tx.items
-        // We'd ideally join with products, but for mock display we'll infer
-        const isFood = item.productName.toLowerCase().includes('beras') || item.productName.toLowerCase().includes('gula') || item.productName.toLowerCase().includes('minyak');
-        const isFresh = item.productName.toLowerCase().includes('telur') || item.productName.toLowerCase().includes('ayam') || item.productName.toLowerCase().includes('ikan');
-        const isDrink = item.productName.toLowerCase().includes('teh') || item.productName.toLowerCase().includes('kopi') || item.productName.toLowerCase().includes('air');
-        const cat = isFood ? 'Sembako' : isFresh ? 'Fresh Food' : isDrink ? 'Minuman' : 'Lainnya';
+        let cat = 'Tanpa Kategori';
+        if (products && products.length > 0) {
+          const prod = products.find(p => p.id === item.productId);
+          if (prod && prod.category) {
+            cat = prod.category;
+          }
+        }
+        
         counts[cat] = (counts[cat] || 0) + (item.price * item.quantity);
+        qtyCounts[cat] = (qtyCounts[cat] || 0) + item.quantity;
         totalSales += (item.price * item.quantity);
       });
     });
 
-    const colors: Record<string, string> = {
-      'Sembako': '#047857',
-      'Fresh Food': '#fbbf24',
-      'Minuman': '#34d399',
-      'Lainnya': '#111827'
-    };
-
-    return Object.keys(counts).map(k => ({
+    const result = Object.keys(counts).map((k, idx) => ({
       name: k,
       value: totalSales > 0 ? Math.round((counts[k] / totalSales) * 100) : 0,
-      color: colors[k] || '#9ca3af'
-    })).sort((a, b) => b.value - a.value);
+      totalRp: counts[k],
+      qty: qtyCounts[k],
+      color: palette[idx % palette.length]
+    })).sort((a, b) => b.totalRp - a.totalRp);
+    
+    // Group small categories (< 2%) into 'Lainnya' if there are too many
+    let finalResult = [];
+    let othersValue = 0;
+    let othersRp = 0;
+    let othersQty = 0;
+    
+    result.forEach((item, idx) => {
+      if (idx > 6 || item.value < 2) {
+        othersValue += item.value;
+        othersRp += item.totalRp;
+        othersQty += item.qty;
+      } else {
+        finalResult.push(item);
+      }
+    });
+    
+    if (othersValue > 0) {
+      finalResult.push({ name: 'Lainnya', value: othersValue, totalRp: othersRp, qty: othersQty, color: '#475569' });
+    }
 
-  }, [filteredTransactions]);
+    return finalResult.sort((a, b) => b.value - a.value);
+  }, [filteredTransactions, products, startDateStr, endDateStr]);
 
   const averageTxValue = totals.count > 0 ? totals.omset / totals.count : 0;
+
+  const topCustomers = useMemo(() => {
+    if (!customers) return [];
+    
+    // Hitung jumlah transaksi per customer
+    const txCounts: Record<string, number> = {};
+    filteredTransactions.forEach(tx => {
+      if (tx.customerId) {
+        txCounts[tx.customerId] = (txCounts[tx.customerId] || 0) + 1;
+      }
+    });
+
+    return [...customers]
+      .filter(c => (c.points || 0) > 0)
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .slice(0, 10)
+      .map(c => ({
+        id: c.id,
+        name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
+        fullName: c.name,
+        points: c.points || 0,
+        txCount: txCounts[c.id] || 0
+      }));
+  }, [customers, filteredTransactions]);
+
+  const formatSingkat = (val: number) => {
+    if (val >= 1000000000) return (val/1000000000).toFixed(1) + 'M'; // Milyar
+    if (val >= 1000000) return (val/1000000).toFixed(1) + 'Jt'; // Juta
+    if (val >= 1000) return (val/1000).toFixed(0) + 'Rb'; // Ribu
+    return val.toString();
+  };
 
   const renderGrowth = (value: number, isDark = false) => {
     if (value > 0) return <span className={`${isDark ? 'text-green-200' : 'bg-green-50 text-green-700 border border-green-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>+{value.toFixed(1)}%</span>;
@@ -348,7 +445,7 @@ export default function TrendPage() {
       </div>
 
       {/* Visual Analytics Quick Stats - Vibrant Gradients */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         
         {/* Omset - Blue Gradient */}
         <div className="relative overflow-hidden bg-blue-600 bg-gradient-to-br from-blue-500 to-cyan-600 p-5 rounded-2xl shadow-lg border-none text-white">
@@ -363,6 +460,23 @@ export default function TrendPage() {
             <div className="mt-3 flex items-center justify-between">
               {renderGrowth(comparisons.omset, true)}
               <span className="text-white/70 text-[10px] font-medium">Berdasar periode</span>
+            </div>
+          </div>
+        </div>
+
+        {/* HPP - Slate Gradient */}
+        <div className="relative overflow-hidden bg-slate-600 bg-gradient-to-br from-slate-500 to-slate-700 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <TrendingUp className="w-32 h-32" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-white/80 text-[11px] font-bold uppercase tracking-wider mb-2">Total HPP</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-extrabold">Rp {(totals.omset - totals.margin).toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{(totals.omset > 0 ? ((totals.omset - totals.margin)/totals.omset) * 100 : 0).toFixed(1)}% dari Omset</span>
+              <span className="text-white/70 text-[10px] font-medium">Modal Pokok</span>
             </div>
           </div>
         </div>
@@ -448,34 +562,31 @@ export default function TrendPage() {
             </div>
           </div>
 
-          <div className="h-72 w-full">
+          <div className="h-80 w-full mt-4">
             <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <ComposedChart data={chartData} margin={{ top: 25, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOmset" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#059669" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#059669" stopOpacity={0.05}/>
-                  </linearGradient>
-                  <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#d97706" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#d97706" stopOpacity={0.05}/>
-                  </linearGradient>
-                  <linearGradient id="colorZakat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0d9488" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#0d9488" stopOpacity={0.05}/>
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.2}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rp ${formatSingkat(val)}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
+                  cursor={{fill: '#f8fafc'}}
                 />
-                <Area type="monotone" dataKey="omset" stroke="#059669" strokeWidth={3} fillOpacity={1} fill="url(#colorOmset)" name="Omset Dagang" />
-                <Area type="monotone" dataKey="margin" stroke="#d97706" strokeWidth={3} fillOpacity={1} fill="url(#colorMargin)" name="Margin Keuntungan" />
-                <Area type="monotone" dataKey="zakat" stroke="#0d9488" strokeWidth={3} fillOpacity={1} fill="url(#colorZakat)" name="Zakat Terkumpul" />
-              </AreaChart>
+                <Bar dataKey="omset" fill="url(#colorOmset)" radius={[4, 4, 0, 0]} barSize={40} name="Omset Dagang">
+                  {chartData.length <= 15 && (
+                    <LabelList dataKey="omset" position="top" fill="#64748b" fontSize={10} formatter={(val: number) => val > 0 ? formatSingkat(val) : ''} />
+                  )}
+                </Bar>
+                <Line type="monotone" dataKey="margin" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} name="Margin Keuntungan" />
+                <Line type="monotone" dataKey="zakat" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} name="Zakat Terkumpul" />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -497,7 +608,7 @@ export default function TrendPage() {
                   innerRadius={55}
                   outerRadius={75}
                   paddingAngle={3}
-                  dataKey="value"
+                  dataKey="totalRp"
                 >
                   {categoryShare.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -505,7 +616,10 @@ export default function TrendPage() {
                 </Pie>
                 <Tooltip 
                   contentStyle={{ fontSize: '11px', borderRadius: '8px' }}
-                  formatter={(value) => [`${value}% Share`]}
+                  formatter={(value: any, name: any, props: any) => {
+                    const percent = props.payload.value;
+                    return [`Rp ${value.toLocaleString('id-ID')} (${percent}%)`];
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -519,16 +633,38 @@ export default function TrendPage() {
           </div>
 
           {/* Table index indicators */}
-          <div className="space-y-2 mt-4 text-xs font-semibold">
+          <div className="space-y-1 mt-4 text-[10px]">
             {categoryShare.map((entry, idx) => (
-              <div key={idx} className="flex items-center justify-between text-gray-600 dark:text-slate-400">
-                <div className="flex items-center space-x-2">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: entry.color }}></span>
-                  <span className="text-gray-700 dark:text-slate-300">{entry.name}</span>
+              <div key={idx} className="flex items-center justify-between text-gray-600 dark:text-slate-400 py-1 border-b border-dashed border-gray-100 dark:border-slate-800 last:border-0">
+                <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }}></span>
+                  <span className="text-gray-700 dark:text-slate-300 font-semibold truncate" title={entry.name}>{entry.name}</span>
                 </div>
-                <span className="font-mono">{entry.value}%</span>
+                <div className="flex items-center justify-end space-x-2 shrink-0">
+                  <span className="text-slate-500 font-mono w-6 text-right">{entry.qty}x</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 w-12 text-right">
+                    {formatSingkat(entry.totalRp)}
+                  </span>
+                  <span className="font-bold text-slate-800 dark:text-white w-8 text-right bg-slate-100 dark:bg-slate-800 rounded px-1">{entry.value}%</span>
+                </div>
               </div>
             ))}
+            
+            {/* Grand Total Row */}
+            <div className="flex items-center justify-between text-gray-800 dark:text-slate-200 py-1.5 border-t border-gray-200 dark:border-slate-700 mt-2">
+              <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                <span className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Total Kategori</span>
+              </div>
+              <div className="flex items-center justify-end space-x-2 shrink-0">
+                <span className="text-slate-600 dark:text-slate-300 font-mono font-bold w-6 text-right">
+                  {categoryShare.reduce((sum, item) => sum + item.qty, 0)}x
+                </span>
+                <span className="font-black text-slate-800 dark:text-slate-100 w-12 text-right">
+                  {formatSingkat(categoryShare.reduce((sum, item) => sum + item.totalRp, 0))}
+                </span>
+                <span className="font-black text-white w-8 text-right bg-blue-600 dark:bg-blue-500 rounded px-1">100%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -617,6 +753,71 @@ export default function TrendPage() {
         </div>
       </div>
 
+      {/* Top 10 Customers by Points (Moved above Zakat) */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs mt-6 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              Top 10 Pelanggan (Poin Terbanyak)
+            </h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">Tabel dan grafik loyalitas pelanggan berdasarkan transaksi</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+              <BarChart data={topCustomers} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                <XAxis type="number" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={100} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: any) => [`${value} Pts`, 'Poin']}
+                  labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                  cursor={{fill: '#f8fafc'}}
+                />
+                <Bar dataKey="points" radius={[0, 4, 4, 0]} barSize={20}>
+                  {
+                    topCustomers.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#8b5cf6' : (index < 3 ? '#a78bfa' : '#c4b5fd')} />
+                    ))
+                  }
+                  <LabelList dataKey="points" position="right" fill="#64748b" fontSize={10} formatter={(val: number) => `${val} pts`} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-700">
+                  <th className="py-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Nama Pelanggan</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center">Jml Transaksi</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Total Poin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                {topCustomers.map((c, i) => (
+                  <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-2 px-3 text-sm font-semibold text-gray-800 dark:text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</span>
+                        <span className="truncate max-w-[120px]" title={c.fullName}>{c.fullName}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 text-sm font-mono text-center text-gray-600 dark:text-slate-400">{c.txCount}x</td>
+                    <td className="py-2 px-3 text-sm font-black text-right text-purple-600 dark:text-purple-400">{c.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Bar graph comparing accumulated Zakat Funds */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div className="mb-4">
@@ -633,12 +834,16 @@ export default function TrendPage() {
               <Tooltip 
                 contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
+                cursor={{fill: '#f8fafc'}}
               />
               <Bar dataKey="zakat" fill="#059669" radius={[4, 4, 0, 0]} name="Zakat Terkumpul (Rp)" barSize={25} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
+
+
+
       {/* Top Up Kas Kecil Modal */}
       {showTopUpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">

@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth, Calendar } from 'lucide-react';
+import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth, Calendar, FileText, CreditCard } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { printToBluetooth } from '../lib/bluetoothPrinter';
+import { printToBluetooth, printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 
 export default function KasirRiwayatPage() {
-  const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings } = useBranchData();
+  const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings, customers, kasbonPayments } = useBranchData();
+  const [activeTab, setActiveTab] = useState<'UMUM' | 'KASBON'>('UMUM');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [selectedKasbonPayment, setSelectedKasbonPayment] = useState<any>(null);
   const [txToVoid, setTxToVoid] = useState<any>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [waNumber, setWaNumber] = useState('');
 
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
@@ -41,6 +44,39 @@ export default function KasirRiwayatPage() {
 
   const totalPages = Math.ceil(filteredTx.length / itemsPerPage);
   const paginatedTx = filteredTx.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const kasbonHistory = [
+    ...transactions.filter(tx => tx.paymentMethod === 'KASBON').map(tx => ({
+      id: tx.id,
+      date: tx.timestamp,
+      type: 'PURCHASE',
+      invoiceNo: tx.invoiceNo,
+      customerName: tx.customerName || (tx.customerId ? customers.find(c => c.id === tx.customerId)?.name : undefined) || 'Umum',
+      cashierName: tx.cashierName,
+      amount: tx.totalAmount,
+      originalTx: tx,
+    })),
+    ...kasbonPayments.map(kp => ({
+      id: kp.id,
+      date: kp.paymentDate,
+      type: 'PAYMENT',
+      invoiceNo: '-',
+      customerName: kp.customerName,
+      cashierName: kp.cashierName,
+      amount: kp.amountPaid,
+      originalRecord: kp,
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const filteredKasbonHistory = kasbonHistory.filter(h => {
+    const hDate = h.date.split('T')[0];
+    const isDateMatch = (!startDate || hDate >= startDate) && (!endDate || hDate <= endDate);
+    const searchMatch = h.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || h.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase());
+    return isDateMatch && searchMatch;
+  });
+
+  const totalPagesKasbon = Math.ceil(filteredKasbonHistory.length / itemsPerPage);
+  const paginatedKasbon = filteredKasbonHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleExportExcel = () => {
     // We export filteredTx (all data matching filter, not just the paginated slice)
@@ -88,18 +124,94 @@ export default function KasirRiwayatPage() {
 
   const handleBluetoothPrint = async () => {
     if (!selectedTx) return;
-    try {
-      const receiptStoreName = branches.find(b => b.id === activeBranchId)?.name || settings.storeName;
-      const address = branches.find(b => b.id === activeBranchId)?.address || settings.storeAddress;
-      const phone = branches.find(b => b.id === activeBranchId)?.phone || settings.storePhone;
+    const receiptStoreName = branches.find(b => b.id === activeBranchId)?.name || settings.storeName;
+    const receiptStoreAddress = branches.find(b => b.id === activeBranchId)?.address || settings.storeAddress;
+    const receiptStorePhone = branches.find(b => b.id === activeBranchId)?.phone || settings.storePhone;
       
-      const zakatTitle = settings.charityTitle || 'Kewajiban Zakat Niaga';
-      const zakatDesc = (settings.charityDescription || '').replace('{amount}', selectedTx.zakatContribution.toLocaleString('id-ID'));
-      
-      await printToBluetooth(selectedTx, receiptStoreName, address, `Telp: ${phone}`, zakatTitle, zakatDesc);
-    } catch (err: any) {
-      alert(err.message || 'Gagal terhubung ke printer Bluetooth.');
+    const device = (navigator as any).bluetooth;
+    if (!device) {
+      alert("Bluetooth Web API tidak didukung di browser ini.");
+      return;
     }
+    
+    try {
+      await printToBluetooth(selectedTx, receiptStoreName, receiptStoreAddress, receiptStorePhone);
+    } catch (err: any) {
+      alert("Gagal print: " + err.message);
+    }
+  };
+
+  const handleSendWATx = () => {
+    if (!selectedTx) return;
+    if (!waNumber) {
+      alert("Silakan masukkan nomor WhatsApp pelanggan terlebih dahulu.");
+      return;
+    }
+    
+    let formattedPhone = waNumber.replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62' + formattedPhone.slice(1);
+    }
+    
+    let itemsText = selectedTx.items.map((it: any) => 
+      `- ${it.productName} x${it.quantity} (Rp ${it.price.toLocaleString('id-ID')}) = Rp ${(it.price * it.quantity).toLocaleString('id-ID')}`
+    ).join('\n');
+
+    const textMessage = `🕌 *${settings.storeName || 'KSA Mart'}* 🕌\n` +
+      `${settings.storeAddress || ''}\n` +
+      `Telp: ${settings.storePhone || ''}\n` +
+      `===============================\n` +
+      `📄 *STRUK PEMBELIAN*\n` +
+      `No Invoice: ${selectedTx.invoiceNo}\n` +
+      `Waktu: ${new Date(selectedTx.timestamp).toLocaleString('id-ID')}\n` +
+      `Kasir: ${selectedTx.cashierName}\n` +
+      `Pelanggan: ${selectedTx.customerName || 'Umum'}\n` +
+      `Status: ${selectedTx.paymentMethod === 'KASBON' ? 'Belum Dibayar (Kasbon)' : selectedTx.paymentMethod}\n` +
+      `===============================\n` +
+      `${itemsText}\n` +
+      `===============================\n` +
+      `💰 *Total Belanja:* Rp ${selectedTx.totalAmount.toLocaleString('id-ID')}\n` +
+      `💵 *Uang Diterima:* Rp ${selectedTx.amountPaid.toLocaleString('id-ID')}\n` +
+      `💳 *Kembali:* Rp ${selectedTx.changeAmount.toLocaleString('id-ID')}\n` +
+      `\nTerima kasih telah berbelanja!`;
+
+    const encodedText = encodeURIComponent(textMessage);
+    window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`, '_blank');
+  };
+
+  const handleSendWAKasbon = () => {
+    if (!selectedKasbonPayment) return;
+    if (!waNumber) {
+      alert("Silakan masukkan nomor WhatsApp pelanggan terlebih dahulu.");
+      return;
+    }
+    
+    let formattedPhone = waNumber.replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '62' + formattedPhone.slice(1);
+    }
+    
+    const rec = selectedKasbonPayment;
+    const title = rec.isFullyPaid ? 'BUKTI KASBON LUNAS' : 'BUKTI PEMBAYARAN KASBON';
+    const textMessage = `🕌 *${settings.storeName || 'KSA Mart'}* 🕌\n` +
+      `${settings.storeAddress || ''}\n` +
+      `Telp: ${settings.storePhone || ''}\n` +
+      `===============================\n` +
+      `📄 *${title}*\n` +
+      `⏰ *Waktu:* ${new Date(rec.paymentDate).toLocaleString('id-ID')}\n` +
+      `👤 *Pelanggan:* ${rec.customerName}\n` +
+      `🧑‍💼 *Kasir:* ${rec.cashierName}\n` +
+      `💳 *Metode:* ${rec.paymentMethod}\n` +
+      `===============================\n` +
+      `💰 *Dibayar:* Rp ${rec.amountPaid.toLocaleString('id-ID')}\n` +
+      `💵 *Sisa Kasbon:* Rp ${rec.remainingDebt.toLocaleString('id-ID')}\n` +
+      (rec.notes ? `📝 *Catatan:* ${rec.notes}\n` : '') +
+      `===============================\n` +
+      (rec.isFullyPaid ? `✅ *L U N A S*\n` : '') +
+      `\nTerima kasih atas kepercayaannya.`;
+
+    const encodedText = encodeURIComponent(textMessage);
+    window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`, '_blank');
   };
 
   const handleVoid = () => {
@@ -124,13 +236,28 @@ export default function KasirRiwayatPage() {
         </div>
       </div>
 
+      <div className="flex border-b border-gray-200 dark:border-slate-700">
+        <button 
+          onClick={() => setActiveTab('UMUM')}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'UMUM' ? 'border-green-600 text-green-700 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+        >
+          Semua Transaksi
+        </button>
+        <button 
+          onClick={() => setActiveTab('KASBON')}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'KASBON' ? 'border-green-600 text-green-700 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+        >
+          Riwayat Kasbon & Pelunasan
+        </button>
+      </div>
+
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
         <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4">
           <div className="relative flex-1 w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Cari No Invoice..."
+              placeholder={activeTab === 'KASBON' ? "Cari Pelanggan..." : "Cari No Invoice..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
@@ -163,6 +290,7 @@ export default function KasirRiwayatPage() {
           </div>
         </div>
 
+        {activeTab === 'UMUM' ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium">
@@ -185,7 +313,7 @@ export default function KasirRiwayatPage() {
                   <td className="px-6 py-4 font-bold text-gray-800 dark:text-slate-200">{tx.invoiceNo}</td>
                   <td className="px-6 py-4 text-gray-600 dark:text-slate-400">{tx.cashierName}</td>
                   <td className="px-6 py-4 text-gray-800 dark:text-slate-200 font-medium">
-                    {tx.customerName || 'Umum'}
+                    {tx.customerName || (tx.customerId ? customers.find(c => c.id === tx.customerId)?.name : undefined) || 'Umum'}
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
@@ -197,7 +325,11 @@ export default function KasirRiwayatPage() {
                   </td>
                   <td className="px-6 py-4 text-center space-x-2">
                     <button
-                      onClick={() => handleReprint(tx)}
+                      onClick={() => {
+                        setSelectedTx(tx);
+                        const cust = tx.customerId ? customers.find(c => c.id === tx.customerId) : null;
+                        setWaNumber(cust?.phone || '');
+                      }}
                       className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-slate-800 rounded-lg transition-colors inline-block border border-blue-200 dark:border-slate-700 shadow-xs"
                       title="Lihat Detail Transaksi"
                     >
@@ -268,28 +400,96 @@ export default function KasirRiwayatPage() {
             )}
           </table>
         </div>
-        
-        {/* Table Footer with Pagination */}
-        <div className="bg-gray-100 dark:bg-slate-800/50 p-4 border-t border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 rounded-b-xl">
-          <div className="flex items-center gap-2">
-            <button 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded text-sm disabled:opacity-50"
-            >
-              Sebelumnya
-            </button>
-            <span className="text-sm font-semibold text-gray-700 dark:text-slate-300">Halaman {currentPage} dari {totalPages || 1}</span>
-            <button 
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded text-sm disabled:opacity-50"
-            >
-              Selanjutnya
-            </button>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium">
+                <tr>
+                  <th className="px-6 py-4">Waktu</th>
+                  <th className="px-6 py-4">Tipe</th>
+                  <th className="px-6 py-4">Pelanggan</th>
+                  <th className="px-6 py-4 text-right">Nominal</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedKasbon.map((item, idx) => (
+                  <tr key={`${item.id}-${idx}`} className="hover:bg-gray-50 dark:bg-slate-800/50">
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-400">
+                      {new Date(item.date).toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-6 py-4 font-bold text-gray-800 dark:text-slate-200">
+                      {item.type === 'PURCHASE' ? (
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">PENGAMBILAN</span>
+                      ) : (
+                        <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">PELUNASAN</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-800 dark:text-slate-200 font-medium">{item.customerName}</td>
+                    <td className="px-6 py-4 text-right font-bold text-gray-700">Rp {item.amount.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 text-center space-x-2">
+                      <button
+                        onClick={() => {
+                          if (item.type === 'PURCHASE') {
+                            setSelectedKasbonPayment(null);
+                            setSelectedTx((item as any).originalTx);
+                            const cust = (item as any).originalTx.customerId ? customers.find(c => c.id === (item as any).originalTx.customerId) : null;
+                            setWaNumber(cust?.phone || '');
+                          } else {
+                            setSelectedTx(null);
+                            setSelectedKasbonPayment((item as any).originalRecord);
+                            const cust = customers.find(c => c.id === (item as any).originalRecord.customerId);
+                            setWaNumber(cust?.phone || '');
+                          }
+                        }}
+                        className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-slate-800 rounded-lg transition-colors inline-block border border-blue-200 dark:border-slate-700 shadow-xs"
+                      >
+                        <span className="flex items-center gap-1 text-xs"><Printer className="w-4 h-4" /> Cetak</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredKasbonHistory.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
+                      <CreditCard className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                      Belum ada riwayat Kasbon / Pelunasan.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              {filteredKasbonHistory.length > 0 && (
+                <tfoot className="bg-slate-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 p-4">
+                  <tr>
+                    <td colSpan={5} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+                          Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredKasbonHistory.length)} dari {filteredKasbonHistory.length} riwayat
+                        </span>
+                        <div className="flex gap-2">
+                          <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold disabled:opacity-50">Sebelumnya</button>
+                          <button disabled={currentPage === totalPagesKasbon} onClick={() => setCurrentPage(p => Math.min(totalPagesKasbon, p + 1))} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold disabled:opacity-50">Selanjutnya</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
           </div>
-          <span className="text-sm font-bold text-gray-800 dark:text-slate-200">Menampilkan {paginatedTx.length} dari {filteredTx.length} transaksi</span>
-        </div>
+        )}
+        
+        {filteredTx.length > 0 && activeTab === 'UMUM' && (
+          <div className="bg-slate-50 dark:bg-slate-800 border-t border-gray-100 dark:border-slate-800 p-4 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+              Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredTx.length)} dari {filteredTx.length} transaksi
+            </span>
+            <div className="flex gap-2">
+              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold disabled:opacity-50">Sebelumnya</button>
+              <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold disabled:opacity-50">Selanjutnya</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modern Shariah Print Receipt Popup card for REPRINT */}
@@ -340,8 +540,8 @@ export default function KasirRiwayatPage() {
                 <p><span className="text-slate-400">No Invoice:</span> {selectedTx.invoiceNo}</p>
                 <p><span className="text-slate-400">Waktu:</span> {new Date(selectedTx.timestamp).toLocaleString('id-ID')}</p>
                 <p><span className="text-slate-400">Kasir:</span> {selectedTx.cashierName}</p>
-                <p><span className="text-slate-400">Pelanggan:</span> {selectedTx.customerName || 'Umum'}</p>
-                <p><span className="text-slate-400">Metode:</span> {selectedTx.paymentMethod}</p>
+                <p><span className="text-slate-400">Pelanggan:</span> {selectedTx.customerName || (selectedTx.customerId ? customers.find(c => c.id === selectedTx.customerId)?.name : undefined) || 'Umum'}</p>
+                <p><span className="text-slate-400">Status:</span> {selectedTx.paymentMethod === 'KASBON' ? 'Belum Dibayar' : selectedTx.paymentMethod}</p>
               </div>
 
               <div className="border-t border-b border-gray-100 dark:border-slate-800 py-2 space-y-2">
@@ -378,25 +578,136 @@ export default function KasirRiwayatPage() {
             </div>
 
             {/* Modal footer printers */}
-            <div className="p-4 bg-slate-50 dark:bg-slate-800 flex gap-2 no-print">
-              <button
-                onClick={() => setSelectedTx(null)}
-                className="flex-1 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 font-semibold text-xs text-center"
-              >
-                Tutup
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
-              >
-                <Printer className="w-4 h-4" /> Cetak Biasa
-              </button>
-              <button
-                onClick={handleBluetoothPrint}
-                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
-              >
-                <Bluetooth className="w-4 h-4" /> Print Bluetooth
-              </button>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 flex flex-col gap-2 no-print">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedTx(null)}
+                  className="flex-1 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-700 dark:text-slate-300 font-semibold text-xs text-center"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Printer className="w-4 h-4" /> Cetak Biasa
+                </button>
+                <button
+                  onClick={handleBluetoothPrint}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Bluetooth className="w-4 h-4" /> Print Bluetooth
+                </button>
+              </div>
+              <div className="mt-2 border-t border-gray-200 dark:border-slate-700 pt-3 flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={waNumber}
+                  onChange={(e) => setWaNumber(e.target.value)}
+                  placeholder="No WA (misal: 0812...)"
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  onClick={handleSendWATx}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
+                >
+                  Kirim WA
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedKasbonPayment && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-green-50 border-b border-green-100 flex justify-between items-center no-print">
+              <h3 className="font-extrabold text-green-800 text-sm flex items-center gap-2">
+                <Printer className="w-5 h-5" /> Cetak Struk
+              </h3>
+              <button onClick={() => setSelectedKasbonPayment(null)} className="text-gray-500 hover:text-gray-700">Tutup</button>
+            </div>
+            
+            <div className="p-6 bg-white flex-1 overflow-y-auto text-sm text-gray-800 dark:text-gray-800 print-area relative">
+              <div className="text-center mb-6">
+                <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-12 h-12 object-contain mx-auto mb-1" />
+                <h2 className="font-extrabold text-xl">{settings.storeName || 'KSA Mart'}</h2>
+                <p className="text-xs text-gray-500">{settings.storeAddress || ''}</p>
+                <p className="text-xs text-gray-500">Telp: {settings.storePhone || ''}</p>
+                <p className="text-xs font-bold mt-1">(COPY / CETAK ULANG)</p>
+              </div>
+
+              <div className="border-t border-b border-dashed border-gray-300 py-3 mb-4 text-center">
+                <p className="font-bold uppercase tracking-widest">{selectedKasbonPayment.isFullyPaid ? 'BUKTI KASBON LUNAS' : 'BUKTI PEMBAYARAN KASBON'}</p>
+              </div>
+
+              <div className="space-y-1 mb-4 text-xs">
+                <p><span className="text-slate-400">Tanggal:</span> {new Date(selectedKasbonPayment.paymentDate).toLocaleString('id-ID')}</p>
+                <p><span className="text-slate-400">Pelanggan:</span> {selectedKasbonPayment.customerName}</p>
+                <p><span className="text-slate-400">Kasir:</span> {selectedKasbonPayment.cashierName}</p>
+                <p><span className="text-slate-400">Metode:</span> {selectedKasbonPayment.paymentMethod}</p>
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 py-3 mb-4 space-y-2 text-right">
+                <div className="flex justify-between font-bold text-sm">
+                  <span>Nominal Bayar:</span>
+                  <span>Rp {selectedKasbonPayment.amountPaid.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-xs text-amber-700 font-bold border-t border-gray-200 pt-2">
+                  <span>Sisa Kasbon:</span>
+                  <span>Rp {selectedKasbonPayment.remainingDebt.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              {selectedKasbonPayment.isFullyPaid && (
+                <div className="border-t border-green-900/20 pt-3 text-center text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 mt-4">
+                  <p className="font-extrabold uppercase tracking-widest text-lg">LUNAS</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 flex flex-col gap-2 no-print">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Printer className="w-4 h-4" /> Cetak Biasa
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await printKasbonPaymentToBluetooth(
+                        selectedKasbonPayment,
+                        settings.storeName || 'KSA Mart',
+                        settings.storeAddress || '',
+                        settings.storePhone || ''
+                      );
+                    } catch (err: any) {
+                      alert(err.message || 'Gagal terhubung ke printer Bluetooth.');
+                    }
+                  }}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Bluetooth className="w-4 h-4" /> Print Bluetooth
+                </button>
+              </div>
+              <div className="mt-2 border-t border-gray-200 dark:border-slate-700 pt-3 flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={waNumber}
+                  onChange={(e) => setWaNumber(e.target.value)}
+                  placeholder="No WA (misal: 0812...)"
+                  className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  onClick={handleSendWAKasbon}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
+                >
+                  Kirim WA
+                </button>
+              </div>
             </div>
           </div>
         </div>

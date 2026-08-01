@@ -49,4 +49,17 @@ ADD COLUMN IF NOT EXISTS petty_cash_balance NUMERIC DEFAULT 0;
 ALTER TABLE public.ksa_users
 ADD COLUMN IF NOT EXISTS debt_amount NUMERIC DEFAULT 0;
 
+-- 11. Tambahkan titik koordinat dan batas radius untuk Toko
+ALTER TABLE public.store_settings
+ADD COLUMN IF NOT EXISTS store_location_lat NUMERIC,
+ADD COLUMN IF NOT EXISTS store_location_lng NUMERIC,
+ADD COLUMN IF NOT EXISTS max_delivery_radius_km NUMERIC DEFAULT 5,
+ADD COLUMN IF NOT EXISTS attendance_radius_meters NUMERIC DEFAULT 50;
+
+-- 12. Tambahkan pengaturan program loyalitas Poin
+ALTER TABLE public.store_settings
+ADD COLUMN IF NOT EXISTS enable_points BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS point_earning_rate NUMERIC DEFAULT 1000,
+ADD COLUMN IF NOT EXISTS point_redemption_value NUMERIC DEFAULT 10;
+
 -- Selesai! Script ini aman dijalankan berkali-kali tanpa error.

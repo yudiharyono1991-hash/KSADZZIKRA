@@ -41,7 +41,8 @@ import {
   LoyaltyProgramPage,
   PPOBInventoryPage,
   PromoProdukPage,
-  CustomerDisplayPage
+  CustomerDisplayPage,
+  KasbonRekapPage
 } from './pages';
 import BukuBesarPage from './pages/BukuBesarPage';
 
@@ -100,6 +101,26 @@ export default function App() {
       try {
         const isCatalogOnly = window.location.hash.includes('/katalog') || !localStorage.getItem('ksa_current_user');
         await initializeStore({ catalogOnly: isCatalogOnly, showLoading: !isCatalogOnly });
+
+        // Backup Reminder Logic (H-3)
+        if (!isCatalogOnly) {
+          const today = new Date();
+          const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+          const currentDay = today.getDate();
+          if (currentDay >= lastDayOfMonth - 3 && currentDay <= lastDayOfMonth) {
+            const hasSeenReminder = localStorage.getItem(`ksa_backup_reminder_${today.getFullYear()}_${today.getMonth()}`);
+            if (!hasSeenReminder) {
+              const { addNotification } = useAppStore.getState();
+              addNotification({
+                title: 'Pengingat Backup Data',
+                message: `Menjelang akhir bulan (${lastDayOfMonth - currentDay} hari lagi). Segera lakukan Backup Data Toko (Export Laporan/Database) agar data bulan ini aman.`,
+                type: 'WARNING',
+                targetRole: ['OWNER', 'ADMIN', 'SUPERADMIN', 'MANAGER']
+              });
+              localStorage.setItem(`ksa_backup_reminder_${today.getFullYear()}_${today.getMonth()}`, 'true');
+            }
+          }
+        }
 
         // Avoid triggering a full bulk background sync immediately on every page load.
         // Background sync is still available manually from settings when the user wants to
@@ -220,6 +241,7 @@ export default function App() {
         <Route path="/cabang" element={<ProtectedRoute><BranchManagementPage /></ProtectedRoute>} />
         <Route path="/purchase-order" element={<ProtectedRoute><PurchaseOrderPage /></ProtectedRoute>} />
         <Route path="/customers" element={<ProtectedRoute><CustomerManagementPage /></ProtectedRoute>} />
+        <Route path="/kasbon-rekap" element={<ProtectedRoute><KasbonRekapPage /></ProtectedRoute>} />
         <Route path="/online-orders" element={<ProtectedRoute><OnlineOrdersPage /></ProtectedRoute>} />
         <Route path="/suppliers" element={<ProtectedRoute><SupplierManagementPage /></ProtectedRoute>} />
         <Route path="/promos" element={<ProtectedRoute><PromoManagementPage /></ProtectedRoute>} />

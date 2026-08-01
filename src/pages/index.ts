@@ -34,3 +34,4 @@ export { default as RegisterPage } from './RegisterPage';
 export { default as CoAPage } from './CoAPage';
 export { default as BeritaPusatPage } from './BeritaPusatPage';
 export { default as LoyaltyProgramPage } from './LoyaltyProgramPage';
+export { default as KasbonRekapPage } from './KasbonRekapPage';

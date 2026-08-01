@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { ShoppingBag, Plus, Search, CheckCircle, ShieldAlert, Send, FileText, Check, Printer } from 'lucide-react';
 
 export default function PurchaseOrderPage() {
-  const { purchaseOrders, addPurchaseOrder, updatePurchaseOrder, suppliers, currentUser, addLog, users } = useAppStore();
+  const { purchaseOrders, addPurchaseOrder, updatePurchaseOrder, suppliers, currentUser, addLog, users, settings } = useAppStore();
   const [isAdding, setIsAdding] = useState(false);
   
   const [poNumber, setPoNumber] = useState('');
@@ -296,49 +296,61 @@ export default function PurchaseOrderPage() {
         const creatorRole = creatorUser?.role || 'KSA Mart';
 
         return (
-          <div className="printable-area printable-a4">
+          <div className="printable-area printable-a4 p-4">
             {/* Rangkap 1 - Asli */}
-          <div className="border-2 border-gray-800 p-6 rounded-lg mb-8">
+          <div className="border border-gray-800 p-6 rounded-lg mb-8 bg-white">
             <div className="flex justify-between items-start border-b-2 border-gray-800 pb-4 mb-4">
-              <div>
-                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900 dark:text-white">KSA Mart</h1>
-                <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mt-1">PURCHASE ORDER (PO)</p>
-                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">Rangkap: Asli (Untuk Supplier)</p>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center text-white shrink-0 no-print" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                   <ShoppingBag className="w-8 h-8" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">{settings.storeName || 'KSA Mart'}</h1>
+                  <p className="text-xs text-gray-700 max-w-xs mt-1">{settings.storeAddress || 'Alamat Belum Diatur'}</p>
+                  <p className="text-xs text-gray-700 font-medium mt-0.5">Telp/WA: {settings.storePhone || '-'}</p>
+                </div>
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{printPo.poNumber}</p>
-                <p className="text-xs text-gray-600 dark:text-slate-400">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+                <p className="text-2xl font-black text-gray-900 uppercase">Purchase Order</p>
+                <p className="text-sm font-bold text-gray-800 mt-1">{printPo.poNumber}</p>
+                <p className="text-xs text-gray-600">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+                <p className="text-[10px] text-gray-500 mt-1">Rangkap: Asli (Untuk Supplier)</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
               <div>
-                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Kepada Yth:</p>
-                <p className="font-bold text-lg text-gray-900 dark:text-white">{printPo.supplier}</p>
+                <p className="font-bold text-gray-500 text-xs uppercase">Kepada Yth:</p>
+                <p className="font-bold text-lg text-gray-900">{printPo.supplier}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Estimasi Total Harga:</p>
-                <p className="font-black text-xl text-gray-900 dark:text-white">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
+                <p className="font-bold text-gray-500 text-xs uppercase">Estimasi Total Harga:</p>
+                <p className="font-black text-xl text-gray-900">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
-              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 whitespace-pre-wrap min-h-[100px]">
+              <p className="font-bold text-gray-500 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-gray-800 whitespace-pre-wrap min-h-[100px]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                 {printPo.notes || '-'}
               </div>
             </div>
 
-            <div className="flex justify-between mt-12 text-sm">
-              <div className="text-center w-40">
+            <div className="grid grid-cols-3 gap-4 mt-12 text-sm">
+              <div className="text-center">
                 <p className="mb-12 font-semibold">Dibuat Oleh,</p>
                 <p className="border-b border-gray-800 pb-1 font-bold">{printPo.createdBy}</p>
-                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1 uppercase">{creatorRole}</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">{creatorRole}</p>
               </div>
-              <div className="text-center w-40">
-                <p className="mb-12 font-semibold">Disetujui/Diterima Oleh,</p>
+              <div className="text-center">
+                <p className="mb-12 font-semibold">Mengetahui,</p>
                 <p className="border-b border-gray-800 pb-1 text-transparent select-none">__________</p>
-                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1 uppercase">Pihak Supplier</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">Manajer / Owner</p>
+              </div>
+              <div className="text-center">
+                <p className="mb-12 font-semibold">Diterima / Disetujui,</p>
+                <p className="border-b border-gray-800 pb-1 text-transparent select-none">__________</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">Pihak Supplier</p>
               </div>
             </div>
           </div>
@@ -346,43 +358,49 @@ export default function PurchaseOrderPage() {
           <hr className="border-dashed border-gray-400 my-8 no-print" />
 
           {/* Rangkap 2 - Arsip */}
-          <div className="border border-gray-400 p-6 rounded-lg">
+          <div className="border border-gray-400 p-6 rounded-lg bg-white">
             <div className="flex justify-between items-start border-b border-gray-400 pb-4 mb-4">
               <div>
-                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900 dark:text-white">KSA Mart</h1>
-                <p className="text-sm font-semibold text-gray-600 dark:text-slate-400 mt-1">PURCHASE ORDER (PO)</p>
-                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-0.5">Rangkap: Copy (Arsip Toko)</p>
+                <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">{settings.storeName || 'KSA Mart'}</h1>
+                <p className="text-sm font-semibold text-gray-600 mt-1">PURCHASE ORDER (PO)</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Rangkap: Copy (Arsip Toko)</p>
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{printPo.poNumber}</p>
-                <p className="text-xs text-gray-600 dark:text-slate-400">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
+                <p className="text-xl font-bold text-gray-900">{printPo.poNumber}</p>
+                <p className="text-xs text-gray-600">Tanggal: {new Date(printPo.date).toLocaleDateString('id-ID')}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-8 mb-6 text-sm">
               <div>
-                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Kepada Yth:</p>
-                <p className="font-bold text-lg text-gray-900 dark:text-white">{printPo.supplier}</p>
+                <p className="font-bold text-gray-500 text-xs uppercase">Kepada Yth:</p>
+                <p className="font-bold text-lg text-gray-900">{printPo.supplier}</p>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase">Estimasi Total Harga:</p>
-                <p className="font-black text-xl text-gray-900 dark:text-white">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
+                <p className="font-bold text-gray-500 text-xs uppercase">Estimasi Total Harga:</p>
+                <p className="font-black text-xl text-gray-900">Rp {printPo.totalAmount.toLocaleString('id-ID')}</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <p className="font-bold text-gray-500 dark:text-slate-400 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
-              <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-slate-200 whitespace-pre-wrap min-h-[100px]">
+              <p className="font-bold text-gray-500 text-xs uppercase mb-2">Rincian Barang / Catatan:</p>
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 text-gray-800 whitespace-pre-wrap min-h-[60px]" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                 {printPo.notes || '-'}
               </div>
             </div>
 
-            <div className="flex justify-between mt-12 text-sm">
-              <div className="text-center w-40">
+            <div className="grid grid-cols-3 gap-4 mt-12 text-sm">
+              <div className="text-center">
                 <p className="mb-12 font-semibold">Dibuat Oleh,</p>
                 <p className="border-b border-gray-800 pb-1 font-bold">{printPo.createdBy}</p>
-                <p className="text-[10px] text-gray-500 dark:text-slate-400 mt-1 uppercase">{creatorRole}</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">{creatorRole}</p>
               </div>
+              <div className="text-center">
+                <p className="mb-12 font-semibold">Mengetahui,</p>
+                <p className="border-b border-gray-800 pb-1 text-transparent select-none">__________</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase">Manajer / Owner</p>
+              </div>
+              <div className="text-center"></div>
             </div>
             
             <div className="mt-8 text-right text-[9px] text-gray-400">

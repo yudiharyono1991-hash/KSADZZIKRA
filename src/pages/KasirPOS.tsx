@@ -455,7 +455,7 @@ export default function KasirPOS() {
       `📄 *No Invoice:* ${receiptTx.invoiceNo}\n` +
       `⏰ *Waktu:* ${new Date(receiptTx.timestamp).toLocaleString('id-ID')}\n` +
       `👤 *Kasir:* ${receiptTx.cashierName}\n` +
-      `💳 *Metode:* ${receiptTx.paymentMethod}\n` +
+      `💳 *Status:* ${receiptTx.paymentMethod === 'KASBON' ? 'Belum Dibayar' : receiptTx.paymentMethod}\n` +
       `===============================\n\n` +
       `${itemsText}\n\n` +
       `===============================\n` +
@@ -1367,12 +1367,18 @@ export default function KasirPOS() {
                 <p className="text-slate-400">Telp: {receiptStorePhone}</p>
               </div>
 
-              <div className="space-y-1 text-xs">
+              {receiptTx.paymentMethod === 'KASBON' && (
+                <div className="border-b border-dashed border-gray-200 dark:border-slate-700 py-1 text-center font-bold text-sm tracking-widest uppercase">
+                  BUKTI PENGAMBILAN KASBON
+                </div>
+              )}
+
+              <div className="space-y-1 text-xs pt-1">
                 <p><span className="text-slate-400">No Invoice:</span> {receiptTx.invoiceNo}</p>
                 <p><span className="text-slate-400">Waktu:</span> {new Date(receiptTx.timestamp).toLocaleString('id-ID')}</p>
                 <p><span className="text-slate-400">Kasir:</span> {receiptTx.cashierName}</p>
                 <p><span className="text-slate-400">Pelanggan:</span> {receiptTx.customerName || 'Umum'}</p>
-                <p><span className="text-slate-400">Metode:</span> {receiptTx.paymentMethod}</p>
+                <p><span className="text-slate-400">Status:</span> {receiptTx.paymentMethod === 'KASBON' ? 'Belum Dibayar' : receiptTx.paymentMethod}</p>
               </div>
 
               <div className="border-t border-b border-gray-100 dark:border-slate-800 py-2 space-y-2">

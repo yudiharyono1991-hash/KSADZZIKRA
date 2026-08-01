@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter, Calendar } from 'lucide-react';
+import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter, Calendar, ClipboardCheck, X, FileText, Check, XCircle } from 'lucide-react';
 
 const getLocalDateString = () => {
   const date = new Date();
@@ -11,9 +11,13 @@ const getLocalDateString = () => {
 };
 
 export default function StockOpnamePage() {
-  const { products, stockMovements, adjustStock, addStockMovement, currentUser, activeBranchId, addLog } = useBranchData();
+  const { products, stockMovements, adjustStock, addStockMovement, currentUser, activeBranchId, addLog, opnameRequests, requestStockOpname, reviewStockOpname } = useBranchData();
   const [selectedProductId, setSelectedProductId] = useState('');
   const [physicalCount, setPhysicalCount] = useState('');
+  const [opnameReason, setOpnameReason] = useState('');
+  const [activeTab, setActiveTab] = useState<'HISTORY' | 'APPROVALS'>('HISTORY');
+  const [approvalModal, setApprovalModal] = useState<{ isOpen: boolean, id: string, isApproved: boolean }>({ isOpen: false, id: '', isApproved: false });
+  const [approvalReason, setApprovalReason] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [opnameSearch, setOpnameSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -41,6 +45,10 @@ export default function StockOpnamePage() {
 
   const handleAdjust = () => {
     if (!selectedProductId || physicalCount === '') return;
+    if (!opnameReason.trim()) {
+      alert("Keterangan/Alasan opname wajib diisi!");
+      return;
+    }
     const prod = products.find(p => p.id === selectedProductId);
     if (!prod) return;
     
@@ -52,11 +60,24 @@ export default function StockOpnamePage() {
       alert("Stok fisik sama dengan stok sistem. Tidak ada penyesuaian yang perlu dilakukan.");
       return;
     }
-    adjustStock(selectedProductId, variance);
-    addLog('STOCK_OPNAME', 'INVENTORY', `Opname: ${prod.name}. Fisik: ${physical}, Sistem sblm: ${currentStock}. Variance: ${variance > 0 ? '+' : ''}${variance}`);
+    
+    requestStockOpname({
+      tenantId: currentUser?.tenantId || 'tenant_default',
+      productId: selectedProductId,
+      productName: prod.name,
+      branchId: activeBranchId || undefined,
+      systemStock: currentStock,
+      physicalStock: physical,
+      variance,
+      reason: opnameReason,
+      requestedBy: currentUser?.name || 'Unknown'
+    });
     
     setPhysicalCount('');
-    alert(`Stok berhasil disesuaikan! Selisih ${variance > 0 ? '+' : ''}${variance} dicatat di Audit Log.`);
+    setOpnameReason('');
+    setSelectedProductId('');
+    setOpnameSearch('');
+    alert(`Pengajuan Opname berhasil dikirim dan menunggu persetujuan.`);
   };
 
   const filteredProducts = products.filter(p => {
@@ -199,17 +220,51 @@ export default function StockOpnamePage() {
                   <span>{Number(physicalCount) - (products.find(p=>p.id === selectedProductId)?.stock || 0)}</span>
                 </div>
               )}
+              <div className="mt-3">
+                <label className="text-xs font-bold text-gray-600 dark:text-slate-400 mb-1 block">Keterangan / Alasan (Wajib)</label>
+                <textarea 
+                  value={opnameReason}
+                  onChange={(e) => setOpnameReason(e.target.value)}
+                  placeholder="Misal: Barang rusak, expired, salah hitung..."
+                  rows={2}
+                  className="w-full border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
               <button 
                 onClick={handleAdjust}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow-xs flex justify-center items-center gap-2"
+                className="w-full mt-3 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow-xs flex justify-center items-center gap-2"
               >
-                <CheckCircle className="w-4 h-4"/> Setujui Opname (Approve)
+                <CheckCircle className="w-4 h-4"/> Ajukan Opname
               </button>
             </>
           )}
         </div>
 
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+        <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setActiveTab('HISTORY')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${activeTab === 'HISTORY' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50'}`}
+            >
+              <History className="w-4 h-4" /> Riwayat Kartu Stok
+            </button>
+            {['MANAGER', 'OWNER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '') && (
+              <button 
+                onClick={() => setActiveTab('APPROVALS')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors relative ${activeTab === 'APPROVALS' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50'}`}
+              >
+                <ClipboardCheck className="w-4 h-4" /> Persetujuan Opname
+                {opnameRequests.filter(r => r.status === 'PENDING').length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">
+                    {opnameRequests.filter(r => r.status === 'PENDING').length}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+          
+          {activeTab === 'HISTORY' ? (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1">
           <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
@@ -312,8 +367,138 @@ export default function StockOpnamePage() {
               </div>
             </div>
           )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1">
+              <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+                <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
+                  <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+                  Persetujuan Opname (Manager)
+                </h3>
+              </div>
+              <div className="overflow-x-auto flex-1 p-4">
+                {opnameRequests.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">Belum ada pengajuan opname.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {opnameRequests.map(req => (
+                      <div key={req.id} className="border border-gray-200 dark:border-slate-700 rounded-xl p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-bold text-gray-800 dark:text-slate-200">{req.productName}</h4>
+                            <p className="text-xs text-gray-500">{new Date(req.requestDate).toLocaleString('id-ID')}</p>
+                          </div>
+                          {req.status === 'PENDING' ? (
+                            <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">MENUNGGU</span>
+                          ) : req.status === 'APPROVED' ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-bold">DISETUJUI</span>
+                          ) : (
+                            <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-bold">DITOLAK</span>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2 mb-3 bg-gray-50 dark:bg-slate-800 p-2 rounded-lg text-sm text-center">
+                          <div>
+                            <p className="text-[10px] text-gray-500 font-semibold uppercase">Sistem</p>
+                            <p className="font-bold">{req.systemStock}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-500 font-semibold uppercase">Fisik</p>
+                            <p className="font-bold">{req.physicalStock}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-500 font-semibold uppercase">Selisih</p>
+                            <p className={`font-bold ${req.variance > 0 ? 'text-green-600' : 'text-amber-600'}`}>
+                              {req.variance > 0 ? '+' : ''}{req.variance}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <p className="text-sm text-gray-700 dark:text-slate-300 mb-2">
+                          <span className="font-semibold text-gray-500">Alasan:</span> {req.reason}
+                        </p>
+                        <p className="text-xs text-gray-400 mb-3">Diajukan oleh: {req.requestedBy}</p>
+                        
+                        {req.status === 'PENDING' && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => { setApprovalReason(''); setApprovalModal({ isOpen: true, id: req.id, isApproved: true }); }}
+                              className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-1"
+                            >
+                              <Check className="w-4 h-4"/> Setujui
+                            </button>
+                            <button 
+                              onClick={() => { setApprovalReason(''); setApprovalModal({ isOpen: true, id: req.id, isApproved: false }); }}
+                              className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-1"
+                            >
+                              <XCircle className="w-4 h-4"/> Tolak
+                            </button>
+                          </div>
+                        )}
+                        {req.status !== 'PENDING' && (
+                          <div className="mt-3 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg text-sm border border-slate-100 dark:border-slate-700">
+                            <p className="font-semibold text-gray-700 dark:text-slate-300">Catatan Approval:</p>
+                            <p className="text-gray-600 dark:text-slate-400 italic">{req.approvalReason || '-'}</p>
+                            <p className="text-xs text-gray-400 mt-1">Oleh: {req.approvedBy}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      
+      {/* Approval Modal */}
+      {approvalModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+            <div className={`p-4 border-b ${approvalModal.isApproved ? 'border-green-100 bg-green-50' : 'border-red-100 bg-red-50'} flex justify-between items-center`}>
+              <h3 className={`font-bold ${approvalModal.isApproved ? 'text-green-800' : 'text-red-800'} flex items-center gap-2`}>
+                {approvalModal.isApproved ? <CheckCircle className="w-5 h-5"/> : <XCircle className="w-5 h-5"/>}
+                Keterangan {approvalModal.isApproved ? 'Persetujuan' : 'Penolakan'}
+              </h3>
+              <button onClick={() => setApprovalModal({ isOpen: false, id: '', isApproved: false })} className="text-gray-500 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600 dark:text-slate-400">
+                Mohon isi keterangan manual terkait {approvalModal.isApproved ? 'disetujui karena apa' : 'ditolak karena apa'} agar tercatat di sistem:
+              </p>
+              <textarea 
+                value={approvalReason}
+                onChange={e => setApprovalReason(e.target.value)}
+                placeholder="Ketik keterangan persetujuan/penolakan..."
+                rows={4}
+                className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setApprovalModal({ isOpen: false, id: '', isApproved: false })}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={() => {
+                    if (!approvalReason.trim()) { alert('Keterangan wajib diisi!'); return; }
+                    reviewStockOpname(approvalModal.id, approvalModal.isApproved, approvalReason, currentUser?.name || 'Manager');
+                    setApprovalModal({ isOpen: false, id: '', isApproved: false });
+                    alert(`Pengajuan berhasil di${approvalModal.isApproved ? 'setujui' : 'tolak'}.`);
+                  }}
+                  className={`flex-1 py-2.5 text-white rounded-lg font-bold ${approvalModal.isApproved ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                >
+                  Konfirmasi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

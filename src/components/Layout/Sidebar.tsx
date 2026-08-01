@@ -142,6 +142,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
           { path: '/cabang', label: 'Manajemen Cabang', icon: Store },
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
+          { path: '/kasbon-rekap', label: 'Master Kasbon Pelanggan', icon: Wallet },
           { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
           { path: '/promos', label: 'Promo Transaksi', icon: Tag },
           { path: '/promo-produk', label: 'Promo Produk', icon: Tag },
@@ -167,7 +168,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
-  } else if (currentUser.role === 'ADMIN' || currentUser.role === 'STAFF_GUDANG' || currentUser.role === 'STAFF_LAPANGAN') {
+  } else if (currentUser.role === 'ADMIN' || currentUser.role === 'STAFF_LAPANGAN') {
     menuData = [
       {
         label: 'Transaksi',
@@ -213,6 +214,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         items: [
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
+          { path: '/kasbon-rekap', label: 'Master Kasbon Pelanggan', icon: Wallet },
           { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
           { path: '/promos', label: 'Promo Transaksi', icon: Tag },
           { path: '/promo-produk', label: 'Promo Produk', icon: Tag },
@@ -238,6 +240,50 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
+  } else if (currentUser.role === 'STAFF_GUDANG') {
+    menuData = [
+      {
+        label: 'Operasional',
+        icon: UsersRound,
+        items: [
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
+        ]
+      },
+      {
+        label: 'Inventory & Stok',
+        icon: Package,
+        items: [
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
+          { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
+          { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
+        ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
+        ]
+      }
+    ];
+  } else if (currentUser.role === 'CLEANING_SERVICE') {
+    menuData = [
+      {
+        label: 'Operasional',
+        icon: UsersRound,
+        items: [
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
+        ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
+        ]
+      }
+    ];
   } else if (currentUser.role === 'PELANGGAN') {
     // Customer / Member portal - very limited menu
     menuData = [
@@ -319,6 +365,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       case 'SUPERADMIN': return 'Super Admin';
       case 'PENGURUS': return 'Pengurus Koperasi';
       case 'MANAGER': return 'Manager';
+      case 'CLEANING_SERVICE': return 'Cleaning Service';
+      case 'STAFF_GUDANG': return 'Admin Gudang';
+      case 'STAFF_LAPANGAN': return 'Staff Lapangan';
       case 'ADMIN': return 'Admin';
       case 'CASHIER': return 'Kasir';
       case 'PELANGGAN': return 'Pelanggan/Anggota';
