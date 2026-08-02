@@ -356,12 +356,13 @@ export default function NeracaRugiPage() {
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
   const physicalInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
 
-  const kasKecilInventory = (journalEntries || []).reduce((sum, j) => {
+  const kasKecilInventoryEntries = (journalEntries || []).filter(j => {
     const acc = j.account?.toLowerCase() || '';
-    if (j.referenceType === 'AUTO_BEBAN' && (acc.includes('persediaan') || acc.includes('1-1040') || acc.includes('1109'))) {
-      return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
-    }
-    return sum;
+    return j.referenceType === 'AUTO_BEBAN' && (acc.includes('persediaan') || acc.includes('1-1040') || acc.includes('1109'));
+  });
+
+  const kasKecilInventory = kasKecilInventoryEntries.reduce((sum, j) => {
+    return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
   }, 0);
 
   const valueOfInventory = physicalInventory + kasKecilInventory;
@@ -790,9 +791,21 @@ export default function NeracaRugiPage() {
                     <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
                   </div>
                   {(kasKecilInventory > 0 || kasKecilInventory < 0) && (
-                    <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-                      <span className="ml-4">↳ Termasuk dari Pembelian Kas Kecil</span>
-                      <span className="font-mono">Rp {kasKecilInventory.toLocaleString('id-ID')}</span>
+                    <div className="flex flex-col mt-1.5 space-y-1">
+                      <div className="flex justify-between text-[10px] text-gray-500">
+                        <span className="ml-4 font-bold">↳ Termasuk dari Pembelian Kas Kecil</span>
+                        <span className="font-mono font-bold">Rp {kasKecilInventory.toLocaleString('id-ID')}</span>
+                      </div>
+                      {kasKecilInventoryEntries.map(entry => {
+                        const dateStr = entry.date ? String(entry.date).split('T')[0] : '';
+                        const desc = entry.description.replace('[Auto] Beban OPERASIONAL: Kas Kecil: ', '');
+                        return (
+                          <div key={entry.id} className="flex justify-between text-[9px] text-gray-400 ml-6 border-l border-gray-200 dark:border-slate-700 pl-2">
+                            <span>{dateStr} • {desc}</span>
+                            <span className="font-mono">Rp {((Number(entry.debit) || 0) - (Number(entry.credit) || 0)).toLocaleString('id-ID')}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
