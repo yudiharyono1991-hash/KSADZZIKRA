@@ -828,6 +828,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ opnameRequests: updated });
     saveStorage('ksa_stock_opname_requests', updated, get().currentUser?.tenantId);
     get().addLog('STOCK_OPNAME_REQ', 'INVENTORY', `Pengajuan Opname: ${data.productName} dari ${data.systemStock} ke ${data.physicalStock}. Oleh: ${data.requestedBy}`);
+    get().addNotification({
+      title: 'Pengajuan Penyesuaian Stok Opname',
+      message: `${data.requestedBy} mengajukan penyesuaian stok untuk barang ${data.productName} sejumlah selisih ${data.variance} item.`,
+      type: 'APPROVAL',
+      targetRole: ['MANAGER', 'OWNER', 'SUPERADMIN'],
+      link: '/stock-opname'
+    });
   },
   reviewStockOpname: (id, isApproved, approvalReason, approverName) => {
     const requests = get().opnameRequests;
@@ -867,6 +874,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       get().addLog('STOCK_OPNAME_REJ', 'INVENTORY', `Ditolak Opname: ${request.productName}. Oleh: ${approverName}`);
     }
+    
+    get().addNotification({
+      title: `Opname ${isApproved ? 'Disetujui' : 'Ditolak'}`,
+      message: `Pengajuan penyesuaian stok ${request.productName} telah ${isApproved ? 'DISETUJUI' : 'DITOLAK'} oleh ${approverName}.`,
+      type: 'SYSTEM',
+      targetRole: ['CASHIER', 'ADMIN'],
+      link: '/stock-opname'
+    });
   },
 
   // Stock Movements
@@ -977,6 +992,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (isSupabaseConfigured) {
         (supabaseService as any).saveTransaction(updatedTx);
       }
+      get().addNotification({
+        title: 'Penolakan Void Transaksi',
+        message: `Pengajuan void untuk transaksi ${tx.invoiceNo} telah DITOLAK oleh ${currentUser.name}.`,
+        type: 'SYSTEM',
+        targetRole: ['CASHIER', 'ADMIN'],
+        branchId: tx.branchId,
+        link: '/kasir-riwayat'
+      });
       return;
     }
 
@@ -1225,6 +1248,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       supabaseService.saveAttendance(modifiedAtt);
     }
     get().addLog('ATTENDANCE', 'SYSTEM', `Permohonan koreksi absen diajukan untuk ID: ${attendanceId}`);
+    
+    const attUser = get().attendances.find(a => a.id === attendanceId)?.userName || get().currentUser?.name;
+    get().addNotification({
+      title: 'Pengajuan Koreksi Absensi/Izin',
+      message: `${attUser} mengajukan izin/koreksi absensi karena: ${reason}.`,
+      type: 'APPROVAL',
+      targetRole: ['MANAGER', 'OWNER', 'SUPERADMIN'],
+      link: '/admin'
+    });
   },
 
   reviewAttendanceCorrection: (attendanceId, approved) => {
@@ -1250,6 +1282,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       supabaseService.saveAttendance(modifiedAtt);
     }
     get().addLog('ATTENDANCE', 'SYSTEM', `Koreksi absen ${approved ? 'DISETUJUI' : 'DITOLAK'} untuk ID: ${attendanceId}`);
+    
+    const attUser = modifiedAtt?.userName || 'Staf';
+    get().addNotification({
+      title: `Koreksi Absen ${approved ? 'Disetujui' : 'Ditolak'}`,
+      message: `Pengajuan izin/koreksi absen Anda telah ${approved ? 'DISETUJUI' : 'DITOLAK'} oleh Owner/Manager.`,
+      type: 'SYSTEM',
+      targetRole: ['CASHIER', 'ADMIN'],
+      link: '/absen'
+    });
   },
 
   // Authentication logic

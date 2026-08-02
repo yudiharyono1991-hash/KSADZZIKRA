@@ -159,9 +159,10 @@ export default function KatalogUmumPage() {
 
   const cartTotal = customerCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const cartCount = customerCart.reduce((sum, item) => sum + item.quantity, 0);
+  const isAllPPOB = customerCart.length > 0 && customerCart.every(item => item.product.isPPOB);
 
   const handleCheckLocation = () => {
-    if (settings.storeLocationLat === undefined || settings.storeLocationLng === undefined) {
+    if (settings.storeLocationLat == null || settings.storeLocationLng == null) {
       alert("Mohon maaf, lokasi toko belum diatur oleh admin.");
       return;
     }
@@ -208,8 +209,8 @@ export default function KatalogUmumPage() {
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
     if (customerCart.length === 0) return;
-    if (!customerName.trim() || !customerPhone.trim() || !customerAddress.trim()) {
-      alert("Mohon lengkapi Nama, No WhatsApp, dan Alamat Pengiriman!");
+    if (!customerName.trim() || !customerPhone.trim() || (!isAllPPOB && !customerAddress.trim())) {
+      alert(isAllPPOB ? "Mohon lengkapi Nama dan No WhatsApp!" : "Mohon lengkapi Nama, No WhatsApp, dan Alamat Pengiriman!");
       return;
     }
     if (!selectedCheckoutBranch) {
@@ -239,11 +240,15 @@ export default function KatalogUmumPage() {
     const storeWa = (settings.ownerWhatsapp || '085881893650').replace(/^0/, '62');
     const itemList = customerCart.map(c => `▪ ${c.quantity}x ${c.product.name}`).join('\n');
     let paymentText = paymentMethod === 'TRANSFER' ? 'Transfer Bank' : paymentMethod === 'QRIS' ? 'QRIS Syariah' : paymentMethod === 'EWALLET' ? 'E-Wallet' : 'COD (Bayar di Tempat)';
-    let waMessage = `Assalamu'alaikum Warahmatullahi Wabarakatuh,\nAdmin KSA Mart, saya ingin memesan:\n\n*🛒 DAFTAR PESANAN:*\n${itemList}\n\n*💰 TOTAL:* Rp ${cartTotal.toLocaleString('id-ID')}\n_(Belum termasuk ongkos kirim)_\n\n*💳 PEMBAYARAN:* ${paymentText}`;
+    let waMessage = `Assalamu'alaikum Warahmatullahi Wabarakatuh,\nAdmin KSA Mart, saya ingin memesan:\n\n*🛒 DAFTAR PESANAN:*\n${itemList}\n\n*💰 TOTAL:* Rp ${cartTotal.toLocaleString('id-ID')}\n_${isAllPPOB ? '(Layanan Digital - Tanpa Ongkir)' : '(Belum termasuk ongkos kirim)'}_\n\n*💳 PEMBAYARAN:* ${paymentText}`;
     if (paymentCode) waMessage += `\n*🔢 KODE:* ${paymentCode}`;
-    waMessage += `\n\n*📦 PENGIRIMAN:*\n- Nama: ${customerName}\n- HP: ${customerPhone}\n- Alamat: ${customerAddress}`;
+    waMessage += `\n\n*👤 INFORMASI PEMESAN:*\n- Nama: ${customerName}\n- HP: ${customerPhone}`;
+    if (!isAllPPOB) {
+      waMessage += `\n- Alamat: ${customerAddress}`;
+      waMessage += `\n- Waktu: ${deliveryPeriod}`;
+    }
     if (checkoutNotes) waMessage += `\n- Catatan: ${checkoutNotes}`;
-    waMessage += `\n- Waktu: ${deliveryPeriod}\n\nMohon informasi ongkos kirimnya. Terima kasih! 🙏`;
+    waMessage += isAllPPOB ? `\n\nMohon diproses, terima kasih! 🙏` : `\n\nMohon informasi ongkos kirimnya. Terima kasih! 🙏`;
 
     setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setCheckoutNotes('');
     setIsPaymentConfirmed(false); setPaymentMethod('COD'); setActiveTab('CATALOG');
@@ -591,25 +596,29 @@ export default function KatalogUmumPage() {
 
                 {/* Checkout Form */}
                 <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
-                  <h3 className="font-bold text-lg text-slate-800 dark:text-slate-200 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">Informasi Pengiriman</h3>
+                  <h3 className="font-bold text-lg text-slate-800 dark:text-slate-200 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    {isAllPPOB ? 'Informasi Pemesan' : 'Informasi Pengiriman'}
+                  </h3>
                   <form onSubmit={handleCheckout} className="space-y-4">
                     {/* GPS Distance */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
-                      <p className="font-bold text-blue-800 mb-1.5">Deteksi Jarak (GPS)</p>
-                      {customerDistanceKm !== null
-                        ? <p className="text-blue-700">Jarak ke toko: <span className="font-black text-lg">{customerDistanceKm.toFixed(2)} km</span></p>
-                        : <p className="text-blue-600 text-xs mb-2">Aktifkan GPS untuk estimasi ongkir otomatis.</p>
-                      }
-                      <button type="button" onClick={handleCheckLocation} disabled={isCheckingLocation}
-                        className="mt-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg disabled:opacity-50">
-                        {isCheckingLocation ? 'Mendeteksi...' : (customerDistanceKm !== null ? 'Perbarui Lokasi' : 'Cek Jarak ke Toko')}
-                      </button>
-                      {customerDistanceKm !== null && settings.maxDeliveryRadiusKm && customerDistanceKm > settings.maxDeliveryRadiusKm && (
-                        <p className="mt-2 text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 p-2 rounded">
-                          Jarak melebihi batas pengiriman ({settings.maxDeliveryRadiusKm} km).
-                        </p>
-                      )}
-                    </div>
+                    {!isAllPPOB && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
+                        <p className="font-bold text-blue-800 mb-1.5">Deteksi Jarak (GPS)</p>
+                        {customerDistanceKm !== null
+                          ? <p className="text-blue-700">Jarak ke toko: <span className="font-black text-lg">{customerDistanceKm.toFixed(2)} km</span></p>
+                          : <p className="text-blue-600 text-xs mb-2">Aktifkan GPS untuk estimasi ongkir otomatis.</p>
+                        }
+                        <button type="button" onClick={handleCheckLocation} disabled={isCheckingLocation}
+                          className="mt-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg disabled:opacity-50">
+                          {isCheckingLocation ? 'Mendeteksi...' : (customerDistanceKm !== null ? 'Perbarui Lokasi' : 'Cek Jarak ke Toko')}
+                        </button>
+                        {customerDistanceKm !== null && settings.maxDeliveryRadiusKm && customerDistanceKm > settings.maxDeliveryRadiusKm && (
+                          <p className="mt-2 text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 p-2 rounded">
+                            Jarak melebihi batas pengiriman ({settings.maxDeliveryRadiusKm} km).
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Nama Lengkap *</label>
@@ -621,33 +630,50 @@ export default function KatalogUmumPage() {
                       <input type="tel" required value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
                         className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none" placeholder="08123456789" />
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alamat Pengiriman *</label>
-                      <textarea required value={customerAddress} onChange={e => setCustomerAddress(e.target.value)}
-                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none h-20 resize-none" placeholder="Alamat lengkap pengiriman..." />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Cabang Tujuan *</label>
-                      <select required value={selectedCheckoutBranch} onChange={e => setSelectedCheckoutBranch(e.target.value)}
-                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900">
-                        <option value="" disabled>-- Pilih Cabang KSA Mart --</option>
-                        <option value="pusat">Kantor Pusat / Cabang Utama</option>
-                        {branches.map(b => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Periode Pengiriman *</label>
-                      <select value={deliveryPeriod} onChange={e => setDeliveryPeriod(e.target.value)}
-                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900">
-                        <option>Periode 1 (08.00-09.00)</option>
-                        <option>Periode 2 (11.00-12.00)</option>
-                        <option>Periode 3 (14.00-15.00)</option>
-                        <option>Periode 4 (17.00-18.00)</option>
-                        <option>Periode 5 (20.00-21.00)</option>
-                      </select>
-                    </div>
+                    {!isAllPPOB && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Alamat Pengiriman *</label>
+                          <textarea required={!isAllPPOB} value={customerAddress} onChange={e => setCustomerAddress(e.target.value)}
+                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none h-20 resize-none" placeholder="Alamat lengkap pengiriman..." />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Cabang Tujuan *</label>
+                          <select required value={selectedCheckoutBranch} onChange={e => setSelectedCheckoutBranch(e.target.value)}
+                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900">
+                            <option value="" disabled>-- Pilih Cabang KSA Mart --</option>
+                            <option value="pusat">Kantor Pusat / Cabang Utama</option>
+                            {branches.map(b => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Periode Pengiriman *</label>
+                          <select value={deliveryPeriod} onChange={e => setDeliveryPeriod(e.target.value)}
+                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900">
+                            <option>Periode 1 (08.00-09.00)</option>
+                            <option>Periode 2 (11.00-12.00)</option>
+                            <option>Periode 3 (14.00-15.00)</option>
+                            <option>Periode 4 (17.00-18.00)</option>
+                            <option>Periode 5 (20.00-21.00)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    {isAllPPOB && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Cabang *</label>
+                        <select required value={selectedCheckoutBranch} onChange={e => setSelectedCheckoutBranch(e.target.value)}
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900">
+                          <option value="" disabled>-- Pilih Cabang KSA Mart --</option>
+                          <option value="pusat">Kantor Pusat / Cabang Utama</option>
+                          {branches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Catatan (Opsional)</label>
                       <input type="text" value={checkoutNotes} onChange={e => setCheckoutNotes(e.target.value)}
@@ -736,7 +762,7 @@ export default function KatalogUmumPage() {
                         <span className="text-slate-600 dark:text-slate-400 font-medium">Total Bayar</span>
                         <div className="text-right">
                           <span className="text-xl font-black text-green-700 block">Rp {cartTotal.toLocaleString('id-ID')}</span>
-                          <span className="text-[10px] text-slate-500 italic block">* Belum termasuk Ongkos Kirim</span>
+                          <span className="text-[10px] text-slate-500 italic block">{isAllPPOB ? '* Layanan Digital (Tanpa Ongkir)' : '* Belum termasuk Ongkos Kirim'}</span>
                         </div>
                       </div>
                       <button type="submit"

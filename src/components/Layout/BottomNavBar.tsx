@@ -24,7 +24,7 @@ export default function BottomNavBar({ onOpenMenu }: BottomNavBarProps) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-stretch z-40 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex items-stretch z-40 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.08)] print:hidden">
       {navItems.map(item => (
         <NavLink
           key={item.path}

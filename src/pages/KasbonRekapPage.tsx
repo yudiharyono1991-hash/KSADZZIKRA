@@ -8,11 +8,12 @@ import { useAppStore } from '../store';
 import { printKasbonCardToBluetooth } from '../lib/bluetoothPrinter';
 
 export default function KasbonRekapPage() {
-  const { settings } = useAppStore();
+  const { settings, currentUser } = useAppStore();
   const { customers, transactions, kasbonPayments } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'BELUM_LUNAS' | 'LUNAS'>('ALL');
+  const [dateFilterType, setDateFilterType] = useState<'ALL' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [receiptCustomer, setReceiptCustomer] = useState<any | null>(null);
   const [waNumber, setWaNumber] = useState('');
@@ -219,14 +220,11 @@ export default function KasbonRekapPage() {
               importedCount++;
             } else {
               addCustomer({
+                tenantId: settings.tenantId || 'tenant_default',
                 name,
                 phone,
-                debtAmount,
-                address: '',
                 points: 0,
-                totalPointsEarned: 0,
-                joinDate: new Date().toISOString(),
-                type: 'REGULAR',
+                debtAmount,
                 branchId: settings.tenantId
               });
               importedCount++;
@@ -254,7 +252,8 @@ export default function KasbonRekapPage() {
         receiptCustomer,
         settings.storeName || 'KSA Mart',
         settings.storeAddress || '',
-        settings.storePhone || ''
+        settings.storePhone || '',
+        currentUser?.name || 'Sistem'
       );
     } catch (err: any) {
       alert(err.message || 'Gagal terhubung ke printer Bluetooth.');
@@ -281,7 +280,11 @@ export default function KasbonRekapPage() {
       text += `[${tgl}] ${label}\nRp ${h.amount.toLocaleString('id-ID')} (${sign})\n`;
     });
     
-    text += `\n*SISA KASBON: Rp ${receiptCustomer.debtAmount.toLocaleString('id-ID')}*\n\n`;
+    text += `\n*SISA KASBON: Rp ${receiptCustomer.debtAmount.toLocaleString('id-ID')}*\n`;
+    if (receiptCustomer.debtAmount === 0) {
+      text += `*Status: L U N A S*\n`;
+    }
+    text += `\nKasir: ${currentUser?.name || 'Sistem'}\n`;
     text += `Terima kasih atas kepercayaan Anda berbelanja di KSA Mart.`;
 
     const encoded = encodeURIComponent(text);
@@ -290,7 +293,7 @@ export default function KasbonRekapPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-900 p-4 md:p-6 overflow-y-auto">
+    <div className="space-y-6 bg-slate-50 dark:bg-slate-900 p-4 md:p-6 pb-24 md:pb-6">
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -349,7 +352,7 @@ export default function KasbonRekapPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex-1 flex flex-col">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row gap-3 justify-between items-center bg-slate-50 dark:bg-slate-800">
           <div className="relative w-full md:w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -372,24 +375,50 @@ export default function KasbonRekapPage() {
               <option value="LUNAS">Lunas (Selesai)</option>
             </select>
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <input 
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full sm:w-auto px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-rose-500"
-              />
-              <span className="text-slate-400">-</span>
-              <input 
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full sm:w-auto px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-rose-500"
-              />
+              <select
+                value={dateFilterType}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setDateFilterType(val);
+                  if (val === 'ALL') {
+                    setDateRange({ startDate: '', endDate: '' });
+                  } else if (val === 'THIS_MONTH') {
+                    const today = new Date();
+                    setDateRange({ 
+                      startDate: new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA'), 
+                      endDate: today.toLocaleDateString('en-CA') 
+                    });
+                  }
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-rose-500"
+              >
+                <option value="ALL">Semua Waktu</option>
+                <option value="THIS_MONTH">Bulan Ini</option>
+                <option value="CUSTOM">Pilih Manual...</option>
+              </select>
+              
+              {dateFilterType === 'CUSTOM' && (
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input 
+                    type="date"
+                    value={dateRange.startDate}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full sm:w-auto px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-rose-500"
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input 
+                    type="date"
+                    value={dateRange.endDate}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full sm:w-auto px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="overflow-x-auto w-full">
           {filteredCustomers.length === 0 ? (
             <div className="p-8 text-center text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center h-full">
               <FileText className="w-12 h-12 mb-3 text-slate-300 dark:text-slate-600" />
@@ -631,6 +660,10 @@ export default function KasbonRekapPage() {
                   <span>Tgl Cetak</span>
                   <span>{format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Kasir</span>
+                  <span>{currentUser?.name || 'Sistem'}</span>
+                </div>
               </div>
 
               <div className="border-t border-dashed border-gray-200 dark:border-slate-700 py-1">
@@ -656,7 +689,12 @@ export default function KasbonRekapPage() {
               <div className="border-t border-solid border-gray-200 dark:border-slate-700 pt-2 pb-4">
                 <div className="flex justify-between font-bold text-[11px]">
                   <span>SISA KASBON</span>
-                  <span>Rp {receiptCustomer.debtAmount.toLocaleString('id-ID')}</span>
+                  <div className="flex items-center gap-1.5">
+                    {receiptCustomer.debtAmount === 0 && (
+                      <span className="bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded text-[8px] font-black border border-emerald-200">LUNAS</span>
+                    )}
+                    <span>Rp {receiptCustomer.debtAmount.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
                 <p className="text-center text-[8px] text-slate-400 mt-4 leading-tight">
                   Simpan struk ini sebagai bukti

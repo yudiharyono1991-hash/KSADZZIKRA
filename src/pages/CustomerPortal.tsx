@@ -218,8 +218,7 @@ export default function CustomerPortal() {
 
   const cartTotal = customerCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
   const cartCount = customerCart.reduce((sum, item) => sum + item.quantity, 0);
-
-
+  const isAllPPOB = customerCart.length > 0 && customerCart.every(item => item.product.isPPOB);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
 
@@ -227,12 +226,11 @@ export default function CustomerPortal() {
 
   
     const handleCheckLocation = () => {
-      if (settings.storeLocationLat === undefined || settings.storeLocationLng === undefined) {
-        alert("Mohon maaf, lokasi toko belum diatur oleh admin. Silakan hubungi admin KSA Mart.");
-        return;
-      }
-      
-      setIsCheckingLocation(true);
+    if (settings.storeLocationLat == null || settings.storeLocationLng == null) {
+      alert("Mohon maaf, lokasi toko belum diatur oleh admin. Silakan hubungi admin KSA Mart.");
+      return;
+    }
+    setIsCheckingLocation(true);
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
           setIsCheckingLocation(false);
@@ -256,9 +254,9 @@ export default function CustomerPortal() {
     const handleCheckout = () => {
     if (customerCart.length === 0) return;
     
-    // Validasi radius pengiriman maksimal 5KM
+    // Validasi radius pengiriman maksimal 5KM (hanya jika bukan PPOB)
     const maxRadius = settings.maxDeliveryRadiusKm || 5;
-    if (customerDistanceKm !== null && customerDistanceKm > maxRadius) {
+    if (!isAllPPOB && customerDistanceKm !== null && customerDistanceKm > maxRadius) {
       alert(`Mohon maaf, lokasi Anda berjarak ${customerDistanceKm.toFixed(2)} km dari toko. Maksimal radius pengiriman adalah ${maxRadius} km. Silakan pilih opsi ambil sendiri di toko.`);
       return;
     }
@@ -272,7 +270,7 @@ export default function CustomerPortal() {
     const paymentCode = `PAY-${Math.floor(100000 + Math.random() * 900000)}`;
     const paymentMethodString = checkoutPaymentMethod === 'TRANSFER' ? 'Transfer/QRIS' : (checkoutPaymentMethod === 'POIN' ? 'Potong Poin' : 'Kasbon (Bayar Nanti)');
     
-    const finalNotes = `[WAKTU PENGIRIMAN: ${deliveryPeriod}] [PEMBAYARAN: ${paymentMethodString}] ${checkoutNotes ? checkoutNotes : ''}`;
+    const finalNotes = (isAllPPOB ? '' : `[WAKTU PENGIRIMAN: ${deliveryPeriod}] `) + `[PEMBAYARAN: ${paymentMethodString}] ${checkoutNotes ? checkoutNotes : ''}`;
     submitOnlineOrder(currentUser.username, currentUser.name, currentUser.username || "08xxxx", finalNotes, undefined, paymentCode, customerDistanceKm || undefined, selectedCheckoutBranch);
     
     let savedAmount = 0;
@@ -286,7 +284,7 @@ export default function CustomerPortal() {
     const waNumber = (selectedBranchData?.phone || settings.storePhone || settings.ownerWhatsapp)?.replace(/^0/, '62');
     if (waNumber) {
       const itemList = customerCart.map(c => `- ${c.quantity}x ${c.product.name}`).join('\n');
-      const waMessage = `Assalamualaikum KSA Mart,\n\nSaya, *${currentUser.name}* (Member KSA Mart), ingin memesan:\n${itemList}\n\nTotal Belanja: Rp ${cartTotal.toLocaleString('id-ID')}\nKode Pembayaran: *${paymentCode}*\n\nCatatan & Pengiriman:\n${finalNotes}\n\nMohon segera diproses pesanan saya dan beritahu saya cara pembayarannya. Terima kasih!`;
+      const waMessage = `Assalamualaikum KSA Mart,\n\nSaya, *${currentUser.name}* (Member KSA Mart), ingin memesan:\n${itemList}\n\nTotal Belanja: Rp ${cartTotal.toLocaleString('id-ID')}\nKode Pembayaran: *${paymentCode}*\n\nCatatan & Pengiriman:\n${finalNotes}\n\nMohon segera diproses pesanan saya. Terima kasih!`;
       const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMessage)}`;
       window.open(waUrl, '_blank');
     }
@@ -722,24 +720,26 @@ export default function CustomerPortal() {
                 
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-800 space-y-4">
                   {/* Deteksi Lokasi Otomatis */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
-                    <p className="font-bold text-blue-800 mb-2">Deteksi Jarak Otomatis (GPS)</p>
-                    {customerDistanceKm !== null ? (
-                      <p className="text-blue-700">Jarak Anda ke toko KSA Mart: <span className="font-black text-lg">{customerDistanceKm.toFixed(2)} km</span></p>
-                    ) : (
-                      <p className="text-blue-600 text-xs mb-2">Aktifkan GPS agar kami bisa menghitung jarak pengiriman otomatis.</p>
-                    )}
-                    <button 
-                      onClick={handleCheckLocation}
-                      disabled={isCheckingLocation}
-                      className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm disabled:opacity-50"
-                    >
-                      {isCheckingLocation ? 'Mendeteksi...' : (customerDistanceKm !== null ? 'Perbarui Lokasi' : 'Cek Jarak ke Toko')}
-                    </button>
-                    {customerDistanceKm !== null && settings.maxDeliveryRadiusKm && customerDistanceKm > settings.maxDeliveryRadiusKm && (
-                      <p className="mt-2 text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 p-2 rounded">Perhatian: Jarak Anda melebihi batas pengiriman ({settings.maxDeliveryRadiusKm} km).</p>
-                    )}
-                  </div>
+                  {!isAllPPOB && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm">
+                      <p className="font-bold text-blue-800 mb-2">Deteksi Jarak Otomatis (GPS)</p>
+                      {customerDistanceKm !== null ? (
+                        <p className="text-blue-700">Jarak Anda ke toko KSA Mart: <span className="font-black text-lg">{customerDistanceKm.toFixed(2)} km</span></p>
+                      ) : (
+                        <p className="text-blue-600 text-xs mb-2">Aktifkan GPS agar kami bisa menghitung jarak pengiriman otomatis.</p>
+                      )}
+                      <button 
+                        onClick={handleCheckLocation}
+                        disabled={isCheckingLocation}
+                        className="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg shadow-sm disabled:opacity-50"
+                      >
+                        {isCheckingLocation ? 'Mendeteksi...' : (customerDistanceKm !== null ? 'Perbarui Lokasi' : 'Cek Jarak ke Toko')}
+                      </button>
+                      {customerDistanceKm !== null && settings.maxDeliveryRadiusKm && customerDistanceKm > settings.maxDeliveryRadiusKm && (
+                        <p className="mt-2 text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 p-2 rounded">Perhatian: Jarak Anda melebihi batas pengiriman ({settings.maxDeliveryRadiusKm} km).</p>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Pilih Cabang Tujuan <span className="text-red-700">*</span></label>
@@ -756,18 +756,22 @@ export default function CustomerPortal() {
                       ))}
                     </select>
 
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Periode Pengiriman / Pengambilan</label>
-                    <select 
-                      value={deliveryPeriod}
-                      onChange={e => setDeliveryPeriod(e.target.value)}
-                      className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900 mb-4"
-                    >
-                      <option value="Periode 1 (08.00-09.00)">Periode 1 (08.00 - 09.00)</option>
-                      <option value="Periode 2 (11.00-12.00)">Periode 2 (11.00 - 12.00)</option>
-                      <option value="Periode 3 (14.00-15.00)">Periode 3 (14.00 - 15.00)</option>
-                      <option value="Periode 4 (17.00-18.00)">Periode 4 (17.00 - 18.00)</option>
-                      <option value="Periode 5 (20.00-21.00)">Periode 5 (20.00 - 21.00)</option>
-                    </select>
+                    {!isAllPPOB && (
+                      <>
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Periode Pengiriman / Pengambilan</label>
+                        <select 
+                          value={deliveryPeriod}
+                          onChange={e => setDeliveryPeriod(e.target.value)}
+                          className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-900 mb-4"
+                        >
+                          <option value="Periode 1 (08.00-09.00)">Periode 1 (08.00 - 09.00)</option>
+                          <option value="Periode 2 (11.00-12.00)">Periode 2 (11.00 - 12.00)</option>
+                          <option value="Periode 3 (14.00-15.00)">Periode 3 (14.00 - 15.00)</option>
+                          <option value="Periode 4 (17.00-18.00)">Periode 4 (17.00 - 18.00)</option>
+                          <option value="Periode 5 (20.00-21.00)">Periode 5 (20.00 - 21.00)</option>
+                        </select>
+                      </>
+                    )}
 
                     <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Catatan Pesanan (Opsional)</label>
                     <input 

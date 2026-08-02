@@ -183,10 +183,11 @@ export default function JurnalUmumPage() {
   const totalPages = Math.ceil(groupedJournals.length / itemsPerPage);
   const paginatedJournals = groupedJournals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const getAccountName = (code: string) => {
-    if (!code || !code.trim()) return "Tidak Diketahui / Kosong";
-    const coa = coaList.find(c => c.code === code);
-    return coa ? `${coa.code} - ${coa.name}` : code;
+  const getAccountName = (codeOrFullName: string) => {
+    if (!codeOrFullName || !codeOrFullName.trim()) return "Tidak Diketahui / Kosong";
+    const code = codeOrFullName.includes(' - ') ? codeOrFullName.split(' - ')[0].trim() : codeOrFullName.trim();
+    const coa = coaList.find(c => c.code === code || c.code === codeOrFullName);
+    return coa ? `${coa.code} - ${coa.name}` : codeOrFullName;
   };
 
   const handleExportExcel = () => {
@@ -194,13 +195,17 @@ export default function JurnalUmumPage() {
     const data: any[] = [];
     groupedJournals.forEach(g => {
       g.entries.forEach((e, i) => {
+        const fullCoaName = getAccountName(e.account);
+        const codeOnly = fullCoaName.includes(' - ') ? fullCoaName.split(' - ')[0].trim() : fullCoaName;
+        const nameOnly = fullCoaName.replace(`${codeOnly} - `, '');
+        
         data.push([
           i === 0 ? new Date(g.date).toLocaleDateString('id-ID') : '',
           i === 0 ? g.refId : '',
           i === 0 ? g.description : '',
           i === 0 ? g.type : '',
-          e.account,
-          getAccountName(e.account).replace(`${e.account} - `, ''),
+          codeOnly,
+          nameOnly,
           e.debit || 0,
           e.credit || 0
         ]);

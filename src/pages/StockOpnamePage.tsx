@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter, Calendar, ClipboardCheck, X, FileText, Check, XCircle } from 'lucide-react';
+import { PackageSearch, History, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, FileSpreadsheet, CheckCircle, Search, Filter, Calendar, ClipboardCheck, X, FileText, Check, XCircle, Printer } from 'lucide-react';
+import PrintHeader from '../components/Print/PrintHeader';
 
 const getLocalDateString = () => {
   const date = new Date();
@@ -18,6 +19,8 @@ export default function StockOpnamePage() {
   const [activeTab, setActiveTab] = useState<'HISTORY' | 'APPROVALS'>('HISTORY');
   const [approvalModal, setApprovalModal] = useState<{ isOpen: boolean, id: string, isApproved: boolean }>({ isOpen: false, id: '', isApproved: false });
   const [approvalReason, setApprovalReason] = useState('');
+  const [selectedReportReq, setSelectedReportReq] = useState<any>(null);
+  const [isPrintingKolektif, setIsPrintingKolektif] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [opnameSearch, setOpnameSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -101,7 +104,8 @@ export default function StockOpnamePage() {
   const paginatedMovements = filteredMovements.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <>
+    <div className="p-6 max-w-6xl mx-auto space-y-6 print:hidden">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
@@ -248,8 +252,7 @@ export default function StockOpnamePage() {
             >
               <History className="w-4 h-4" /> Riwayat Kartu Stok
             </button>
-            {['MANAGER', 'OWNER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '') && (
-              <button 
+            <button 
                 onClick={() => setActiveTab('APPROVALS')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors relative ${activeTab === 'APPROVALS' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-700 hover:bg-gray-50'}`}
               >
@@ -260,7 +263,6 @@ export default function StockOpnamePage() {
                   </span>
                 )}
               </button>
-            )}
           </div>
           
           {activeTab === 'HISTORY' ? (
@@ -370,15 +372,49 @@ export default function StockOpnamePage() {
             </div>
           ) : (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1">
-              <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+              <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center">
                 <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
                   <ClipboardCheck className="w-5 h-5 text-indigo-600" />
                   Persetujuan Opname (Manager)
                 </h3>
+                {opnameRequests.filter(r => r.status === 'APPROVED').length > 0 && (
+                  <button 
+                    onClick={() => {
+                      setIsPrintingKolektif(true);
+                      setTimeout(() => window.print(), 300);
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Cetak Rekap (Kolektif)
+                  </button>
+                )}
               </div>
               <div className="overflow-x-auto flex-1 p-4">
                 {opnameRequests.length === 0 ? (
-                  <div className="text-center py-10 text-gray-400">Belum ada pengajuan opname.</div>
+                  <div className="text-center py-10 flex flex-col items-center justify-center">
+                    <p className="text-gray-400 mb-4">Belum ada pengajuan opname.</p>
+                    <button 
+                      onClick={() => {
+                        setSelectedReportReq({
+                          id: 'dummy',
+                          requestDate: new Date().toISOString(),
+                          productName: '(...................................)',
+                          systemStock: 0,
+                          physicalStock: 0,
+                          variance: 0,
+                          reason: '(...................................)',
+                          approvalReason: '(...................................)',
+                          requestedBy: currentUser?.name || '....................',
+                          approvedBy: '....................',
+                          status: 'APPROVED'
+                        });
+                        setTimeout(() => window.print(), 300);
+                      }}
+                      className="px-4 py-2 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-50 transition-colors"
+                    >
+                      <Printer className="w-4 h-4"/> Preview Cetak Template Kosong
+                    </button>
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     {opnameRequests.map(req => (
@@ -419,7 +455,7 @@ export default function StockOpnamePage() {
                         </p>
                         <p className="text-xs text-gray-400 mb-3">Diajukan oleh: {req.requestedBy}</p>
                         
-                        {req.status === 'PENDING' && (
+                        {req.status === 'PENDING' && ['MANAGER', 'OWNER', 'SUPERADMIN', 'PENGURUS'].includes(currentUser?.role || '') && (
                           <div className="flex gap-2">
                             <button 
                               onClick={() => { setApprovalReason(''); setApprovalModal({ isOpen: true, id: req.id, isApproved: true }); }}
@@ -441,6 +477,18 @@ export default function StockOpnamePage() {
                             <p className="text-gray-600 dark:text-slate-400 italic">{req.approvalReason || '-'}</p>
                             <p className="text-xs text-gray-400 mt-1">Oleh: {req.approvedBy}</p>
                           </div>
+                        )}
+                        
+                        {req.status === 'APPROVED' && (
+                          <button
+                            onClick={() => {
+                              setSelectedReportReq(req);
+                              setTimeout(() => window.print(), 300);
+                            }}
+                            className="mt-3 w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-lg flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-600 transition-colors"
+                          >
+                            <Printer className="w-4 h-4"/> Cetak Berita Acara
+                          </button>
                         )}
                       </div>
                     ))}
@@ -500,5 +548,124 @@ export default function StockOpnamePage() {
         </div>
       )}
     </div>
+    {/* Print Layout for Berita Acara */}
+    {selectedReportReq && (
+      <div className="hidden print:block printable-a4 bg-white p-8 text-black font-sans">
+        <PrintHeader title="Berita Acara Penyesuaian Stok Opname" />
+        
+        <div className="space-y-4 mb-8 text-justify leading-relaxed">
+          <p>
+            Pada hari ini, tanggal <strong>{new Date(selectedReportReq.requestDate).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>, telah dilakukan investigasi dan penyesuaian stok opname dengan rincian sebagai berikut:
+          </p>
+          
+          <table className="w-full border-collapse border border-black text-sm my-4">
+            <tbody>
+              <tr>
+                <td className="border border-black p-3 font-bold w-1/3 bg-gray-100">Nama Barang</td>
+                <td className="border border-black p-3 font-bold text-lg">{selectedReportReq.productName}</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-3 font-bold bg-gray-100">Stok Sistem (Awal)</td>
+                <td className="border border-black p-3">{selectedReportReq.systemStock === 0 && selectedReportReq.id === 'dummy' ? '(.......)' : selectedReportReq.systemStock} Item</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-3 font-bold bg-gray-100">Stok Fisik (Aktual)</td>
+                <td className="border border-black p-3">{selectedReportReq.physicalStock === 0 && selectedReportReq.id === 'dummy' ? '(.......)' : selectedReportReq.physicalStock} Item</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-3 font-bold bg-gray-100">Selisih (Variance)</td>
+                <td className="border border-black p-3 font-bold text-lg">
+                  {selectedReportReq.variance === 0 && selectedReportReq.id === 'dummy' ? '(.......)' : (selectedReportReq.variance > 0 ? '+' : '') + selectedReportReq.variance}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black p-3 font-bold bg-gray-100">Keterangan / Alasan (Tervalidasi)</td>
+                <td className="border border-black p-3 font-semibold italic text-red-700">{selectedReportReq.id === 'dummy' ? '(...................................)' : `"${selectedReportReq.reason}"`}</td>
+              </tr>
+              <tr>
+                <td className="border border-black p-3 font-bold bg-gray-100">Catatan Persetujuan</td>
+                <td className="border border-black p-3">{selectedReportReq.id === 'dummy' ? '(...................................)' : (selectedReportReq.approvalReason || '-')}</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <p className="mt-4">
+            Demikian berita acara penyesuaian stok ini dibuat dengan sebenar-benarnya berdasarkan hasil pengecekan (investigasi fisik/CCTV) dan telah disetujui bersama untuk keperluan penyesuaian laporan persediaan dan keuangan toko.
+          </p>
+        </div>
+        
+        <div className="flex justify-between mt-16 pt-8 text-center">
+          <div className="w-1/3">
+            <p className="mb-24 font-semibold">Dibuat Oleh,</p>
+            <p className="font-bold border-b border-black inline-block min-w-[180px] pb-1 uppercase">{selectedReportReq.requestedBy}</p>
+            <p className="text-xs mt-1 text-gray-600">Pemohon (Admin / Kasir)</p>
+          </div>
+          <div className="w-1/3">
+            <p className="mb-24 font-semibold">Disetujui Oleh,</p>
+            <p className="font-bold border-b border-black inline-block min-w-[180px] pb-1 uppercase">{selectedReportReq.approvedBy || 'Pemilik Toko'}</p>
+            <p className="text-xs mt-1 text-gray-600">Ketua / Owner</p>
+          </div>
+        </div>
+      </div>
+    )}
+    {/* Print Layout for Berita Acara Kolektif */}
+    {isPrintingKolektif && (
+      <div className="hidden print:block printable-a4 bg-white p-8 text-black font-sans">
+        <PrintHeader title="Rekapitulasi Berita Acara Penyesuaian Stok Opname" />
+        
+        <div className="space-y-4 mb-8 text-justify leading-relaxed">
+          <p>
+            Pada hari ini, tanggal <strong>{new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>, telah dilakukan investigasi dan penyesuaian stok opname secara kolektif dengan rincian hasil yang telah disetujui sebagai berikut:
+          </p>
+          
+          <table className="w-full border-collapse border border-black text-[10px] my-4">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-black p-2">No</th>
+                <th className="border border-black p-2">Nama Barang</th>
+                <th className="border border-black p-2">Sistem</th>
+                <th className="border border-black p-2">Fisik</th>
+                <th className="border border-black p-2">Selisih</th>
+                <th className="border border-black p-2">Alasan Validasi</th>
+                <th className="border border-black p-2">Catatan Approval</th>
+              </tr>
+            </thead>
+            <tbody>
+              {opnameRequests.filter(r => r.status === 'APPROVED').map((req, idx) => (
+                <tr key={req.id}>
+                  <td className="border border-black p-2 text-center">{idx + 1}</td>
+                  <td className="border border-black p-2 font-bold">{req.productName}</td>
+                  <td className="border border-black p-2 text-center">{req.systemStock}</td>
+                  <td className="border border-black p-2 text-center">{req.physicalStock}</td>
+                  <td className="border border-black p-2 text-center font-bold">
+                    {req.variance > 0 ? '+' : ''}{req.variance}
+                  </td>
+                  <td className="border border-black p-2 italic">"{req.reason}"</td>
+                  <td className="border border-black p-2">{req.approvalReason || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          <p className="mt-4">
+            Demikian rekapitulasi berita acara penyesuaian stok ini dibuat dengan sebenar-benarnya berdasarkan hasil pengecekan (investigasi fisik/CCTV) dan telah disetujui bersama untuk keperluan penyesuaian laporan persediaan dan keuangan toko.
+          </p>
+        </div>
+        
+        <div className="flex justify-between mt-16 pt-8 text-center">
+          <div className="w-1/3">
+            <p className="mb-24 font-semibold">Dibuat Oleh,</p>
+            <p className="font-bold border-b border-black inline-block min-w-[180px] pb-1 uppercase">{currentUser?.name || 'Petugas Toko'}</p>
+            <p className="text-xs mt-1 text-gray-600">Admin / Kasir</p>
+          </div>
+          <div className="w-1/3">
+            <p className="mb-24 font-semibold">Disetujui Oleh,</p>
+            <p className="font-bold border-b border-black inline-block min-w-[180px] pb-1 uppercase">Pemilik Toko</p>
+            <p className="text-xs mt-1 text-gray-600">Ketua / Owner</p>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

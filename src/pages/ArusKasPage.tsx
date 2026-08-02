@@ -7,7 +7,7 @@ import PrintHeader from '../components/Print/PrintHeader';
 import PrintFooter from '../components/Print/PrintFooter';
 
 export default function ArusKasPage() {
-  const { transactions, expenses, journalEntries, currentUser, activeBranchId, addLog, addNotification, branches, settings } = useBranchData();
+  const { transactions, expenses, journalEntries, currentUser, activeBranchId, addLog, addNotification, branches, settings, products } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const today = new Date();
@@ -16,6 +16,7 @@ export default function ArusKasPage() {
   
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(currentDay);
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'FISIK' | 'PPOB'>('ALL');
   const itemsPerPage = 20;
 
   const dynamicPettyCash = React.useMemo(() => {
@@ -33,26 +34,71 @@ export default function ArusKasPage() {
     // Exclude voided transactions from cash flow report
     if (t.isVoided) return;
     
+    const txTotal = t.totalAmount;
+    let fisikTotal = 0;
+    let ppobTotal = 0;
+    
+    t.items?.forEach((item: any) => {
+      const p = products.find((prod: any) => prod.id === item.productId);
+      const isPPOB = p ? p.isPPOB : false;
+      const lineTotal = item.price * item.quantity;
+      if (isPPOB) ppobTotal += lineTotal;
+      else fisikTotal += lineTotal;
+    });
+
+    const fisikRatio = txTotal > 0 ? fisikTotal / (fisikTotal + ppobTotal) : (ppobTotal === 0 ? 1 : 0);
+    const ppobRatio = txTotal > 0 ? ppobTotal / (fisikTotal + ppobTotal) : (fisikTotal === 0 && ppobTotal > 0 ? 1 : 0);
+
     if (t.splitPayments && t.splitPayments.length > 0) {
       t.splitPayments.forEach((sp: any, i: number) => {
-        cashMovements.push({
-          id: `${t.id}_${i}`,
-          date: t.timestamp,
-          description: `Pendapatan Penjualan ${t.invoiceNo} (Split: ${sp.method})`,
-          type: 'IN',
-          amount: sp.amount - (i === 0 ? t.changeAmount : 0), // Adjust change on first payment
-          method: sp.method
-        });
+        const amt = sp.amount - (i === 0 ? t.changeAmount : 0);
+        if (fisikRatio > 0) {
+          cashMovements.push({
+            id: `${t.id}_${i}_F`,
+            date: t.timestamp,
+            description: `Pendapatan Penjualan Fisik ${t.invoiceNo} (Split: ${sp.method})`,
+            type: 'IN',
+            amount: amt * fisikRatio,
+            method: sp.method,
+            category: 'FISIK'
+          });
+        }
+        if (ppobRatio > 0) {
+          cashMovements.push({
+            id: `${t.id}_${i}_P`,
+            date: t.timestamp,
+            description: `Pendapatan Penjualan PPOB ${t.invoiceNo} (Split: ${sp.method})`,
+            type: 'IN',
+            amount: amt * ppobRatio,
+            method: sp.method,
+            category: 'PPOB'
+          });
+        }
       });
     } else if (t.paymentMethod !== 'KASBON') {
-      cashMovements.push({
-        id: t.id,
-        date: t.timestamp,
-        description: `Pendapatan Penjualan ${t.invoiceNo} (${t.paymentMethod})`,
-        type: 'IN',
-        amount: t.totalAmount,
-        method: t.paymentMethod
-      });
+      const amt = t.totalAmount;
+      if (fisikRatio > 0) {
+        cashMovements.push({
+          id: `${t.id}_F`,
+          date: t.timestamp,
+          description: `Pendapatan Penjualan Fisik ${t.invoiceNo} (${t.paymentMethod})`,
+          type: 'IN',
+          amount: amt * fisikRatio,
+          method: t.paymentMethod,
+          category: 'FISIK'
+        });
+      }
+      if (ppobRatio > 0) {
+        cashMovements.push({
+          id: `${t.id}_P`,
+          date: t.timestamp,
+          description: `Pendapatan Penjualan PPOB ${t.invoiceNo} (${t.paymentMethod})`,
+          type: 'IN',
+          amount: amt * ppobRatio,
+          method: t.paymentMethod,
+          category: 'PPOB'
+        });
+      }
     }
   });
 
@@ -64,7 +110,8 @@ export default function ArusKasPage() {
       description: `Kas Kecil: ${e.description}`,
       type: (e.amount < 0 ? 'IN' : 'OUT') as 'IN' | 'OUT',
       amount: Math.abs(e.amount),
-      method: 'CASH'
+      method: 'CASH',
+      category: 'FISIK'
     })),
     ...journalEntries
       .filter(je => je.account === 'KAS' && je.description.includes('Pelunasan piutang'))
@@ -74,7 +121,8 @@ export default function ArusKasPage() {
         description: je.description,
         type: 'IN' as const,
         amount: je.debit,
-        method: 'CASH'
+        method: 'CASH',
+        category: 'FISIK'
       }))
   ];
 
@@ -89,6 +137,7 @@ export default function ArusKasPage() {
     const txDate = d.toLocaleDateString('en-CA');
     if (startDate && txDate < startDate) return false;
     if (endDate && txDate > endDate) return false;
+    if (categoryFilter !== 'ALL' && m.category !== categoryFilter) return false;
     return true;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -166,6 +215,15 @@ export default function ArusKasPage() {
               className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
             />
           </div>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as 'ALL' | 'FISIK' | 'PPOB')}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-green-500/20"
+          >
+            <option value="ALL">Semua Tipe</option>
+            <option value="FISIK">Fisik</option>
+            <option value="PPOB">PPOB</option>
+          </select>
           <button
             onClick={() => {
               addLog('REPORT_APPROVAL', 'FINANCE', `Mengirim Laporan Arus Kas untuk persetujuan Owner.`);

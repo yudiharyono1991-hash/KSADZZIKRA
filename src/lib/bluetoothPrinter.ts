@@ -405,7 +405,8 @@ export async function printKasbonCardToBluetooth(
   receiptCustomer: any,
   storeName: string,
   storeAddress: string,
-  storePhone: string
+  storePhone: string,
+  cashierName: string = 'Sistem'
 ) {
   try {
     const device = await (navigator as any).bluetooth.requestDevice({
@@ -439,6 +440,7 @@ export async function printKasbonCardToBluetooth(
     encoder.line(`Nama : ${receiptCustomer.name}`);
     encoder.line(`Telp : ${receiptCustomer.phone || '-'}`);
     encoder.line(`Tgl Cetak: ${new Date().toLocaleString('id-ID')}`);
+    encoder.line(`Kasir: ${cashierName}`);
     encoder.line('--------------------------------');
 
     encoder.line('TGL       REF      NOMINAL');
@@ -459,6 +461,9 @@ export async function printKasbonCardToBluetooth(
     encoder.line('--------------------------------');
     encoder.bold(true);
     encoder.line(`SISA KASBON : Rp ${receiptCustomer.debtAmount.toLocaleString('id-ID')}`);
+    if (receiptCustomer.debtAmount === 0) {
+      encoder.line('** L U N A S **');
+    }
     encoder.bold(false);
     
     encoder.newline();

@@ -199,20 +199,36 @@ export default function NeracaRugiPage() {
   const filteredExpenses = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0);
   const filteredOtherIncome = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) < 0);
 
-  const periodTransactionsRevenue = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
-  const periodTransactionsHPP = filteredTransactions.reduce((sum, tx) => {
-    return sum + (tx.items || []).reduce((s, it) => {
+  let periodPhysicalRevenue = 0;
+  let periodPpobRevenue = 0;
+  let periodPhysicalHPP = 0;
+  let periodPpobHPP = 0;
+
+  filteredTransactions.forEach(tx => {
+    (tx.items || []).forEach(it => {
       let cp = Number(it.costPrice || 0);
-      if (!cp) {
-        const productData = products?.find((p: any) => p.id === it.productId);
-        if (productData) {
-          const isBox = it.productName?.toLowerCase().includes('(box)');
-          cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
-        }
+      const productData = products?.find((p: any) => p.id === it.productId);
+      
+      if (!cp && productData) {
+        const isBox = it.productName?.toLowerCase().includes('(box)');
+        cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
       }
-      return s + (cp * (Number(it.quantity) || 0));
-    }, 0);
-  }, 0);
+
+      const itemRevenue = (Number(it.price) || 0) * (Number(it.quantity) || 0);
+      const itemHpp = cp * (Number(it.quantity) || 0);
+
+      if (productData?.isPPOB) {
+        periodPpobRevenue += itemRevenue;
+        periodPpobHPP += itemHpp;
+      } else {
+        periodPhysicalRevenue += itemRevenue;
+        periodPhysicalHPP += itemHpp;
+      }
+    });
+  });
+
+  const periodTransactionsRevenue = periodPhysicalRevenue + periodPpobRevenue;
+  const periodTransactionsHPP = periodPhysicalHPP + periodPpobHPP;
   const periodTransactionsExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
   const periodOtherIncome = filteredOtherIncome.reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
 
@@ -581,19 +597,49 @@ export default function NeracaRugiPage() {
 
             {/* Calculations Fields */}
             <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 rounded-lg border">
-                <span>PENDAPATAN PENJUALAN</span>
-                <span className="font-mono">Rp {totalRevenue.toLocaleString('id-ID')}</span>
+              <div className="space-y-1">
+                <div className="flex justify-between font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2.5 rounded-lg border">
+                  <span>PENDAPATAN PENJUALAN</span>
+                  <span className="font-mono">Rp {totalRevenue.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center pl-4 py-1">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Pendapatan Fisik</span>
+                  <span className="text-slate-600 font-medium font-mono">Rp {(periodPhysicalRevenue + periodManualRevenue).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center pl-4 py-1">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Pendapatan PPOB</span>
+                  <span className="text-slate-600 font-medium font-mono">Rp {periodPpobRevenue.toLocaleString('id-ID')}</span>
+                </div>
               </div>
 
-              <div className="flex justify-between items-center pl-4 py-1.5 border-b border-dashed border-gray-100 dark:border-slate-800">
-                <span className="text-gray-500 dark:text-slate-400 font-medium">Beban Pokok Penjualan (HPP produk keluar)</span>
-                <span className="text-red-700 font-semibold font-mono">- Rp {totalHPP.toLocaleString('id-ID')}</span>
+              <div className="space-y-1">
+                <div className="flex justify-between items-center px-3.5 py-1.5 border-b border-dashed border-gray-200 dark:border-slate-700 bg-red-50/30">
+                  <span className="text-slate-700 font-bold">BEBAN POKOK PENJUALAN (HPP)</span>
+                  <span className="text-red-700 font-bold font-mono">- Rp {totalHPP.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center pl-4 py-1">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">HPP Produk Fisik</span>
+                  <span className="text-red-700/80 font-semibold font-mono">- Rp {(periodPhysicalHPP + periodManualHPP).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center pl-4 py-1">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">HPP Layanan PPOB</span>
+                  <span className="text-red-700/80 font-semibold font-mono">- Rp {periodPpobHPP.toLocaleString('id-ID')}</span>
+                </div>
               </div>
 
-              <div className="flex justify-between font-bold text-green-800 bg-green-50/40 px-3.5 py-2 rounded-lg border border-green-100/60">
-                <span>LABA KOTOR PENJUALAN (PSAK 102)</span>
-                <span className="font-mono">Rp {grossProfit.toLocaleString('id-ID')}</span>
+              <div className="space-y-1 mt-2">
+                <div className="flex justify-between font-bold text-green-800 bg-green-50/40 px-3.5 py-2 rounded-lg border border-green-100/60">
+                  <span>LABA KOTOR PENJUALAN (PSAK 102)</span>
+                  <span className="font-mono">Rp {grossProfit.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center pl-4 py-1">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Laba Kotor Fisik</span>
+                  <span className="text-green-700 font-medium font-mono">Rp {(periodPhysicalRevenue + periodManualRevenue - (periodPhysicalHPP + periodManualHPP)).toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between items-center pl-4 py-1">
+                  <span className="text-gray-500 dark:text-slate-400 font-medium">Laba Kotor PPOB</span>
+                  <span className="text-green-700 font-medium font-mono">Rp {(periodPpobRevenue - periodPpobHPP).toLocaleString('id-ID')}</span>
+                </div>
               </div>
 
               {filteredOtherIncome.length > 0 && (

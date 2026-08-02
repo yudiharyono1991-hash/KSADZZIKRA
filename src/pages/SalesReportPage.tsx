@@ -18,6 +18,7 @@ export default function SalesReportPage() {
   const { transactions, products, currentUser, addLog, addNotification } = useBranchData();
   const { activeBranchId } = useBranchData();
   const [searchQuery, setSearchQuery] = useState('');
+  const [productTypeFilter, setProductTypeFilter] = useState<'ALL' | 'FISIK' | 'PPOB'>('ALL');
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -54,6 +55,12 @@ export default function SalesReportPage() {
 
     validTxs.forEach(tx => {
       tx.items.forEach(item => {
+        const productData = products.find((p: any) => p.id === item.productId);
+        const isPPOB = productData ? productData.isPPOB : false;
+        
+        if (productTypeFilter === 'FISIK' && isPPOB) return;
+        if (productTypeFilter === 'PPOB' && !isPPOB) return;
+
         if (!itemMap.has(item.productId)) {
           itemMap.set(item.productId, {
             productId: item.productId,
@@ -73,7 +80,6 @@ export default function SalesReportPage() {
         
         // Coba ambil HPP dari record transaksi, jika 0 atau tidak ada, fallback ke master produk
         let costPrice = Number(item.costPrice || 0);
-        const productData = products.find((p: any) => p.id === item.productId);
         if (!costPrice && productData) {
           // Cari apakah item ini terjual dalam bentuk box
           const isBox = item.productName.toLowerCase().includes('(box)');
@@ -117,7 +123,7 @@ export default function SalesReportPage() {
       aggregatedData: resultArr, 
       grandTotal: { qty: finalQty, omset: finalOmset, profit: finalProfit, zakat: finalZakat } 
     };
-  }, [transactions, products, activeBranchId, startDate, endDate, searchQuery]);
+  }, [transactions, products, activeBranchId, startDate, endDate, searchQuery, productTypeFilter]);
 
   // Handle Search Input Change (Reset Page)
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,17 +219,28 @@ export default function SalesReportPage() {
             />
           </div>
 
-          <div className="relative w-full md:w-56">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search className="w-4 h-4 text-gray-400" />
-            </span>
-            <input
-              type="text"
-              className="w-full pl-9 pr-4 py-1.5 border border-gray-200 dark:border-slate-700 rounded-lg text-xs"
-              placeholder="Cari nama barang..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
+          <div className="relative w-full md:w-56 flex gap-2">
+            <div className="relative flex-1">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Search className="w-4 h-4 text-gray-400" />
+              </span>
+              <input
+                type="text"
+                className="w-full pl-9 pr-4 py-1.5 border border-gray-200 dark:border-slate-700 rounded-lg text-xs"
+                placeholder="Cari nama barang..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+            </div>
+            <select
+              value={productTypeFilter}
+              onChange={(e) => setProductTypeFilter(e.target.value as 'ALL' | 'FISIK' | 'PPOB')}
+              className="border border-gray-200 dark:border-slate-700 rounded-lg text-xs px-2 py-1.5 focus:ring-green-500/20 focus:border-green-500 font-semibold"
+            >
+              <option value="ALL">Semua</option>
+              <option value="FISIK">Fisik</option>
+              <option value="PPOB">PPOB</option>
+            </select>
           </div>
           <div className="flex gap-2">
             <button

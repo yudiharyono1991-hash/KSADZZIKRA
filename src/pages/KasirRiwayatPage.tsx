@@ -5,9 +5,11 @@ import * as XLSX from 'xlsx';
 import { printToBluetooth, printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 
 export default function KasirRiwayatPage() {
-  const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings, customers, kasbonPayments } = useBranchData();
+  const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings, customers, kasbonPayments, products } = useBranchData();
   const [activeTab, setActiveTab] = useState<'UMUM' | 'KASBON'>('UMUM');
   const [searchTerm, setSearchTerm] = useState('');
+  const [txTypeFilter, setTxTypeFilter] = useState<'ALL' | 'FISIK' | 'PPOB'>('ALL');
+  const [cashierFilter, setCashierFilter] = useState('ALL');
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [selectedKasbonPayment, setSelectedKasbonPayment] = useState<any>(null);
   const [txToVoid, setTxToVoid] = useState<any>(null);
@@ -38,9 +40,27 @@ export default function KasirRiwayatPage() {
     return isDateMatch && isMyTx && matchesBranch;
   });
 
-  const filteredTx = myTransactions.filter(tx => 
-    tx.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const uniqueCashiers = Array.from(new Set(myTransactions.map(tx => tx.cashierName))).filter(Boolean);
+
+  const filteredTx = myTransactions.filter(tx => {
+    const matchSearch = tx.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchCashier = cashierFilter === 'ALL' || tx.cashierName === cashierFilter;
+    let matchType = true;
+    
+    if (txTypeFilter === 'FISIK') {
+      matchType = tx.items?.some((it: any) => {
+        const p = products?.find((prod: any) => prod.id === it.productId);
+        return p && !p.isPPOB;
+      }) || false;
+    } else if (txTypeFilter === 'PPOB') {
+      matchType = tx.items?.some((it: any) => {
+        const p = products?.find((prod: any) => prod.id === it.productId);
+        return p && p.isPPOB;
+      }) || false;
+    }
+
+    return matchSearch && matchType && matchCashier;
+  });
 
   const totalPages = Math.ceil(filteredTx.length / itemsPerPage);
   const paginatedTx = filteredTx.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -117,6 +137,49 @@ export default function KasirRiwayatPage() {
     if (tx.isVoided) return sum;
     return sum + (tx.items?.reduce((itemSum: number, item: any) => itemSum + Number(item.quantity || 0), 0) || 0);
   }, 0);
+
+  let totalOmsetFisik = 0;
+  let totalOmsetPPOB = 0;
+
+  filteredTx.forEach(tx => {
+    if (tx.isVoided) return;
+    tx.items?.forEach((item: any) => {
+      const p = products?.find((prod: any) => prod.id === item.productId);
+      const isPPOB = p ? p.isPPOB : false;
+      const lineTotal = item.price * item.quantity;
+      if (isPPOB) {
+        totalOmsetPPOB += lineTotal;
+      } else {
+        totalOmsetFisik += lineTotal;
+      }
+    });
+  });
+
+  const cashierBreakdowns = uniqueCashiers.map(cashierName => {
+    let fisik = 0;
+    let ppob = 0;
+    let total = 0;
+    let transaksi = 0;
+    let barang = 0;
+    
+    filteredTx.forEach(tx => {
+      if (tx.cashierName === cashierName && !tx.isVoided) {
+        total += tx.totalAmount;
+        transaksi += 1;
+        tx.items?.forEach((item: any) => {
+          const p = products?.find((prod: any) => prod.id === item.productId);
+          const isPPOB = p ? p.isPPOB : false;
+          const qty = Number(item.quantity || 0);
+          const lineTotal = item.price * qty;
+          barang += qty;
+          if (isPPOB) ppob += lineTotal;
+          else fisik += lineTotal;
+        });
+      }
+    });
+
+    return { cashierName, fisik, ppob, total, transaksi, barang };
+  }).filter(c => c.total > 0);
 
   const handleReprint = (tx: any) => {
     setSelectedTx(tx);
@@ -253,15 +316,38 @@ export default function KasirRiwayatPage() {
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
         <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4">
-          <div className="relative flex-1 w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder={activeTab === 'KASBON' ? "Cari Pelanggan..." : "Cari No Invoice..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
-            />
+          <div className="relative flex-1 w-full max-w-md flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder={activeTab === 'KASBON' ? "Cari Pelanggan..." : "Cari No Invoice..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm"
+              />
+            </div>
+            {activeTab === 'UMUM' && (
+              <>
+                <select
+                  value={txTypeFilter}
+                  onChange={(e) => setTxTypeFilter(e.target.value as 'ALL' | 'FISIK' | 'PPOB')}
+                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold text-gray-700 dark:text-slate-300"
+                >
+                  <option value="ALL">Semua Tipe</option>
+                  <option value="FISIK">Fisik</option>
+                  <option value="PPOB">PPOB</option>
+                </select>
+                <select
+                  value={cashierFilter}
+                  onChange={(e) => setCashierFilter(e.target.value)}
+                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold text-gray-700 dark:text-slate-300 max-w-[150px]"
+                >
+                  <option value="ALL">Semua Kasir</option>
+                  {uniqueCashiers.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </>
+            )}
           </div>
           <div className="w-full md:w-auto flex flex-col md:flex-row gap-2">
             <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
@@ -289,6 +375,62 @@ export default function KasirRiwayatPage() {
             </button>
           </div>
         </div>
+
+        {activeTab === 'UMUM' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+              <p className="text-[10px] font-bold text-gray-500 uppercase">Total Transaksi</p>
+              <p className="text-lg font-black text-gray-800 dark:text-slate-200">{filteredTx.length} Struk</p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+              <p className="text-[10px] font-bold text-gray-500 uppercase">Total Barang</p>
+              <p className="text-lg font-black text-blue-600">{totalBarang} Item</p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+              <p className="text-[10px] font-bold text-gray-500 uppercase">Total Omset</p>
+              <p className="text-lg font-black text-green-600">Rp {totalOmset.toLocaleString('id-ID')}</p>
+              <div className="mt-1 pt-1 border-t border-gray-100 dark:border-slate-800 text-[10px] space-y-0.5">
+                <div className="flex justify-between"><span className="text-gray-500">Fisik:</span><span className="font-bold text-gray-700 dark:text-slate-300">Rp {totalOmsetFisik.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">PPOB:</span><span className="font-bold text-gray-700 dark:text-slate-300">Rp {totalOmsetPPOB.toLocaleString('id-ID')}</span></div>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
+              <p className="text-[10px] font-bold text-gray-500 uppercase">Total Margin</p>
+              <p className="text-lg font-black text-orange-600">Rp {totalMargin.toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'UMUM' && cashierFilter === 'ALL' && cashierBreakdowns.length > 0 && (
+          <div className="bg-slate-50 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-4 pb-4">
+             <div className="bg-white dark:bg-slate-900 rounded-lg p-0 border border-gray-200 dark:border-slate-700 overflow-x-auto">
+               <table className="w-full text-left text-[11px] sm:text-xs">
+                 <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-bold uppercase">
+                   <tr>
+                     <th className="px-3 py-2 border-b">Nama Kasir</th>
+                     <th className="px-3 py-2 border-b text-center">Transaksi</th>
+                     <th className="px-3 py-2 border-b text-center">Barang</th>
+                     <th className="px-3 py-2 border-b text-right">Fisik</th>
+                     <th className="px-3 py-2 border-b text-right">PPOB</th>
+                     <th className="px-3 py-2 border-b text-right">Total Omset</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                   {cashierBreakdowns.map(c => (
+                     <tr key={c.cashierName} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                       <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-200">{c.cashierName}</td>
+                       <td className="px-3 py-2 text-center text-slate-600 dark:text-slate-400">{c.transaksi} Struk</td>
+                       <td className="px-3 py-2 text-center text-slate-600 dark:text-slate-400">{c.barang} Item</td>
+                       <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Rp {c.fisik.toLocaleString('id-ID')}</td>
+                       <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Rp {c.ppob.toLocaleString('id-ID')}</td>
+                       <td className="px-3 py-2 text-right font-bold text-green-600 dark:text-green-500">Rp {c.total.toLocaleString('id-ID')}</td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+          </div>
+        )}
 
         {activeTab === 'UMUM' ? (
         <div className="overflow-x-auto">

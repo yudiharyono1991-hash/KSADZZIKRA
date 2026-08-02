@@ -389,7 +389,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         id="app-sidebar" 
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`fixed md:sticky top-0 left-0 h-[100dvh] ${effectiveIsCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 ${
+        className={`fixed md:sticky top-0 left-0 h-[100dvh] ${effectiveIsCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 print:hidden ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >

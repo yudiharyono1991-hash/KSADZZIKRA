@@ -100,6 +100,31 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
       return sum + physicalMargin;
     }, 0);
 
+  // Today's PPOB Sales
+  const todayPPOBSales = transactions
+    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
+    .reduce((sum, tx) => {
+      const ppobSales = tx.items.reduce((itemSum, item) => {
+        const prod = products.find(p => p.id === item.productId);
+        if (!prod?.isPPOB) return itemSum;
+        return itemSum + (item.price * item.quantity);
+      }, 0);
+      return sum + ppobSales;
+    }, 0);
+
+  // Today's PPOB Margin
+  const todayPPOBMargin = transactions
+    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
+    .reduce((sum, tx) => {
+      const ppobMargin = tx.items.reduce((itemSum, item) => {
+        const prod = products.find(p => p.id === item.productId);
+        if (!prod?.isPPOB) return itemSum;
+        const cogs = item.costPrice || prod?.costPrice || 0;
+        return itemSum + ((item.price - cogs) * item.quantity);
+      }, 0);
+      return sum + ppobMargin;
+    }, 0);
+
   // Check how many items low stock
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;
 
@@ -136,7 +161,7 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   };
 
   return (
-    <header id="app-topbar" className="h-16 bg-gradient-to-r from-emerald-50 via-white to-green-50 border-b-2 border-green-700 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none">
+    <header id="app-topbar" className="h-16 bg-gradient-to-r from-emerald-50 via-white to-green-50 border-b-2 border-green-700 px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 bg-opacity-95 backdrop-blur-md select-none print:hidden">
       
       {/* Brand Context */}
       <div className="flex items-center space-x-1.5 md:space-x-2 text-gray-500 dark:text-slate-400 font-semibold text-xs">
@@ -238,13 +263,34 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
         {/* Live Counters */}
         {currentUser && (currentUser.role === 'OWNER' || currentUser.role === 'ADMIN' || currentUser.role === 'CASHIER') && (
           <div className="hidden lg:flex items-center space-x-4 text-[10px] font-bold uppercase tracking-wider border-l border-r border-gray-100 dark:border-slate-800 px-5">
-            <div>
-              <p className="text-gray-400">Total Omset Hari Ini</p>
-              <p className="font-extrabold text-gray-900 dark:text-white text-xs font-mono mt-0.5">Rp {todaySales.toLocaleString('id-ID')}</p>
+            <div className="flex flex-col">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[9px] text-gray-500">FISIK:</span>
+                <span className="font-mono text-[9px]">Rp {todaySales.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[9px] text-gray-500">PPOB:</span>
+                <span className="font-mono text-[9px]">Rp {todayPPOBSales.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center">
+                <span className="text-gray-400">TOTAL OMSET HARI INI</span>
+                <span className="font-extrabold text-gray-900 dark:text-white font-mono ml-2">Rp {(todaySales + todayPPOBSales).toLocaleString('id-ID')}</span>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-400">Margin Berkah</p>
-              <p className="font-extrabold text-green-700 text-xs font-mono mt-0.5">Rp {todayMargin.toLocaleString('id-ID')}</p>
+            
+            <div className="flex flex-col ml-4">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[9px] text-gray-500">FISIK:</span>
+                <span className="font-mono text-[9px] text-green-600">Rp {todayMargin.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[9px] text-gray-500">PPOB:</span>
+                <span className="font-mono text-[9px] text-green-600">Rp {todayPPOBMargin.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center">
+                <span className="text-gray-400">MARGIN BERKAH</span>
+                <span className="font-extrabold text-green-700 font-mono ml-2">Rp {(todayMargin + todayPPOBMargin).toLocaleString('id-ID')}</span>
+              </div>
             </div>
           </div>
         )}

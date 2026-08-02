@@ -20,7 +20,7 @@ const getLocalTodayDate = () => {
 };
 
 export default function KasirShiftPage() {
-  const { transactions, currentUser, addExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash } = useAppStore();
+  const { transactions, products, currentUser, addExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
@@ -137,6 +137,19 @@ export default function KasirShiftPage() {
   const totalTunai = myTransactions
     .filter(t => t.paymentMethod === 'CASH' && !t.isVoided)
     .reduce((sum, t) => sum + t.totalAmount, 0);
+
+  let totalFisik = 0;
+  let totalPPOB = 0;
+  
+  myTransactions.filter(t => !t.isVoided).forEach(t => {
+    t.items?.forEach((item: any) => {
+      const p = products.find((prod: any) => prod.id === item.productId);
+      const isPPOB = p ? p.isPPOB : false;
+      const lineTotal = item.price * item.quantity;
+      if (isPPOB) totalPPOB += lineTotal;
+      else totalFisik += lineTotal;
+    });
+  });
 
   const totalQris = myTransactions
     .filter(t => t.paymentMethod.includes('QRIS') && !t.isVoided)
@@ -468,6 +481,14 @@ export default function KasirShiftPage() {
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
               <span>Total Transaksi</span>
               <span className="font-bold">{myTransactions.filter(t => !t.isVoided).length} Struk</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-slate-800">
+              <span className="text-xs text-gray-500 ml-4">↳ Penjualan Fisik</span>
+              <span className="font-bold text-gray-700 dark:text-slate-300 text-sm">Rp {totalFisik.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-slate-800">
+              <span className="text-xs text-gray-500 ml-4">↳ Penjualan PPOB</span>
+              <span className="font-bold text-gray-700 dark:text-slate-300 text-sm">Rp {totalPPOB.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
               <span>Pembayaran Tunai</span>

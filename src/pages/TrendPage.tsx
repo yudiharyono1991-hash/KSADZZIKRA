@@ -144,17 +144,43 @@ export default function TrendPage() {
 
     const aggregate = (txs, exps) => {
       const grouped = txs.reduce((a, t) => {
-        const physicalOmset = t.items?.reduce((s: number, it: any) => {
+        let txPhysicalOmset = 0;
+        let txPpobOmset = 0;
+        let txPhysicalHpp = 0;
+        let txPpobHpp = 0;
+
+        t.items?.forEach((it: any) => {
           const prod = products.find((p: any) => p.id === it.productId);
-          if (prod?.isPPOB) return s;
-          return s + ((Number(it.price) || 0) * (Number(it.quantity) || 0));
-        }, 0) || 0;
+          const isPpob = prod?.isPPOB || false;
+          
+          let cp = Number(it.costPrice || 0);
+          if (!cp && prod) {
+            const isBox = it.productName?.toLowerCase().includes('(box)');
+            cp = isBox ? Number(prod.boxCostPrice || 0) : Number(prod.costPrice || 0);
+          }
+
+          const itemOmset = (Number(it.price) || 0) * (Number(it.quantity) || 0);
+          const itemHpp = cp * (Number(it.quantity) || 0);
+
+          if (isPpob) {
+            txPpobOmset += itemOmset;
+            txPpobHpp += itemHpp;
+          } else {
+            txPhysicalOmset += itemOmset;
+            txPhysicalHpp += itemHpp;
+          }
+        });
         
-        a.omset += physicalOmset;
+        a.omset += txPhysicalOmset;
+        a.omset_ppob += txPpobOmset;
+        a.hpp_fisik += txPhysicalHpp;
+        a.hpp_ppob += txPpobHpp;
         a.margin += (t.marginContribution || 0);
+        a.margin_fisik += (txPhysicalOmset - txPhysicalHpp);
+        a.margin_ppob += (txPpobOmset - txPpobHpp);
         a.count += 1;
         return a;
-      }, { omset: 0, margin: 0, count: 0 });
+      }, { omset: 0, omset_ppob: 0, hpp_fisik: 0, hpp_ppob: 0, margin: 0, margin_fisik: 0, margin_ppob: 0, count: 0 });
       
       const totalExp = exps.reduce((a, e) => a + (Number(e.amount) || 0), 0);
       const zakat = grouped.margin > 0 ? Math.round(grouped.margin * 0.025) : 0;
@@ -453,13 +479,19 @@ export default function TrendPage() {
             <LineChartIcon className="w-32 h-32" />
           </div>
           <div className="relative z-10">
-            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Omset {totals.label}</p>
+            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Total Omset {totals.label}</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {totals.omset.toLocaleString('id-ID')}</h3>
+              <h3 className="text-2xl font-extrabold">Rp {(totals.omset + totals.omset_ppob).toLocaleString('id-ID')}</h3>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              {renderGrowth(comparisons.omset, true)}
-              <span className="text-white/70 text-[10px] font-medium">Berdasar periode</span>
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">Fisik:</span>
+                <span className="font-bold">Rp {totals.omset.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">PPOB:</span>
+                <span className="font-bold">Rp {totals.omset_ppob.toLocaleString('id-ID')}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -470,13 +502,19 @@ export default function TrendPage() {
             <TrendingUp className="w-32 h-32" />
           </div>
           <div className="relative z-10">
-            <p className="text-white/80 text-[11px] font-bold uppercase tracking-wider mb-2">Total HPP</p>
+            <p className="text-white/80 text-[11px] font-bold uppercase tracking-wider mb-2">Total HPP (Modal Pokok)</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {(totals.omset - totals.margin).toLocaleString('id-ID')}</h3>
+              <h3 className="text-2xl font-extrabold">Rp {(totals.hpp_fisik + totals.hpp_ppob).toLocaleString('id-ID')}</h3>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{(totals.omset > 0 ? ((totals.omset - totals.margin)/totals.omset) * 100 : 0).toFixed(1)}% dari Omset</span>
-              <span className="text-white/70 text-[10px] font-medium">Modal Pokok</span>
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">HPP Fisik:</span>
+                <span className="font-bold">Rp {totals.hpp_fisik.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">HPP PPOB:</span>
+                <span className="font-bold">Rp {totals.hpp_ppob.toLocaleString('id-ID')}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -491,9 +529,15 @@ export default function TrendPage() {
             <div className="flex items-baseline justify-between">
               <h3 className="text-2xl font-extrabold">Rp {totals.margin.toLocaleString('id-ID')}</h3>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
-              {renderGrowth(comparisons.margin, true)}
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">Profit Fisik:</span>
+                <span className="font-bold">Rp {totals.margin_fisik.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">Profit PPOB:</span>
+                <span className="font-bold">Rp {totals.margin_ppob.toLocaleString('id-ID')}</span>
+              </div>
             </div>
           </div>
         </div>
