@@ -182,7 +182,7 @@ export default function KasirShiftPage() {
       
       // Auto-detect Persediaan Barang if not specified
       const descLower = pettyCashDesc.toLowerCase();
-      if (!finalCoa && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan'))) {
+      if (!finalCoa && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan') || descLower.includes('belanja'))) {
         const persediaanCoa = useAppStore.getState().coaList?.find((c: any) => c.name.toLowerCase().includes('persediaan'));
         if (persediaanCoa) {
           finalCoa = persediaanCoa.code;
