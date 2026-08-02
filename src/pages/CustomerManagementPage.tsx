@@ -838,7 +838,12 @@ export default function CustomerManagementPage() {
 
                 return (
                   <div className="border border-gray-200 dark:border-slate-700 rounded-xl p-3 bg-gray-50 dark:bg-slate-800 max-h-48 overflow-y-auto">
-                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">Pilih Struk Kasbon yang Dilunasi (Opsional)</label>
+                    <div className="mb-2">
+                      <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-0.5">Pilih Struk Kasbon yang Dilunasi (Opsional)</label>
+                      <p className="text-[10px] text-gray-500 italic leading-tight">
+                        *Jika struk kasbon lama tidak muncul di sini, Anda tetap bisa melunasinya dengan langsung mengetik nominal uang pada kotak di bawah.
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       {unpaidInvoices.map(inv => (
                         <label key={inv.id} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
