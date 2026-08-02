@@ -354,7 +354,17 @@ export default function NeracaRugiPage() {
 
   // Unsold merchandise stock valuation (asset)
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
-  const valueOfInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
+  const physicalInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
+
+  const kasKecilInventory = (journalEntries || []).reduce((sum, j) => {
+    const acc = j.account?.toLowerCase() || '';
+    if (j.referenceType === 'AUTO_BEBAN' && (acc.includes('persediaan') || acc.includes('1-1040') || acc.includes('1109'))) {
+      return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
+    }
+    return sum;
+  }, 0);
+
+  const valueOfInventory = physicalInventory + kasKecilInventory;
 
   // Total Aktiva (Assets)
   const totalAssets = cashOnHand + valueOfInventory + activeReceivablesVal + Number(receivablesVal) + piutangKaryawanVal;
@@ -774,9 +784,17 @@ export default function NeracaRugiPage() {
                   <span className="font-mono font-black text-slate-900 dark:text-white">Rp {cashOnHand.toLocaleString('id-ID')}</span>
                 </div>
 
-                <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium">Persediaan Barang Dagang</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
+                <div className="flex flex-col border-b border-gray-100 dark:border-slate-800 pb-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-slate-400 font-medium">Persediaan Barang Dagang</span>
+                    <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
+                  </div>
+                  {(kasKecilInventory > 0 || kasKecilInventory < 0) && (
+                    <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                      <span className="ml-4">↳ Termasuk dari Pembelian Kas Kecil</span>
+                      <span className="font-mono">Rp {kasKecilInventory.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded-lg border border-gray-150 shadow-2xs">

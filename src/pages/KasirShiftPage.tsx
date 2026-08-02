@@ -178,13 +178,24 @@ export default function KasirShiftPage() {
     const expenseDate = pettyCashDate ? new Date(pettyCashDate).toISOString() : new Date().toISOString();
 
     if (currentUser) {
+      let finalCoa = coaAccount ? coaAccount.split(' - ')[0].trim() : undefined;
+      
+      // Auto-detect Persediaan Barang if not specified
+      const descLower = pettyCashDesc.toLowerCase();
+      if (!finalCoa && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan'))) {
+        const persediaanCoa = useAppStore.getState().coaList?.find((c: any) => c.name.toLowerCase().includes('persediaan'));
+        if (persediaanCoa) {
+          finalCoa = persediaanCoa.code;
+        }
+      }
+
       addExpense({
         tenantId: currentUser.tenantId || 'tenant_default',
         amount: finalAmount,
         category: 'OPERASIONAL',
         date: expenseDate,
         description: `Kas Kecil: ${pettyCashDesc}`,
-        coaId: coaAccount || undefined
+        coaId: finalCoa
       } as any);
     }
     
