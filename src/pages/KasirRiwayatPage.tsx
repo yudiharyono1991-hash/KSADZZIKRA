@@ -3,7 +3,7 @@ import { useBranchData } from '../hooks/useBranchData';
 import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth, Calendar, FileText, CreditCard } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { printToBluetooth, printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 
 export default function KasirRiwayatPage() {
   const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings, customers, kasbonPayments, products } = useBranchData();
@@ -255,14 +255,12 @@ export default function KasirRiwayatPage() {
       el.style.padding = '16px';
       el.style.backgroundColor = '#ffffff';
       
-      const canvas = await html2canvas(el, {
-        scale: 2, // high res
+      const dataUrl = await htmlToImage.toJpeg(el, {
+        quality: 0.95,
         backgroundColor: '#ffffff',
-        useCORS: true,
-        logging: false
+        pixelRatio: 2
       });
       
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       const link = document.createElement('a');
       link.download = `${filename}.jpg`;
       link.href = dataUrl;

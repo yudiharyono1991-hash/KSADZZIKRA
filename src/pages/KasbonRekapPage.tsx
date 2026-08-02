@@ -6,6 +6,7 @@ import { id } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { useAppStore } from '../store';
 import { printKasbonCardToBluetooth } from '../lib/bluetoothPrinter';
+import * as htmlToImage from 'html-to-image';
 
 export default function KasbonRekapPage() {
   const { settings, currentUser } = useAppStore();
@@ -290,6 +291,34 @@ export default function KasbonRekapPage() {
     const encoded = encodeURIComponent(text);
     const num = waNumber.replace(/^0/, '62');
     window.open(`https://wa.me/${num}?text=${encoded}`, '_blank');
+  };
+
+  const handleDownloadJPG = async () => {
+    const el = document.getElementById('printable-kartu-kasbon');
+    if (!el || !receiptCustomer) return;
+    
+    const originalStyle = el.style.cssText;
+    
+    try {
+      el.style.width = '350px';
+      el.style.padding = '16px';
+      el.style.backgroundColor = '#ffffff';
+      
+      const dataUrl = await htmlToImage.toJpeg(el, {
+        quality: 0.95,
+        backgroundColor: '#ffffff',
+        pixelRatio: 2
+      });
+      
+      const link = document.createElement('a');
+      link.download = `Kartu-Kasbon-${receiptCustomer.name.replace(/\s+/g, '-')}.jpg`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err: any) {
+      alert("Gagal membuat JPG: " + err.message);
+    } finally {
+      el.style.cssText = originalStyle;
+    }
   };
 
   return (
@@ -636,7 +665,7 @@ export default function KasbonRekapPage() {
             </div>
 
             {/* Simulated Thermic strip content */}
-            <div className="printable-area printable-thermal p-1 space-y-0.5 text-[10px] font-mono text-gray-700 dark:text-slate-300 border-b border-dashed border-gray-200 dark:border-slate-700 max-h-96 overflow-y-auto">
+            <div id="printable-kartu-kasbon" className="printable-area printable-thermal p-1 space-y-0.5 text-[10px] font-mono text-gray-700 dark:text-slate-300 border-b border-dashed border-gray-200 dark:border-slate-700 max-h-96 overflow-y-auto bg-white">
               <div className="text-center space-y-0.5 border-b border-gray-100 dark:border-slate-800 pb-2">
                 <p className="font-bold text-gray-800 dark:text-slate-200 text-[11px]">{settings.storeName || 'KSA Mart'}</p>
                 <p className="text-slate-400 uppercase">{settings.storeAddress || 'Alamat Belum Diatur'}</p>
@@ -728,7 +757,13 @@ export default function KasbonRekapPage() {
                   onClick={handleSendWA}
                   className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg text-center shadow-xs transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <MessageCircle className="w-3.5 h-3.5" /> Kirim WA
+                  <MessageCircle className="w-3.5 h-3.5" /> WA Teks
+                </button>
+                <button
+                  onClick={handleDownloadJPG}
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  <FileDown className="w-3.5 h-3.5" /> Unduh JPG
                 </button>
               </div>
               <div className="flex gap-2">
