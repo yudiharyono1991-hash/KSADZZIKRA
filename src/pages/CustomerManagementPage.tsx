@@ -798,9 +798,31 @@ export default function CustomerManagementPage() {
                   }
                 });
 
-                const unpaidInvoices = transactions
+                let unallocatedPayment = kasbonPayments
+                  .filter(kp => kp.customerId === payoffModal.customerId && (!kp.targetInvoiceNos || kp.targetInvoiceNos.length === 0))
+                  .reduce((sum, kp) => sum + kp.amountPaid, 0);
+
+                let unpaidInvoices = transactions
                   .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID' && !paidInvoiceIds.has(t.invoiceNo))
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // sort oldest first for FIFO
+                
+                if (unallocatedPayment > 0) {
+                   unpaidInvoices = unpaidInvoices.filter(tx => {
+                       if (unallocatedPayment >= tx.totalAmount) {
+                           unallocatedPayment -= tx.totalAmount;
+                           return false;
+                       } else {
+                           unallocatedPayment -= tx.totalAmount;
+                           if (unallocatedPayment >= 0) return false;
+                       }
+                       return true;
+                   });
+                }
+                
+                if (payoffModal.debtAmount <= 0) unpaidInvoices = [];
+
+                // sort back to newest first for display
+                unpaidInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                 if (unpaidInvoices.length === 0) return null;
 

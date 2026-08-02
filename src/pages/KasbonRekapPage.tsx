@@ -27,10 +27,27 @@ export default function KasbonRekapPage() {
   // Group kasbon data by customer
   const customersWithKasbon = useMemo(() => {
     return customers.map(customer => {
+      let unallocatedPayment = (kasbonPayments || [])
+        .filter(kp => kp.customerId === customer.id && (!kp.targetInvoiceNos || kp.targetInvoiceNos.length === 0))
+        .reduce((sum, kp) => sum + kp.amountPaid, 0);
+
       const debits = (transactions || [])
         .filter(tx => tx.customerId === customer.id && tx.paymentMethod === 'KASBON')
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         .map(tx => {
-          const isPaid = (kasbonPayments || []).some(kp => kp.customerId === customer.id && kp.targetInvoiceNos?.includes(tx.invoiceNo));
+          let isPaid = (kasbonPayments || []).some(kp => kp.customerId === customer.id && kp.targetInvoiceNos?.includes(tx.invoiceNo));
+          
+          if (!isPaid && unallocatedPayment > 0) {
+             if (unallocatedPayment >= tx.totalAmount) {
+                 unallocatedPayment -= tx.totalAmount;
+                 isPaid = true;
+             } else {
+                 unallocatedPayment -= tx.totalAmount;
+                 if (unallocatedPayment >= 0) isPaid = true;
+             }
+          }
+          if (customer.debtAmount <= 0) isPaid = true;
+
           return {
             date: new Date(tx.timestamp),
             type: 'PEMBELIAN',
@@ -752,20 +769,24 @@ export default function KasbonRekapPage() {
               </div>
 
               <div className="border-t border-dashed border-gray-200 dark:border-slate-700 py-1">
-                <div className="flex justify-between font-bold mb-1">
-                  <span>TGL</span>
-                  <span>REF</span>
-                  <span>NOMINAL</span>
+                <div className="grid grid-cols-[1fr_1fr_1fr] font-bold mb-1">
+                  <span className="text-left">TGL</span>
+                  <span className="text-center">REF</span>
+                  <span className="text-right">NOMINAL</span>
                 </div>
                 {receiptCustomer.history.map((h: any, i: number) => (
                   <div key={i} className="mb-2">
-                    <div className="flex justify-between text-[9px]">
-                      <span>{format(h.date, 'dd/MM/yy')}</span>
-                      <span className="truncate max-w-[80px] text-right">{h.ref}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[9px]">
-                      <span>{h.type === 'PEMBELIAN' ? `KASBON BARU ${h.isPaid ? '(Lunas)' : '(Belum Dilunasi)'}` : `PELUNASAN${h.paymentMethod ? ` (${h.paymentMethod})` : ''}`}</span>
-                      <span>{h.type === 'PEMBELIAN' ? '+' : '-'} {h.amount.toLocaleString('id-ID')}</span>
+                    <div className="grid grid-cols-[1fr_1fr_1fr] text-[9px] gap-1 items-start">
+                      <div className="flex flex-col text-left">
+                        <span>{format(h.date, 'dd/MM/yy')}</span>
+                        <span className="leading-tight mt-0.5">{h.type === 'PEMBELIAN' ? `KASBON ${h.isPaid ? '(Lunas)' : '(Belum Lunas)'}` : `PELUNASAN`}</span>
+                      </div>
+                      <div className="flex flex-col text-center">
+                        <span className="truncate max-w-[80px] mx-auto">{h.ref}</span>
+                      </div>
+                      <div className="flex flex-col text-right">
+                        <span>{h.type === 'PEMBELIAN' ? '+' : '-'} {h.amount.toLocaleString('id-ID')}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
