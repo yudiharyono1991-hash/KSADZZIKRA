@@ -661,12 +661,12 @@ export default function NeracaRugiPage() {
                   </div>
                   <div className="space-y-2 pl-4">
                     {filteredOtherIncome.map((exp) => (
-                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400">
-                        <span className="truncate max-w-[240px]">
+                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 py-0.5">
+                        <span className="pr-4 flex-1">
                           <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span>
                           • {exp.description.replace('Pemasukan Kas: ', '')}
                         </span>
-                        <span className="text-blue-700 font-mono">+ Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
+                        <span className="text-blue-700 font-mono whitespace-nowrap">+ Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
                       </div>
                     ))}
                   </div>
@@ -688,12 +688,12 @@ export default function NeracaRugiPage() {
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
                   ) : (
                     filteredExpenses.map((exp) => (
-                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors">
-                        <span className="truncate max-w-[240px]">
+                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors py-0.5">
+                        <span className="pr-4 flex-1">
                           <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span> 
                           • {exp.description} ({exp.category})
                         </span>
-                        <span className="text-red-700 font-mono">- Rp {exp.amount.toLocaleString('id-ID')}</span>
+                        <span className="text-red-700 font-mono whitespace-nowrap">- Rp {exp.amount.toLocaleString('id-ID')}</span>
                       </div>
                     ))
                   )}
