@@ -303,6 +303,8 @@ export default function KasbonRekapPage() {
       el.style.width = '350px';
       el.style.padding = '16px';
       el.style.backgroundColor = '#ffffff';
+      el.style.maxHeight = 'none';
+      el.style.overflow = 'visible';
       
       const dataUrl = await htmlToImage.toJpeg(el, {
         quality: 0.95,
