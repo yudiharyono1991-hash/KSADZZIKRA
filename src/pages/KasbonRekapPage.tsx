@@ -645,7 +645,7 @@ export default function KasbonRekapPage() {
                                             : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                                         }`}>
                                           {h.type === 'PEMBELIAN' 
-                                            ? `KASBON BARU ${h.isPaid ? '(Lunas)' : '(Belum Dilunasi)'}` 
+                                            ? `KASBON ${h.isPaid ? '(Sudah Dilunasi)' : '(Belum Dilunasi)'}` 
                                             : `PELUNASAN ${h.targetInvoiceNos?.length ? `(Inv: ${h.targetInvoiceNos.join(', ')})` : ''}`}
                                         </span>
                                       </td>
@@ -795,7 +795,7 @@ export default function KasbonRekapPage() {
                     <div className="grid grid-cols-[1fr_1fr_1fr] text-[9px] gap-1 items-start">
                       <div className="flex flex-col text-left">
                         <span>{format(h.date, 'dd/MM/yy')}</span>
-                        <span className="leading-tight mt-0.5">{h.type === 'PEMBELIAN' ? `KASBON ${h.isPaid ? '(Lunas)' : '(Belum Lunas)'}` : `PELUNASAN`}</span>
+                        <span className="leading-tight mt-0.5">{h.type === 'PEMBELIAN' ? `KASBON ${h.isPaid ? '(Sudah Dilunasi)' : '(Belum Dilunasi)'}` : `PELUNASAN`}</span>
                       </div>
                       <div className="flex flex-col text-center">
                         <span className="truncate max-w-[80px] mx-auto">{h.ref}</span>
