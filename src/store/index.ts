@@ -2766,7 +2766,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // === JURNAL OTOMATIS dari Pengeluaran ===
     const now = new Date().toISOString();
     const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
-    const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
+    const kasAccount = expenseData.kasAccountId || (kasKecilCoa ? kasKecilCoa.code : '1-1000');
     const bebanAccount = (expenseData as any).coaId || '5-2020';
 
     const isIncome = newExpense.amount < 0;

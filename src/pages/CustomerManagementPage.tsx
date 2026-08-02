@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 import { printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 
 export default function CustomerManagementPage() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry, settings, users, updateUser, transactions, addKasbonPayment, kasbonPayments } = useBranchData();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, currentUser, addJournalEntry, settings, users, updateUser, transactions, addKasbonPayment, kasbonPayments, coaList } = useBranchData();
   const location = useLocation();
   const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
@@ -25,8 +25,8 @@ export default function CustomerManagementPage() {
     isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''
   });
   
-  const [payoffModal, setPayoffModal] = useState<{ isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: string, notes?: string, selectedInvoices: string[] }>({
-    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: []
+  const [payoffModal, setPayoffModal] = useState<{ isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: string, notes?: string, selectedInvoices: string[], debitAccountId?: string, creditAccountId?: string }>({
+    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [], debitAccountId: '', creditAccountId: ''
   });
 
   const [receiptModal, setReceiptModal] = useState<{ isOpen: boolean, record: import('../types').KasbonPaymentRecord | null }>({
@@ -176,7 +176,16 @@ export default function CustomerManagementPage() {
       return '1-1000';
     };
 
-    const targetAccount = getAccountForMethod(paymentMethod);
+    let targetAccount = getAccountForMethod(paymentMethod);
+    if (payoffModal.debitAccountId) {
+      targetAccount = payoffModal.debitAccountId.split(' - ')[0].trim();
+    }
+
+    let targetCreditAccount = '1-1030';
+    if (payoffModal.creditAccountId) {
+      targetCreditAccount = payoffModal.creditAccountId.split(' - ')[0].trim();
+    }
+
     const { addJournalEntries } = useAppStore.getState();
     const dateStr = new Date().toISOString();
     const tenantIdStr = currentUser?.tenantId || 'tenant_default';
@@ -197,7 +206,7 @@ export default function CustomerManagementPage() {
       {
         tenantId: tenantIdStr,
         date: dateStr,
-        account: '1-1030', // Piutang Kasbon Pelanggan
+        account: targetCreditAccount, // Piutang Kasbon Pelanggan
         description: `[Auto] Pengurangan piutang pelanggan: ${customerName}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
         debit: 0,
         credit: payAmount,
@@ -227,7 +236,7 @@ export default function CustomerManagementPage() {
     if (cust && cust.phone) setWaNumber(cust.phone);
     else setWaNumber('');
 
-    setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [] });
+    setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [], debitAccountId: '', creditAccountId: '' });
     setReceiptModal({ isOpen: true, record: { ...newPaymentRecord, id: `kp_${Date.now()}`, paymentDate: dateStr } });
   };
 
@@ -885,17 +894,37 @@ export default function CustomerManagementPage() {
                 );
               })()}
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Metode Pembayaran</label>
-                <select
-                  value={payoffModal.paymentMethod}
-                  onChange={(e) => setPayoffModal({ ...payoffModal, paymentMethod: e.target.value as any })}
-                  className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="CASH">Tunai (Cash)</option>
-                  <option value="TRANSFER_BSI">Transfer BSI</option>
-                  <option value="QRIS_SHARIAH">QRIS Syariah</option>
-                </select>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-gray-700 dark:text-slate-300 mb-1 uppercase">Akun Kas Penerima (Debit)</label>
+                  <input
+                    list="debit-options"
+                    value={payoffModal.debitAccountId || ''}
+                    onChange={(e) => setPayoffModal({ ...payoffModal, debitAccountId: e.target.value })}
+                    placeholder="Pilih Akun Kas/Bank"
+                    className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <datalist id="debit-options">
+                    {coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('kas') || c.name.toLowerCase().includes('bank')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-gray-700 dark:text-slate-300 mb-1 uppercase">Akun Piutang Kasbon (Kredit)</label>
+                  <input
+                    list="credit-options"
+                    value={payoffModal.creditAccountId || ''}
+                    onChange={(e) => setPayoffModal({ ...payoffModal, creditAccountId: e.target.value })}
+                    placeholder="Pilih Akun Piutang"
+                    className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <datalist id="credit-options">
+                    {coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('piutang')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
               <div>

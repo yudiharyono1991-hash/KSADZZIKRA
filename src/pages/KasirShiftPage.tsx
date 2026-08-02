@@ -25,6 +25,7 @@ export default function KasirShiftPage() {
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [coaAccount, setCoaAccount] = useState('');
+  const [kasAccount, setKasAccount] = useState('');
   
   const [todayDate, setTodayDate] = useState(getLocalTodayDate());
   const firstDayOfMonth = todayDate.substring(0, 8) + '01';
@@ -195,13 +196,15 @@ export default function KasirShiftPage() {
         category: 'OPERASIONAL',
         date: expenseDate,
         description: `Kas Kecil: ${pettyCashDesc}`,
-        coaId: finalCoa
+        coaId: finalCoa,
+        kasAccountId: kasAccount ? kasAccount.split(' - ')[0].trim() : undefined
       } as any);
     }
     
     setPettyCashAmount('');
     setPettyCashDesc('');
     setCoaAccount('');
+    setKasAccount('');
   };
 
   const handleCloseShift = () => {
@@ -655,20 +658,37 @@ export default function KasirShiftPage() {
                   placeholder="Misal: Parkir Galon"
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA)</label>
-                <input
-                  list="coa-options"
-                  value={coaAccount}
-                  onChange={(e) => setCoaAccount(e.target.value)}
-                  placeholder="Pilih Akun (Otomatis jika kosong)"
-                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
-                />
-                <datalist id="coa-options">
-                  {useAppStore.getState().coaList?.filter((c: any) => c.isActive && !c.name.toLowerCase().includes('kas')).map((c: any) => (
-                    <option key={c.id} value={`${c.code} - ${c.name}`} />
-                  ))}
-                </datalist>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA)</label>
+                  <input
+                    list="coa-options"
+                    value={coaAccount}
+                    onChange={(e) => setCoaAccount(e.target.value)}
+                    placeholder="Otomatis jika kosong"
+                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+                  />
+                  <datalist id="coa-options">
+                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && !c.name.toLowerCase().includes('kas')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-amber-800 uppercase">Akun Kas</label>
+                  <input
+                    list="kas-options"
+                    value={kasAccount}
+                    onChange={(e) => setKasAccount(e.target.value)}
+                    placeholder="Default: Kas Utama"
+                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+                  />
+                  <datalist id="kas-options">
+                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('kas')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
               <button 
                 type="submit"

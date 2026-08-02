@@ -365,6 +365,7 @@ export interface Expense {
   createdBy: string;
   branchId?: string;
   coaId?: string;
+  kasAccountId?: string;
 }
 
 export interface ClosingRecord {
