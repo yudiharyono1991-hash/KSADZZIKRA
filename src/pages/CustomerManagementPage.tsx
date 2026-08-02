@@ -791,35 +791,45 @@ export default function CustomerManagementPage() {
 
               {/* Invoice Selection */}
               {(() => {
-                const paidInvoiceIds = new Set<string>();
+                const debitsRaw = transactions
+                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID')
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // sort oldest first for FIFO
+
+                const explicitPaidInvoiceNos = new Set<string>();
                 kasbonPayments.forEach(p => {
                   if (p.customerId === payoffModal.customerId && p.targetInvoiceNos) {
-                    p.targetInvoiceNos.forEach(id => paidInvoiceIds.add(id));
+                    p.targetInvoiceNos.forEach(id => explicitPaidInvoiceNos.add(id));
                   }
                 });
 
-                let unallocatedPayment = kasbonPayments
-                  .filter(kp => kp.customerId === payoffModal.customerId && (!kp.targetInvoiceNos || kp.targetInvoiceNos.length === 0))
-                  .reduce((sum, kp) => sum + kp.amountPaid, 0);
+                let totalDebits = 0;
+                let explicitPaidAmount = 0;
+                debitsRaw.forEach(tx => {
+                   totalDebits += tx.totalAmount;
+                   if (explicitPaidInvoiceNos.has(tx.invoiceNo)) {
+                      explicitPaidAmount += tx.totalAmount;
+                   }
+                });
 
-                let unpaidInvoices = transactions
-                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID' && !paidInvoiceIds.has(t.invoiceNo))
-                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // sort oldest first for FIFO
+                let totalPaid = totalDebits - (payoffModal.debtAmount || 0);
+                let unallocatedPayment = totalPaid - explicitPaidAmount;
+
+                let unpaidInvoices = debitsRaw.filter(tx => !explicitPaidInvoiceNos.has(tx.invoiceNo));
                 
                 if (unallocatedPayment > 0) {
                    unpaidInvoices = unpaidInvoices.filter(tx => {
-                       if (unallocatedPayment >= tx.totalAmount) {
+                       if (unallocatedPayment >= tx.totalAmount - 0.01) {
                            unallocatedPayment -= tx.totalAmount;
                            return false;
                        } else {
                            unallocatedPayment -= tx.totalAmount;
-                           if (unallocatedPayment >= 0) return false;
+                           if (unallocatedPayment >= -0.01) return false;
                        }
                        return true;
                    });
                 }
                 
-                if (payoffModal.debtAmount <= 0) unpaidInvoices = [];
+                if ((payoffModal.debtAmount || 0) <= 0) unpaidInvoices = [];
 
                 // sort back to newest first for display
                 unpaidInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

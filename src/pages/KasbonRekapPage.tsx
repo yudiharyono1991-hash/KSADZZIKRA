@@ -27,26 +27,42 @@ export default function KasbonRekapPage() {
   // Group kasbon data by customer
   const customersWithKasbon = useMemo(() => {
     return customers.map(customer => {
-      let unallocatedPayment = (kasbonPayments || [])
-        .filter(kp => kp.customerId === customer.id && (!kp.targetInvoiceNos || kp.targetInvoiceNos.length === 0))
-        .reduce((sum, kp) => sum + kp.amountPaid, 0);
-
-      const debits = (transactions || [])
+      const debitsRaw = (transactions || [])
         .filter(tx => tx.customerId === customer.id && tx.paymentMethod === 'KASBON')
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-        .map(tx => {
-          let isPaid = (kasbonPayments || []).some(kp => kp.customerId === customer.id && kp.targetInvoiceNos?.includes(tx.invoiceNo));
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      const explicitPaidInvoiceNos = new Set<string>();
+      (kasbonPayments || []).forEach(kp => {
+        if (kp.customerId === customer.id && kp.targetInvoiceNos) {
+           kp.targetInvoiceNos.forEach(id => explicitPaidInvoiceNos.add(id));
+        }
+      });
+
+      let totalDebits = 0;
+      let explicitPaidAmount = 0;
+      debitsRaw.forEach(tx => {
+         totalDebits += tx.totalAmount;
+         if (explicitPaidInvoiceNos.has(tx.invoiceNo)) {
+            explicitPaidAmount += tx.totalAmount;
+         }
+      });
+
+      let totalPaid = totalDebits - (customer.debtAmount || 0);
+      let unallocatedPayment = totalPaid - explicitPaidAmount;
+
+      const debits = debitsRaw.map(tx => {
+          let isPaid = explicitPaidInvoiceNos.has(tx.invoiceNo);
           
           if (!isPaid && unallocatedPayment > 0) {
-             if (unallocatedPayment >= tx.totalAmount) {
+             if (unallocatedPayment >= tx.totalAmount - 0.01) {
                  unallocatedPayment -= tx.totalAmount;
                  isPaid = true;
              } else {
                  unallocatedPayment -= tx.totalAmount;
-                 if (unallocatedPayment >= 0) isPaid = true;
+                 if (unallocatedPayment >= -0.01) isPaid = true;
              }
           }
-          if (customer.debtAmount <= 0) isPaid = true;
+          if ((customer.debtAmount || 0) <= 0) isPaid = true;
 
           return {
             date: new Date(tx.timestamp),
