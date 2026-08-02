@@ -262,6 +262,7 @@ interface AppState {
 
   // Expenses & Closing Actions
   addExpense: (expense: Omit<Expense, 'id' | 'createdBy'>) => void;
+  updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
   getCalculatedPettyCash: () => number;
   addPettyCashDeposit: (amount: number, description: string) => void;
@@ -358,39 +359,7 @@ const getSavedUsers = (): UserAccount[] => {
   const saved = getStorage('ksa_users');
   if (saved) {
     try {
-      const parsed = saved as any[];
-      // Force update owner name and credentials for KSA Mart Owner
-      const hasOwner = parsed.some((u: any) => u.username === 'owner' || u.id === 'usr_3');
-      let updatedUsers = parsed.map((u: any) => {
-        if (u.username === 'owner' || u.id === 'usr_3') {
-          return {
-            ...u,
-            id: 'usr_3',
-            name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.',
-            username: 'owner',
-            password: 'owner123',
-            role: 'OWNER',
-            isActive: true,
-            isApproved: true,
-            tenantId: 'tenant_default'
-          };
-        }
-        return u;
-      });
-      if (!hasOwner) {
-        updatedUsers.push({
-          id: 'usr_3',
-          tenantId: 'tenant_default',
-          name: 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.',
-          username: 'owner',
-          password: 'owner123',
-          role: 'OWNER',
-          createdAt: new Date().toISOString(),
-          isActive: true,
-          isApproved: true
-        });
-      }
-      return updatedUsers;
+      return saved as any[];
     } catch (e) { }
   }
   return [
@@ -1064,7 +1033,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().addLog('TRANSACTION_VOID_APPROVED', 'POS', `Void transaksi ${tx.invoiceNo} disetujui oleh ${currentUser.name}`);
 
     if (isSupabaseConfigured) {
-      (supabaseService as any).saveTransaction(updatedTx);
+      supabaseService.saveTransaction(updatedTx);
       if (reversingJournals.length > 0) {
         (supabaseService as any).saveJournalEntriesBulk(reversingJournals);
       }
@@ -1072,7 +1041,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       tx.items.forEach(item => {
         const prod = updatedProducts.find(p => p.id === item.productId);
         if (prod && !prod.isPPOB) {
-          (supabaseService as any).saveProduct(prod);
+          supabaseService.saveProduct(prod);
         }
       });
     }
@@ -2807,6 +2776,68 @@ export const useAppStore = create<AppState>((set, get) => ({
       expJournals.forEach(j => supabaseService.saveJournalEntry(j));
     }
     // === END JURNAL OTOMATIS ===
+  },
+
+  updateExpense: (id, updates) => {
+    const { currentUser, expenses, journalEntries, coaList } = get();
+    const existingExpense = expenses.find(e => e.id === id);
+    if (!existingExpense) return;
+
+    const updatedExpense = { ...existingExpense, ...updates };
+    const updatedExpenses = expenses.map(e => e.id === id ? updatedExpense : e);
+    
+    // Delete old journal entries
+    const updatedJournalsRaw = journalEntries.filter(j => j.referenceId !== id);
+    
+    // Create new journal entries
+    const kasAccount = updatedExpense.kasAccountId || '1-1000';
+    const bebanAccount = updatedExpense.coaId || '5-2020';
+
+    const isIncome = updatedExpense.amount < 0;
+    const absAmount = Math.abs(updatedExpense.amount);
+
+    const expJournals: import('../types').JournalEntry[] = [
+      {
+        id: `je_${Date.now()}_exp1_${Math.random().toString(36).substring(2, 8)}`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: updatedExpense.date,
+        account: bebanAccount,
+        description: `[Auto] Beban ${updatedExpense.category}: ${updatedExpense.description}`,
+        debit: isIncome ? 0 : absAmount,
+        credit: isIncome ? absAmount : 0,
+        referenceId: updatedExpense.id,
+        referenceType: 'AUTO_BEBAN' as import('../types').JournalSourceType,
+        createdBy: updatedExpense.createdBy,
+        branchId: updatedExpense.branchId
+      },
+      {
+        id: `je_${Date.now()}_exp2_${Math.random().toString(36).substring(2, 8)}`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: updatedExpense.date,
+        account: kasAccount,
+        description: `[Auto] Kas ${isIncome ? 'masuk dari' : 'keluar untuk'} ${updatedExpense.description}`,
+        debit: isIncome ? absAmount : 0,
+        credit: isIncome ? 0 : absAmount,
+        referenceId: updatedExpense.id,
+        referenceType: 'AUTO_BEBAN' as import('../types').JournalSourceType,
+        createdBy: updatedExpense.createdBy,
+        branchId: updatedExpense.branchId
+      }
+    ];
+
+    const finalJournals = [...expJournals, ...updatedJournalsRaw];
+
+    set({ expenses: updatedExpenses, journalEntries: finalJournals });
+    saveStorage('ksa_expenses', updatedExpenses, currentUser?.tenantId);
+    saveStorage('ksa_journal_entries', finalJournals, currentUser?.tenantId);
+
+    get().addLog('EXPENSE_UPDATE', 'FINANCE', `Mengupdate pengeluaran: ${updatedExpense.description}`);
+
+    if (typeof isSupabaseConfigured !== 'undefined' && isSupabaseConfigured) {
+      (supabaseService as any).saveExpense(updatedExpense);
+      (supabaseService as any).deleteJournalEntryByRef(id);
+      expJournals.forEach(j => (supabaseService as any).saveJournalEntry(j));
+    }
   },
 
   deleteExpense: (id) => {

@@ -455,7 +455,7 @@ export async function printKasbonCardToBluetooth(
       // format to fit 32 chars
       encoder.line(`${tgl} ${ref}  ${nom}`);
       const method = h.paymentMethod ? ` (${h.paymentMethod})` : '';
-      encoder.line(`(${h.type === 'PEMBELIAN' ? 'KASBON BARU' : `PELUNASAN${method}`})`);
+      encoder.line(`(${h.type === 'PEMBELIAN' ? (h.isPaid ? 'KASBON (LUNAS)' : 'KASBON (BELUM LUNAS)') : `PELUNASAN${method}`})`);
     });
 
     encoder.line('--------------------------------');

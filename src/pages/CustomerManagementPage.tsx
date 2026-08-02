@@ -291,21 +291,60 @@ export default function CustomerManagementPage() {
   };
 
   const getKasbonHistory = (customerId: string) => {
-    const debits = transactions
-      .filter(tx => tx.customerId === customerId && tx.paymentMethod === 'KASBON')
-      .map(tx => ({
+    const debitsRaw = transactions
+      .filter(tx => tx.customerId === customerId && tx.paymentMethod === 'KASBON' && tx.status !== 'VOID')
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const explicitPaidInvoiceNos = new Set<string>();
+    (kasbonPayments || []).forEach(p => {
+      if (p.customerId === customerId && p.targetInvoiceNos) {
+        p.targetInvoiceNos.forEach(id => explicitPaidInvoiceNos.add(id));
+      }
+    });
+
+    let totalDebits = 0;
+    let explicitPaidAmount = 0;
+    debitsRaw.forEach(tx => {
+       totalDebits += tx.totalAmount;
+       if (explicitPaidInvoiceNos.has(tx.invoiceNo)) {
+          explicitPaidAmount += tx.totalAmount;
+       }
+    });
+
+    const cust = customers.find(c => c.id === customerId);
+    const debtAmount = cust ? (cust.debtAmount || 0) : 0;
+    let totalPaid = totalDebits - debtAmount;
+    let unallocatedPayment = totalPaid - explicitPaidAmount;
+
+    const paidInvoices = new Set<string>(explicitPaidInvoiceNos);
+    
+    debitsRaw.forEach(tx => {
+        if (!paidInvoices.has(tx.invoiceNo)) {
+            if (unallocatedPayment >= tx.totalAmount - 0.01) {
+                unallocatedPayment -= tx.totalAmount;
+                paidInvoices.add(tx.invoiceNo);
+            } else if (unallocatedPayment > 0) {
+                unallocatedPayment = 0; // partially paid, not lunas
+            }
+        }
+    });
+
+    const debits = debitsRaw.map(tx => ({
         date: new Date(tx.timestamp),
         type: 'PEMBELIAN',
+        isLunas: paidInvoices.has(tx.invoiceNo),
         ref: tx.id,
+        invoiceNo: tx.invoiceNo,
         amount: tx.totalAmount,
         cashier: tx.cashierName
-      }));
+    }));
       
     const credits = (kasbonPayments || [])
       .filter(kp => kp.customerId === customerId)
       .map(kp => ({
         date: new Date(kp.paymentDate),
         type: 'PELUNASAN',
+        isLunas: false,
         ref: kp.id,
         amount: kp.amountPaid,
         cashier: kp.cashierName
@@ -1099,7 +1138,7 @@ export default function CustomerManagementPage() {
                           <span className={`px-2 py-1 rounded-md text-xs font-bold ${
                             item.type === 'PEMBELIAN' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
                           }`}>
-                            {item.type === 'PEMBELIAN' ? 'Kasbon Baru' : 'Pelunasan Kasbon'}
+                            {item.type === 'PEMBELIAN' ? (item.isLunas ? 'Kasbon (Lunas)' : 'Kasbon (Belum Lunas)') : 'Pelunasan Kasbon'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-rose-600 dark:text-rose-400">

@@ -272,10 +272,10 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                 <span className="text-[9px] text-gray-500">PPOB:</span>
                 <span className="font-mono text-[9px]">Rp {todayPPOBSales.toLocaleString('id-ID')}</span>
               </div>
-              <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center">
-                <span className="text-gray-400">TOTAL OMSET HARI INI</span>
-                <span className="font-extrabold text-gray-900 dark:text-white font-mono ml-2">Rp {(todaySales + todayPPOBSales).toLocaleString('id-ID')}</span>
-              </div>
+                <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center whitespace-nowrap">
+                  <span className="text-gray-400 mr-2">TOTAL OMSET HARI INI</span>
+                  <span className="font-extrabold text-gray-900 dark:text-white font-mono">Rp {(todaySales + todayPPOBSales).toLocaleString('id-ID')}</span>
+                </div>
             </div>
             
             <div className="flex flex-col ml-4">
@@ -287,10 +287,10 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
                 <span className="text-[9px] text-gray-500">PPOB:</span>
                 <span className="font-mono text-[9px] text-green-600">Rp {todayPPOBMargin.toLocaleString('id-ID')}</span>
               </div>
-              <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center">
-                <span className="text-gray-400">MARGIN BERKAH</span>
-                <span className="font-extrabold text-green-700 font-mono ml-2">Rp {(todayMargin + todayPPOBMargin).toLocaleString('id-ID')}</span>
-              </div>
+                <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center whitespace-nowrap">
+                  <span className="text-gray-400 mr-2">MARGIN BERKAH</span>
+                  <span className="font-extrabold text-green-700 dark:text-green-500 font-mono">Rp {(todayMargin + todayPPOBMargin).toLocaleString('id-ID')}</span>
+                </div>
             </div>
           </div>
         )}

@@ -174,7 +174,7 @@ export default function KasbonRekapPage() {
             "Nama Pelanggan": customer.name,
             "No. Telepon": customer.phone || '-',
             "Tanggal": format(h.date, 'dd/MM/yyyy HH:mm'),
-            "Tipe": h.type === 'PEMBELIAN' ? 'KASBON BARU' : 'PELUNASAN',
+            "Tipe": h.type === 'PEMBELIAN' ? (h.isPaid ? 'KASBON (LUNAS)' : 'KASBON (BELUM LUNAS)') : 'PELUNASAN',
             "Referensi": h.ref,
             "Jumlah (Rp)": h.amount,
             "Saldo Setelah Transaksi (Rp)": h.balance,
@@ -318,7 +318,7 @@ export default function KasbonRekapPage() {
     receiptCustomer.history.forEach((h: any) => {
       const tgl = format(h.date, 'dd/MM/yy');
       const sign = h.type === 'PEMBELIAN' ? '+' : '-';
-      const label = h.type === 'PEMBELIAN' ? 'Kasbon Baru' : `Pelunasan${h.paymentMethod ? ` (${h.paymentMethod})` : ''}`;
+      const label = h.type === 'PEMBELIAN' ? (h.isPaid ? 'Kasbon (Lunas)' : 'Kasbon (Belum Lunas)') : `Pelunasan${h.paymentMethod ? ` (${h.paymentMethod})` : ''}`;
       text += `[${tgl}] ${label}\nRp ${h.amount.toLocaleString('id-ID')} (${sign})\n`;
     });
     
@@ -341,7 +341,7 @@ export default function KasbonRekapPage() {
     const originalStyle = el.style.cssText;
     
     try {
-      el.style.width = '350px';
+      el.style.width = '400px';
       el.style.padding = '16px';
       el.style.backgroundColor = '#ffffff';
       el.style.maxHeight = 'none';
@@ -376,7 +376,7 @@ export default function KasbonRekapPage() {
     const originalStyle = el.style.cssText;
     
     try {
-      el.style.width = '350px';
+      el.style.width = '400px';
       el.style.padding = '16px';
       el.style.backgroundColor = '#ffffff';
       el.style.maxHeight = 'none';
@@ -395,10 +395,10 @@ export default function KasbonRekapPage() {
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
-        format: [350, fullHeight]
+        format: [400, fullHeight]
       });
       
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, 350, fullHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, 400, fullHeight);
       pdf.save(`Kartu-Kasbon-${receiptCustomer.name.replace(/\\s+/g, '-')}.pdf`);
     } catch (err: any) {
       alert("Gagal membuat PDF: " + err.message);
@@ -746,7 +746,7 @@ export default function KasbonRekapPage() {
               .no-print { display: none !important; }
             }
           `}} />
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Receipt headers */}
             <div className="p-4 text-center border-b border-gray-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 no-print">
               <h3 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Pratinjau Kartu Kasbon</h3>

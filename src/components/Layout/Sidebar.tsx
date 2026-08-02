@@ -101,6 +101,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: ShoppingCart,
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag, badge: pendingOrdersCount },
         ]

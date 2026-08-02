@@ -463,7 +463,9 @@ export default function JurnalUmumPage() {
                       <tbody key={group.refId} className="text-sm print:break-inside-avoid border-b border-slate-100 dark:border-slate-800">
                         <tr className="bg-slate-50 dark:bg-slate-800/50">
                           <td className="p-3 text-xs text-slate-500 dark:text-slate-400 align-top" rowSpan={group.entries.length}>
-                            <div className="font-bold text-slate-700 dark:text-slate-300">{new Date(group.date).toLocaleDateString('id-ID')}</div>
+                            <div className="font-bold text-slate-700 dark:text-slate-300">
+                              {new Date(group.date).toLocaleString('id-ID', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
                             <div className="font-mono text-[10px] mt-1 break-all">{group.refId}</div>
                             {isManual && <span className="inline-block mt-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-bold rounded">MANUAL</span>}
                           </td>

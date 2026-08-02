@@ -27,6 +27,7 @@ export default function NeracaRugiPage() {
   const navigate = useNavigate();
   const { transactions, products, expenses, journalEntries, currentUser, activeBranchId, branches, addLog, addNotification, settings, customers } = useBranchData();
   const users = useAppStore(state => state.users);
+  const coaList = useAppStore(state => state.coaList);
   const reportRef = useRef<HTMLDivElement>(null);
   const isOwner = currentUser?.role === 'OWNER' || currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'PENGURUS';
   const isReadOnlyRole = !isOwner && currentUser?.role !== 'MANAGER';
@@ -196,7 +197,28 @@ export default function NeracaRugiPage() {
     return expDate >= startDate && expDate <= endDate;
   });
 
-  const filteredExpenses = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0);
+  const isInventoryExpense = (exp: any) => {
+    const acc = exp.coaId?.toLowerCase() || '';
+    if (acc.includes('persediaan') || acc.includes('1-1040') || acc.includes('1109') || acc.includes('1110')) return true;
+    const coa = coaList?.find((c: any) => c.code === exp.coaId);
+    if (coa && coa.name.toLowerCase().includes('persediaan')) return true;
+    
+    const desc = (exp.description || '').toLowerCase();
+    if (
+      desc.includes('persediaan') || 
+      desc.includes('stok') || 
+      desc.includes('kulakan') || 
+      desc.includes('1110') ||
+      (desc.includes('belanja') && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air')) ||
+      desc.includes('paket cod') ||
+      desc.includes('cadar') ||
+      desc.includes('telur')
+    ) return true;
+    
+    return false;
+  };
+
+  const filteredExpenses = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp));
   const filteredOtherIncome = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) < 0);
 
   let periodPhysicalRevenue = 0;
@@ -274,9 +296,17 @@ export default function NeracaRugiPage() {
     .filter(exp => {
       if (!exp || !exp.date) return false;
       const expDate = String(exp.date).split('T')[0];
-      return expDate <= endDate;
+      return expDate <= endDate && (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp);
     })
     .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+
+  const allTimeTransactionsOtherIncome = (expenses || [])
+    .filter(exp => {
+      if (!exp || !exp.date) return false;
+      const expDate = String(exp.date).split('T')[0];
+      return expDate <= endDate && (Number(exp.amount) || 0) < 0;
+    })
+    .reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
 
   const allTimeTransactionsHPP = (transactions || [])
     .filter(tx => {
@@ -347,7 +377,7 @@ export default function NeracaRugiPage() {
   const allTimeExpenses = allTimeTransactionsExpenses + allTimeManualExpenses;
   const allTimeHPP = allTimeTransactionsHPP + allTimeManualHPP;
 
-  const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses;
+  const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses + allTimeTransactionsOtherIncome;
 
   // Sound liquid capital: sum of the separated cash accounts
   const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank + balanceRadar + balanceDana;
@@ -358,8 +388,21 @@ export default function NeracaRugiPage() {
 
   const kasKecilInventoryEntries = (journalEntries || []).filter(j => {
     const acc = j.account?.toLowerCase() || '';
-    return j.referenceType === 'AUTO_BEBAN' && (acc.includes('persediaan') || acc.includes('1-1040') || acc.includes('1109'));
-  });
+    const desc = j.description?.toLowerCase() || '';
+    return j.referenceType === 'AUTO_BEBAN' && Number(j.debit) > 0 && (
+      acc.includes('persediaan') || 
+      acc.includes('1-1040') || 
+      acc.includes('1109') || 
+      acc.includes('1110') ||
+      desc.includes('persediaan') ||
+      desc.includes('stok') ||
+      desc.includes('kulakan') ||
+      (desc.includes('belanja') && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air')) ||
+      desc.includes('paket cod') ||
+      desc.includes('cadar') ||
+      desc.includes('telur')
+    );
+  }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
   const kasKecilInventory = kasKecilInventoryEntries.reduce((sum, j) => {
     return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
@@ -793,7 +836,7 @@ export default function NeracaRugiPage() {
                   {(kasKecilInventory > 0 || kasKecilInventory < 0) && (
                     <div className="flex flex-col mt-1.5 space-y-1">
                       <div className="flex justify-between text-[10px] text-gray-500">
-                        <span className="ml-4 font-bold">↳ Termasuk dari Pembelian Kas Kecil</span>
+                        <span className="ml-4 font-bold">↳ Tambahan dari Pembelian Langsung</span>
                         <span className="font-mono font-bold">Rp {kasKecilInventory.toLocaleString('id-ID')}</span>
                       </div>
                       {kasKecilInventoryEntries.map(entry => {

@@ -253,7 +253,7 @@ export default function KasirRiwayatPage() {
     
     try {
       // Temporary styling to ensure good capture
-      el.style.width = '350px';
+      el.style.width = '400px';
       el.style.padding = '16px';
       el.style.backgroundColor = '#ffffff';
       el.style.maxHeight = 'none';
@@ -288,7 +288,7 @@ export default function KasirRiwayatPage() {
     const originalStyle = el.style.cssText;
     
     try {
-      el.style.width = '350px';
+      el.style.width = '400px';
       el.style.padding = '16px';
       el.style.backgroundColor = '#ffffff';
       el.style.maxHeight = 'none';
@@ -307,10 +307,10 @@ export default function KasirRiwayatPage() {
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
-        format: [350, fullHeight]
+        format: [400, fullHeight]
       });
       
-      pdf.addImage(dataUrl, 'JPEG', 0, 0, 350, fullHeight);
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, 400, fullHeight);
       pdf.save(`${filename}.pdf`);
     } catch (err: any) {
       alert("Gagal membuat PDF: " + err.message);
@@ -715,7 +715,7 @@ export default function KasirRiwayatPage() {
       {/* Modern Shariah Print Receipt Popup card for REPRINT */}
       {selectedTx && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             {/* Receipt headers */}
             <div className="p-6 text-center border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 no-print">
               <CheckCircle className="w-12 h-12 text-slate-400 mx-auto mb-2" />
@@ -747,7 +747,7 @@ export default function KasirRiwayatPage() {
             `}</style>
 
             {/* Simulated Thermic strip content */}
-            <div id="printable-receipt" className="printable-thermal p-1 space-y-0.5 text-xs font-mono text-gray-700 dark:text-slate-300 border-b border-dashed border-gray-200 dark:border-slate-700 max-h-96 overflow-y-auto">
+            <div id="printable-receipt" className="printable-thermal p-4 px-5 space-y-0.5 text-xs font-mono text-gray-700 dark:text-slate-300 border-b border-dashed border-gray-200 dark:border-slate-700 max-h-96 overflow-y-auto">
               <div className="text-center space-y-0.5 border-b border-gray-100 dark:border-slate-800 pb-2 flex flex-col items-center">
                 <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-12 h-12 object-contain mb-1" />
                 <p className="font-bold text-gray-800 dark:text-slate-200 text-sm">{branches.find(b => b.id === activeBranchId)?.name || settings.storeName}</p>
@@ -858,7 +858,7 @@ export default function KasirRiwayatPage() {
 
       {selectedKasbonPayment && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
             <div className="p-4 bg-green-50 border-b border-green-100 flex justify-between items-center no-print">
               <h3 className="font-extrabold text-green-800 text-sm flex items-center gap-2">
                 <Printer className="w-5 h-5" /> Cetak Struk
@@ -966,7 +966,7 @@ export default function KasirRiwayatPage() {
       {/* Void Modal */}
       {txToVoid && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-6 text-center border-b border-gray-100 dark:border-slate-800 bg-red-50">
               <XOctagon className="w-12 h-12 text-red-700 mx-auto mb-2" />
               <h3 className="font-extrabold text-gray-800 dark:text-slate-200 text-md">Ajukan Batal Transaksi</h3>

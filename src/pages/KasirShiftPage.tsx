@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X } from 'lucide-react';
+import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X, Bluetooth, MessageCircle } from 'lucide-react';
+import { printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 
 const getDistanceFromLatLonInM = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3; // Radius of the earth in m
@@ -20,15 +21,53 @@ const getLocalTodayDate = () => {
 };
 
 export default function KasirShiftPage() {
-  const { transactions, products, currentUser, addExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash } = useAppStore();
+  const { transactions, products, currentUser, addExpense, updateExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash, customers, kasbonPayments, updateCustomer, addKasbonPayment, coaList, addJournalEntries } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [coaAccount, setCoaAccount] = useState('');
   const [kasAccount, setKasAccount] = useState('');
   
+  const [editExpenseModal, setEditExpenseModal] = useState<{isOpen: boolean, id: string, amount: string, desc: string, coaAccount: string, kasAccount: string, type: 'PENGELUARAN'|'PEMASUKAN'}>({
+    isOpen: false, id: '', amount: '', desc: '', coaAccount: '', kasAccount: '', type: 'PENGELUARAN'
+  });
+
+  const [payoffModal, setPayoffModal] = useState<{ isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: string, notes?: string, selectedInvoices: string[], debitAccountId?: string, creditAccountId?: string }>({
+    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [], debitAccountId: '', creditAccountId: ''
+  });
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [receiptModal, setReceiptModal] = useState<{ isOpen: boolean, record: import('../types').KasbonPaymentRecord | null }>({ isOpen: false, record: null });
+  const [waNumber, setWaNumber] = useState('');
+  
   const [todayDate, setTodayDate] = useState(getLocalTodayDate());
   const firstDayOfMonth = todayDate.substring(0, 8) + '01';
+
+  const handleBluetoothPrint = async () => {
+    if (!receiptModal.record) return;
+    try {
+      await printKasbonPaymentToBluetooth(receiptModal.record, settings);
+    } catch (err: any) {
+      alert(err.message || 'Gagal mencetak ke printer Bluetooth');
+    }
+  };
+
+  const handleSendWA = () => {
+    if (!receiptModal.record || !waNumber) return;
+    const rec = receiptModal.record;
+    
+    let text = `*BUKTI ${rec.isFullyPaid ? 'KASBON LUNAS' : 'PEMBAYARAN KASBON'}*\n`;
+    text += `${settings.storeName}\n\n`;
+    text += `Tanggal: ${new Date(rec.paymentDate).toLocaleString('id-ID')}\n`;
+    text += `Pelanggan: ${rec.customerName}\n`;
+    text += `Nominal Bayar: Rp ${rec.amountPaid.toLocaleString('id-ID')}\n`;
+    text += `Sisa Kasbon: Rp ${rec.remainingDebt.toLocaleString('id-ID')}\n`;
+    if (rec.notes) text += `Catatan: ${rec.notes}\n`;
+    text += `\nTerima kasih.`;
+    
+    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
   
   const [pettyCashDate, setPettyCashDate] = useState(todayDate);
   const [pettyCashStartDate, setPettyCashStartDate] = useState(firstDayOfMonth);
@@ -660,21 +699,6 @@ export default function KasirShiftPage() {
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA)</label>
-                  <input
-                    list="coa-options"
-                    value={coaAccount}
-                    onChange={(e) => setCoaAccount(e.target.value)}
-                    placeholder="Otomatis jika kosong"
-                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
-                  />
-                  <datalist id="coa-options">
-                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && !c.name.toLowerCase().includes('kas')).map((c: any) => (
-                      <option key={c.id} value={`${c.code} - ${c.name}`} />
-                    ))}
-                  </datalist>
-                </div>
-                <div className="flex-1">
                   <label className="text-[10px] font-bold text-amber-800 uppercase">Akun Kas</label>
                   <input
                     list="kas-options"
@@ -689,6 +713,21 @@ export default function KasirShiftPage() {
                     ))}
                   </datalist>
                 </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA)</label>
+                  <input
+                    list="coa-options"
+                    value={coaAccount}
+                    onChange={(e) => setCoaAccount(e.target.value)}
+                    placeholder="Otomatis jika kosong"
+                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+                  />
+                  <datalist id="coa-options">
+                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && !c.name.toLowerCase().includes('kas')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
               <button 
                 type="submit"
@@ -698,6 +737,65 @@ export default function KasirShiftPage() {
                 <Plus className="w-4 h-4" /> {pettyCashType === 'PEMASUKAN' ? 'Tambah Pemasukan' : 'Tambah Pengeluaran'}
               </button>
             </form>
+          </div>
+
+          {/* Quick Kasbon Payoff */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-4">
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+              <Banknote className="w-4 h-4 text-blue-500" />
+              Pelunasan Kasbon Pelanggan KSA Mart
+            </h3>
+            <div className="flex gap-2 relative">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Cari nama/HP pelanggan yang punya kasbon..."
+                  value={customerSearchTerm}
+                  onChange={(e) => {
+                    setCustomerSearchTerm(e.target.value);
+                    setShowCustomerSearch(true);
+                  }}
+                  onFocus={() => setShowCustomerSearch(true)}
+                  onBlur={() => setShowCustomerSearch(false)}
+                  className="w-full border border-blue-300 rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                />
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                
+                {showCustomerSearch && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {customers.filter(c => (c.debtAmount || 0) > 0 && (!customerSearchTerm || c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm))).length > 0 ? (
+                      customers.filter(c => (c.debtAmount || 0) > 0 && (!customerSearchTerm || c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || c.phone.includes(customerSearchTerm))).map(c => (
+                        <div
+                          key={c.id}
+                          className="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // Prevent onBlur from firing before click
+                            setPayoffModal({
+                              isOpen: true,
+                              customerId: c.id!,
+                              customerName: c.name,
+                              debtAmount: c.debtAmount || 0,
+                              payAmount: 0,
+                              paymentMethod: 'CASH',
+                              selectedInvoices: [],
+                              debitAccountId: '',
+                              creditAccountId: ''
+                            });
+                            setCustomerSearchTerm('');
+                            setShowCustomerSearch(false);
+                          }}
+                        >
+                          <div className="font-bold text-sm text-gray-800">{c.name}</div>
+                          <div className="text-xs text-red-600 font-bold">Kasbon: Rp {(c.debtAmount || 0).toLocaleString('id-ID')}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-2 text-xs text-gray-500 text-center italic">Tidak ada pelanggan dengan kasbon yang cocok.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* List Kas Kecil */}
@@ -774,12 +872,35 @@ export default function KasirShiftPage() {
                             <div key={exp.id} className="min-w-[320px] flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 rounded text-xs transition-colors border-b border-slate-100 dark:border-slate-700/50">
                               <div className="flex flex-col">
                                 <span className="font-bold text-slate-700 dark:text-slate-300">{exp.description}</span>
-                                <span className="text-[9px] text-slate-400">{new Date(exp.date).toLocaleDateString("id-ID")}</span>
+                                <span className="text-[9px] text-slate-400">
+                                  {new Date(exp.date).toLocaleString("id-ID", { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
                               </div>
                               <div className="flex items-center space-x-3">
                                 <span className={`font-bold whitespace-nowrap ${exp.amount < 0 ? "text-green-600" : "text-rose-600"}`}>
                                   {exp.amount < 0 ? "+" : "-"} Rp {Math.abs(exp.amount).toLocaleString("id-ID")}
                                 </span>
+                                <button 
+                                  onClick={() => {
+                                    if ((exp as any).isManual) {
+                                      alert("Transaksi ini diinput manual dari Jurnal Umum. Harap hapus/edit melalui menu Jurnal Umum.");
+                                      return;
+                                    }
+                                    setEditExpenseModal({
+                                      isOpen: true,
+                                      id: exp.id,
+                                      amount: Math.abs(exp.amount).toString(),
+                                      desc: exp.description.replace('Kas Kecil: ', ''),
+                                      coaAccount: exp.coaId || '',
+                                      kasAccount: exp.kasAccountId || '',
+                                      type: exp.amount < 0 ? 'PEMASUKAN' : 'PENGELUARAN'
+                                    });
+                                  }}
+                                  className="text-gray-400 hover:text-blue-500 transition-colors p-1"
+                                  title="Edit riwayat kas"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
                                 <button 
                                   onClick={() => {
                                     if ((exp as any).isManual) {
@@ -1166,6 +1287,416 @@ export default function KasirShiftPage() {
                 >
                   Kirim Pengajuan
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editExpenseModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-6 shadow-xl border border-gray-100 dark:border-slate-800">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+              <Edit2 className="w-5 h-5 text-blue-600" />
+              Edit Kas Kecil
+            </h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              let finalCoa = editExpenseModal.coaAccount ? editExpenseModal.coaAccount.split(' - ')[0].trim() : undefined;
+              const descLower = editExpenseModal.desc.toLowerCase();
+              if (!finalCoa && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan') || descLower.includes('belanja'))) {
+                const persediaanCoa = useAppStore.getState().coaList?.find((c: any) => c.name.toLowerCase().includes('persediaan'));
+                if (persediaanCoa) {
+                  finalCoa = persediaanCoa.code;
+                }
+              }
+              const amountNum = Number(editExpenseModal.amount);
+              const finalAmount = editExpenseModal.type === 'PEMASUKAN' ? -Math.abs(amountNum) : Math.abs(amountNum);
+              updateExpense(editExpenseModal.id, {
+                amount: finalAmount,
+                description: `Kas Kecil: ${editExpenseModal.desc}`,
+                coaId: finalCoa,
+                kasAccountId: editExpenseModal.kasAccount ? editExpenseModal.kasAccount.split(' - ')[0].trim() : undefined
+              });
+              setEditExpenseModal({ isOpen: false, id: '', amount: '', desc: '', coaAccount: '', kasAccount: '', type: 'PENGELUARAN' });
+            }} className="space-y-4">
+              <div className="flex gap-2 mb-2">
+                <button type="button" onClick={() => setEditExpenseModal({ ...editExpenseModal, type: 'PENGELUARAN' })} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-colors ${editExpenseModal.type === 'PENGELUARAN' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-600 hover:bg-rose-200'}`}>Pengeluaran</button>
+                <button type="button" onClick={() => setEditExpenseModal({ ...editExpenseModal, type: 'PEMASUKAN' })} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-colors ${editExpenseModal.type === 'PEMASUKAN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>Pemasukan</button>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-700">Nominal Rp</label>
+                <input type="number" required value={editExpenseModal.amount} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, amount: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-700">Keterangan</label>
+                <input type="text" required value={editExpenseModal.desc} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, desc: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-gray-700">Akun Kas</label>
+                  <input list="kas-options" value={editExpenseModal.kasAccount} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, kasAccount: e.target.value })} placeholder="Default: Kas Utama" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-bold text-gray-700">Jurnal Lawan</label>
+                  <input list="coa-options" value={editExpenseModal.coaAccount} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, coaAccount: e.target.value })} placeholder="Otomatis jika kosong" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setEditExpenseModal({ ...editExpenseModal, isOpen: false })} className="flex-1 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold text-sm">Batal</button>
+                <button type="submit" className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold text-sm">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {payoffModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md p-6 shadow-xl border border-gray-100 dark:border-slate-800">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-blue-600" />
+              Lunasi Kasbon Pelanggan
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Nama Pelanggan</label>
+                <div className="font-bold text-gray-800 dark:text-slate-200">{payoffModal.customerName}</div>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">Total Piutang (Kasbon)</label>
+                <div className="font-bold text-red-600 text-lg">Rp {payoffModal.debtAmount.toLocaleString('id-ID')}</div>
+              </div>
+
+              {/* Invoice Selection */}
+              {(() => {
+                const debitsRaw = transactions
+                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID')
+                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+                const explicitPaidInvoiceNos = new Set<string>();
+                kasbonPayments.forEach(p => {
+                  if (p.customerId === payoffModal.customerId && p.targetInvoiceNos) {
+                    p.targetInvoiceNos.forEach(id => explicitPaidInvoiceNos.add(id));
+                  }
+                });
+
+                let totalDebits = 0;
+                let explicitPaidAmount = 0;
+                debitsRaw.forEach(tx => {
+                   totalDebits += tx.totalAmount;
+                   if (explicitPaidInvoiceNos.has(tx.invoiceNo)) {
+                      explicitPaidAmount += tx.totalAmount;
+                   }
+                });
+
+                let totalPaid = totalDebits - (payoffModal.debtAmount || 0);
+                let unallocatedPayment = totalPaid - explicitPaidAmount;
+
+                let unpaidInvoices = debitsRaw.filter(tx => !explicitPaidInvoiceNos.has(tx.invoiceNo));
+                
+                if (unallocatedPayment > 0) {
+                   unpaidInvoices = unpaidInvoices.filter(tx => {
+                       if (unallocatedPayment >= tx.totalAmount - 0.01) {
+                           unallocatedPayment -= tx.totalAmount;
+                           return false;
+                       } else {
+                           unallocatedPayment -= tx.totalAmount;
+                           if (unallocatedPayment >= -0.01) return false;
+                       }
+                       return true;
+                   });
+                }
+                
+                if ((payoffModal.debtAmount || 0) <= 0) unpaidInvoices = [];
+                unpaidInvoices.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+                if (unpaidInvoices.length === 0) return null;
+
+                return (
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-xl p-3 bg-gray-50 dark:bg-slate-800 max-h-48 overflow-y-auto">
+                    <div className="mb-2">
+                      <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-0.5">Pilih Struk Kasbon yang Dilunasi (Opsional)</label>
+                    </div>
+                    <div className="space-y-2">
+                      {unpaidInvoices.map(inv => (
+                        <label key={inv.id} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                            checked={payoffModal.selectedInvoices.includes(inv.invoiceNo)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const amount = inv.totalAmount;
+                              setPayoffModal(prev => {
+                                let newSelected = [...prev.selectedInvoices];
+                                let newPayAmount = prev.payAmount;
+
+                                if (checked) {
+                                  newSelected.push(inv.invoiceNo);
+                                  newPayAmount += amount;
+                                } else {
+                                  newSelected = newSelected.filter(id => id !== inv.invoiceNo);
+                                  newPayAmount -= amount;
+                                }
+                                
+                                if (newPayAmount > prev.debtAmount) newPayAmount = prev.debtAmount;
+
+                                return { ...prev, selectedInvoices: newSelected, payAmount: newPayAmount };
+                              });
+                            }}
+                          />
+                          <div className="flex-1">
+                            <div className="text-xs font-bold text-gray-800 dark:text-slate-200">{inv.invoiceNo}</div>
+                            <div className="text-[10px] text-gray-500">{new Date(inv.timestamp).toLocaleDateString('id-ID')}</div>
+                          </div>
+                          <div className="text-sm font-bold text-red-600">Rp {inv.totalAmount.toLocaleString('id-ID')}</div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-gray-700 dark:text-slate-300 mb-1 uppercase">Akun Kas Penerima (Debit)</label>
+                  <input
+                    list="debit-options"
+                    value={payoffModal.debitAccountId || ''}
+                    onChange={(e) => setPayoffModal({ ...payoffModal, debitAccountId: e.target.value })}
+                    placeholder="Pilih Akun Kas/Bank"
+                    className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <datalist id="debit-options">
+                    {coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('kas') || c.name.toLowerCase().includes('bank')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-gray-700 dark:text-slate-300 mb-1 uppercase">Akun Piutang Kasbon (Kredit)</label>
+                  <input
+                    list="credit-options"
+                    value={payoffModal.creditAccountId || ''}
+                    onChange={(e) => setPayoffModal({ ...payoffModal, creditAccountId: e.target.value })}
+                    placeholder="Pilih Akun Piutang"
+                    className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <datalist id="credit-options">
+                    {coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('piutang')).map((c: any) => (
+                      <option key={c.id} value={`${c.code} - ${c.name}`} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Nominal Pelunasan</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rp</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={payoffModal.debtAmount}
+                    value={payoffModal.payAmount || ''}
+                    onChange={(e) => setPayoffModal({ ...payoffModal, payAmount: Number(e.target.value) })}
+                    className="w-full p-3 pl-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-xl font-bold text-gray-800 dark:text-slate-200"
+                  />
+                </div>
+                {payoffModal.payAmount > 0 && (
+                  <div className="mt-2 text-sm">
+                    Sisa Kasbon setelah pelunasan: <span className="font-bold text-green-600">Rp {(payoffModal.debtAmount - payoffModal.payAmount).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Catatan Tambahan (Opsional)</label>
+                <input
+                  type="text"
+                  value={payoffModal.notes || ''}
+                  onChange={(e) => setPayoffModal({ ...payoffModal, notes: e.target.value })}
+                  placeholder="Misal: Diwakilkan istri"
+                  className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [], debitAccountId: '', creditAccountId: '' })}
+                  className="flex-1 py-3 px-4 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    const { customerId, customerName, debtAmount, payAmount, paymentMethod } = payoffModal;
+                    if (payAmount <= 0) return;
+                    if (payAmount > debtAmount) {
+                      alert('Nominal pelunasan tidak boleh lebih besar dari total piutang!');
+                      return;
+                    }
+
+                    const newDebt = debtAmount - payAmount;
+                    updateCustomer(customerId, { debtAmount: newDebt });
+
+                    const getAccountForMethod = (method: string) => {
+                      if (method === 'QRIS_SHARIAH') return '1-1020';
+                      if (method === 'TRANSFER_BSI') return '1-1010';
+                      return '1-1000';
+                    };
+
+                    let targetAccount = getAccountForMethod(paymentMethod);
+                    if (payoffModal.debitAccountId) {
+                      targetAccount = payoffModal.debitAccountId.split(' - ')[0].trim();
+                    }
+
+                    let targetCreditAccount = '1-1030';
+                    if (payoffModal.creditAccountId) {
+                      targetCreditAccount = payoffModal.creditAccountId.split(' - ')[0].trim();
+                    }
+
+                    const dateStr = new Date().toISOString();
+                    const tenantIdStr = currentUser?.tenantId || 'tenant_default';
+
+                    addJournalEntries([
+                      {
+                        tenantId: tenantIdStr,
+                        date: dateStr,
+                        account: targetAccount,
+                        description: `[Auto] Pelunasan piutang (kasbon) dari pelanggan: ${customerName} via ${paymentMethod}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
+                        debit: payAmount,
+                        credit: 0,
+                        referenceId: customerId,
+                        referenceType: 'MANUAL',
+                        createdBy: currentUser?.name || 'System',
+                        branchId: currentUser?.branchId
+                      },
+                      {
+                        tenantId: tenantIdStr,
+                        date: dateStr,
+                        account: targetCreditAccount, 
+                        description: `[Auto] Pengurangan piutang pelanggan: ${customerName}${payoffModal.notes ? ' - ' + payoffModal.notes : ''}`,
+                        debit: 0,
+                        credit: payAmount,
+                        referenceId: customerId,
+                        referenceType: 'MANUAL',
+                        createdBy: currentUser?.name || 'System',
+                        branchId: currentUser?.branchId
+                      }
+                    ]);
+
+                    const newPaymentRecord = {
+                      tenantId: tenantIdStr,
+                      customerId,
+                      customerName,
+                      amountPaid: payAmount,
+                      remainingDebt: newDebt,
+                      paymentMethod,
+                      cashierName: currentUser?.name || 'Kasir',
+                      isFullyPaid: newDebt <= 0,
+                      notes: payoffModal.notes,
+                      targetInvoiceNos: payoffModal.selectedInvoices
+                    };
+                    addKasbonPayment(newPaymentRecord);
+                    setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [], debitAccountId: '', creditAccountId: '' });
+                    setReceiptModal({ isOpen: true, record: { ...newPaymentRecord, id: `kp_${Date.now()}`, paymentDate: dateStr } });
+                  }}
+                  disabled={payoffModal.payAmount <= 0}
+                  className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Proses Pelunasan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Modal */}
+      {receiptModal.isOpen && receiptModal.record && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            <div className="p-4 bg-green-50 border-b border-green-100 flex justify-between items-center no-print">
+              <h3 className="font-extrabold text-green-800 text-sm flex items-center gap-2">
+                <Printer className="w-5 h-5" /> Cetak Struk
+              </h3>
+              <button onClick={() => setReceiptModal({ isOpen: false, record: null })} className="text-gray-500 hover:text-gray-700">Tutup</button>
+            </div>
+            
+            <div className="p-6 bg-white flex-1 overflow-y-auto text-sm text-gray-800 dark:text-gray-800 print-area relative" id="print-area">
+              <div className="text-center mb-6">
+                <h2 className="font-extrabold text-xl">{settings.storeName || 'KSA Mart'}</h2>
+                <p className="text-xs text-gray-500">{settings.storeAddress || ''}</p>
+                <p className="text-xs text-gray-500">Telp: {settings.storePhone || ''}</p>
+              </div>
+
+              <div className="border-t border-b border-dashed border-gray-300 py-3 mb-4 text-center">
+                <p className="font-bold uppercase tracking-widest">{receiptModal.record.isFullyPaid ? 'BUKTI KASBON LUNAS' : 'BUKTI PEMBAYARAN KASBON'}</p>
+              </div>
+
+              <div className="space-y-1 mb-4 text-xs">
+                <p><span className="text-slate-400">Tanggal:</span> {new Date(receiptModal.record.paymentDate).toLocaleString('id-ID')}</p>
+                <p><span className="text-slate-400">Pelanggan:</span> {receiptModal.record.customerName}</p>
+                <p><span className="text-slate-400">Kasir:</span> {receiptModal.record.cashierName}</p>
+                <p><span className="text-slate-400">Metode:</span> {receiptModal.record.paymentMethod}</p>
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 py-3 mb-4 space-y-2 text-right">
+                <div className="flex justify-between font-bold text-sm">
+                  <span>Nominal Bayar:</span>
+                  <span>Rp {receiptModal.record.amountPaid.toLocaleString('id-ID')}</span>
+                </div>
+                <div className="flex justify-between text-xs text-amber-700 font-bold border-t border-gray-200 pt-2">
+                  <span>Sisa Kasbon:</span>
+                  <span>Rp {receiptModal.record.remainingDebt.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+
+              {receiptModal.record.isFullyPaid && (
+                <div className="border-t border-green-900/20 pt-3 text-center text-green-800 bg-green-50 p-2.5 rounded-lg border border-green-100 mt-4">
+                  <p className="font-extrabold uppercase tracking-widest text-lg">LUNAS</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 flex flex-col gap-2 no-print">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 py-2 bg-green-700 hover:bg-green-800 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Printer className="w-4 h-4" /> Cetak Biasa
+                </button>
+                <button
+                  onClick={handleBluetoothPrint}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1"
+                >
+                  <Bluetooth className="w-4 h-4" /> Print Bluetooth
+                </button>
+              </div>
+              <div className="mt-2 border-t border-gray-200 dark:border-slate-700 pt-3">
+                <p className="text-xs font-bold text-gray-600 dark:text-slate-400 mb-2 flex items-center gap-1">
+                  <MessageCircle className="w-4 h-4" /> Kirim Struk via WhatsApp
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={waNumber}
+                    onChange={(e) => setWaNumber(e.target.value)}
+                    placeholder="No WA (misal: 0812...)"
+                    className="flex-1 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    onClick={handleSendWA}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
+                  >
+                    Kirim WA
+                  </button>
+                </div>
               </div>
             </div>
           </div>
