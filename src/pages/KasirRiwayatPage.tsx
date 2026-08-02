@@ -3,6 +3,7 @@ import { useBranchData } from '../hooks/useBranchData';
 import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth, Calendar, FileText, CreditCard } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { printToBluetooth, printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
+import html2canvas from 'html2canvas';
 
 export default function KasirRiwayatPage() {
   const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings, customers, kasbonPayments, products } = useBranchData();
@@ -240,6 +241,37 @@ export default function KasirRiwayatPage() {
 
     const encodedText = encodeURIComponent(textMessage);
     window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`, '_blank');
+  };
+
+  const handleDownloadJPG = async (elementId: string, filename: string) => {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    
+    const originalStyle = el.style.cssText;
+    
+    try {
+      // Temporary styling to ensure good capture
+      el.style.width = '350px';
+      el.style.padding = '16px';
+      el.style.backgroundColor = '#ffffff';
+      
+      const canvas = await html2canvas(el, {
+        scale: 2, // high res
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false
+      });
+      
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const link = document.createElement('a');
+      link.download = `${filename}.jpg`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err: any) {
+      alert("Gagal membuat JPG: " + err.message);
+    } finally {
+      el.style.cssText = originalStyle;
+    }
   };
 
   const handleSendWAKasbon = () => {
@@ -752,8 +784,16 @@ export default function KasirRiwayatPage() {
                 <button
                   onClick={handleSendWATx}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
+                  title="Kirim Struk Berupa Teks"
                 >
-                  Kirim WA
+                  WA Teks
+                </button>
+                <button
+                  onClick={() => handleDownloadJPG('printable-receipt', `Struk-${selectedTx.invoiceNo}`)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1"
+                  title="Unduh struk sebagai gambar JPG"
+                >
+                  <Download className="w-3.5 h-3.5" /> JPG
                 </button>
               </div>
             </div>
@@ -771,7 +811,7 @@ export default function KasirRiwayatPage() {
               <button onClick={() => setSelectedKasbonPayment(null)} className="text-gray-500 hover:text-gray-700">Tutup</button>
             </div>
             
-            <div className="p-6 bg-white flex-1 overflow-y-auto text-sm text-gray-800 dark:text-gray-800 print-area relative">
+            <div id="printable-kasbon-receipt" className="p-6 bg-white flex-1 overflow-y-auto text-sm text-gray-800 dark:text-gray-800 print-area relative">
               <div className="text-center mb-6">
                 <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-12 h-12 object-contain mx-auto mb-1" />
                 <h2 className="font-extrabold text-xl">{settings.storeName || 'KSA Mart'}</h2>
@@ -847,7 +887,13 @@ export default function KasirRiwayatPage() {
                   onClick={handleSendWAKasbon}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap"
                 >
-                  Kirim WA
+                  WA Teks
+                </button>
+                <button
+                  onClick={() => handleDownloadJPG('printable-kasbon-receipt', `Bukti-Kasbon-${new Date(selectedKasbonPayment.paymentDate).getTime()}`)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1"
+                >
+                  <Download className="w-3.5 h-3.5" /> JPG
                 </button>
               </div>
             </div>
