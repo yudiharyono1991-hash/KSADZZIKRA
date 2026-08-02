@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { useAppStore } from '../store';
 import { printKasbonCardToBluetooth } from '../lib/bluetoothPrinter';
 import * as htmlToImage from 'html-to-image';
+import { jsPDF } from 'jspdf';
 
 export default function KasbonRekapPage() {
   const { settings, currentUser } = useAppStore();
@@ -21,19 +22,24 @@ export default function KasbonRekapPage() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Group kasbon data by customer
   const customersWithKasbon = useMemo(() => {
     return customers.map(customer => {
       const debits = (transactions || [])
         .filter(tx => tx.customerId === customer.id && tx.paymentMethod === 'KASBON')
-        .map(tx => ({
-          date: new Date(tx.timestamp),
-          type: 'PEMBELIAN',
-          ref: tx.invoiceNo,
-          amount: tx.totalAmount,
-          cashier: tx.cashierName
-        }));
+        .map(tx => {
+          const isPaid = (kasbonPayments || []).some(kp => kp.customerId === customer.id && kp.targetInvoiceNos?.includes(tx.invoiceNo));
+          return {
+            date: new Date(tx.timestamp),
+            type: 'PEMBELIAN',
+            ref: tx.invoiceNo,
+            amount: tx.totalAmount,
+            cashier: tx.cashierName,
+            isPaid
+          };
+        });
 
       const credits = (kasbonPayments || [])
         .filter(kp => kp.customerId === customer.id)
@@ -43,7 +49,9 @@ export default function KasbonRekapPage() {
           ref: kp.id,
           amount: kp.amountPaid,
           cashier: kp.cashierName,
-          note: kp.notes
+          note: kp.notes,
+          targetInvoiceNos: kp.targetInvoiceNos,
+          paymentMethod: kp.paymentMethod
         }));
 
       const history = [...debits, ...credits].sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -306,20 +314,64 @@ export default function KasbonRekapPage() {
       el.style.maxHeight = 'none';
       el.style.overflow = 'visible';
       
+      const fullHeight = el.scrollHeight;
+
+      setIsDownloading(true);
       const dataUrl = await htmlToImage.toJpeg(el, {
         quality: 0.95,
         backgroundColor: '#ffffff',
-        pixelRatio: 2
+        pixelRatio: 1.5,
+        height: fullHeight
       });
       
       const link = document.createElement('a');
-      link.download = `Kartu-Kasbon-${receiptCustomer.name.replace(/\s+/g, '-')}.jpg`;
+      link.download = `Kartu-Kasbon-${receiptCustomer.name.replace(/\\s+/g, '-')}.jpg`;
       link.href = dataUrl;
       link.click();
     } catch (err: any) {
       alert("Gagal membuat JPG: " + err.message);
     } finally {
       el.style.cssText = originalStyle;
+      setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    const el = document.getElementById('printable-kartu-kasbon');
+    if (!el || !receiptCustomer) return;
+    
+    const originalStyle = el.style.cssText;
+    
+    try {
+      el.style.width = '350px';
+      el.style.padding = '16px';
+      el.style.backgroundColor = '#ffffff';
+      el.style.maxHeight = 'none';
+      el.style.overflow = 'visible';
+      
+      const fullHeight = el.scrollHeight;
+
+      setIsDownloading(true);
+      const dataUrl = await htmlToImage.toJpeg(el, {
+        quality: 0.95,
+        backgroundColor: '#ffffff',
+        pixelRatio: 1.5,
+        height: fullHeight
+      });
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [350, fullHeight]
+      });
+      
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, 350, fullHeight);
+      pdf.save(`Kartu-Kasbon-${receiptCustomer.name.replace(/\\s+/g, '-')}.pdf`);
+    } catch (err: any) {
+      alert("Gagal membuat PDF: " + err.message);
+    } finally {
+      el.style.cssText = originalStyle;
+      setIsDownloading(false);
     }
   };
 
@@ -559,7 +611,9 @@ export default function KasbonRekapPage() {
                                             ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' 
                                             : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                                         }`}>
-                                          {h.type === 'PEMBELIAN' ? 'KASBON BARU' : 'PELUNASAN'}
+                                          {h.type === 'PEMBELIAN' 
+                                            ? `KASBON BARU ${h.isPaid ? '(Lunas)' : '(Belum Dilunasi)'}` 
+                                            : `PELUNASAN ${h.targetInvoiceNos?.length ? `(Inv: ${h.targetInvoiceNos.join(', ')})` : ''}`}
                                         </span>
                                       </td>
                                       <td className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap text-[10px] sm:text-sm text-slate-600 dark:text-slate-400">
@@ -710,7 +764,7 @@ export default function KasbonRekapPage() {
                       <span className="truncate max-w-[80px] text-right">{h.ref}</span>
                     </div>
                     <div className="flex justify-between items-center text-[9px]">
-                      <span>{h.type === 'PEMBELIAN' ? 'KASBON BARU' : `PELUNASAN${h.paymentMethod ? ` (${h.paymentMethod})` : ''}`}</span>
+                      <span>{h.type === 'PEMBELIAN' ? `KASBON BARU ${h.isPaid ? '(Lunas)' : '(Belum Dilunasi)'}` : `PELUNASAN${h.paymentMethod ? ` (${h.paymentMethod})` : ''}`}</span>
                       <span>{h.type === 'PEMBELIAN' ? '+' : '-'} {h.amount.toLocaleString('id-ID')}</span>
                     </div>
                   </div>
@@ -763,9 +817,17 @@ export default function KasbonRekapPage() {
                 </button>
                 <button
                   onClick={handleDownloadJPG}
-                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1.5"
+                  disabled={isDownloading}
+                  className={`flex-1 py-2 ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1.5`}
                 >
-                  <FileDown className="w-3.5 h-3.5" /> Unduh JPG
+                  <FileDown className="w-3.5 h-3.5" /> {isDownloading ? 'Memproses...' : 'Unduh JPG'}
+                </button>
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={isDownloading}
+                  className={`flex-1 py-2 ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} text-white font-bold text-xs rounded-lg text-center shadow-xs flex items-center justify-center gap-1.5`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> {isDownloading ? 'Memproses...' : 'Unduh PDF'}
                 </button>
               </div>
               <div className="flex gap-2">

@@ -25,8 +25,8 @@ export default function CustomerManagementPage() {
     isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''
   });
   
-  const [payoffModal, setPayoffModal] = useState<{ isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: string, notes?: string }>({
-    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH'
+  const [payoffModal, setPayoffModal] = useState<{ isOpen: boolean, customerId: string, customerName: string, debtAmount: number, payAmount: number, paymentMethod: string, notes?: string, selectedInvoices: string[] }>({
+    isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: []
   });
 
   const [receiptModal, setReceiptModal] = useState<{ isOpen: boolean, record: import('../types').KasbonPaymentRecord | null }>({
@@ -217,7 +217,8 @@ export default function CustomerManagementPage() {
       paymentMethod,
       cashierName: currentUser?.name || 'Kasir',
       isFullyPaid: newDebt <= 0,
-      notes: payoffModal.notes
+      notes: payoffModal.notes,
+      targetInvoiceNos: payoffModal.selectedInvoices
     };
     addKasbonPayment(newPaymentRecord);
     
@@ -226,7 +227,7 @@ export default function CustomerManagementPage() {
     if (cust && cust.phone) setWaNumber(cust.phone);
     else setWaNumber('');
 
-    setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH' });
+    setPayoffModal({ isOpen: false, customerId: '', customerName: '', debtAmount: 0, payAmount: 0, paymentMethod: 'CASH', selectedInvoices: [] });
     setReceiptModal({ isOpen: true, record: { ...newPaymentRecord, id: `kp_${Date.now()}`, paymentDate: dateStr } });
   };
 
@@ -681,7 +682,7 @@ export default function CustomerManagementPage() {
                     <td className="px-1 py-2 sm:px-2 sm:py-3 text-right font-bold text-green-700 align-middle">Rp {nilaiRp.toLocaleString('id-ID')}</td>
                     <td className="px-1 py-2 sm:px-2 sm:py-3 text-center space-x-1 align-middle">
                       {c.debtAmount > 0 && (
-                        <button onClick={() => setPayoffModal({ isOpen: true, customerId: c.id, customerName: c.name, debtAmount: c.debtAmount || 0, payAmount: c.debtAmount || 0, paymentMethod: 'CASH', notes: '' })} className="p-1 text-green-600 hover:bg-green-50 rounded-lg" title="Lunasi Kasbon">
+                        <button onClick={() => setPayoffModal({ isOpen: true, customerId: c.id, customerName: c.name, debtAmount: c.debtAmount || 0, payAmount: 0, paymentMethod: 'CASH', notes: '', selectedInvoices: [] })} className="p-1 text-green-600 hover:bg-green-50 rounded-lg" title="Lunasi Kasbon">
                           <CreditCard className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -787,6 +788,65 @@ export default function CustomerManagementPage() {
                 <label className="block text-xs font-bold text-gray-500 mb-1">Total Piutang (Kasbon)</label>
                 <div className="font-bold text-red-600 text-lg">Rp {payoffModal.debtAmount.toLocaleString('id-ID')}</div>
               </div>
+
+              {/* Invoice Selection */}
+              {(() => {
+                const paidInvoiceIds = new Set<string>();
+                kasbonPayments.forEach(p => {
+                  if (p.customerId === payoffModal.customerId && p.targetInvoiceNos) {
+                    p.targetInvoiceNos.forEach(id => paidInvoiceIds.add(id));
+                  }
+                });
+
+                const unpaidInvoices = transactions
+                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID' && !paidInvoiceIds.has(t.invoiceNo))
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                if (unpaidInvoices.length === 0) return null;
+
+                return (
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-xl p-3 bg-gray-50 dark:bg-slate-800 max-h-48 overflow-y-auto">
+                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-2">Pilih Struk Kasbon yang Dilunasi (Opsional)</label>
+                    <div className="space-y-2">
+                      {unpaidInvoices.map(inv => (
+                        <label key={inv.id} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                            checked={payoffModal.selectedInvoices.includes(inv.invoiceNo)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const amount = inv.finalTotal;
+                              setPayoffModal(prev => {
+                                let newSelected = [...prev.selectedInvoices];
+                                let newPayAmount = prev.payAmount;
+
+                                if (checked) {
+                                  newSelected.push(inv.invoiceNo);
+                                  newPayAmount += amount;
+                                } else {
+                                  newSelected = newSelected.filter(id => id !== inv.invoiceNo);
+                                  newPayAmount -= amount;
+                                }
+                                
+                                // Cegah payAmount > debtAmount akibat pembulatan
+                                if (newPayAmount > prev.debtAmount) newPayAmount = prev.debtAmount;
+
+                                return { ...prev, selectedInvoices: newSelected, payAmount: newPayAmount };
+                              });
+                            }}
+                          />
+                          <div className="flex-1">
+                            <div className="text-xs font-bold text-gray-800 dark:text-slate-200">{inv.invoiceNo}</div>
+                            <div className="text-[10px] text-gray-500">{new Date(inv.date).toLocaleDateString('id-ID')}</div>
+                          </div>
+                          <div className="text-sm font-bold text-red-600">Rp {inv.finalTotal.toLocaleString('id-ID')}</div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Metode Pembayaran</label>

@@ -127,6 +127,7 @@ export interface KasbonPaymentRecord {
   cashierName: string;
   isFullyPaid: boolean;
   notes?: string;
+  targetInvoiceNos?: string[];
 }
 
 export interface StockOpnameRequest {

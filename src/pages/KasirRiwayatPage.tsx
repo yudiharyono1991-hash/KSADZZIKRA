@@ -4,11 +4,13 @@ import { History, Search, Printer, CheckCircle, XOctagon, Download, Bluetooth, C
 import * as XLSX from 'xlsx';
 import { printToBluetooth, printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 import * as htmlToImage from 'html-to-image';
+import { jsPDF } from 'jspdf';
 
 export default function KasirRiwayatPage() {
   const { transactions, currentUser, requestVoidTransaction, approveVoidTransaction, activeBranchId, branches, settings, customers, kasbonPayments, products } = useBranchData();
   const [activeTab, setActiveTab] = useState<'UMUM' | 'KASBON'>('UMUM');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
   const [txTypeFilter, setTxTypeFilter] = useState<'ALL' | 'FISIK' | 'PPOB'>('ALL');
   const [cashierFilter, setCashierFilter] = useState('ALL');
   const [selectedTx, setSelectedTx] = useState<any>(null);
@@ -257,10 +259,14 @@ export default function KasirRiwayatPage() {
       el.style.maxHeight = 'none';
       el.style.overflow = 'visible';
       
+      const fullHeight = el.scrollHeight;
+
+      setIsDownloading(true);
       const dataUrl = await htmlToImage.toJpeg(el, {
         quality: 0.95,
         backgroundColor: '#ffffff',
-        pixelRatio: 2
+        pixelRatio: 1.5,
+        height: fullHeight
       });
       
       const link = document.createElement('a');
@@ -271,6 +277,46 @@ export default function KasirRiwayatPage() {
       alert("Gagal membuat JPG: " + err.message);
     } finally {
       el.style.cssText = originalStyle;
+      setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadPDF = async (elementId: string, filename: string) => {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    
+    const originalStyle = el.style.cssText;
+    
+    try {
+      el.style.width = '350px';
+      el.style.padding = '16px';
+      el.style.backgroundColor = '#ffffff';
+      el.style.maxHeight = 'none';
+      el.style.overflow = 'visible';
+      
+      const fullHeight = el.scrollHeight;
+
+      setIsDownloading(true);
+      const dataUrl = await htmlToImage.toJpeg(el, {
+        quality: 0.95,
+        backgroundColor: '#ffffff',
+        pixelRatio: 1.5,
+        height: fullHeight
+      });
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [350, fullHeight]
+      });
+      
+      pdf.addImage(dataUrl, 'JPEG', 0, 0, 350, fullHeight);
+      pdf.save(`${filename}.pdf`);
+    } catch (err: any) {
+      alert("Gagal membuat PDF: " + err.message);
+    } finally {
+      el.style.cssText = originalStyle;
+      setIsDownloading(false);
     }
   };
 
@@ -790,10 +836,19 @@ export default function KasirRiwayatPage() {
                 </button>
                 <button
                   onClick={() => handleDownloadJPG('printable-receipt', `Struk-${selectedTx.invoiceNo}`)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1"
-                  title="Unduh struk sebagai gambar JPG"
+                  disabled={isDownloading}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
+                  title="Unduh JPG"
                 >
-                  <Download className="w-3.5 h-3.5" /> JPG
+                  <Download className="w-3.5 h-3.5" /> {isDownloading ? 'Memproses...' : 'JPG'}
+                </button>
+                <button
+                  onClick={() => handleDownloadPDF('printable-receipt', `Struk-${selectedTx.invoiceNo}`)}
+                  disabled={isDownloading}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} text-white`}
+                  title="Unduh PDF"
+                >
+                  <FileText className="w-3.5 h-3.5" /> {isDownloading ? 'Memproses...' : 'PDF'}
                 </button>
               </div>
             </div>
@@ -891,9 +946,17 @@ export default function KasirRiwayatPage() {
                 </button>
                 <button
                   onClick={() => handleDownloadJPG('printable-kasbon-receipt', `Bukti-Kasbon-${new Date(selectedKasbonPayment.paymentDate).getTime()}`)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1"
+                  disabled={isDownloading}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
                 >
-                  <Download className="w-3.5 h-3.5" /> JPG
+                  <Download className="w-3.5 h-3.5" /> {isDownloading ? 'Memproses...' : 'JPG'}
+                </button>
+                <button
+                  onClick={() => handleDownloadPDF('printable-kasbon-receipt', `Bukti-Kasbon-${new Date(selectedKasbonPayment.paymentDate).getTime()}`)}
+                  disabled={isDownloading}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 ${isDownloading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} text-white`}
+                >
+                  <FileText className="w-3.5 h-3.5" /> {isDownloading ? 'Memproses...' : 'PDF'}
                 </button>
               </div>
             </div>
