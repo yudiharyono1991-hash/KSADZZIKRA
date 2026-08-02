@@ -793,7 +793,7 @@ export default function CustomerManagementPage() {
               {(() => {
                 const debitsRaw = transactions
                   .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID')
-                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // sort oldest first for FIFO
+                  .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); // sort oldest first for FIFO
 
                 const explicitPaidInvoiceNos = new Set<string>();
                 kasbonPayments.forEach(p => {
@@ -832,7 +832,7 @@ export default function CustomerManagementPage() {
                 if ((payoffModal.debtAmount || 0) <= 0) unpaidInvoices = [];
 
                 // sort back to newest first for display
-                unpaidInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                unpaidInvoices.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
                 if (unpaidInvoices.length === 0) return null;
 
@@ -848,7 +848,7 @@ export default function CustomerManagementPage() {
                             checked={payoffModal.selectedInvoices.includes(inv.invoiceNo)}
                             onChange={(e) => {
                               const checked = e.target.checked;
-                              const amount = inv.finalTotal;
+                              const amount = inv.totalAmount;
                               setPayoffModal(prev => {
                                 let newSelected = [...prev.selectedInvoices];
                                 let newPayAmount = prev.payAmount;
@@ -870,9 +870,9 @@ export default function CustomerManagementPage() {
                           />
                           <div className="flex-1">
                             <div className="text-xs font-bold text-gray-800 dark:text-slate-200">{inv.invoiceNo}</div>
-                            <div className="text-[10px] text-gray-500">{new Date(inv.date).toLocaleDateString('id-ID')}</div>
+                            <div className="text-[10px] text-gray-500">{new Date(inv.timestamp).toLocaleDateString('id-ID')}</div>
                           </div>
-                          <div className="text-sm font-bold text-red-600">Rp {inv.finalTotal.toLocaleString('id-ID')}</div>
+                          <div className="text-sm font-bold text-red-600">Rp {inv.totalAmount.toLocaleString('id-ID')}</div>
                         </label>
                       ))}
                     </div>
