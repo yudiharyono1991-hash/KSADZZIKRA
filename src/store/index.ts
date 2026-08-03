@@ -421,8 +421,29 @@ const getSavedTransactions = (): Transaction[] => {
   const saved = getStorage('ksa_transactions');
   if (saved) {
     try {
-      const parsed = saved as any[];
-      if (Array.isArray(parsed)) return parsed as Transaction[];
+      let parsed = saved as any[];
+      if (Array.isArray(parsed)) {
+        let changed = false;
+        parsed = parsed.map(tx => {
+          if (tx.invoiceNo && tx.invoiceNo.startsWith('INV-20260607-') && tx.timestamp) {
+            const txDate = new Date(tx.timestamp);
+            const yyyy = txDate.getFullYear();
+            const mm = String(txDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(txDate.getDate()).padStart(2, '0');
+            const correctDateStr = `${yyyy}${mm}${dd}`;
+            if (correctDateStr !== '20260607') {
+              const suffix = tx.invoiceNo.split('-')[2];
+              tx.invoiceNo = `INV-${correctDateStr}-${suffix}`;
+              changed = true;
+            }
+          }
+          return tx;
+        });
+        if (changed) {
+          localStorage.setItem('ksa_transactions', JSON.stringify(parsed));
+        }
+        return parsed as Transaction[];
+      }
     } catch (e) { }
   }
   return DEFAULT_TRANSACTIONS;
@@ -847,7 +868,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().addNotification({
       title: `Opname ${isApproved ? 'Disetujui' : 'Ditolak'}`,
       message: `Pengajuan penyesuaian stok ${request.productName} telah ${isApproved ? 'DISETUJUI' : 'DITOLAK'} oleh ${approverName}.`,
-      type: 'SYSTEM',
+      type: 'INFO',
       targetRole: ['CASHIER', 'ADMIN'],
       link: '/stock-opname'
     });
@@ -964,7 +985,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().addNotification({
         title: 'Penolakan Void Transaksi',
         message: `Pengajuan void untuk transaksi ${tx.invoiceNo} telah DITOLAK oleh ${currentUser.name}.`,
-        type: 'SYSTEM',
+        type: 'INFO',
         targetRole: ['CASHIER', 'ADMIN'],
         branchId: tx.branchId,
         link: '/kasir-riwayat'
@@ -1256,7 +1277,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().addNotification({
       title: `Koreksi Absen ${approved ? 'Disetujui' : 'Ditolak'}`,
       message: `Pengajuan izin/koreksi absen Anda telah ${approved ? 'DISETUJUI' : 'DITOLAK'} oleh Owner/Manager.`,
-      type: 'SYSTEM',
+      type: 'INFO',
       targetRole: ['CASHIER', 'ADMIN'],
       link: '/absen'
     });
@@ -1907,7 +1928,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     if (paymentMethod !== 'KASBON' && actualPaid < totalAmount) return null;
 
-    const invoiceNo = `INV-20260607-${Math.floor(100 + Math.random() * 900)}`;
+    const invDate = new Date();
+    const yyyy = invDate.getFullYear();
+    const mm = String(invDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(invDate.getDate()).padStart(2, '0');
+    const invoiceNo = `INV-${yyyy}${mm}${dd}-${Math.floor(100 + Math.random() * 900)}`;
     const newTx: Transaction = {
       id: `tx_${Date.now()}`,
       tenantId: currentUser.tenantId || 'tenant_default',
@@ -3135,11 +3160,25 @@ export const useAppStore = create<AppState>((set, get) => ({
           return await supabaseService.getTransactions();
         }, (remoteTxs) => {
           if (remoteTxs && remoteTxs.length > 0) {
-            const transactionsMap = remoteTxs.map(t => ({
-              id: t.id,
-              tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
-              invoiceNo: t.invoice_no,
-              timestamp: t.timestamp || t.created_at || new Date().toISOString(),
+            const transactionsMap = remoteTxs.map(t => {
+              const ts = t.timestamp || t.created_at || new Date().toISOString();
+              let invNo = t.invoice_no;
+              if (invNo && invNo.startsWith('INV-20260607-')) {
+                const txDate = new Date(ts);
+                const yyyy = txDate.getFullYear();
+                const mm = String(txDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(txDate.getDate()).padStart(2, '0');
+                const correctDateStr = `${yyyy}${mm}${dd}`;
+                if (correctDateStr !== '20260607') {
+                  const suffix = invNo.split('-')[2];
+                  invNo = `INV-${correctDateStr}-${suffix}`;
+                }
+              }
+              return {
+                id: t.id,
+                tenantId: t.tenant_id || get().currentUser?.tenantId || 'tenant_default',
+                invoiceNo: invNo,
+                timestamp: ts,
               cashierName: t.cashier_name,
               items: t.items,
               totalAmount: Number(t.total_amount),
@@ -3160,7 +3199,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               voidStatus: t.void_status,
               voidReason: t.void_reason,
               taxAmount: Number(t.tax_amount || 0)
-            }));
+            }; });
             set({ transactions: transactionsMap });
           }
         }));
