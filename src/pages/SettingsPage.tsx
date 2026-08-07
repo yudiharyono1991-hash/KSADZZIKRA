@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw, Globe, Clock, X } from 'lucide-react';
+import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw, Globe, Clock, X, QrCode } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabaseService, isSupabaseConfigured } from '../lib/supabase';
+import * as htmlToImage from 'html-to-image';
 
 export default function SettingsPage() {
   const {
@@ -108,6 +109,63 @@ export default function SettingsPage() {
     settings.paymentMethods?.ewallet || []
   );
 
+  // QR Code Poster States
+  const posterRef = useRef<HTMLDivElement>(null);
+  const [customPortalUrl, setCustomPortalUrl] = useState('');
+  const [qrBase64, setQrBase64] = useState<string>('');
+
+  useEffect(() => {
+    if (!customPortalUrl) return;
+    const generateQrBase64 = async () => {
+      try {
+        const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(customPortalUrl)}`;
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setQrBase64(reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.error('Error fetching QR as base64:', err);
+      }
+    };
+    generateQrBase64();
+  }, [customPortalUrl]);
+
+  const downloadPoster = async () => {
+    if (!posterRef.current) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(posterRef.current, {
+        quality: 1.0,
+        pixelRatio: 2, // 2x resolution for clean prints
+      });
+      const link = document.createElement('a');
+      link.download = `Poster_QR_KSAMart_${storeName.replace(/\s+/g, '_')}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error: any) {
+      console.error('Error generating poster:', error);
+      alert('Gagal mengunduh poster: ' + error.message);
+    }
+  };
+
+  const downloadQrOnly = async () => {
+    if (!qrBase64) {
+      alert('QR Code belum selesai dibuat. Silakan tunggu beberapa detik.');
+      return;
+    }
+    try {
+      const link = document.createElement('a');
+      link.download = `QR_Code_Only_${storeName.replace(/\s+/g, '_')}.png`;
+      link.href = qrBase64;
+      link.click();
+    } catch (error: any) {
+      console.error('Error downloading QR code:', error);
+      alert('Gagal mengunduh QR Code: ' + error.message);
+    }
+  };
+
   const isOwner = currentUser?.role === 'OWNER';
 
   useEffect(() => {
@@ -149,6 +207,7 @@ export default function SettingsPage() {
     setLandingContactUs(settings.landingPageConfig?.contactUs || { phone: '', email: '', address: '', description: '' });
     setLandingFaqs(settings.landingPageConfig?.faqs || []);
     setLandingShowTopDropdowns(settings.landingPageConfig?.showTopDropdowns ?? true);
+    setCustomPortalUrl(`${window.location.origin}${window.location.pathname}#/`);
   }, [settings]);
 
   const handleSave = () => {
@@ -684,6 +743,130 @@ export default function SettingsPage() {
                 Akses Terkunci (Khusus Owner)
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* QR Code Aplikasi & Portal Pelanggan */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden mt-6">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gradient-to-r from-emerald-50/50 to-green-50/30 dark:from-emerald-950/20 dark:to-slate-900">
+          <QrCode className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="font-bold text-gray-800 dark:text-slate-200">QR Code Aplikasi & Portal Pelanggan</h2>
+        </div>
+        <div className="p-6">
+          <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+            {/* Left Column: Poster Preview */}
+            <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">Preview Poster Cetak (Ukuran Pintu Toko)</span>
+              
+              {/* The Actual Poster Element to Download */}
+              <div 
+                ref={posterRef}
+                className="w-full max-w-[340px] bg-gradient-to-br from-emerald-900 via-green-950 to-emerald-950 text-white rounded-3xl p-8 flex flex-col items-center justify-between shadow-xl text-center border-4 border-amber-400/30 relative overflow-hidden min-h-[500px]"
+              >
+                {/* Decorative Border & Islamic Design elements */}
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200" />
+                <div className="absolute -top-12 -left-12 w-24 h-24 bg-white/5 rounded-full blur-xl" />
+                <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-white/5 rounded-full blur-xl" />
+                
+                {/* Logo Top Left */}
+                <div className="absolute top-3 left-4 z-20 w-10 h-10 bg-white rounded-lg p-0.5 shadow-lg border border-amber-400/30">
+                  <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-full h-full object-contain" />
+                </div>
+
+                {/* Header */}
+                <div className="space-y-1.5 z-10">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-amber-300/90 font-mono">Selamat Datang di</div>
+                  <h3 className="text-2xl font-black text-amber-200 tracking-wide font-serif drop-shadow-sm">{storeName || 'KSA Mart'}</h3>
+                  <div className="h-0.5 w-16 bg-amber-400/40 mx-auto rounded-full" />
+                  <p className="text-[10px] text-emerald-200 font-medium italic">"Belanja Hemat ??? Ada di KSA Mart"</p>
+                </div>
+
+                {/* QR Code Container */}
+                <div className="my-6 p-4 bg-white rounded-2xl shadow-lg border border-amber-400/20 z-10 flex flex-col items-center justify-center">
+                  {qrBase64 ? (
+                    <img 
+                      src={qrBase64} 
+                      alt="QR Code Aplikasi" 
+                      className="w-48 h-48 object-contain"
+                    />
+                  ) : (
+                    <div className="w-48 h-48 flex items-center justify-center text-slate-400 text-xs">
+                      <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Slogan & Instructions */}
+                <div className="space-y-3 z-10">
+                  <div className="bg-amber-400/10 border border-amber-400/30 rounded-xl px-4 py-2">
+                    <span className="text-xs font-bold text-amber-200 block uppercase tracking-wider">Pindai QR Code Di Atas</span>
+                    <span className="text-[10px] text-emerald-100 block mt-0.5">Untuk melihat Katalog Produk, Poin Member, & Pemesanan Online</span>
+                  </div>
+                  <div className="text-[9px] text-emerald-300 font-mono opacity-80 select-all">{customPortalUrl}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Information, Link customization, and Action buttons */}
+            <div className="flex-1 flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Bagikan QR Code ke Pelanggan</h4>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    Tempelkan poster QR Code ini di pintu masuk toko, area kasir, atau bagikan secara online. Pelanggan cukup melakukan scan/pindai menggunakan kamera HP mereka untuk langsung masuk ke **Portal Pelanggan (Katalog & Pemesanan Online)** tanpa perlu menginstal aplikasi tambahan.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-slate-400 block">Tautan Portal Pelanggan (Bisa Diedit jika Menggunakan Domain Kustom)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customPortalUrl}
+                      onChange={(e) => setCustomPortalUrl(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-xs"
+                      placeholder="Masukkan alamat URL website..."
+                    />
+                    <button
+                      onClick={() => {
+                        if (!customPortalUrl) return;
+                        navigator.clipboard.writeText(customPortalUrl);
+                        alert("Tautan berhasil disalin!");
+                      }}
+                      className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                    >
+                      <Copy size={14} /> Salin
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-400">
+                    Default: `{window.location.origin}{window.location.pathname}#/member`
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-gray-100 dark:border-slate-800 space-y-3">
+                <button
+                  onClick={downloadPoster}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold py-3 rounded-xl transition-all shadow-md cursor-pointer text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Unduh Poster QR Siap Cetak (PNG)
+                </button>
+                <button
+                  onClick={downloadQrOnly}
+                  className="w-full flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold py-2.5 rounded-xl transition-all border border-gray-200 dark:border-slate-700 cursor-pointer text-xs"
+                >
+                  <QrCode className="w-4 h-4" />
+                  Unduh QR Code Saja (PNG)
+                </button>
+                <div className="bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-3 text-center">
+                  <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">
+                    💡 **Tips Percetakan:** Gunakan kertas jenis Art Paper / Glossy berukuran A4 or A5 untuk hasil cetak poster pintu masuk yang maksimal dan profesional.
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

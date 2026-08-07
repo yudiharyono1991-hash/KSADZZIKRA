@@ -46,7 +46,12 @@ export default function KasirShiftPage() {
   const handleBluetoothPrint = async () => {
     if (!receiptModal.record) return;
     try {
-      await printKasbonPaymentToBluetooth(receiptModal.record, settings);
+      await printKasbonPaymentToBluetooth(
+        receiptModal.record,
+        settings.storeName || 'KSA Mart',
+        settings.storeAddress || '',
+        settings.storePhone || ''
+      );
     } catch (err: any) {
       alert(err.message || 'Gagal mencetak ke printer Bluetooth');
     }
@@ -1373,7 +1378,7 @@ export default function KasirShiftPage() {
               {/* Invoice Selection */}
               {(() => {
                 const debitsRaw = transactions
-                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID')
+                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && !t.isVoided)
                   .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
                 const explicitPaidInvoiceNos = new Set<string>();

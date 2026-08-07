@@ -1111,7 +1111,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addCustomer: (customerData) => {
     const newCustomer: Customer = {
       ...customerData,
-      id: customerData.id || `cust_${Date.now()}`,
+      id: customerData.id || `cust_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       createdAt: new Date().toISOString(),
       branchId: customerData.branchId || get().currentUser?.branchId
     };
@@ -1122,10 +1122,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isSupabaseConfigured) supabaseService.saveCustomer(newCustomer);
   },
   updateCustomer: (id, updates) => {
+    const oldCustomer = get().customers.find(c => c.id === id);
     const updated = get().customers.map(c => c.id === id ? { ...c, ...updates } : c);
     set({ customers: updated });
     saveStorage('ksa_customers', updated, get().currentUser?.tenantId);
     get().addLog('CUSTOMER_UPDATE', 'SYSTEM', `Update pelanggan ID: ${id}`);
+    
+    if (oldCustomer) {
+      if ((updates.phone && oldCustomer.phone !== updates.phone) || (updates.name && oldCustomer.name !== updates.name)) {
+        const linkedUser = get().users.find(u => u.role === 'PELANGGAN' && u.username === oldCustomer.phone);
+        if (linkedUser) {
+          get().updateUser(linkedUser.id, { 
+            username: updates.phone || linkedUser.username, 
+            name: updates.name || linkedUser.name 
+          });
+        }
+      }
+    }
+
     const cust = updated.find(c => c.id === id);
     if (cust && isSupabaseConfigured) supabaseService.saveCustomer(cust);
   },
@@ -1137,7 +1151,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addSupplier: (supplierData) => {
-    const newSupplier: Supplier = { ...supplierData, id: `sup_${Date.now()}`, createdAt: new Date().toISOString() };
+    const newSupplier: Supplier = { ...supplierData, id: `sup_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, createdAt: new Date().toISOString() };
     const updated = [...get().suppliers, newSupplier];
     set({ suppliers: updated });
     saveStorage('ksa_suppliers', updated, get().currentUser?.tenantId);

@@ -702,7 +702,7 @@ export default function NeracaRugiPage() {
                     <span>PENDAPATAN LAINNYA (DARI KASIR)</span>
                     <span className="text-[10px] text-gray-400 font-medium">{filteredOtherIncome.length} transaksi</span>
                   </div>
-                  <div className="space-y-2 pl-4">
+                  <div className="space-y-2 pl-4 max-h-44 overflow-y-auto pr-1">
                     {filteredOtherIncome.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 py-0.5">
                         <span className="pr-4 flex-1">
@@ -839,16 +839,18 @@ export default function NeracaRugiPage() {
                         <span className="ml-4 font-bold">↳ Tambahan dari Pembelian Langsung</span>
                         <span className="font-mono font-bold">Rp {kasKecilInventory.toLocaleString('id-ID')}</span>
                       </div>
-                      {kasKecilInventoryEntries.map(entry => {
-                        const dateStr = entry.date ? String(entry.date).split('T')[0] : '';
-                        const desc = entry.description.replace('[Auto] Beban OPERASIONAL: Kas Kecil: ', '');
-                        return (
-                          <div key={entry.id} className="flex justify-between text-[9px] text-gray-400 ml-6 border-l border-gray-200 dark:border-slate-700 pl-2">
-                            <span>{dateStr} • {desc}</span>
-                            <span className="font-mono">Rp {((Number(entry.debit) || 0) - (Number(entry.credit) || 0)).toLocaleString('id-ID')}</span>
-                          </div>
-                        );
-                      })}
+                      <div className="max-h-44 overflow-y-auto pr-1 space-y-1 mt-1">
+                        {kasKecilInventoryEntries.map(entry => {
+                          const dateStr = entry.date ? String(entry.date).split('T')[0] : '';
+                          const desc = entry.description.replace('[Auto] Beban OPERASIONAL: Kas Kecil: ', '');
+                          return (
+                            <div key={entry.id} className="flex justify-between text-[9px] text-gray-400 ml-6 border-l border-gray-200 dark:border-slate-700 pl-2">
+                              <span>{dateStr} • {desc}</span>
+                              <span className="font-mono">Rp {((Number(entry.debit) || 0) - (Number(entry.credit) || 0)).toLocaleString('id-ID')}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

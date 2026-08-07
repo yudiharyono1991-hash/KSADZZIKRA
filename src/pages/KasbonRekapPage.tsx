@@ -136,6 +136,13 @@ export default function KasbonRekapPage() {
       );
     }
 
+    // Sort by most recent transaction date descending
+    result = result.sort((a, b) => {
+      const dateA = a.history.length > 0 ? a.history[0].date.getTime() : 0;
+      const dateB = b.history.length > 0 ? b.history[0].date.getTime() : 0;
+      return dateB - dateA;
+    });
+
     return result;
   }, [customersWithKasbon, searchQuery, statusFilter, dateRange]);
 
@@ -547,8 +554,9 @@ export default function KasbonRekapPage() {
                 <div className="col-span-1"></div>
                 <div className="col-span-3">Nama Pelanggan</div>
                 <div className="col-span-2">No. Telepon</div>
-                <div className="col-span-2">Status</div>
-                <div className="col-span-2">Total Transaksi</div>
+                <div className="col-span-1">Status</div>
+                <div className="col-span-2">Tgl Update</div>
+                <div className="col-span-1">Trx</div>
                 <div className="col-span-2 text-right">Sisa Kasbon</div>
               </div>
 
@@ -575,23 +583,17 @@ export default function KasbonRekapPage() {
                         <div className="col-span-2 text-[10px] sm:text-sm text-slate-600 dark:text-slate-400">
                           {customer.phone || '-'}
                         </div>
-                        <div className="col-span-2 text-[10px] sm:text-sm">
+                        <div className="col-span-1 text-[10px] sm:text-sm">
                           {customer.debtAmount > 0 
                             ? <span className="inline-flex items-center px-1.5 py-0.5 sm:px-2 rounded text-[9px] sm:text-xs font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400">Belum Lunas</span>
-                            : (
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="inline-flex items-center px-1.5 py-0.5 sm:px-2 rounded text-[9px] sm:text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 w-fit">Lunas</span>
-                                  {customer.history.find((h: any) => h.type === 'PELUNASAN') && (
-                                    <span className="text-[8px] sm:text-[10px] text-slate-500 whitespace-nowrap">
-                                      {format(customer.history.find((h: any) => h.type === 'PELUNASAN').date, 'dd/MM/yy')} | Ref: {customer.history.find((h: any) => h.type === 'PELUNASAN').ref.substring(0,8)}...
-                                    </span>
-                                  )}
-                                </div>
-                            )
+                            : <span className="inline-flex items-center px-1.5 py-0.5 sm:px-2 rounded text-[9px] sm:text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 w-fit">Lunas</span>
                           }
                         </div>
                         <div className="col-span-2 text-[10px] sm:text-sm text-slate-600 dark:text-slate-400">
-                          {customer.history.length} Riwayat
+                          {customer.history.length > 0 ? format(customer.history[0].date, 'dd/MM/yyyy HH:mm') : '-'}
+                        </div>
+                        <div className="col-span-1 text-[10px] sm:text-sm text-slate-600 dark:text-slate-400">
+                          {customer.history.length}
                         </div>
                         <div className="col-span-2 text-right font-bold text-[11px] sm:text-base text-rose-600 dark:text-rose-400">
                           Rp {customer.debtAmount.toLocaleString('id-ID')}
@@ -641,7 +643,7 @@ export default function KasbonRekapPage() {
                                       <td className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap font-medium">
                                         <span className={`inline-flex items-center px-1.5 py-0.5 sm:px-2 rounded text-[9px] sm:text-xs font-medium ${
                                           h.type === 'PEMBELIAN' 
-                                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400' 
+                                            ? (h.isPaid ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400')
                                             : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                                         }`}>
                                           {h.type === 'PEMBELIAN' 
@@ -654,7 +656,9 @@ export default function KasbonRekapPage() {
                                         <div className="text-[9px] sm:text-xs">{h.cashier || 'Sistem'}</div>
                                       </td>
                                       <td className={`px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap text-[10px] sm:text-sm text-right font-bold ${
-                                        h.type === 'PEMBELIAN' ? 'text-rose-600 dark:text-rose-400' : 'text-green-600 dark:text-green-400'
+                                        h.type === 'PEMBELIAN' 
+                                          ? (h.isPaid ? 'text-slate-500 dark:text-slate-500' : 'text-rose-600 dark:text-rose-400') 
+                                          : 'text-green-600 dark:text-green-400'
                                       }`}>
                                         {h.type === 'PEMBELIAN' ? '+' : '-'} Rp {h.amount.toLocaleString('id-ID')}
                                       </td>

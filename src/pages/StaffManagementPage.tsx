@@ -14,6 +14,7 @@ export default function StaffManagementPage() {
   const { settings, updateSettings } = useAppStore();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('ALL');
   
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
@@ -39,22 +40,105 @@ export default function StaffManagementPage() {
   }
 
 
-  const filteredAttendances = attendances.filter(a => {
+  const getDatesInRange = (start: string, end: string) => {
+    const dates = [];
+    let currDate = new Date(start);
+    const lastDate = new Date(end);
+    const limitDate = new Date(); 
+    limitDate.setHours(23, 59, 59, 999);
+    const maxDate = lastDate < limitDate ? lastDate : limitDate;
+    
+    while (currDate <= maxDate) {
+      dates.push(new Date(currDate).toLocaleDateString('en-CA'));
+      currDate.setDate(currDate.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const datesInRange = startDate && endDate ? getDatesInRange(startDate, endDate) : [];
+  // Proses semua Kasir & Staff, kecuali akun percobaan "Yudi Hariyono"
+  const staffUsers = users.filter(u => 
+    (u.role === 'CASHIER' || u.role.startsWith('STAFF')) &&
+    !u.name.toLowerCase().includes('yudi hariyono')
+  );
+
+  const fullAttendances = [...attendances];
+  
+  datesInRange.forEach(date => {
+    const dateObj = new Date(date);
+    const dayIndex = dateObj.getDay();
+    
+    staffUsers.forEach(user => {
+      const userAssigns = (settings.operationalHours?.shiftAssignments?.[user.id] as any) || {};
+      const assignedShiftId = userAssigns[dayIndex];
+      if (assignedShiftId === 'LIBUR') return;
+      
+      const hasRecord = fullAttendances.some(a => a.userId === user.id && a.date === date);
+      if (!hasRecord) {
+        fullAttendances.push({
+          id: `virtual-${user.id}-${date}`,
+          userId: user.id,
+          userName: user.name,
+          date: date,
+          clockIn: '',
+          status: 'ALFA',
+          isVirtual: true
+        });
+      }
+    });
+  });
+
+  const filteredAttendances = fullAttendances.filter(a => {
     const matchName = a.userName.toLowerCase().includes(searchTerm.toLowerCase());
     let matchDate = true;
     if (startDate && new Date(a.date).getTime() < new Date(startDate).setHours(0,0,0,0)) matchDate = false;
     if (endDate && new Date(a.date).getTime() > new Date(endDate).setHours(23,59,59,999)) matchDate = false;
-    return matchName && matchDate;
+
+    let matchShift = true;
+    if (shiftFilter !== 'ALL') {
+       const dateObj = new Date(a.date);
+       const dayIndex = dateObj.getDay();
+       const userAssigns = (settings.operationalHours?.shiftAssignments?.[a.userId] as any) || {};
+       const assignedShiftId = userAssigns[dayIndex];
+       
+       if (shiftFilter === 'UNASSIGNED') {
+          matchShift = !assignedShiftId || assignedShiftId === 'LIBUR';
+       } else {
+          matchShift = assignedShiftId === shiftFilter;
+       }
+    }
+
+    return matchName && matchDate && matchShift;
   });
 
-  const stats = {
-    present: filteredAttendances.filter(a => a.status === 'PRESENT').length,
-    late: filteredAttendances.filter(a => a.status === 'LATE').length,
-    izin: filteredAttendances.filter(a => a.status === 'IZIN').length,
-    sakit: filteredAttendances.filter(a => a.status === 'SAKIT').length,
-    cuti: filteredAttendances.filter(a => a.status === 'CUTI').length,
-    alfa: filteredAttendances.filter(a => a.status === 'ALFA').length,
+  const getEffectiveStatus = (a: any) => {
+    if (a.status === 'PRESENT' && a.clockIn) {
+      const clockInTime = new Date(a.clockIn);
+      const hours = clockInTime.getHours();
+      const minutes = clockInTime.getMinutes();
+      if (hours > 7 || (hours === 7 && minutes > 0)) {
+        return 'LATE';
+      }
+    }
+    return a.status;
   };
+
+  const summaryByStaff = Array.from(new Set(filteredAttendances.map(a => a.userName))).map(name => {
+    const userRecords = filteredAttendances.filter(a => a.userName === name);
+    return {
+      name,
+      present: userRecords.filter(a => getEffectiveStatus(a) === 'PRESENT').length,
+      late: userRecords.filter(a => getEffectiveStatus(a) === 'LATE').length,
+      sakit: userRecords.filter(a => getEffectiveStatus(a) === 'SAKIT').length,
+      izin: userRecords.filter(a => getEffectiveStatus(a) === 'IZIN').length,
+      cuti: userRecords.filter(a => getEffectiveStatus(a) === 'CUTI').length,
+      alfa: userRecords.filter(a => getEffectiveStatus(a) === 'ALFA').length,
+      clockIn: userRecords.filter(a => (getEffectiveStatus(a) === 'PRESENT' || getEffectiveStatus(a) === 'LATE') && !!a.clockIn).length,
+      noClockIn: userRecords.filter(a => getEffectiveStatus(a) === 'ALFA').length,
+      clockOut: userRecords.filter(a => (getEffectiveStatus(a) === 'PRESENT' || getEffectiveStatus(a) === 'LATE') && !!a.clockOut).length,
+      noClockOut: userRecords.filter(a => (getEffectiveStatus(a) === 'PRESENT' || getEffectiveStatus(a) === 'LATE') && !a.clockOut).length,
+    };
+  });
 
   const pendingCorrections = attendances.filter(a => a.correctionStatus === 'PENDING');
 
@@ -130,6 +214,17 @@ export default function StaffManagementPage() {
                     className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none w-28"
                   />
                 </div>
+                <select 
+                  value={shiftFilter} 
+                  onChange={e => setShiftFilter(e.target.value)}
+                  className="border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="ALL">Semua Shift</option>
+                  {settings.operationalHours?.shifts?.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                  <option value="UNASSIGNED">Reguler (Tanpa Shift)</option>
+                </select>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
@@ -137,37 +232,52 @@ export default function StaffManagementPage() {
               </div>
             </div>
             
-            <div className="p-4 grid grid-cols-2 md:grid-cols-6 gap-3 bg-gray-50/50 dark:bg-slate-800/20 border-b border-gray-100 dark:border-slate-800">
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tepat Waktu</div>
-                <div className="text-xl font-black text-green-600">{stats.present}</div>
-              </div>
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Terlambat</div>
-                <div className="text-xl font-black text-amber-500">{stats.late}</div>
-              </div>
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Sakit</div>
-                <div className="text-xl font-black text-blue-500">{stats.sakit}</div>
-              </div>
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Izin</div>
-                <div className="text-xl font-black text-purple-500">{stats.izin}</div>
-              </div>
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cuti</div>
-                <div className="text-xl font-black text-teal-500">{stats.cuti}</div>
-              </div>
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700 text-center">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Alfa</div>
-                <div className="text-xl font-black text-red-700">{stats.alfa}</div>
-              </div>
+            <div className="overflow-x-auto border-b border-gray-100 dark:border-slate-800 p-4 bg-gray-50/50 dark:bg-slate-800/20">
+              <table className="w-full text-left text-[10px] bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden min-w-[800px]">
+                <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wide">
+                  <tr>
+                    <th className="px-3 py-2 border-b dark:border-slate-700">Nama Staff</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-green-600">Tepat Wkt</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-amber-500">Terlambat</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-blue-500">Sakit</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-purple-500">Izin</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-teal-500">Cuti</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-red-700">Alfa</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center border-l bg-teal-50 dark:bg-teal-900/10 text-teal-700">Absen Masuk</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center bg-red-50 dark:bg-red-900/10 text-red-600">Tdk Absen Masuk</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center bg-blue-50 dark:bg-blue-900/10 text-blue-700">Absen Keluar</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center bg-amber-50 dark:bg-amber-900/10 text-amber-600">Tdk Absen Keluar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-700 font-medium">
+                  {summaryByStaff.length === 0 ? (
+                    <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-500">Tidak ada data</td></tr>
+                  ) : (
+                    summaryByStaff.map((s, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="px-3 py-2 font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">{s.name}</td>
+                        <td className="px-2 py-2 text-center">{s.present || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.late || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.sakit || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.izin || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.cuti || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.alfa || '-'}</td>
+                        <td className="px-2 py-2 text-center border-l bg-teal-50/50 dark:bg-teal-900/5 font-bold">{s.clockIn || '-'}</td>
+                        <td className="px-2 py-2 text-center bg-red-50/50 dark:bg-red-900/5 font-bold">{s.noClockIn || '-'}</td>
+                        <td className="px-2 py-2 text-center bg-blue-50/50 dark:bg-blue-900/5 font-bold">{s.clockOut || '-'}</td>
+                        <td className="px-2 py-2 text-center bg-amber-50/50 dark:bg-amber-900/5 font-bold">{s.noClockOut || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wide sticky top-0">
                   <tr>
                     <th className="px-4 py-3">Tanggal</th>
+                    <th className="px-4 py-3">Shift</th>
                     <th className="px-4 py-3">Nama Staff</th>
                     <th className="px-4 py-3 text-center">Foto Masuk</th>
                     <th className="px-4 py-3 text-center">Masuk</th>
@@ -182,6 +292,18 @@ export default function StaffManagementPage() {
                         {a.date}
                         {a.isRevised && <span className="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Direvisi</span>}
                       </td>
+                      <td className="px-4 py-3 text-[10px] text-gray-500 dark:text-slate-400 font-medium">
+                        {(() => {
+                          const dayIndex = new Date(a.date).getDay();
+                          const userAssigns = (settings.operationalHours?.shiftAssignments?.[a.userId] as any) || {};
+                          const shiftId = userAssigns[dayIndex];
+                          if (shiftId && shiftId !== 'LIBUR') {
+                            const shiftObj = settings.operationalHours?.shifts?.find(s => s.id === shiftId);
+                            return shiftObj ? shiftObj.name : 'Reguler';
+                          }
+                          return 'Reguler';
+                        })()}
+                      </td>
                       <td className="px-4 py-3 font-bold text-gray-800 dark:text-slate-200">{a.userName}</td>
                       <td className="px-4 py-3 text-center flex justify-center">
                         {a.photoUrl ? (
@@ -195,14 +317,33 @@ export default function StaffManagementPage() {
                            <span className="text-[10px] text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-teal-600">{new Date(a.clockIn).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}</td>
-                      <td className="px-4 py-3 text-center text-amber-600">
+                      <td className="px-4 py-3 text-center text-teal-600">
+                        {a.clockIn ? new Date(a.clockIn).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-amber-600 flex flex-col items-center justify-center gap-1">
                         {a.clockOut ? new Date(a.clockOut).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-'}
+                        {a.clockOut && (() => {
+                          const t = new Date(a.clockOut);
+                          if (t.getHours() > 21 || (t.getHours() === 21 && t.getMinutes() > 0)) {
+                            return <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[9px] rounded font-bold border border-purple-200">LEMBUR</span>;
+                          }
+                          return null;
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded border border-teal-100 text-[10px]">
-                          {a.status}
-                        </span>
+                        {(() => {
+                          const effStatus = getEffectiveStatus(a);
+                          return (
+                            <span className={`px-2 py-0.5 rounded border text-[10px] ${
+                              effStatus === 'PRESENT' ? 'bg-teal-50 text-teal-700 border-teal-100' :
+                              effStatus === 'LATE' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                              effStatus === 'ALFA' ? 'bg-red-50 text-red-700 border-red-100' :
+                              'bg-gray-50 text-gray-700 border-gray-100'
+                            }`}>
+                              {effStatus}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}

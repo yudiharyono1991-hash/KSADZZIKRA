@@ -48,7 +48,7 @@ export default function CustomerManagementPage() {
   const [debtAmount, setDebtAmount] = useState(0);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'SEMUA' | 'PUNYA_AKUN' | 'BELUM_ADA' | 'KASBON' | 'POIN_TERPAKAI'>('SEMUA');
+  const [filterType, setFilterType] = useState<'SEMUA' | 'PUNYA_AKUN' | 'BELUM_ADA' | 'KASBON' | 'POIN_TERPAKAI' | 'PERNAH_BELANJA'>('SEMUA');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -66,11 +66,18 @@ export default function CustomerManagementPage() {
     // Logika matematika murni: Total Poin yang pernah didapat = Sisa Saat Ini + Total Terpakai
     const earnedLogic = (Number(c.points) || 0) + redeemed;
     const earned = Math.max(c.totalPointsEarned || 0, earnedTx, earnedLogic);
+    
+    const totalSpending = customerTxs.reduce((sum, tx) => sum + (tx.isVoided ? 0 : tx.totalAmount), 0);
+    const lastTransactionDate = customerTxs.length > 0 
+      ? new Date(Math.max(...customerTxs.map(tx => new Date(tx.timestamp).getTime())))
+      : new Date(c.createdAt || 0);
 
     return {
       ...c,
       totalPointsEarned: earned,
       totalPointsRedeemed: redeemed,
+      totalSpending,
+      lastTransactionDate
     };
   });
 
@@ -81,7 +88,10 @@ export default function CustomerManagementPage() {
     if (filterType === 'BELUM_ADA') return matchesSearch && !linkedUser;
     if (filterType === 'KASBON') return matchesSearch && (c.debtAmount || 0) > 0;
     if (filterType === 'POIN_TERPAKAI') return matchesSearch && (c.totalPointsRedeemed || 0) > 0;
+    if (filterType === 'PERNAH_BELANJA') return matchesSearch && (c.totalSpending || 0) > 0;
     return matchesSearch;
+  }).sort((a, b) => {
+    return b.lastTransactionDate.getTime() - a.lastTransactionDate.getTime();
   });
   
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -93,9 +103,18 @@ export default function CustomerManagementPage() {
   const totalRemainingPointsSum = filtered.reduce((sum, c) => sum + (c.points || 0), 0);
   const totalValueSum = filtered.reduce((sum, c) => sum + ((c.points || 0) * (settings?.pointRedemptionValue || 10)), 0);
   const totalDebtSum = filtered.reduce((sum, c) => sum + (c.debtAmount || 0), 0);
+  const totalSpendingSum = filtered.reduce((sum, c) => sum + (c.totalSpending || 0), 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (phone) {
+      const isDuplicate = customers.some(c => c.phone === phone && c.id !== editingId);
+      if (isDuplicate) {
+        alert('Nomor HP ini sudah digunakan oleh akun pelanggan lain!');
+        return;
+      }
+    }
+    
     if (editingId) {
       updateCustomer(editingId, { id: customId || editingId, name, phone, points, totalPointsEarned, totalPointsRedeemed, lastPointsUpdate, debtAmount });
       if (customId && customId !== editingId) setEditingId(customId);
@@ -292,7 +311,7 @@ export default function CustomerManagementPage() {
 
   const getKasbonHistory = (customerId: string) => {
     const debitsRaw = transactions
-      .filter(tx => tx.customerId === customerId && tx.paymentMethod === 'KASBON' && tx.status !== 'VOID')
+      .filter(tx => tx.customerId === customerId && tx.paymentMethod === 'KASBON' && !tx.isVoided)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     const explicitPaidInvoiceNos = new Set<string>();
@@ -425,10 +444,18 @@ export default function CustomerManagementPage() {
                   const idxBranch = headers.findIndex(h => ['branchid', 'cabang'].includes(h));
                   if (idxName === -1) { alert('Template salah. Pastikan ada kolom name / Nama Pelanggan.'); setIsImporting(false); e.target.value = ''; return; }
                   let imported = 0;
+                  const existingPhones = new Set(customers.filter(c => c.phone).map(c => c.phone));
+                  
                   for (let i = 1; i < rows.length; i++) {
                     const row = rows[i]; if (!row || row.length === 0) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
                     const nameVal = String(row[idxName] || '').trim(); if (!nameVal) { setImportProgress(p => ({ ...p, done: p.done + 1 })); continue; }
                     const phoneVal = idxPhone !== -1 ? String(row[idxPhone] || '').trim() : '';
+
+                    if (phoneVal && existingPhones.has(phoneVal)) {
+                      setImportProgress(p => ({ ...p, done: p.done + 1 }));
+                      continue; // Skip duplicate phone
+                    }
+                    if (phoneVal) existingPhones.add(phoneVal);
 
                     const totalPt = idxTotalPoint !== -1 ? Number(row[idxTotalPoint]) || 0 : 0;
                     const usedPt = idxUsedPoint !== -1 ? Number(row[idxUsedPoint]) || 0 : 0;
@@ -559,6 +586,19 @@ export default function CustomerManagementPage() {
                 <button onClick={() => {
                   if(!resetPwdModal.newPwd) return alert('Sandi tidak boleh kosong');
                   updateUser(resetPwdModal.userId, { password: resetPwdModal.newPwd });
+                  
+                  // Construct WhatsApp message
+                  const targetUser = users.find(u => u.id === resetPwdModal.userId);
+                  const phone = targetUser?.phone || targetUser?.username || '';
+                  
+                  let waNumber = phone.replace(/\D/g, '');
+                  if (waNumber.startsWith('0')) waNumber = '62' + waNumber.substring(1);
+                  
+                  if (waNumber) {
+                    const message = `Halo *${resetPwdModal.userName}*,\n\nSandi akun KSA Mart Anda berhasil direset oleh Admin.\n\nSandi Baru Anda: *${resetPwdModal.newPwd}*\n\nSilakan login kembali dan simpan pesan ini baik-baik. Terima kasih!`;
+                    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`, '_blank');
+                  }
+                  
                   alert('Sandi berhasil direset!');
                   setResetPwdModal({isOpen: false, userId: '', userName: '', newPwd: ''});
                 }} className="px-3 py-1.5 text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 rounded-lg">Simpan Sandi Baru</button>
@@ -622,6 +662,14 @@ export default function CustomerManagementPage() {
                     tenantId: currentUser?.tenantId
                   });
                   
+                  let waNumber = createAccountModal.phone.replace(/\D/g, '');
+                  if (waNumber.startsWith('0')) waNumber = '62' + waNumber.substring(1);
+                  
+                  if (waNumber) {
+                    const message = `Halo *${createAccountModal.customerName}*,\n\nAkun Member KSA Mart Anda telah berhasil dibuat oleh Admin.\n\nUsername: *${createAccountModal.phone}*\nSandi: *${createAccountModal.initialPwd}*\n\nSilakan gunakan kredensial ini untuk login ke Portal Pelanggan KSA Mart. Terima kasih!`;
+                    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`, '_blank');
+                  }
+                  
                   alert('Akun pelanggan berhasil dibuat!');
                   setCreateAccountModal({isOpen: false, customerId: '', customerName: '', phone: '', initialPwd: ''});
                 }} className="px-3 py-1.5 text-xs font-bold bg-green-600 text-white hover:bg-green-700 rounded-lg">Buat Akun</button>
@@ -656,6 +704,7 @@ export default function CustomerManagementPage() {
             <option value="BELUM_ADA">Belum Ada Akun</option>
             <option value="KASBON">Punya Kasbon</option>
             <option value="POIN_TERPAKAI">Poin Terpakai</option>
+            <option value="PERNAH_BELANJA">Pernah Belanja</option>
           </select>
         </div>
 
@@ -668,11 +717,12 @@ export default function CustomerManagementPage() {
                 <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle">Phone</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle min-w-[120px]">Name</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Akses Login</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle">Total Belanja</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle">Piutang (Kasbon)</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Tot. Poin</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Terpakai</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Sisa</th>
-                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle hidden sm:table-cell">Tgl Update Poin</th>
+                <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle hidden sm:table-cell">Tgl Update Belanja</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle">Nilai (Rp)</th>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">Aksi</th>
               </tr>
@@ -682,13 +732,15 @@ export default function CustomerManagementPage() {
                 const totalPoint = c.totalPointsEarned || c.points;
                 const pointTerpakai = c.totalPointsRedeemed || 0;
                 const sisaPoint = c.points;
-                const updateDate = c.lastPointsUpdate || c.createdAt.split('T')[0];
+                const updateDate = c.lastTransactionDate && c.lastTransactionDate.getFullYear() > 2000
+                  ? c.lastTransactionDate.toLocaleDateString('en-CA')
+                  : (c.lastPointsUpdate || (c.createdAt ? String(c.createdAt).split('T')[0] : '-'));
                 const nilaiRp = sisaPoint * (settings?.pointRedemptionValue || 10);
 
                 return (
                   <tr key={c.id} className="hover:bg-gray-50 dark:bg-slate-800">
                     <td className="px-1 py-2 sm:px-2 sm:py-3 text-center text-gray-600 dark:text-slate-400 align-middle">{startIndex + index + 1}</td>
-                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-gray-500 dark:text-slate-400 font-mono text-[9px] sm:text-[10px] align-middle">{c.id.substring(0, 8)}</td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-gray-500 dark:text-slate-400 font-mono text-[9px] sm:text-[10px] align-middle">{c.id.length > 12 ? c.id.slice(-8) : c.id.substring(0, 8)}</td>
                     <td className="px-1 py-2 sm:px-2 sm:py-3 text-gray-600 dark:text-slate-400 align-middle text-[9px] sm:text-[10px]">{c.phone}</td>
                     <td className="px-1 py-2 sm:px-2 sm:py-3 font-bold text-gray-800 dark:text-slate-200 align-middle whitespace-normal break-words leading-tight">{c.name}</td>
                     <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">
@@ -709,6 +761,9 @@ export default function CustomerManagementPage() {
                           </div>
                         );
                       })()}
+                    </td>
+                    <td className="px-1 py-2 sm:px-2 sm:py-3 text-right text-blue-600 dark:text-blue-400 font-bold align-middle">
+                      Rp {Number(c.totalSpending || 0).toLocaleString('id-ID')}
                     </td>
                     <td className="px-1 py-2 sm:px-2 sm:py-3 text-right text-red-600 dark:text-red-400 font-bold align-middle">
                       Rp {Number(c.debtAmount || 0).toLocaleString('id-ID')}
@@ -758,6 +813,7 @@ export default function CustomerManagementPage() {
             <tfoot className="bg-gray-100 dark:bg-slate-800 font-bold text-gray-800 dark:text-slate-200 border-t border-gray-200 dark:border-slate-700 whitespace-nowrap text-[10px] sm:text-xs">
               <tr>
                 <td colSpan={5} className="px-1 py-2 sm:px-2 sm:py-3 text-right align-middle pr-4">TOTAL</td>
+                <td className="px-1 py-2 sm:px-2 sm:py-3 text-right text-blue-600 dark:text-blue-400 align-middle">Rp {totalSpendingSum.toLocaleString('id-ID')}</td>
                 <td className="px-1 py-2 sm:px-2 sm:py-3 text-right text-red-600 dark:text-red-400 align-middle">Rp {totalDebtSum.toLocaleString('id-ID')}</td>
                 <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{totalPointsEarnedSum.toLocaleString('id-ID')}</td>
                 <td className="px-1 py-2 sm:px-2 sm:py-3 text-center align-middle">{totalPointsRedeemedSum.toLocaleString('id-ID')}</td>
@@ -840,7 +896,7 @@ export default function CustomerManagementPage() {
               {/* Invoice Selection */}
               {(() => {
                 const debitsRaw = transactions
-                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && t.status !== 'VOID')
+                  .filter(t => t.customerId === payoffModal.customerId && t.paymentMethod === 'KASBON' && !t.isVoided)
                   .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); // sort oldest first for FIFO
 
                 const explicitPaidInvoiceNos = new Set<string>();

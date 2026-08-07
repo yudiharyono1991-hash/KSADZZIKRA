@@ -44,7 +44,8 @@ export default function CustomerPortal() {
     settings,
     branches,
     isDarkMode,
-    toggleDarkMode
+    toggleDarkMode,
+    transactions
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CATALOG' | 'PPOB' | 'PROMO' | 'CART' | 'ORDERS' | 'POINTS' | 'GUIDE'>('DASHBOARD');
@@ -203,13 +204,16 @@ export default function CustomerPortal() {
   const totalUtang = myCustomerProfile?.debtAmount || 0;
   
   const myOrders = onlineOrders.filter(o => o.customerName === currentUser.name);
-  const totalBelanja = myOrders.filter(o => o.status === 'COMPLETED').reduce((sum, o) => sum + o.totalAmount, 0);
+  const myTransactions = transactions.filter(t => !t.isVoided && (t.customerName === currentUser.name || (myCustomerProfile && t.customerId === myCustomerProfile.id)));
+  const totalBelanja = myTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
 
-  // Calculate total hemat (discount obtained) by checking if order items had a wholesale price
+  // Calculate total hemat (discount obtained)
   let totalHemat = 0;
-  myOrders.filter(o => o.status === 'COMPLETED').forEach(o => {
-    o.items.forEach(item => {
-      const prod = products.find(p => p.name === item.productName);
+  myTransactions.forEach(t => {
+    if (t.discountAmount) totalHemat += t.discountAmount;
+    if (t.pointsDiscount) totalHemat += t.pointsDiscount;
+    t.items.forEach(item => {
+      const prod = products.find(p => p.name === item.productName || p.id === item.productId);
       if (prod && prod.price > item.price) {
         totalHemat += (prod.price - item.price) * item.quantity;
       }
