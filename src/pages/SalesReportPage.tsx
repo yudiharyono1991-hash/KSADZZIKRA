@@ -54,6 +54,9 @@ export default function SalesReportPage() {
     let totalZakat = 0;
 
     validTxs.forEach(tx => {
+      const txTotal = Number(tx.totalAmount || 0);
+      const rawSum = tx.items.reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+
       tx.items.forEach(item => {
         const productData = products.find((p: any) => p.id === item.productId);
         const isPPOB = productData ? productData.isPPOB : false;
@@ -74,9 +77,13 @@ export default function SalesReportPage() {
         const existing = itemMap.get(item.productId);
         const qty = Number(item.quantity || 0);
         const price = Number(item.price || 0);
+        const rawOmset = price * qty;
+        
+        // Proporsional omset terhadap total nominal transaksi aktual
+        const itemOmset = rawSum > 0 ? (rawOmset / rawSum) * txTotal : rawOmset;
         
         existing.qty += qty;
-        existing.omset += (price * qty);
+        existing.omset += itemOmset;
         
         // Coba ambil HPP dari record transaksi, jika 0 atau tidak ada, fallback ke master produk
         let costPrice = Number(item.costPrice || 0);
@@ -93,7 +100,7 @@ export default function SalesReportPage() {
         existing.zakat += itemZakat;
 
         totalQty += qty;
-        totalOmset += (price * qty);
+        totalOmset += itemOmset;
         totalProfit += itemProfit;
         totalZakat += itemZakat;
       });

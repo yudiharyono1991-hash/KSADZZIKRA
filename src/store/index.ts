@@ -291,58 +291,163 @@ interface AppState {
   updateCoaAccount: (account: CoaAccount) => void;
   deleteCoaAccount: (id: string) => void;
   clearCoaList: () => void;
-
   // Feedback Actions
   updateTransactionFeedback: (id: string, rating: 'PUAS' | 'TIDAK_PUAS', feedback?: string) => void;
 }
 
 const DEFAULT_COA: CoaAccount[] = [
-  { id: 'coa_1', tenantId: 'tenant_default', code: '1-1000', name: 'Kas Tunai Toko', category: 'ASSET', isActive: true },
-  { id: 'coa_2', tenantId: 'tenant_default', code: '1-1010', name: 'Bank Syariah Indonesia (BSI)', category: 'ASSET', isActive: true },
-  { id: 'coa_3', tenantId: 'tenant_default', code: '1-1020', name: 'QRIS Syariah Dana', category: 'ASSET', isActive: true },
-  { id: 'coa_4', tenantId: 'tenant_default', code: '1-1030', name: 'Piutang Kasbon Pelanggan', category: 'ASSET', isActive: true },
-  { id: 'coa_5', tenantId: 'tenant_default', code: '1-1040', name: 'Persediaan Barang Dagang', category: 'ASSET', isActive: true },
-  { id: 'coa_6', tenantId: 'tenant_default', code: '1-1050', name: 'Saldo Radar Pulsa', category: 'ASSET', isActive: true },
-  { id: 'coa_kemenkuota', tenantId: 'tenant_default', code: '1-1051', name: 'Saldo Kemenkuota', category: 'ASSET', isActive: true },
-  { id: 'coa_bosspulsa', tenantId: 'tenant_default', code: '1-1052', name: 'Saldo Boss Pulsa', category: 'ASSET', isActive: true },
-  { id: 'coa_tokopedia', tenantId: 'tenant_default', code: '1-1053', name: 'Saldo Tokopedia', category: 'ASSET', isActive: true },
-  { id: 'coa_dana', tenantId: 'tenant_default', code: '1-1054', name: 'Saldo Dana', category: 'ASSET', isActive: true },
-  { id: 'coa_6', tenantId: 'tenant_default', code: '2-1000', name: 'Utang Dagang ke Supplier', category: 'LIABILITY', isActive: true },
-  { id: 'coa_7', tenantId: 'tenant_default', code: '2-1010', name: 'Utang Zakat Niaga Terhutang', category: 'LIABILITY', isActive: true },
-  { id: 'coa_8', tenantId: 'tenant_default', code: '3-1000', name: 'Modal Awal KSA Mart', category: 'EQUITY', isActive: true },
-  { id: 'coa_9', tenantId: 'tenant_default', code: '4-1000', name: 'Pendapatan Usaha', category: 'REVENUE', isActive: true },
-  { id: 'coa_10', tenantId: 'tenant_default', code: '4-1001', name: 'Pendapatan Penjualan', category: 'REVENUE', isActive: true },
-  { id: 'coa_11', tenantId: 'tenant_default', code: '4-1010', name: 'Pendapatan Layanan PPOB', category: 'REVENUE', isActive: true },
-  { id: 'coa_12', tenantId: 'tenant_default', code: '5-1000', name: 'Beban Pokok Penjualan (HPP)', category: 'EXPENSE', isActive: true },
-  { id: 'coa_13', tenantId: 'tenant_default', code: '5-1010', name: 'Beban Pokok Layanan PPOB', category: 'EXPENSE', isActive: true },
-  { id: 'coa_14', tenantId: 'tenant_default', code: '5-2000', name: 'Beban Gaji Karyawan', category: 'EXPENSE', isActive: true },
-  { id: 'coa_15', tenantId: 'tenant_default', code: '5-2010', name: 'Beban Listrik, Air & Internet', category: 'EXPENSE', isActive: true },
-  { id: 'coa_16', tenantId: 'tenant_default', code: '5-2020', name: 'Beban Operasional Lainnya', category: 'EXPENSE', isActive: true }
+  // 1000 - ASET
+  { id: 'coa_1000', tenantId: 'tenant_default', code: '1000', name: 'ASET', category: 'ASSET', isActive: true },
+  { id: 'coa_1100', tenantId: 'tenant_default', code: '1100', name: 'Aset Lancar', category: 'ASSET', isActive: true },
+  { id: 'coa_1101', tenantId: 'tenant_default', code: '1101', name: 'Kas', category: 'ASSET', isActive: true },
+  { id: 'coa_1102', tenantId: 'tenant_default', code: '1102', name: 'Kas Kecil', category: 'ASSET', isActive: true },
+  { id: 'coa_1103', tenantId: 'tenant_default', code: '1103', name: 'Bank Syariah Indonesia (BSI)', category: 'ASSET', isActive: true },
+  { id: 'coa_1104', tenantId: 'tenant_default', code: '1104', name: 'Bank Syariah Lainnya', category: 'ASSET', isActive: true },
+  { id: 'coa_1020', tenantId: 'tenant_default', code: '1020', name: 'QRIS Syariah Dana', category: 'ASSET', isActive: true },
+  { id: 'coa_1030', tenantId: 'tenant_default', code: '1030', name: 'Piutang Kasbon Pelanggan', category: 'ASSET', isActive: true },
+  { id: 'coa_1105', tenantId: 'tenant_default', code: '1105', name: 'Piutang Murabahah', category: 'ASSET', isActive: true },
+  { id: 'coa_1106', tenantId: 'tenant_default', code: '1106', name: 'Piutang Ijarah', category: 'ASSET', isActive: true },
+  { id: 'coa_1107', tenantId: 'tenant_default', code: '1107', name: 'Piutang Qardh', category: 'ASSET', isActive: true },
+  { id: 'coa_1108', tenantId: 'tenant_default', code: '1108', name: 'Cadangan Kerugian Piutang', category: 'ASSET', isActive: true },
+  { id: 'coa_1109', tenantId: 'tenant_default', code: '1109', name: 'Persediaan Barang Murabahah', category: 'ASSET', isActive: true },
+  { id: 'coa_1110', tenantId: 'tenant_default', code: '1110', name: 'Persediaan Unit Toko', category: 'ASSET', isActive: true },
+  { id: 'coa_1111', tenantId: 'tenant_default', code: '1111', name: 'Persediaan Konsinyasi', category: 'ASSET', isActive: true },
+  { id: 'coa_1112', tenantId: 'tenant_default', code: '1112', name: 'Saldo Dana & Digital PPOB', category: 'ASSET', isActive: true },
+  { id: 'coa_1113', tenantId: 'tenant_default', code: '1113', name: 'Biaya Dibayar Dimuka', category: 'ASSET', isActive: true },
+  { id: 'coa_1117', tenantId: 'tenant_default', code: '1117', name: 'Saldo Dana Dokuku', category: 'ASSET', isActive: true },
+  { id: 'coa_1200', tenantId: 'tenant_default', code: '1200', name: 'Aset Tidak Lancar', category: 'ASSET', isActive: true },
+  { id: 'coa_1201', tenantId: 'tenant_default', code: '1201', name: 'Tanah', category: 'ASSET', isActive: true },
+  { id: 'coa_1202', tenantId: 'tenant_default', code: '1202', name: 'Bangunan', category: 'ASSET', isActive: true },
+  { id: 'coa_1203', tenantId: 'tenant_default', code: '1203', name: 'Kendaraan', category: 'ASSET', isActive: true },
+  { id: 'coa_1204', tenantId: 'tenant_default', code: '1204', name: 'Peralatan Usaha', category: 'ASSET', isActive: true },
+  { id: 'coa_1205', tenantId: 'tenant_default', code: '1205', name: 'Peralatan Kantor', category: 'ASSET', isActive: true },
+  { id: 'coa_1206', tenantId: 'tenant_default', code: '1206', name: 'Akumulasi Penyusutan Bangunan', category: 'ASSET', isActive: true },
+  { id: 'coa_1207', tenantId: 'tenant_default', code: '1207', name: 'Akumulasi Penyusutan Kendaraan', category: 'ASSET', isActive: true },
+  { id: 'coa_1208', tenantId: 'tenant_default', code: '1208', name: 'Akumulasi Penyusutan Peralatan', category: 'ASSET', isActive: true },
+  { id: 'coa_1209', tenantId: 'tenant_default', code: '1209', name: 'Aset Tak Berwujud', category: 'ASSET', isActive: true },
+
+  // 2000 - LIABILITAS
+  { id: 'coa_2000', tenantId: 'tenant_default', code: '2000', name: 'LIABILITAS', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2100', tenantId: 'tenant_default', code: '2100', name: 'Liabilitas Jangka Pendek', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2101', tenantId: 'tenant_default', code: '2101', name: 'Utang Usaha', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2102', tenantId: 'tenant_default', code: '2102', name: 'Utang Bagi Hasil', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2103', tenantId: 'tenant_default', code: '2103', name: 'Utang Gaji', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2104', tenantId: 'tenant_default', code: '2104', name: 'Utang Pajak', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2105', tenantId: 'tenant_default', code: '2105', name: 'Utang Listrik & Operasional', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2106', tenantId: 'tenant_default', code: '2106', name: 'Titipan IPL', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2107', tenantId: 'tenant_default', code: '2107', name: 'Simpanan Titipan', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2108', tenantId: 'tenant_default', code: '2108', name: 'Dana Zakat Terhutang', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2109', tenantId: 'tenant_default', code: '2109', name: 'Dana Infaq Sedekah', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2110', tenantId: 'tenant_default', code: '2110', name: 'Angsuran Pembiayaan', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2200', tenantId: 'tenant_default', code: '2200', name: 'Liabilitas Jangka Panjang', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2201', tenantId: 'tenant_default', code: '2201', name: 'Simpanan Berjangka Panjang', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2202', tenantId: 'tenant_default', code: '2202', name: 'Pembiayaan Bank', category: 'LIABILITY', isActive: true },
+  { id: 'coa_2203', tenantId: 'tenant_default', code: '2203', name: 'Utang Jangka Panjang Lainnya', category: 'LIABILITY', isActive: true },
+
+  // 3000 - EKUITAS
+  { id: 'coa_3000', tenantId: 'tenant_default', code: '3000', name: 'EKUITAS', category: 'EQUITY', isActive: true },
+  { id: 'coa_3100', tenantId: 'tenant_default', code: '3100', name: 'Modal Anggota / Modal Awal', category: 'EQUITY', isActive: true },
+  { id: 'coa_3101', tenantId: 'tenant_default', code: '3101', name: 'Simpanan Pokok', category: 'EQUITY', isActive: true },
+  { id: 'coa_3102', tenantId: 'tenant_default', code: '3102', name: 'Simpanan Wajib', category: 'EQUITY', isActive: true },
+  { id: 'coa_3103', tenantId: 'tenant_default', code: '3103', name: 'Simpanan Sukarela', category: 'EQUITY', isActive: true },
+  { id: 'coa_3104', tenantId: 'tenant_default', code: '3104', name: 'Simpanan Berjangka Ekuitas', category: 'EQUITY', isActive: true },
+  { id: 'coa_3105', tenantId: 'tenant_default', code: '3105', name: 'Tabungan Anggota', category: 'EQUITY', isActive: true },
+  { id: 'coa_3200', tenantId: 'tenant_default', code: '3200', name: 'Cadangan', category: 'EQUITY', isActive: true },
+  { id: 'coa_3201', tenantId: 'tenant_default', code: '3201', name: 'Cadangan Umum', category: 'EQUITY', isActive: true },
+  { id: 'coa_3202', tenantId: 'tenant_default', code: '3202', name: 'SHU Tahun Berjalan', category: 'EQUITY', isActive: true },
+  { id: 'coa_3203', tenantId: 'tenant_default', code: '3203', name: 'SHU Belum Dibagi', category: 'EQUITY', isActive: true },
+  { id: 'coa_3204', tenantId: 'tenant_default', code: '3204', name: 'Dana Pengembang Usaha', category: 'EQUITY', isActive: true },
+  { id: 'coa_3205', tenantId: 'tenant_default', code: '3205', name: 'Dana Pengawas', category: 'EQUITY', isActive: true },
+  { id: 'coa_3206', tenantId: 'tenant_default', code: '3206', name: 'Dana Pendidikan', category: 'EQUITY', isActive: true },
+  { id: 'coa_3207', tenantId: 'tenant_default', code: '3207', name: 'Dana Sosial', category: 'EQUITY', isActive: true },
+  { id: 'coa_3208', tenantId: 'tenant_default', code: '3208', name: 'Dana Pengurus', category: 'EQUITY', isActive: true },
+
+  // 4000 - PENDAPATAN
+  { id: 'coa_4000', tenantId: 'tenant_default', code: '4000', name: 'PENDAPATAN', category: 'REVENUE', isActive: true },
+  { id: 'coa_4100', tenantId: 'tenant_default', code: '4100', name: 'Pendapatan Pembiayaan', category: 'REVENUE', isActive: true },
+  { id: 'coa_4101', tenantId: 'tenant_default', code: '4101', name: 'Margin Murabahah', category: 'REVENUE', isActive: true },
+  { id: 'coa_4102', tenantId: 'tenant_default', code: '4102', name: 'Pendapatan Ijarah', category: 'REVENUE', isActive: true },
+  { id: 'coa_4103', tenantId: 'tenant_default', code: '4103', name: 'Bagi Hasil Mudharabah', category: 'REVENUE', isActive: true },
+  { id: 'coa_4104', tenantId: 'tenant_default', code: '4104', name: 'Bagi Hasil Musyarakah', category: 'REVENUE', isActive: true },
+  { id: 'coa_4105', tenantId: 'tenant_default', code: '4105', name: 'Pendapatan Administrasi', category: 'REVENUE', isActive: true },
+  { id: 'coa_4200', tenantId: 'tenant_default', code: '4200', name: 'Pendapatan Unit Usaha', category: 'REVENUE', isActive: true },
+  { id: 'coa_4201', tenantId: 'tenant_default', code: '4201', name: 'Penjualan Barang Toko', category: 'REVENUE', isActive: true },
+  { id: 'coa_4202', tenantId: 'tenant_default', code: '4202', name: 'Pendapatan Jasa Printing', category: 'REVENUE', isActive: true },
+  { id: 'coa_4203', tenantId: 'tenant_default', code: '4203', name: 'Pendapatan Sewa', category: 'REVENUE', isActive: true },
+  { id: 'coa_4204', tenantId: 'tenant_default', code: '4204', name: 'Pendapatan Layanan PPOB', category: 'REVENUE', isActive: true },
+  { id: 'coa_4300', tenantId: 'tenant_default', code: '4300', name: 'Pendapatan Non Operasional', category: 'REVENUE', isActive: true },
+  { id: 'coa_4301', tenantId: 'tenant_default', code: '4301', name: 'Pendapatan Infaq Sedekah', category: 'REVENUE', isActive: true },
+  { id: 'coa_4303', tenantId: 'tenant_default', code: '4303', name: 'Keuntungan Pelepasan Aset', category: 'REVENUE', isActive: true },
+  { id: 'coa_4902', tenantId: 'tenant_default', code: '4902', name: 'Pendapatan Lain-lain', category: 'REVENUE', isActive: true },
+
+  // 5000 - BEBAN
+  { id: 'coa_5000', tenantId: 'tenant_default', code: '5000', name: 'BEBAN', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5001', tenantId: 'tenant_default', code: '5001', name: 'Harga Pokok Penjualan (HPP)', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5100', tenantId: 'tenant_default', code: '5100', name: 'Beban SDM', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5101', tenantId: 'tenant_default', code: '5101', name: 'Gaji Karyawan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5102', tenantId: 'tenant_default', code: '5102', name: 'Tunjangan & Bonus Staf', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5103', tenantId: 'tenant_default', code: '5103', name: 'Honor Pengurus', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5104', tenantId: 'tenant_default', code: '5104', name: 'Honor Pengawas', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5105', tenantId: 'tenant_default', code: '5105', name: 'BPJS dan Ketenagakerjaan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5200', tenantId: 'tenant_default', code: '5200', name: 'Beban Kantor', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5201', tenantId: 'tenant_default', code: '5201', name: 'ATK', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5202', tenantId: 'tenant_default', code: '5202', name: 'Listrik', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5203', tenantId: 'tenant_default', code: '5203', name: 'Air', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5204', tenantId: 'tenant_default', code: '5204', name: 'Telepon dan Internet', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5205', tenantId: 'tenant_default', code: '5205', name: 'Transport', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5206', tenantId: 'tenant_default', code: '5206', name: 'Konsumsi', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5207', tenantId: 'tenant_default', code: '5207', name: 'Pemeliharaan Inventaris', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5208', tenantId: 'tenant_default', code: '5208', name: 'Pemeliharaan Bangunan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5300', tenantId: 'tenant_default', code: '5300', name: 'Beban Penyusutan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5301', tenantId: 'tenant_default', code: '5301', name: 'Penyusutan Bangunan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5302', tenantId: 'tenant_default', code: '5302', name: 'Penyusutan Kendaraan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5303', tenantId: 'tenant_default', code: '5303', name: 'Penyusutan Peralatan', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5400', tenantId: 'tenant_default', code: '5400', name: 'Beban Operasional Lainnya', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5401', tenantId: 'tenant_default', code: '5401', name: 'Beban Pemasaran', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5402', tenantId: 'tenant_default', code: '5402', name: 'Beban Profesional / Audit', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5403', tenantId: 'tenant_default', code: '5403', name: 'Beban Asuransi', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5404', tenantId: 'tenant_default', code: '5404', name: 'Beban RAT', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5405', tenantId: 'tenant_default', code: '5405', name: 'Beban ZIS', category: 'EXPENSE', isActive: true },
+  { id: 'coa_5406', tenantId: 'tenant_default', code: '5406', name: 'Kerugian Piutang Tak Tertagih', category: 'EXPENSE', isActive: true }
 ];
 
 const getSavedCoaList = (): CoaAccount[] => {
   const saved = getStorage('ksa_coa_list');
-  if (saved) {
-    try {
-      let parsed = saved as CoaAccount[];
-      // Migrate missing PPOB COAs for existing users
-      const requiredCodes = ['1-1050', '1-1051', '1-1052', '1-1053', '1-1054', '4-1010', '5-1010'];
-      const missing = requiredCodes.filter(code => !parsed.some(c => c.code === code));
-      if (missing.length > 0) {
-        const toAdd = DEFAULT_COA.filter(c => missing.includes(c.code));
-        parsed = [...parsed, ...toAdd];
-        // Note: this will only update memory initially, but it will be saved back on next COA modification
-      }
+  let parsed = (saved && Array.isArray(saved) && saved.length > 0) ? (saved as CoaAccount[]) : [...DEFAULT_COA];
+  let changed = false;
 
-      // Update existing name for 1-1050
-      const radarIndex = parsed.findIndex(c => c.code === '1-1050');
-      if (radarIndex !== -1 && parsed[radarIndex].name === 'Saldo Radar Pulsa / Digital') {
-        parsed[radarIndex].name = 'Saldo Radar Pulsa';
-      }
-      return parsed;
-    } catch (e) { }
+  // Hapus duplikat kode legacy yang ber-strip (misal: 1-1020, 1-1030) agar tidak ganda
+  const cleanParsed = parsed.filter(c => {
+    if (c.code === '1-1020' && parsed.some(x => x.code === '1020')) return false;
+    if (c.code === '1-1030' && parsed.some(x => x.code === '1030')) return false;
+    return true;
+  });
+
+  if (cleanParsed.length !== parsed.length) {
+    parsed = cleanParsed;
+    changed = true;
   }
-  return DEFAULT_COA;
+
+  // Automatically sync all DEFAULT_COA accounts
+  DEFAULT_COA.forEach(defaultAcc => {
+    const existingIdx = parsed.findIndex(c => c.code === defaultAcc.code);
+    if (existingIdx === -1) {
+      parsed.push(defaultAcc);
+      changed = true;
+    } else {
+      if (parsed[existingIdx].name !== defaultAcc.name || parsed[existingIdx].category !== defaultAcc.category) {
+        parsed[existingIdx] = { ...parsed[existingIdx], name: defaultAcc.name, category: defaultAcc.category };
+        changed = true;
+      }
+    }
+  });
+
+  // Persist immediately so it shows up in CoA list
+  if (changed) {
+    try { localStorage.setItem('ksa_coa_list', JSON.stringify(parsed)); } catch (e) {}
+  }
+
+  return parsed;
 };
 
 const DEFAULT_PRODUCTS: Product[] = [];
@@ -384,8 +489,37 @@ const getSavedJournalEntries = (): JournalEntry[] => {
       const entries = saved as JournalEntry[];
       let changed = false;
       entries.forEach(e => {
-        if (e.account === 'KAS') { e.account = '1-1000'; changed = true; }
-        if (e.account === 'BEBAN') { e.account = '5-2020'; changed = true; }
+        if (e.account === 'KAS') { e.account = '1101'; changed = true; }
+        if (e.account === 'BEBAN') { e.account = '5400'; changed = true; }
+        if (e.account === '1-1000') { e.account = '1101'; changed = true; }
+        if (e.account === '1-1010') { e.account = '1103'; changed = true; }
+        if (e.account === '1-1040') { e.account = '1110'; changed = true; }
+        if (e.account === '5-2020') { e.account = '5400'; changed = true; }
+        if (e.account === '5-2000') { e.account = '5101'; changed = true; }
+        if (e.account === '1-1030') { e.account = '1107'; changed = true; }
+        if (e.account === '2-1000') { e.account = '2106'; changed = true; }
+        if (e.account === '3-1000') { e.account = '3103'; changed = true; }
+        
+        if (e.account?.startsWith('1-1000')) { e.account = '1101 - Kas'; changed = true; }
+        if (e.account?.startsWith('1-1010')) { e.account = '1103 - Bank Syariah Indonesia'; changed = true; }
+        if (e.account?.startsWith('1-1040')) { e.account = '1110 - Persediaan Unit Toko'; changed = true; }
+        if (e.account?.startsWith('5-2020')) { e.account = '5400 - Beban Operasional Lain'; changed = true; }
+        if (e.account?.startsWith('5-2000')) { e.account = '5101 - Beban Gaji'; changed = true; }
+        if (e.account?.startsWith('1-1030')) { e.account = '1107 - Piutang Qardh'; changed = true; }
+        if (e.account?.startsWith('2-1000')) { e.account = '2106 - Titipan IPL'; changed = true; }
+        if (e.account?.startsWith('3-1000')) { e.account = '3103 - Simpanan Sukarela'; changed = true; }
+
+        // Auto-correct Kas Kecil journals that were mistakenly saved to 1101
+        if (e.referenceType === 'AUTO_BEBAN' && e.account?.startsWith('1101') && e.description?.includes('Kas Kecil:')) {
+          e.account = '1102';
+          changed = true;
+        }
+
+        // Auto-correct Penjualan CASH journals that were mistakenly saved to 1102 (Kas Kecil)
+        if (e.referenceType === 'AUTO_TRANSAKSI' && e.account?.startsWith('1102') && (e.description?.includes('Penjualan') || e.description?.includes('CASH'))) {
+          e.account = '1101';
+          changed = true;
+        }
       });
       if (changed) localStorage.setItem('ksa_journal_entries', JSON.stringify(entries));
       return entries;
@@ -396,7 +530,36 @@ const getSavedJournalEntries = (): JournalEntry[] => {
 
 const getSavedExpenses = (): Expense[] => {
   const saved = getStorage('ksa_expenses');
-  if (saved) { try { return saved as Expense[]; } catch (e) { } }
+  if (saved) {
+    try {
+      const expenses = saved as Expense[];
+      let changed = false;
+      expenses.forEach(e => {
+        if (e.kasAccountId === '1-1000') { e.kasAccountId = '1101'; changed = true; }
+        if (e.kasAccountId === '1-1010') { e.kasAccountId = '1103'; changed = true; }
+        
+        // CoaId Migrations
+        if (e.coaId === '1-1000') { e.coaId = '1101'; changed = true; }
+        if (e.coaId === '1-1010') { e.coaId = '1103'; changed = true; }
+        if (e.coaId === '1-1040') { e.coaId = '1110'; changed = true; }
+        if (e.coaId === '5-2020') { e.coaId = '5400'; changed = true; }
+        if (e.coaId === '5-2000') { e.coaId = '5101'; changed = true; }
+        if (e.coaId === '1-1030') { e.coaId = '1107'; changed = true; }
+        if (e.coaId === '2-1000') { e.coaId = '2106'; changed = true; }
+        if (e.coaId === '3-1000') { e.coaId = '3103'; changed = true; }
+        
+        // Auto-correct Kas Kecil expenses that were mistakenly saved to 1101
+        if (e.description?.startsWith('Kas Kecil:') && (!e.kasAccountId || e.kasAccountId === '1101' || e.kasAccountId === '1-1000')) {
+          e.kasAccountId = '1102';
+          changed = true;
+        }
+      });
+      if (changed) localStorage.setItem('ksa_expenses', JSON.stringify(expenses));
+      return expenses;
+    } catch {
+      return [];
+    }
+  }
   return [];
 };
 
@@ -617,6 +780,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (parsed.role === 'OWNER' || parsed.username === 'owner' || parsed.name?.toLowerCase().includes('koperasi')) {
+          parsed.name = 'Dr. Grandis Imama Hendra, S.E.I., M.Sc (Acc), SAS.';
+          localStorage.setItem('ksa_current_user', JSON.stringify(parsed));
+        }
         return {
           ...parsed,
           tenantId: parsed.tenantId || 'tenant_default'
@@ -1729,10 +1896,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
 
     const kasCode = paymentMethod === 'TRANSFER_BSI'
-      ? resolveCoa('bank', '1-1010 Bank Syariah Indonesia (BSI)')
+      ? resolveCoa('bank', '1103 Bank Syariah Indonesia')
       : paymentMethod === 'QRIS_SHARIAH'
         ? resolveCoa('qris', '1-1020 QRIS Syariah Dana')
-        : resolveCoa('kas', '1-1000 Kas Tunai Toko');
+        : resolveCoa('kas', '1101 Kas');
 
     const newJournals: JournalEntry[] = [
       {
@@ -1766,7 +1933,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const isDukodu = prod?.name.toLowerCase().includes('dukodu') || prod?.category.toLowerCase().includes('internet');
       const invCoa = prod?.isPPOB
         ? isDukodu ? resolveCoa('dana', '1-1054 Saldo Dana') : resolveCoa('radar', '1-1050 Saldo Radar Pulsa')
-        : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
+        : resolveCoa('persediaan', '1110 Persediaan Unit Toko');
 
       const key = `${cCoa}|${invCoa}`;
       cogsGroups[key] = (cogsGroups[key] || 0) + cogs;
@@ -2038,27 +2205,40 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const resolveCoa = (keyword: string, fallback: string) => {
       const coas = get().coaList;
-      const exact = coas.find(c => c.code === fallback || c.code.includes(fallback.split(' ')[0]));
+      const exact = coas.find(c => c.code === fallback || c.code === fallback.split(' ')[0]);
       if (exact) return exact.code;
-      const fuzzy = coas.find(c => c.name.toLowerCase().includes(keyword.toLowerCase()));
-      return fuzzy ? fuzzy.code : fallback;
+      const fuzzyName = coas.find(c => c.name.toLowerCase() === keyword.toLowerCase());
+      if (fuzzyName) return fuzzyName.code;
+      const partialName = coas.find(c => c.name.toLowerCase().includes(keyword.toLowerCase()));
+      return partialName ? partialName.code : fallback;
     };
 
     const getPrimaryCashCoa = () => {
-      const kasKecilCoa = get().coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || get().coaList.find(c => c.code === '1-1000');
-      return kasKecilCoa ? kasKecilCoa.code : '1-1000';
+      const kasUtamaCoa = get().coaList.find(c => c.code === '1101') || 
+                          get().coaList.find(c => c.name.toLowerCase() === 'kas' || c.name.toLowerCase() === 'kas utama') ||
+                          get().coaList.find(c => c.name.toLowerCase().includes('kas utama'));
+      return kasUtamaCoa ? kasUtamaCoa.code : '1101';
+    };
+
+    const getPaymentCoa = (method: string) => {
+      if (method === 'CASH') return getPrimaryCashCoa();
+      if (method === 'QRIS_SHARIAH' || method === 'QRIS') return resolveCoa('qris', '1020');
+      if (method === 'KASBON') return resolveCoa('piutang', '1030');
+      if (method === 'EWALLET') return resolveCoa('dana', '1117');
+      if (method === 'BANK_LAIN') return resolveCoa('bank', '1104');
+      return resolveCoa('bank', '1103');
     };
 
     if (splitPayments && splitPayments.length > 0) {
       splitPayments.forEach((sp, i) => {
-        const akunKas = sp.method === 'CASH' ? getPrimaryCashCoa() : sp.method === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : resolveCoa('bank', 'BANK_BSI');
+        const akunKas = getPaymentCoa(sp.method);
         autoJournals.push({
           id: `${jId}_${i + 1}`,
           tenantId: currentUser.tenantId || 'tenant_default',
           date: now,
           account: akunKas,
           description: `[Auto] Penjualan SPLIT (${sp.method}) dari ${invoiceNo}`,
-          debit: sp.amount - (i === 0 ? changeAmount : 0), // Kurangi kembalian dari pembayaran pertama
+          debit: sp.amount - (i === 0 ? changeAmount : 0),
           credit: 0,
           referenceId: newTx.id,
           referenceType: 'AUTO_TRANSAKSI' as JournalSourceType,
@@ -2067,7 +2247,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       });
     } else {
-      const akunKas = paymentMethod === 'CASH' ? getPrimaryCashCoa() : paymentMethod === 'QRIS_SHARIAH' ? resolveCoa('qris', 'QRIS_SYARIAH') : paymentMethod === 'KASBON' ? resolveCoa('piutang', 'PIUTANG_DAGANG') : resolveCoa('bank', 'BANK_BSI');
+      const akunKas = getPaymentCoa(paymentMethod);
       autoJournals.push({
         id: `${jId}_1`,
         tenantId: currentUser.tenantId || 'tenant_default',
@@ -2089,7 +2269,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     cart.forEach(item => {
       const prod = productList.find(p => p.id === item.product.id) || item.product;
-      const sCoa = prod.salesCoaCode || resolveCoa('pendapatan', '4-1001 Pendapatan Penjualan');
+      const sCoa = prod.salesCoaCode || (prod.isPPOB 
+        ? (resolveCoa('ppob', '4105 Pendapatan Administrasi') || resolveCoa('administrasi', '4204 Pendapatan Layanan PPOB'))
+        : (resolveCoa('penjualan', '4101 Margin Murabahah') || resolveCoa('pendapatan', '4200 Pendapatan Unit Usaha'))
+      );
       const cCoa = prod.cogsCoaCode || resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)');
 
       const rev = getDynamicPrice(item) * item.quantity;
@@ -2099,7 +2282,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const isDukodu = prod.name.toLowerCase().includes('dukodu') || prod.category.toLowerCase().includes('internet');
       const invCoa = prod.isPPOB
         ? isDukodu ? resolveCoa('dana', '1-1054 Saldo Dana') : resolveCoa('radar', '1-1050 Saldo Radar Pulsa')
-        : resolveCoa('persediaan', '1-1040 Persediaan Barang Dagang');
+        : resolveCoa('persediaan', '1110 Persediaan Unit Toko');
       const key = `${cCoa}|${invCoa}`;
       cogsGroups[key] = (cogsGroups[key] || 0) + cogs;
     });
@@ -2448,7 +2631,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().addJournalEntry({
           tenantId,
           date: now,
-          account: '1-1040',
+          account: '1110',
           description: `[Auto] Selisih kurang stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
           debit: 0,
           credit: totalValue,
@@ -2461,7 +2644,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().addJournalEntry({
           tenantId,
           date: now,
-          account: '1-1040',
+          account: '1110',
           description: `[Auto] Selisih lebih stok opname: ${prod.name} (${Math.abs(amount)} pcs)`,
           debit: totalValue,
           credit: 0,
@@ -2773,9 +2956,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // === JURNAL OTOMATIS dari Pengeluaran ===
     const now = new Date().toISOString();
-    const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
-    const kasAccount = expenseData.kasAccountId || (kasKecilCoa ? kasKecilCoa.code : '1-1000');
-    const bebanAccount = (expenseData as any).coaId || '5-2020';
+    const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1101');
+    const kasAccount = expenseData.kasAccountId || (kasKecilCoa ? kasKecilCoa.code : '1101');
+    const bebanAccount = (expenseData as any).coaId || '5400';
 
     const isIncome = newExpense.amount < 0;
     const absAmount = Math.abs(newExpense.amount);
@@ -2829,8 +3012,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedJournalsRaw = journalEntries.filter(j => j.referenceId !== id);
     
     // Create new journal entries
-    const kasAccount = updatedExpense.kasAccountId || '1-1000';
-    const bebanAccount = updatedExpense.coaId || '5-2020';
+    const kasAccount = updatedExpense.kasAccountId || '1101';
+    const bebanAccount = updatedExpense.coaId || '5400';
 
     const isIncome = updatedExpense.amount < 0;
     const absAmount = Math.abs(updatedExpense.amount);
@@ -2894,15 +3077,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   getCalculatedPettyCash: () => {
-    const { journalEntries, coaList } = get();
-    // Kas Kecil is functionally the main cash drawer (1-1000 or 1102)
-    const kasKecilCoa = coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || coaList.find(c => c.code === '1-1000');
-    const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
+    const { journalEntries, coaList, settings } = get();
+    // Estimasi Tunai di Laci is functionally the main cash drawer (1101)
+    const kasUtamaCoa = coaList.find(c => c.code === '1101') ||
+                        coaList.find(c => c.name.toLowerCase() === 'kas' || c.name.toLowerCase() === 'kas utama') ||
+                        coaList.find(c => c.name.toLowerCase().includes('kas utama'));
+    const kasAccount = kasUtamaCoa ? kasUtamaCoa.code : '1101';
+    const initialCapital = (settings?.initialStoreCapital !== undefined && settings.initialStoreCapital !== null) 
+      ? Number(settings.initialStoreCapital) 
+      : (Number(localStorage.getItem('ksa_neraca_initial_capital')) || 685500);
 
-    return (journalEntries || []).reduce((sum, j) => {
-      // Allow exact match with Kas account
-      const entryAccCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
-      if (entryAccCode === kasAccount) {
+    return initialCapital + (journalEntries || []).reduce((sum, j) => {
+      if (!j.account) return sum;
+      const rawAcc = String(j.account).trim();
+      const match = rawAcc.match(/^(\d+[\d-]*)/);
+      const entryAccCode = match ? match[1] : (rawAcc.includes(' - ') ? rawAcc.split(' - ')[0].trim() : rawAcc);
+      
+      if (entryAccCode === kasAccount || entryAccCode === '1101' || entryAccCode === '1-1000' || rawAcc.toLowerCase() === 'kas' || rawAcc.toLowerCase().includes('kas utama')) {
         return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
       }
       return sum;
@@ -3279,18 +3470,28 @@ export const useAppStore = create<AppState>((set, get) => ({
         tasks.push(runSupabaseTask('getCoaAccounts', async () => {
           return await supabaseService.getCoaAccounts();
         }, (remoteCoa) => {
+          let mapped: CoaAccount[] = [];
           if (remoteCoa && remoteCoa.length > 0) {
-            const mapped = remoteCoa.map(c => ({
+            mapped = remoteCoa.map(c => ({
               id: c.id,
               tenantId: c.tenant_id,
               code: c.code,
               name: c.name,
-              category: c.category,
-              normalBalance: c.normal_balance,
+              category: c.category as any,
+              normalBalance: c.normal_balance as any,
               isActive: c.is_active
             }));
-            set({ coaList: mapped });
           }
+          
+          // Always ensure all DEFAULT_COA accounts exist
+          DEFAULT_COA.forEach(defaultAcc => {
+            if (!mapped.some(c => c.code === defaultAcc.code)) {
+              mapped.push(defaultAcc);
+            }
+          });
+
+          set({ coaList: mapped });
+          saveStorage('ksa_coa_list', mapped);
         }));
       }
 
@@ -3630,3 +3831,69 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   }
 }));
+
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    const store = useAppStore.getState();
+    const { expenses, journalEntries, coaList, currentUser } = store;
+    
+    let expensesChanged = false;
+    let journalsChanged = false;
+
+    const getAutoCoaId = (desc: string) => {
+      const d = desc.toLowerCase();
+      if (d.includes('belanja') || d.includes('stok') || d.includes('kulakan') || d.includes('telur') || d.includes('persediaan') || d.includes('roti') || d.includes('cimory') || d.includes('sosis') || d.includes('minuman') || d.includes('basreng') || d.includes('snack') || d.includes('indomaret') || d.includes('alfagift')) {
+        if (d.includes('bensin') || d.includes('listrik') || d.includes('air')) return undefined;
+        return '1110';
+      }
+      if (d.includes('honor') || d.includes('gaji') || d.includes('tunjangan') || d.includes('bonus')) return '5101'; // Default ke Beban Gaji
+      if (d.includes('bensin') || d.includes('transport') || d.includes('parkir') || d.includes('bengkel')) return '5400';
+      if (d.includes('tarik tunai') || d.includes('kembalian transfer') || d.includes('nominal transfer') || d.includes('transfer bank')) return '1103';
+      
+      const findCoa = (nameQuery: string) => coaList.find(c => c.name.toLowerCase().includes(nameQuery))?.code;
+      
+      if (d.includes('talangan') || d.includes('cod')) return findCoa('qardh') || findCoa('piutang') || '1107'; // Piutang Qardh
+      if (d.includes('ipl')) return findCoa('ipl') || '2106'; // Titipan IPL
+      if (d.includes('simpanan')) return findCoa('simpanan') || '3103'; // Simpanan Sukarela
+      if (d.includes('pemeliharaan') || d.includes('perbaikan')) return findCoa('pemeliharaan') || '5400';
+      if (d.includes('jasa transfer')) return findCoa('pendapatan administrasi') || '4-1000';
+      
+      return undefined;
+    };
+
+    const newExpenses = expenses.map(exp => {
+      if (!exp.coaId || exp.coaId === '5400' || exp.coaId === '1101') {
+        const autoCoa = getAutoCoaId(exp.description);
+        if (autoCoa && exp.coaId !== autoCoa) {
+          expensesChanged = true;
+          return { ...exp, coaId: autoCoa };
+        }
+      }
+      return exp;
+    });
+
+    if (expensesChanged) {
+      useAppStore.setState({ expenses: newExpenses });
+      saveStorage('ksa_expenses', newExpenses, currentUser?.tenantId);
+      console.log('Migrated legacy kas kecil expense COAs.');
+    }
+    
+    const newJournals = journalEntries.map(j => {
+      if (j.referenceType === 'AUTO_BEBAN' && j.account === '5400') {
+        const autoCoa = getAutoCoaId(j.description);
+        if (autoCoa && j.account !== autoCoa) {
+          journalsChanged = true;
+          return { ...j, account: autoCoa };
+        }
+      }
+      return j;
+    });
+
+    if (journalsChanged) {
+      useAppStore.setState({ journalEntries: newJournals });
+      saveStorage('ksa_journal_entries', newJournals, currentUser?.tenantId);
+      console.log('Migrated legacy kas kecil journal entries COAs.');
+    }
+  }, 3000);
+}

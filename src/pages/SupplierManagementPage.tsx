@@ -65,7 +65,7 @@ export default function SupplierManagementPage() {
     
     const now = new Date().toISOString();
     // 2-1000 = Utang Dagang ke Supplier
-    // 1-1000 = Kas Tunai Toko
+    // 1101 = Kas
     addJournalEntry({
       tenantId: currentUser?.tenantId || 'tenant_default',
       date: now,
@@ -80,7 +80,7 @@ export default function SupplierManagementPage() {
     addJournalEntry({
       tenantId: currentUser?.tenantId || 'tenant_default',
       date: now,
-      account: '1-1000',
+      account: '1101',
       description: `[Auto] Pembayaran hutang usaha ke Pemasok: ${s.name}`,
       debit: 0,
       credit: amount,

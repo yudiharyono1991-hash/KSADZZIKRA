@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X, Bluetooth, MessageCircle } from 'lucide-react';
+import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X, Bluetooth, MessageCircle, Download, Search } from 'lucide-react';
 import { printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
+import * as XLSX from 'xlsx';
 
 const getDistanceFromLatLonInM = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3; // Radius of the earth in m
@@ -24,6 +25,7 @@ export default function KasirShiftPage() {
   const { transactions, products, currentUser, addExpense, updateExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash, customers, kasbonPayments, updateCustomer, addKasbonPayment, coaList, addJournalEntries } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
+  const [pettyCashCustomDesc, setPettyCashCustomDesc] = useState('');
   const [pettyCashType, setPettyCashType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [coaAccount, setCoaAccount] = useState('');
   const [kasAccount, setKasAccount] = useState('');
@@ -77,6 +79,7 @@ export default function KasirShiftPage() {
   const [pettyCashDate, setPettyCashDate] = useState(todayDate);
   const [pettyCashStartDate, setPettyCashStartDate] = useState(firstDayOfMonth);
   const [pettyCashEndDate, setPettyCashEndDate] = useState(todayDate);
+  const [pettyCashSearch, setPettyCashSearch] = useState('');
   const [pettyCashFilter, setPettyCashFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
 
   const [actualCash, setActualCash] = useState<string>('');
@@ -160,28 +163,48 @@ export default function KasirShiftPage() {
   };
 
 
+  // Helper for timezone-safe local date string
+  const getLocalDateStr = (dStr: string | Date | undefined) => {
+    if (!dStr) return '';
+    if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dStr)) return dStr;
+    const d = new Date(dStr);
+    if (isNaN(d.getTime())) return String(dStr).substring(0, 10);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Filter Today's data for this cashier
   const today = todayDate;
   const myTransactions = (transactions || []).filter(tx => 
-    String(tx.timestamp || '').startsWith(today) && tx.cashierName === currentUser?.name
+    getLocalDateStr(tx.timestamp) === today && 
+    (!currentUser?.name || !tx.cashierName || tx.cashierName.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
   );
 
   const myAttendance = currentUser ? attendances.find(a => a.userId === currentUser.username && a.date === today) : undefined;
 
   const myExpenses = (expenses || []).filter(exp => 
-    String(exp.date || '').startsWith(today) && exp.category === 'OPERASIONAL'
+    getLocalDateStr(exp.date) === today && exp.category === 'OPERASIONAL'
   );
 
   const manualJournalsToday = (journalEntries || []).filter(j => 
-    String(j.date || '').startsWith(today) && 
+    getLocalDateStr(j.date) === today && 
     j.referenceType === 'MANUAL' && 
     j.account && 
-    j.account.toLowerCase().includes('kas kecil')
+    (j.account.toLowerCase().includes('kas kecil') || j.account.includes('1102'))
   );
 
   const totalTunai = myTransactions
-    .filter(t => t.paymentMethod === 'CASH' && !t.isVoided)
-    .reduce((sum, t) => sum + t.totalAmount, 0);
+    .filter(t => !t.isVoided)
+    .reduce((sum, t) => {
+      if (t.paymentMethod === 'CASH') return sum + t.totalAmount;
+      if (t.splitPayments) {
+        const cashSplit = t.splitPayments.find((sp: any) => sp.method === 'CASH');
+        if (cashSplit) return sum + (cashSplit.amount - (t.changeAmount || 0));
+      }
+      return sum;
+    }, 0);
 
   let totalFisik = 0;
   let totalPPOB = 0;
@@ -197,12 +220,26 @@ export default function KasirShiftPage() {
   });
 
   const totalQris = myTransactions
-    .filter(t => t.paymentMethod.includes('QRIS') && !t.isVoided)
-    .reduce((sum, t) => sum + t.totalAmount, 0);
+    .filter(t => !t.isVoided && (t.paymentMethod.includes('QRIS') || (t.splitPayments && t.splitPayments.some((sp: any) => sp.method.includes('QRIS')))))
+    .reduce((sum, t) => {
+      if (t.paymentMethod.includes('QRIS')) return sum + t.totalAmount;
+      if (t.splitPayments) {
+        const qrisSplit = t.splitPayments.find((sp: any) => sp.method.includes('QRIS'));
+        if (qrisSplit) return sum + qrisSplit.amount;
+      }
+      return sum;
+    }, 0);
 
   const totalTransfer = myTransactions
-    .filter(t => t.paymentMethod.includes('TRANSFER') && !t.isVoided)
-    .reduce((sum, t) => sum + t.totalAmount, 0);
+    .filter(t => !t.isVoided && (t.paymentMethod.includes('TRANSFER') || (t.splitPayments && t.splitPayments.some((sp: any) => sp.method.includes('TRANSFER')))))
+    .reduce((sum, t) => {
+      if (t.paymentMethod.includes('TRANSFER')) return sum + t.totalAmount;
+      if (t.splitPayments) {
+        const tfSplit = t.splitPayments.find((sp: any) => sp.method.includes('TRANSFER'));
+        if (tfSplit) return sum + tfSplit.amount;
+      }
+      return sum;
+    }, 0);
 
   const totalKasbon = myTransactions
     .filter(t => t.paymentMethod === 'KASBON' && !t.isVoided)
@@ -216,39 +253,61 @@ export default function KasirShiftPage() {
 
   const handleAddPettyCash = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pettyCashAmount || !pettyCashDesc) return;
-    
+
+    // 1. Validasi Akun Kas (Khusus 1102 Kas Kecil)
+    const selectedKasCode = kasAccount ? kasAccount.split(' - ')[0].trim() : '1102';
+    if (selectedKasCode !== '1102' && !kasAccount.toLowerCase().includes('kas kecil')) {
+      alert('⛔ DITOLAK OLEH SISTEM:\n\nFormulir ini khusus untuk transaksi KAS KECIL (Kode Akun 1102).\n\nTransaksi menggunakan Kas Utama (1101) atau Rekening Bank ditolak di halaman ini. Silakan gunakan menu Jurnal Umum untuk transaksi Kas Utama/Bank.');
+      return;
+    }
+
+    // 2. Validasi Jumlah Nominal Rp
     const amountNum = Number(pettyCashAmount);
+    if (!pettyCashAmount || isNaN(amountNum) || amountNum <= 0) {
+      alert('⚠️ HARAP DIISI DENGAN BENAR:\n\nNominal Rp transaksi Kas Kecil wajib diisi dan harus lebih besar dari Rp 0.');
+      return;
+    }
+
+    // 3. Validasi Keterangan
+    if (!pettyCashDesc || !pettyCashDesc.trim()) {
+      alert('⚠️ HARAP DIISI DENGAN BENAR:\n\nKeterangan transaksi Kas Kecil wajib diisi lengkap (contoh: Belanja Stok, Honor Kasir, dsb).');
+      return;
+    }
+
+    // 4. Validasi Jurnal Lawan (CoA)
+    if (!coaAccount || !coaAccount.trim()) {
+      alert('⚠️ HARAP DIPILIH DENGAN BENAR:\n\nJurnal Lawan (CoA) wajib dipilih agar transaksi terintegrasi otomatis ke pos Laporan Keuangan yang sesuai.');
+      return;
+    }
+
     const finalAmount = pettyCashType === 'PEMASUKAN' ? -Math.abs(amountNum) : Math.abs(amountNum);
-    const expenseDate = pettyCashDate ? new Date(pettyCashDate).toISOString() : new Date().toISOString();
+    const expenseDate = pettyCashDate
+      ? (() => {
+          const today = new Date().toISOString().split('T')[0];
+          if (pettyCashDate === today) return new Date().toISOString();
+          return new Date(`${pettyCashDate}T12:00:00+07:00`).toISOString();
+        })()
+      : new Date().toISOString();
 
     if (currentUser) {
-      let finalCoa = coaAccount ? coaAccount.split(' - ')[0].trim() : undefined;
-      
-      // Auto-detect Persediaan Barang if not specified
-      const descLower = pettyCashDesc.toLowerCase();
-      if (!finalCoa && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan') || descLower.includes('belanja'))) {
-        const persediaanCoa = useAppStore.getState().coaList?.find((c: any) => c.name.toLowerCase().includes('persediaan'));
-        if (persediaanCoa) {
-          finalCoa = persediaanCoa.code;
-        }
-      }
+      let finalCoa = coaAccount.split(' - ')[0].trim();
 
       addExpense({
         tenantId: currentUser.tenantId || 'tenant_default',
         amount: finalAmount,
         category: 'OPERASIONAL',
         date: expenseDate,
-        description: `Kas Kecil: ${pettyCashDesc}`,
+        description: `Kas Kecil: ${pettyCashDesc.trim()}`,
         coaId: finalCoa,
-        kasAccountId: kasAccount ? kasAccount.split(' - ')[0].trim() : undefined
+        kasAccountId: '1102'
       } as any);
     }
     
     setPettyCashAmount('');
     setPettyCashDesc('');
+    setPettyCashCustomDesc('');
     setCoaAccount('');
-    setKasAccount('');
+    setKasAccount('1102 - Kas Kecil');
   };
 
   const handleCloseShift = () => {
@@ -281,7 +340,7 @@ export default function KasirShiftPage() {
         addJournalEntry({
           tenantId: currentUser?.tenantId || 'tenant_default',
           date: dateStr,
-          account: isIncome ? code : '5-2020',
+          account: isIncome ? code : '5400',
           debit: amount,
           credit: 0,
           description: `Penyesuaian Tutup Shift: ${name}`,
@@ -307,7 +366,7 @@ export default function KasirShiftPage() {
     processDigital('1-1051', digitalBalances.kemenkuota, 'Kemenkuota');
     processDigital('1-1052', digitalBalances.bosspulsa, 'Boss Pulsa');
     processDigital('1-1053', digitalBalances.tokopedia, 'Tokopedia');
-    processDigital('1-1054', digitalBalances.dana, 'Dana');
+    processDigital('1117', digitalBalances.dana, 'Saldo Dana Dokuku');
 
     addLog(
       'SHIFT_CLOSED',
@@ -532,56 +591,87 @@ export default function KasirShiftPage() {
 
         {/* Ringkasan Shift */}
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+          <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center">
             <h2 className="font-bold text-gray-800 dark:text-slate-200 text-md">Rekapitulasi Shift Hari Ini</h2>
+            <span className="text-[10px] font-bold text-teal-700 bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800">Kas Utama 1101</span>
           </div>
           <div className="p-5 space-y-4 text-sm text-gray-600 dark:text-slate-400">
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
-              <span>Total Transaksi</span>
-              <span className="font-bold">{myTransactions.filter(t => !t.isVoided).length} Struk</span>
+              <span className="font-medium">Total Transaksi Shift Ini</span>
+              <span className="font-bold text-gray-800 dark:text-slate-200">{myTransactions.filter(t => !t.isVoided).length} Struk</span>
             </div>
             <div className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-slate-800">
-              <span className="text-xs text-gray-500 ml-4">↳ Penjualan Fisik</span>
+              <span className="text-xs text-gray-500 ml-4">↳ Penjualan Produk Fisik (Mart)</span>
               <span className="font-bold text-gray-700 dark:text-slate-300 text-sm">Rp {totalFisik.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-slate-800">
-              <span className="text-xs text-gray-500 ml-4">↳ Penjualan PPOB</span>
+              <span className="text-xs text-gray-500 ml-4">↳ Penjualan Layanan PPOB</span>
               <span className="font-bold text-gray-700 dark:text-slate-300 text-sm">Rp {totalPPOB.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
-              <span>Pembayaran Tunai</span>
+              <div>
+                <span className="font-medium block">Pembayaran Tunai</span>
+                <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold">(Uang Tunai Masuk Laci 1101)</span>
+              </div>
               <span className="font-bold text-gray-800 dark:text-slate-200">Rp {totalTunai.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
-              <span>Pembayaran QRIS</span>
+              <div>
+                <span className="font-medium block">Pembayaran QRIS</span>
+                <span className="text-[10px] text-blue-500 font-semibold">(Rekening QRIS Dana 1-1020)</span>
+              </div>
               <span className="font-bold text-blue-600">Rp {totalQris.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800">
-              <span>Pembayaran Transfer</span>
+              <div>
+                <span className="font-medium block">Pembayaran Transfer</span>
+                <span className="text-[10px] text-indigo-500 font-semibold">(Rekening Bank BSI 1103)</span>
+              </div>
               <span className="font-bold text-indigo-600">Rp {totalTransfer.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800">
-              <span>Pembayaran Kasbon</span>
-              <span className="font-bold text-red-600">Rp {totalKasbon.toLocaleString('id-ID')}</span>
+              <div>
+                <span className="font-medium block">Pembayaran Kasbon</span>
+                <span className="text-[10px] text-rose-500 font-semibold">(Piutang Pelanggan 1-1030)</span>
+              </div>
+              <span className="font-bold text-rose-600">Rp {totalKasbon.toLocaleString('id-ID')}</span>
             </div>
-            <div className={`flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800 ${totalPettyCash < 0 ? 'text-green-600' : 'text-red-600'}`}>
-              <span>Kas Kecil (Net)</span>
+            <div className={`flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800 ${totalPettyCash < 0 ? 'text-green-600' : 'text-rose-600'}`}>
+              <div>
+                <span className="font-medium block">Mutasi Kas Kecil Shift Ini</span>
+                <span className="text-[10px] text-gray-500 font-semibold">(Dipakai dari / Disetor ke Kas Kecil 1102)</span>
+              </div>
               <span className="font-bold">{totalPettyCash < 0 ? '+' : '-'} Rp {Math.abs(totalPettyCash).toLocaleString('id-ID')}</span>
             </div>
-            <div className="pt-4 flex justify-between items-center">
-              <span className="font-bold text-green-800">ESTIMASI TUNAI DI LACI</span>
-              <span className="font-extrabold text-2xl text-green-700">Rp {expectedCash.toLocaleString('id-ID')}</span>
+            
+            <div className="pt-3 pb-1 border-t border-teal-200 dark:border-teal-800">
+              <div className="flex justify-between items-center py-2.5 px-3.5 bg-teal-50/70 dark:bg-teal-950/40 rounded-lg border border-teal-200/80 dark:border-teal-800/80">
+                <div>
+                  <span className="font-bold text-teal-900 dark:text-teal-200 text-xs block">Estimasi Fisik Tunai di Laci</span>
+                  <span className="text-[9.5px] font-semibold text-teal-700 dark:text-teal-400 uppercase">(Kas Utama 1101)</span>
+                </div>
+                <span className="font-extrabold text-base text-teal-800 dark:text-teal-200 font-mono">Rp {expectedCash.toLocaleString('id-ID')}</span>
+              </div>
+
+              <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/60 dark:border-slate-700/60 text-[10px] text-slate-600 dark:text-slate-400">
+                <p className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1 leading-snug">
+                  💡 Komposisi Uang Laci = Modal Awal Kas Utama (1101) + Penjualan Tunai + Pelunasan Kasbon Tunai - Mutasi Kas Kecil.
+                </p>
+              </div>
             </div>
             
-            <div className="pt-4 space-y-2">
-              <label className="font-bold text-gray-800 dark:text-slate-200 text-sm">Uang Fisik di Laci (Rp) <span className="text-red-500">*</span></label>
+            <div className="pt-3 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <label className="font-bold text-gray-800 dark:text-slate-200 text-xs">Uang Fisik di Laci Kasir (Rp) <span className="text-red-500">*</span></label>
+                <span className="text-[10px] text-gray-400 italic">Hitung total uang kertas & koin</span>
+              </div>
               <input 
                 type="number" 
                 required
                 value={actualCash}
                 onChange={(e) => setActualCash(e.target.value)}
-                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-3 text-lg font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none"
-                placeholder="Ketikkan jumlah uang fisik di laci.."
+                className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-bold text-gray-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-orange-500 outline-none"
+                placeholder="Ketikkan jumlah fisik uang tunai di laci.."
               />
             </div>
             
@@ -612,7 +702,7 @@ export default function KasirShiftPage() {
                   <input type="number" value={digitalBalances.tokopedia} onChange={e => setDigitalBalances(d => ({...d, tokopedia: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Dana</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Dana Dokuku (1117)</label>
                   <input type="number" value={digitalBalances.dana} onChange={e => setDigitalBalances(d => ({...d, dana: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
               </div>
@@ -646,8 +736,21 @@ export default function KasirShiftPage() {
               Catat pengeluaran tunai tak terduga selama shift Anda (misal: bayar parkir, beli galon, dll) agar perhitungan akhir tunai di laci tetap akurat.
             </p>
             <div className="mb-4 bg-amber-100/50 p-2 rounded-lg border border-amber-200/50 flex justify-between items-center">
-              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Saldo Kas Fisik</span>
-              <span className="text-sm font-black text-amber-900">Rp {getCalculatedPettyCash().toLocaleString('id-ID')}</span>
+              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Saldo Kas Kecil (1102)</span>
+              <span className="text-sm font-black text-amber-900">
+                Rp {(() => {
+                  const kasKecilCoa = coaList?.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102');
+                  const targetCode = kasKecilCoa ? kasKecilCoa.code : '1102';
+                  const bal = (journalEntries || []).reduce((sum, j) => {
+                    const accCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
+                    if (accCode === targetCode || accCode === '1102') {
+                      return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
+                    }
+                    return sum;
+                  }, 0);
+                  return bal.toLocaleString('id-ID');
+                })()}
+              </span>
             </div>
             <form onSubmit={handleAddPettyCash} className="space-y-3 relative z-10">
               <div className="flex bg-amber-100 rounded-lg p-1">
@@ -691,44 +794,67 @@ export default function KasirShiftPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-amber-800 uppercase">Keterangan</label>
-                <input 
-                  type="text" 
-                  required
-                  value={pettyCashDesc}
-                  onChange={(e) => setPettyCashDesc(e.target.value)}
-                  className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
-                  placeholder="Misal: Parkir Galon"
-                />
+              <div className="mt-4 space-y-3">
+                                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-amber-800 uppercase">Keterangan</label>
+                  <input
+                    list="keterangan-options"
+                    required
+                    value={pettyCashDesc}
+                    onChange={(e) => setPettyCashDesc(e.target.value)}
+                    placeholder="Ketik keterangan atau pilih dari daftar..."
+                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+                  />
+                  <datalist id="keterangan-options">
+                    {pettyCashType === 'PENGELUARAN' ? (
+                      <>
+                        <option value="BELANJA STOK" />
+                        <option value="HONOR KASIR" />
+                        <option value="TUNJANGAN KASIR" />
+                        <option value="BENSIN" />
+                        <option value="TARIK TUNAI" />
+                        <option value="HONOR PERBAIKAN TOKO/MOTOR/FASILITAS" />
+                        <option value="TALANGAN COD PAKET" />
+                        <option value="SETOR IPL" />
+                      </>
+                    ) : (
+                      <>
+                        <option value="BAYAR IPL" />
+                        <option value="SIMPANAN POKOK" />
+                        <option value="SIMPANAN WAJIB" />
+                        <option value="ANGSURAN PEMBIAYAAN" />
+                        <option value="JASA TRANSFER (5000)" />
+                        <option value="JASA TRANSFER (NOMINAL YANG DITRANSFER)" />
+                        <option value="TALANGAN COD PAKET" />
+                      </>
+                    )}
+                  </datalist>
+                </div>
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-[10px] font-bold text-amber-800 uppercase">Akun Kas</label>
+                  <label className="text-[10px] font-bold text-amber-800 uppercase">Akun Kas (Sumber/Tujuan)</label>
                   <input
-                    list="kas-options"
-                    value={kasAccount}
-                    onChange={(e) => setKasAccount(e.target.value)}
-                    placeholder="Default: Kas Utama"
-                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+                    type="text"
+                    readOnly
+                    value="1102 - Kas Kecil"
+                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm font-bold bg-amber-100/70 text-amber-900 cursor-not-allowed outline-none"
+                    title="Formulir ini khusus untuk transaksi Kas Kecil (1102)"
                   />
-                  <datalist id="kas-options">
-                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('kas')).map((c: any) => (
-                      <option key={c.id} value={`${c.code} - ${c.name}`} />
-                    ))}
-                  </datalist>
+                  <span className="text-[9px] font-semibold text-amber-700 italic mt-0.5 block">Khusus Kas Kecil (1102)</span>
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA)</label>
+                  <label className="text-[10px] font-bold text-amber-800 uppercase">Jurnal Lawan (CoA) *</label>
                   <input
                     list="coa-options"
+                    required
                     value={coaAccount}
                     onChange={(e) => setCoaAccount(e.target.value)}
-                    placeholder="Otomatis jika kosong"
-                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+                    placeholder="Wajib pilih jurnal lawan..."
+                    className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white font-medium"
                   />
                   <datalist id="coa-options">
-                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && !c.name.toLowerCase().includes('kas')).map((c: any) => (
+                    {useAppStore.getState().coaList?.filter((c: any) => c.isActive && c.code !== '1102' && !c.name.toLowerCase().includes('kas kecil')).map((c: any) => (
                       <option key={c.id} value={`${c.code} - ${c.name}`} />
                     ))}
                   </datalist>
@@ -783,8 +909,8 @@ export default function KasirShiftPage() {
                               payAmount: 0,
                               paymentMethod: 'CASH',
                               selectedInvoices: [],
-                              debitAccountId: '',
-                              creditAccountId: ''
+                              debitAccountId: '1101 - Kas',
+                              creditAccountId: '1030 - Piutang Kasbon Pelanggan'
                             });
                             setCustomerSearchTerm('');
                             setShowCustomerSearch(false);
@@ -805,23 +931,95 @@ export default function KasirShiftPage() {
 
           {/* List Kas Kecil */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-             <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center">
+             <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center flex-wrap gap-2">
                <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300">Riwayat Kas Kecil</h3>
-               <div className="flex items-center space-x-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                 <input
-                   type="date"
-                   value={pettyCashStartDate}
-                   onChange={(e) => setPettyCashStartDate(e.target.value)}
-                   className="bg-transparent border-none text-xs focus:outline-none text-slate-700 dark:text-slate-300 font-medium"
-                 />
-                 <span className="text-slate-400 text-xs">s/d</span>
-                 <input
-                   type="date"
-                   value={pettyCashEndDate}
-                   onChange={(e) => setPettyCashEndDate(e.target.value)}
-                   className="bg-transparent border-none text-xs focus:outline-none text-slate-700 dark:text-slate-300 font-medium"
-                 />
+               <div className="flex items-center gap-2 flex-wrap">
+                 <div className="flex items-center space-x-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                   <input
+                     type="date"
+                     value={pettyCashStartDate}
+                     onChange={(e) => setPettyCashStartDate(e.target.value)}
+                     className="bg-transparent border-none text-xs focus:outline-none text-slate-700 dark:text-slate-300 font-medium"
+                   />
+                   <span className="text-slate-400 text-xs">s/d</span>
+                   <input
+                     type="date"
+                     value={pettyCashEndDate}
+                     onChange={(e) => setPettyCashEndDate(e.target.value)}
+                     className="bg-transparent border-none text-xs focus:outline-none text-slate-700 dark:text-slate-300 font-medium"
+                   />
+                 </div>
+                 <button
+                   onClick={() => {
+                     const baseExpenses = (expenses || []).filter(exp =>
+                       exp.category === 'OPERASIONAL' &&
+                       exp.date >= pettyCashStartDate && exp.date <= pettyCashEndDate + 'T23:59:59'
+                     );
+                     const manualJournals = (journalEntries || [])
+                       .filter(j => {
+                         if (j.referenceType !== 'MANUAL' || !j.account) return false;
+                         const kasKecilCoa = useAppStore.getState().coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || useAppStore.getState().coaList.find(c => c.code === '1101');
+                         const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1101';
+                         const entryAccCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
+                         if (entryAccCode !== kasAccount) return false;
+                         return j.date >= pettyCashStartDate && j.date <= pettyCashEndDate + 'T23:59:59';
+                       })
+                       .map(j => ({ id: j.id, description: `[Jurnal Umum] ${j.description}`, date: j.date, amount: (j.credit || 0) - (j.debit || 0) } as any));
+                     const allData = [...baseExpenses, ...manualJournals].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                     const totalIn = allData.reduce((s, e) => e.amount < 0 ? s + Math.abs(e.amount) : s, 0);
+                     const totalOut = allData.reduce((s, e) => e.amount > 0 ? s + e.amount : s, 0);
+                     const coaList = useAppStore.getState().coaList || [];
+                     const rows = allData.map(exp => {
+                       const dateOnly = String(exp.date).split('T')[0];
+                       const desc = (exp.description || '').toLowerCase();
+                       const isIncome = exp.amount < 0;
+                       let warning = '';
+                       if (!isIncome && (desc.includes('kembalian') || desc.includes('bayar belanja') || desc.includes(' sw ') || desc.includes('simpanan') || desc.includes('angsuran') || desc.includes('ipl') || desc.includes('jasa tf') || desc.includes('hasil jual') || desc.includes('bayar pulsa') || desc.includes('sw '))) {
+                         warning = '⚠️ DICEK: kemungkinan harusnya PEMASUKAN';
+                       }
+                       if (isIncome && (desc.includes('honor') || (desc.includes('belanja') && !desc.includes('bayar belanja')) || desc.includes('bensin') || desc.includes('talang') || desc.includes('tunjangan'))) {
+                         warning = '⚠️ DICEK: kemungkinan harusnya PENGELUARAN';
+                       }
+                       const kasCode = (exp.kasAccountId && exp.kasAccountId !== '1101') ? exp.kasAccountId : '1102';
+                       let coaCode = exp.coaId;
+                       if (!coaCode || coaCode === '5400') {
+                         if (desc.includes('honor') || desc.includes('gaji') || desc.includes('tunjangan') || desc.includes('bonus')) coaCode = '5101';
+                         else if (desc.includes('belanja') || desc.includes('stok') || desc.includes('kulakan') || desc.includes('telur') || desc.includes('roti') || desc.includes('sosis') || desc.includes('minuman') || desc.includes('indomaret') || desc.includes('alfagift')) coaCode = '1110';
+                         else if (desc.includes('ipl')) coaCode = '2106';
+                         else if (desc.includes('simpanan')) coaCode = '3103';
+                         else if (desc.includes('talangan') || desc.includes('cod')) coaCode = '1107';
+                         else if (desc.includes('tarik tunai') || desc.includes('jasa tf') || desc.includes('transfer')) coaCode = '1103';
+                         else coaCode = '5400';
+                       }
+                       const kasObj = coaList.find(c => c.code === kasCode);
+                       const coaObj = coaList.find(c => c.code === coaCode);
+                       return {
+                         'Tanggal': dateOnly,
+                         'Keterangan': exp.description,
+                         'Akun Kas (Sumber/Tujuan)': kasObj ? `${kasObj.code} - ${kasObj.name}` : kasCode,
+                         'Jurnal Lawan': coaObj ? `${coaObj.code} - ${coaObj.name}` : coaCode,
+                         'Jenis': isIncome ? 'Pemasukan' : 'Pengeluaran',
+                         'Nominal (Rp)': Math.abs(exp.amount),
+                         'Keterangan Jenis': isIncome ? `+${Math.abs(exp.amount).toLocaleString('id-ID')}` : `-${Math.abs(exp.amount).toLocaleString('id-ID')}`,
+                         'Perlu Koreksi?': warning
+                       };
+                     });
+                     rows.push({ 'Tanggal': '', 'Keterangan': 'TOTAL PEMASUKAN', 'Akun Kas (Sumber/Tujuan)': '', 'Jurnal Lawan': '', 'Jenis': '', 'Nominal (Rp)': totalIn, 'Keterangan Jenis': `+${totalIn.toLocaleString('id-ID')}`, 'Perlu Koreksi?': '' } as any);
+                     rows.push({ 'Tanggal': '', 'Keterangan': 'TOTAL PENGELUARAN', 'Akun Kas (Sumber/Tujuan)': '', 'Jurnal Lawan': '', 'Jenis': '', 'Nominal (Rp)': totalOut, 'Keterangan Jenis': `-${totalOut.toLocaleString('id-ID')}`, 'Perlu Koreksi?': '' } as any);
+                     rows.push({ 'Tanggal': '', 'Keterangan': 'SELISIH (Net)', 'Akun Kas (Sumber/Tujuan)': '', 'Jurnal Lawan': '', 'Jenis': '', 'Nominal (Rp)': totalIn - totalOut, 'Keterangan Jenis': `${(totalIn - totalOut) >= 0 ? '+' : ''}${(totalIn - totalOut).toLocaleString('id-ID')}`, 'Perlu Koreksi?': '' } as any);
+                     const ws = XLSX.utils.json_to_sheet(rows);
+                     ws['!cols'] = [{ wch: 14 }, { wch: 50 }, { wch: 25 }, { wch: 30 }, { wch: 14 }, { wch: 16 }, { wch: 20 }, { wch: 50 }];
+                     const wb = XLSX.utils.book_new();
+                     XLSX.utils.book_append_sheet(wb, ws, 'Riwayat Kas Kecil');
+                     XLSX.writeFile(wb, `Riwayat_KasKecil_${pettyCashStartDate}_sd_${pettyCashEndDate}.xlsx`);
+                   }}
+                   className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+                   title="Unduh Riwayat Kas Kecil sebagai Excel"
+                 >
+                   <Download className="w-3.5 h-3.5" />
+                   Unduh Excel
+                 </button>
                </div>
              </div>
              <div className="p-2 space-y-1 max-h-60 overflow-y-auto overflow-x-auto">
@@ -834,8 +1032,8 @@ export default function KasirShiftPage() {
                   const manualJournals = (journalEntries || [])
                     .filter(j => {
                       if (j.referenceType !== 'MANUAL' || !j.account) return false;
-                      const kasKecilCoa = useAppStore.getState().coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || useAppStore.getState().coaList.find(c => c.code === '1-1000');
-                      const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1-1000';
+                      const kasKecilCoa = useAppStore.getState().coaList.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102') || useAppStore.getState().coaList.find(c => c.code === '1101');
+                      const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1101';
                       const entryAccCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
                       if (entryAccCode !== kasAccount) return false;
                       return j.date >= pettyCashStartDate && j.date <= pettyCashEndDate + 'T23:59:59';
@@ -856,13 +1054,26 @@ export default function KasirShiftPage() {
                   const totalOut = filteredPettyCash.reduce((sum, exp) => exp.amount > 0 ? sum + exp.amount : sum, 0);
 
                   const displayedPettyCash = filteredPettyCash.filter(exp => {
-                    if (pettyCashFilter === 'IN') return exp.amount < 0;
-                    if (pettyCashFilter === 'OUT') return exp.amount > 0;
+                    if (pettyCashFilter === 'IN' && exp.amount > 0) return false;
+                    if (pettyCashFilter === 'OUT' && exp.amount < 0) return false;
+                    if (pettyCashSearch && !exp.description.toLowerCase().includes(pettyCashSearch.toLowerCase())) return false;
                     return true;
                   });
 
                   return (
                     <div className="flex flex-col h-full">
+                      <div className="mb-2 px-1">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Cari transaksi..."
+                            value={pettyCashSearch}
+                            onChange={(e) => setPettyCashSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none dark:bg-slate-800"
+                          />
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                        </div>
+                      </div>
                       <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-2">
                         <button onClick={() => setPettyCashFilter('ALL')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'ALL' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>Semua</button>
                         <button onClick={() => setPettyCashFilter('IN')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'IN' ? 'bg-white dark:bg-slate-700 shadow-sm text-green-600' : 'text-slate-500 hover:text-green-600'}`}>Pemasukan</button>
@@ -878,7 +1089,12 @@ export default function KasirShiftPage() {
                               <div className="flex flex-col">
                                 <span className="font-bold text-slate-700 dark:text-slate-300">{exp.description}</span>
                                 <span className="text-[9px] text-slate-400">
-                                  {new Date(exp.date).toLocaleString("id-ID", { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  {(() => {
+                                    const d = new Date(exp.date);
+                                    const t = d.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' });
+                                    const dateStr = d.toLocaleDateString("id-ID", { year: 'numeric', month: 'numeric', day: 'numeric' });
+                                    return (t === '07.00' || t === '07:00') ? dateStr : `${dateStr}, ${t}`;
+                                  })()}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-3">
@@ -1309,7 +1525,7 @@ export default function KasirShiftPage() {
               e.preventDefault();
               let finalCoa = editExpenseModal.coaAccount ? editExpenseModal.coaAccount.split(' - ')[0].trim() : undefined;
               const descLower = editExpenseModal.desc.toLowerCase();
-              if (!finalCoa && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan') || descLower.includes('belanja'))) {
+              if (!finalCoa && editExpenseModal.type === 'PENGELUARAN' && (descLower.includes('stok') || descLower.includes('barang') || descLower.includes('kulakan') || descLower.includes('persediaan') || descLower.includes('belanja'))) {
                 const persediaanCoa = useAppStore.getState().coaList?.find((c: any) => c.name.toLowerCase().includes('persediaan'));
                 if (persediaanCoa) {
                   finalCoa = persediaanCoa.code;
@@ -1321,7 +1537,7 @@ export default function KasirShiftPage() {
                 amount: finalAmount,
                 description: `Kas Kecil: ${editExpenseModal.desc}`,
                 coaId: finalCoa,
-                kasAccountId: editExpenseModal.kasAccount ? editExpenseModal.kasAccount.split(' - ')[0].trim() : undefined
+                kasAccountId: '1102'
               });
               setEditExpenseModal({ isOpen: false, id: '', amount: '', desc: '', coaAccount: '', kasAccount: '', type: 'PENGELUARAN' });
             }} className="space-y-4">
@@ -1340,11 +1556,11 @@ export default function KasirShiftPage() {
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-xs font-bold text-gray-700">Akun Kas</label>
-                  <input list="kas-options" value={editExpenseModal.kasAccount} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, kasAccount: e.target.value })} placeholder="Default: Kas Utama" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input type="text" readOnly value="1102 - Kas Kecil" className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100 font-bold text-gray-700 cursor-not-allowed" />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs font-bold text-gray-700">Jurnal Lawan</label>
-                  <input list="coa-options" value={editExpenseModal.coaAccount} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, coaAccount: e.target.value })} placeholder="Otomatis jika kosong" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <label className="text-xs font-bold text-gray-700">Jurnal Lawan *</label>
+                  <input list="coa-options" required value={editExpenseModal.coaAccount} onChange={(e) => setEditExpenseModal({ ...editExpenseModal, coaAccount: e.target.value })} placeholder="Wajib pilih..." className="w-full border rounded-lg px-3 py-2 text-sm" />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
@@ -1550,8 +1766,8 @@ export default function KasirShiftPage() {
 
                     const getAccountForMethod = (method: string) => {
                       if (method === 'QRIS_SHARIAH') return '1-1020';
-                      if (method === 'TRANSFER_BSI') return '1-1010';
-                      return '1-1000';
+                      if (method === 'TRANSFER_BSI') return '1103';
+                      return '1101';
                     };
 
                     let targetAccount = getAccountForMethod(paymentMethod);
@@ -1559,7 +1775,7 @@ export default function KasirShiftPage() {
                       targetAccount = payoffModal.debitAccountId.split(' - ')[0].trim();
                     }
 
-                    let targetCreditAccount = '1-1030';
+                    let targetCreditAccount = '1030';
                     if (payoffModal.creditAccountId) {
                       targetCreditAccount = payoffModal.creditAccountId.split(' - ')[0].trim();
                     }

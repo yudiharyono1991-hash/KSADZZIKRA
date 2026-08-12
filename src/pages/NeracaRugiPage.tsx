@@ -197,29 +197,70 @@ export default function NeracaRugiPage() {
     return expDate >= startDate && expDate <= endDate;
   });
 
+  // === MASTER KEYWORD MAP: sesuai arahan Pak Grandis (INPUT JURNAL KAS KECIL.pdf) ===
+  // Semua kata kunci yang BUKAN beban operasional - fungsi ini mengembalikan TRUE jika bukan beban
   const isInventoryExpense = (exp: any) => {
-    const acc = exp.coaId?.toLowerCase() || '';
-    if (acc.includes('persediaan') || acc.includes('1-1040') || acc.includes('1109') || acc.includes('1110')) return true;
-    const coa = coaList?.find((c: any) => c.code === exp.coaId);
-    if (coa && coa.name.toLowerCase().includes('persediaan')) return true;
-    
+    const acc = (exp.coaId || '').toLowerCase();
     const desc = (exp.description || '').toLowerCase();
-    if (
-      desc.includes('persediaan') || 
-      desc.includes('stok') || 
-      desc.includes('kulakan') || 
-      desc.includes('1110') ||
-      (desc.includes('belanja') && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air')) ||
-      desc.includes('paket cod') ||
-      desc.includes('cadar') ||
-      desc.includes('telur')
-    ) return true;
-    
+
+    // --- STEP 1: CEK DESKRIPSI TERLEBIH DAHULU (Berlaku untuk SEMUA data, termasuk data lama) ---
+    // 1a. Pembelian Stok / Persediaan → ke Persediaan Unit Toko (ASSET)
+    if (acc.includes('1110') || acc.includes('1109') || acc.includes('1110') || acc.includes('persediaan')) return true;
+    if (desc.includes('persediaan') || desc.includes('kulakan')) return true;
+    if (desc.includes('stok') && !desc.includes('stok opname')) return true;
+    if ((desc.includes('belanja') || desc.includes('beli ')) && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air')) return true;
+    // Produk spesifik yang sering dibeli sebagai persediaan
+    if (desc.includes('telur') || desc.includes('cadar') || desc.includes('roti') || desc.includes('cimory') || desc.includes('sosis') || desc.includes('basreng') || desc.includes('snack') || desc.includes('minuman') || desc.includes('aqua') || desc.includes('indomaret') || desc.includes('alfagift') || desc.includes('sales ') || desc.includes('wings') || desc.includes('pokka') || desc.includes('tango') || desc.includes('permen') || desc.includes('croisant') || desc.includes('crois') || desc.includes('donasin') || desc.includes('kontak') || desc.includes('setor roti') || desc.includes('crystal') || desc.includes('indogrosir') || desc.includes('indomart') || desc.includes('stop kontak') || desc.includes('kopi') || desc.includes('pisang') || desc.includes('plastik')) return true;
+
+    // 1b. Tarik Tunai / Transfer → ke Bank BSI (ASSET)
+    if (desc.includes('tarik tunai') || desc.includes('tarik uang') || desc.includes('kembalian transfer') || desc.includes('nominal transfer') || desc.includes('transfer bank') || desc.includes('setor transfer')) return true;
+
+    // 1c. Talangan COD Paket → ke Piutang Qardh (ASSET)
+    if (desc.includes('talang') || desc.includes('paket cod') || desc.includes('cod paket') || desc.includes('paket ksa') || desc.includes('paket cs')) return true;
+
+    // 1d. Setor IPL / Bayar IPL → ke Titipan IPL (LIABILITY)
+    if (desc.includes('setor ipl') || desc.includes('bayar ipl') || desc.includes('setoripl')) return true;
+
+    // 1e. Simpanan → ke Simpanan Pokok/Wajib (LIABILITY)
+    if (desc.includes('simpanan pokok') || desc.includes('simpanan wajib')) return true;
+
+    // 1f. Angsuran Pembiayaan → ke Angsuran Anggota Kopsyah (LIABILITY)
+    if (desc.includes('angsuran pembiayaan') || desc.includes('cicilan anggota')) return true;
+
+    // 1g. Setor Mainan / Setor lainnya yang bukan beban
+    if (desc.includes('setor mainan') || desc.includes('mainan')) return true;
+
+    // --- STEP 2: CEK KATEGORI COA (untuk data baru yang COA-nya sudah benar) ---
+    const coa = coaList?.find((c: any) => c.code === exp.coaId);
+    if (coa) {
+      if (coa.category === 'ASSET') return true;          // Aset → bukan beban
+      if (coa.category === 'LIABILITY') return true;      // Kewajiban → bukan beban
+      if (coa.category === 'EQUITY') return true;         // Ekuitas → bukan beban
+      if (coa.category === 'REVENUE') return false;       // Pendapatan → handled by isOtherIncome
+      if (coa.category === 'EXPENSE') return false;       // Beban → ya, ini beban operasional
+    }
+
+    // --- STEP 3: Fallback - jika tidak ada COA terdaftar dan tidak ada keyword →  anggap beban ---
     return false;
+  };
+  
+  const isOtherIncome = (exp: any) => {
+    if ((Number(exp.amount) || 0) >= 0) return false;
+    
+    const coa = coaList?.find((c: any) => c.code === exp.coaId);
+    if (coa) {
+      if (coa.category === 'REVENUE' || coa.category === 'EXPENSE') return true;
+      if (coa.category === 'ASSET' || coa.category === 'LIABILITY' || coa.category === 'EQUITY') return false;
+    }
+    
+    // Legacy fallback
+    const desc = (exp.description || '').toLowerCase();
+    if (desc.includes('ipl') || desc.includes('titipan') || desc.includes('simpanan')) return false;
+    return true;
   };
 
   const filteredExpenses = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp));
-  const filteredOtherIncome = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) < 0);
+  const filteredOtherIncome = filteredAllExpenses.filter(exp => isOtherIncome(exp));
 
   let periodPhysicalRevenue = 0;
   let periodPpobRevenue = 0;
@@ -227,6 +268,9 @@ export default function NeracaRugiPage() {
   let periodPpobHPP = 0;
 
   filteredTransactions.forEach(tx => {
+    let itemPhysRev = 0;
+    let itemPpobRev = 0;
+
     (tx.items || []).forEach(it => {
       let cp = Number(it.costPrice || 0);
       const productData = products?.find((p: any) => p.id === it.productId);
@@ -240,13 +284,22 @@ export default function NeracaRugiPage() {
       const itemHpp = cp * (Number(it.quantity) || 0);
 
       if (productData?.isPPOB) {
-        periodPpobRevenue += itemRevenue;
+        itemPpobRev += itemRevenue;
         periodPpobHPP += itemHpp;
       } else {
-        periodPhysicalRevenue += itemRevenue;
+        itemPhysRev += itemRevenue;
         periodPhysicalHPP += itemHpp;
       }
     });
+
+    const itemSum = itemPhysRev + itemPpobRev;
+    if (itemSum > 0) {
+      const physShare = Math.round((Number(tx.totalAmount) || 0) * (itemPhysRev / itemSum));
+      periodPhysicalRevenue += physShare;
+      periodPpobRevenue += ((Number(tx.totalAmount) || 0) - physShare);
+    } else {
+      periodPhysicalRevenue += (Number(tx.totalAmount) || 0);
+    }
   });
 
   const periodTransactionsRevenue = periodPhysicalRevenue + periodPpobRevenue;
@@ -304,7 +357,7 @@ export default function NeracaRugiPage() {
     .filter(exp => {
       if (!exp || !exp.date) return false;
       const expDate = String(exp.date).split('T')[0];
-      return expDate <= endDate && (Number(exp.amount) || 0) < 0;
+      return expDate <= endDate && isOtherIncome(exp);
     })
     .reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
 
@@ -352,6 +405,7 @@ export default function NeracaRugiPage() {
   let balanceKasTunai = initialStoreCapital; // modal awal dianggap masuk ke kas tunai
   let balanceKasKecil = 0;
   let balanceBank = 0;
+  let balanceQris = 0;
   let balanceRadar = 0;
   let balanceDana = 0;
 
@@ -361,13 +415,15 @@ export default function NeracaRugiPage() {
       const acc = j.account ? j.account.toLowerCase() : '';
       if (acc.includes('1102') || acc.includes('kas kecil')) {
         balanceKasKecil += (j.debit - j.credit);
-      } else if (acc.includes('1112') || acc.includes('bank') || acc.includes('qris')) {
+      } else if (acc.includes('1020') || acc.includes('1-1020') || acc.includes('qris')) {
+        balanceQris += (j.debit - j.credit);
+      } else if (acc.includes('1103') || acc.includes('1104') || acc.includes('bank')) {
         balanceBank += (j.debit - j.credit);
-      } else if (acc.includes('1-1050') || acc.includes('radar pulsa')) {
+      } else if (acc.includes('1050') || acc.includes('1-1050') || acc.includes('radar pulsa')) {
         balanceRadar += (j.debit - j.credit);
-      } else if (acc.includes('1-1054') || acc.includes('saldo dana')) {
+      } else if (acc.includes('1117') || acc.includes('1054') || acc.includes('1-1054') || acc.includes('dokuku') || acc.includes('saldo dana')) {
         balanceDana += (j.debit - j.credit);
-      } else if (acc.includes('1101') || acc.includes('1-1000') || acc.includes('kas tunai') || acc.includes('kas utama') || acc.startsWith('1-100')) {
+      } else if (acc.includes('1101') || acc.includes('kas tunai') || acc.includes('kas utama') || acc.startsWith('1-100')) {
         balanceKasTunai += (j.debit - j.credit);
       }
     }
@@ -380,7 +436,7 @@ export default function NeracaRugiPage() {
   const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses + allTimeTransactionsOtherIncome;
 
   // Sound liquid capital: sum of the separated cash accounts
-  const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank + balanceRadar + balanceDana;
+  const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank + balanceQris + balanceRadar + balanceDana;
 
   // Unsold merchandise stock valuation (asset)
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
@@ -391,7 +447,7 @@ export default function NeracaRugiPage() {
     const desc = j.description?.toLowerCase() || '';
     return j.referenceType === 'AUTO_BEBAN' && Number(j.debit) > 0 && (
       acc.includes('persediaan') || 
-      acc.includes('1-1040') || 
+      acc.includes('1110') || 
       acc.includes('1109') || 
       acc.includes('1110') ||
       desc.includes('persediaan') ||
@@ -450,7 +506,7 @@ export default function NeracaRugiPage() {
       ["--- NERACA POSISI KEUANGAN (PSAK 101) ---"],
       ["POS AKTIVA (ASET)", "Jumlah", "POS PASIVA (LIABILITAS / MODAL)", "Jumlah"],
       ["Kas & Setara Kas", cashOnHand, "Utang (Qardh/Kewajiban)", accountsPayables],
-      ["Persediaan Barang Dagang", valueOfInventory, "Dana Syirkah Temporer", activeEquityValue],
+      ["1110 - Persediaan Unit Toko", valueOfInventory, "Dana Syirkah Temporer", activeEquityValue],
       ["Piutang Dagang (Penjualan)", receivablesVal, "Laba Ditahan / Ekuitas", allTimeProfit],
       ["TOTAL AKTIVA", totalAssets, "TOTAL PASIVA", totalLiabilitiesAndEquity],
       [],
@@ -702,7 +758,7 @@ export default function NeracaRugiPage() {
                     <span>PENDAPATAN LAINNYA (DARI KASIR)</span>
                     <span className="text-[10px] text-gray-400 font-medium">{filteredOtherIncome.length} transaksi</span>
                   </div>
-                  <div className="space-y-2 pl-4 max-h-44 overflow-y-auto pr-1">
+                  <div className="space-y-2 pl-4 max-h-96 overflow-y-auto pr-1">
                     {filteredOtherIncome.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 py-0.5">
                         <span className="pr-4 flex-1">
@@ -726,7 +782,7 @@ export default function NeracaRugiPage() {
                   <span className="text-[10px] text-gray-400 font-medium">{filteredExpenses.length} transaksi</span>
                 </div>
 
-                <div className="space-y-2 pl-4 max-h-44 overflow-y-auto pr-1">
+                <div className="space-y-2 pl-4 max-h-96 overflow-y-auto pr-1">
                   {filteredExpenses.length === 0 ? (
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
                   ) : (
@@ -799,28 +855,28 @@ export default function NeracaRugiPage() {
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas Tunai Utama</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceKasTunai.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1101 - Kas</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {balanceKasTunai.toLocaleString('id-ID')}</span>
                 </div>
                 
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas Kecil</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceKasKecil.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1102 - Kas Kecil</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {balanceKasKecil.toLocaleString('id-ID')}</span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Kas di Bank / QRIS</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceBank.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1103 - Bank Syariah Indonesia (BSI)</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {balanceBank.toLocaleString('id-ID')}</span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Saldo Radar Pulsa</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceRadar.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1020 - QRIS Syariah Dana</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {balanceQris.toLocaleString('id-ID')}</span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-slate-400 font-medium ml-4">↳ Saldo Aplikasi DANA</span>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {balanceDana.toLocaleString('id-ID')}</span>
+                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1117 - Saldo Dana Dokuku</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {(balanceRadar + balanceDana).toLocaleString('id-ID')}</span>
                 </div>
                 
                 <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-slate-700/50">
@@ -830,8 +886,8 @@ export default function NeracaRugiPage() {
 
                 <div className="flex flex-col border-b border-gray-100 dark:border-slate-800 pb-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-slate-400 font-medium">Persediaan Barang Dagang</span>
-                    <span className="font-mono font-semibold text-slate-900 dark:text-white">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
+                    <span className="text-gray-600 dark:text-slate-400 font-semibold">1110 - Persediaan Unit Toko</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {valueOfInventory.toLocaleString('id-ID')}</span>
                   </div>
                   {(kasKecilInventory > 0 || kasKecilInventory < 0) && (
                     <div className="flex flex-col mt-1.5 space-y-1">
@@ -839,7 +895,7 @@ export default function NeracaRugiPage() {
                         <span className="ml-4 font-bold">↳ Tambahan dari Pembelian Langsung</span>
                         <span className="font-mono font-bold">Rp {kasKecilInventory.toLocaleString('id-ID')}</span>
                       </div>
-                      <div className="max-h-44 overflow-y-auto pr-1 space-y-1 mt-1">
+                      <div className="max-h-96 overflow-y-auto space-y-1 mt-1 pr-1">
                         {kasKecilInventoryEntries.map(entry => {
                           const dateStr = entry.date ? String(entry.date).split('T')[0] : '';
                           const desc = entry.description.replace('[Auto] Beban OPERASIONAL: Kas Kecil: ', '');
@@ -1178,7 +1234,7 @@ export default function NeracaRugiPage() {
                   <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {cashOnHand.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>
-                  <td className="p-2 border border-gray-300 dark:border-slate-600">Persediaan Barang Dagang</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">1110 - Persediaan Unit Toko</td>
                   <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {valueOfInventory.toLocaleString('id-ID')}</td>
                 </tr>
                 <tr>

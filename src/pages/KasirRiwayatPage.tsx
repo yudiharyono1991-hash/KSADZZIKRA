@@ -146,16 +146,22 @@ export default function KasirRiwayatPage() {
 
   filteredTx.forEach(tx => {
     if (tx.isVoided) return;
+    let itemPhys = 0;
+    let itemPpob = 0;
     tx.items?.forEach((item: any) => {
       const p = products?.find((prod: any) => prod.id === item.productId);
-      const isPPOB = p ? p.isPPOB : false;
-      const lineTotal = item.price * item.quantity;
-      if (isPPOB) {
-        totalOmsetPPOB += lineTotal;
-      } else {
-        totalOmsetFisik += lineTotal;
-      }
+      const line = Number(item.price || 0) * Number(item.quantity || 0);
+      if (p?.isPPOB) itemPpob += line;
+      else itemPhys += line;
     });
+    const itemSum = itemPhys + itemPpob;
+    if (itemSum > 0) {
+      const physShare = Math.round(tx.totalAmount * (itemPhys / itemSum));
+      totalOmsetFisik += physShare;
+      totalOmsetPPOB += (tx.totalAmount - physShare);
+    } else {
+      totalOmsetFisik += tx.totalAmount;
+    }
   });
 
   const cashierBreakdowns = uniqueCashiers.map(cashierName => {
@@ -169,15 +175,26 @@ export default function KasirRiwayatPage() {
       if (tx.cashierName === cashierName && !tx.isVoided) {
         total += tx.totalAmount;
         transaksi += 1;
+        
+        let itemPhys = 0;
+        let itemPpob = 0;
         tx.items?.forEach((item: any) => {
           const p = products?.find((prod: any) => prod.id === item.productId);
-          const isPPOB = p ? p.isPPOB : false;
           const qty = Number(item.quantity || 0);
-          const lineTotal = item.price * qty;
+          const line = Number(item.price || 0) * qty;
           barang += qty;
-          if (isPPOB) ppob += lineTotal;
-          else fisik += lineTotal;
+          if (p?.isPPOB) itemPpob += line;
+          else itemPhys += line;
         });
+
+        const itemSum = itemPhys + itemPpob;
+        if (itemSum > 0) {
+          const physShare = Math.round(tx.totalAmount * (itemPhys / itemSum));
+          fisik += physShare;
+          ppob += (tx.totalAmount - physShare);
+        } else {
+          fisik += tx.totalAmount;
+        }
       }
     });
 

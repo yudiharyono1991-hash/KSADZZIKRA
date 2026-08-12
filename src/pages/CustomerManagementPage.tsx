@@ -191,8 +191,8 @@ export default function CustomerManagementPage() {
 
     const getAccountForMethod = (method: string) => {
       if (method === 'QRIS_SHARIAH') return '1-1020';
-      if (method === 'TRANSFER_BSI') return '1-1010';
-      return '1-1000';
+      if (method === 'TRANSFER_BSI') return '1103';
+      return '1101';
     };
 
     let targetAccount = getAccountForMethod(paymentMethod);

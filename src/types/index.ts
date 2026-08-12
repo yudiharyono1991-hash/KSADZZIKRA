@@ -61,6 +61,7 @@ export interface StoreSettings {
   maintenanceMode?: boolean;
   minimumCashBalance?: number;
   pettyCashBalance?: number;
+  initialStoreCapital?: number;
   zakatRate?: number; // e.g. 2.5
   autoApproveTransactions?: boolean;
   defaultPpobAdminFee?: number; // Biaya admin default untuk PPOB

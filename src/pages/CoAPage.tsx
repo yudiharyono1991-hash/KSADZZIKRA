@@ -110,9 +110,17 @@ export default function CoAPage() {
   // Filtered accounts
   const filteredCoa = coaList.filter(acc => {
     const matchesCategory = activeCategoryFilter === 'ALL' || acc.category === activeCategoryFilter;
-    const matchesSearch = acc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      acc.code.includes(searchQuery);
+    const cleanSearch = searchQuery.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanCode = acc.code.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanName = acc.name.toLowerCase();
+    
+    const matchesSearch = !searchQuery.trim() || cleanCode.includes(cleanSearch) || cleanName.includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
+  }).sort((a, b) => {
+    const numA = parseInt(a.code.replace(/[^0-9]/g, ''), 10) || 0;
+    const numB = parseInt(b.code.replace(/[^0-9]/g, ''), 10) || 0;
+    if (numA !== numB) return numA - numB;
+    return a.code.localeCompare(b.code, undefined, { numeric: true });
   });
 
   const totalPages = Math.ceil(filteredCoa.length / itemsPerPage);

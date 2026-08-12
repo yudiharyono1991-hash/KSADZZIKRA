@@ -48,7 +48,7 @@ export default function BukuBesarPage() {
     const groups: Record<string, typeof activeAccounts> = {
       'SEMUA AKUN': [{ id: 'all', code: 'SEMUA', name: 'Seluruh Transaksi Akun', type: 'ALL', normalBalance: 'DEBIT', isActive: true, branchId: '' }],
       '1 - ASET': [], '2 - KEWAJIBAN': [], '3 - EKUITAS': [], 
-      '4 - PENDAPATAN': [], '5 - HARGA POKOK': [], '6 - BEBAN': [], 'LAINNYA': []
+      '4 - PENDAPATAN': [], '5 - HARGA POKOK (HPP)': [], '6 - BEBAN OPERASIONAL': [], 'LAINNYA': []
     };
     
     activeAccounts.forEach(acc => {
@@ -57,13 +57,16 @@ export default function BukuBesarPage() {
         return;
       }
       
-      const firstDigit = acc.code.charAt(0);
+      const code = acc.code;
+      const firstDigit = code.charAt(0);
+      const isHPP = code.startsWith('5-10') || code === '5100';
+      
       if (firstDigit === '1') groups['1 - ASET'].push(acc);
       else if (firstDigit === '2') groups['2 - KEWAJIBAN'].push(acc);
       else if (firstDigit === '3') groups['3 - EKUITAS'].push(acc);
       else if (firstDigit === '4') groups['4 - PENDAPATAN'].push(acc);
-      else if (firstDigit === '5') groups['5 - HARGA POKOK'].push(acc);
-      else if (firstDigit === '6') groups['6 - BEBAN'].push(acc);
+      else if (isHPP) groups['5 - HARGA POKOK (HPP)'].push(acc);
+      else if (firstDigit === '5' || firstDigit === '6' || acc.category === 'EXPENSE') groups['6 - BEBAN OPERASIONAL'].push(acc);
       else groups['LAINNYA'].push(acc);
     });
     

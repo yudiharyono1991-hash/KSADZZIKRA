@@ -31,11 +31,11 @@ export default function JurnalUmumPage() {
   const [description, setDescription] = useState('');
   const [debitAccount, setDebitAccount] = useState(() => {
     const activeAccounts = useAppStore.getState().coaList.filter(c => c.isActive);
-    return activeAccounts[0] ? `${activeAccounts[0].code} - ${activeAccounts[0].name}` : '1-1000';
+    return activeAccounts[0] ? `${activeAccounts[0].code} - ${activeAccounts[0].name}` : '1101';
   });
   const [creditAccount, setCreditAccount] = useState(() => {
     const activeAccounts = useAppStore.getState().coaList.filter(c => c.isActive);
-    return activeAccounts.length > 1 ? `${activeAccounts[1].code} - ${activeAccounts[1].name}` : '1-1000';
+    return activeAccounts.length > 1 ? `${activeAccounts[1].code} - ${activeAccounts[1].name}` : '1101';
   });
   const [amount, setAmount] = useState(0);
 
@@ -422,13 +422,71 @@ export default function JurnalUmumPage() {
                 <p className="text-xl font-mono font-bold text-green-700">Rp {totalCredit.toLocaleString('id-ID')}</p>
               </div>
             </div>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl flex items-center justify-between">
-              <div>
+            <div className={`border p-4 rounded-xl flex items-center justify-between ${totalDebit === totalCredit ? 'bg-green-50 dark:bg-green-900/20 border-green-200' : 'bg-red-50 dark:bg-red-900/20 border-red-200'}`}>
+              <div className="w-full">
                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Status Keseimbangan (Neraca)</p>
                 {totalDebit === totalCredit ? (
                   <p className="text-sm font-bold text-green-600 flex items-center gap-1"><Scale className="w-4 h-4"/> SEIMBANG (BALANCE)</p>
                 ) : (
-                  <p className="text-sm font-bold text-red-600 flex items-center gap-1"><Scale className="w-4 h-4"/> TIDAK SEIMBANG</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-red-600 flex items-center gap-1"><Scale className="w-4 h-4"/> TIDAK SEIMBANG</p>
+                    <p className="text-xs text-red-500 font-mono">Selisih: Rp {Math.abs(totalDebit - totalCredit).toLocaleString('id-ID')} ({totalDebit > totalCredit ? 'Debit lebih besar' : 'Kredit lebih besar'})</p>
+                    {(() => {
+                      // Find which referenceIds are imbalanced
+                      const imbalanced = groupedJournals.filter(g => {
+                        const gDebit = g.entries.reduce((s, e) => s + (e.debit || 0), 0);
+                        const gCredit = g.entries.reduce((s, e) => s + (e.credit || 0), 0);
+                        return Math.abs(gDebit - gCredit) > 0.01;
+                      });
+                      if (imbalanced.length === 0) return null;
+                      return (
+                        <div className="mt-1 space-y-1">
+                          <p className="text-[10px] font-bold text-red-600 uppercase">Transaksi Tidak Seimbang ({imbalanced.length}):</p>
+                          <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
+                            {imbalanced.map(g => {
+                              const gD = g.entries.reduce((s, e) => s + (e.debit || 0), 0);
+                              const gC = g.entries.reduce((s, e) => s + (e.credit || 0), 0);
+                              return (
+                                <div key={g.refId} className="text-[9px] bg-red-100 dark:bg-red-900/40 rounded px-2 py-1">
+                                  <span className="font-bold">{g.refId}</span>: {g.description?.slice(0, 40)}...
+                                  <br/>Selisih: <span className="font-mono font-bold">Rp {Math.abs(gD - gC).toLocaleString('id-ID')}</span> ({gD > gC ? 'Debit lebih' : 'Kredit lebih'})
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const { addJournalEntry } = useAppStore.getState();
+                              let count = 0;
+                              imbalanced.forEach(g => {
+                                const gD = g.entries.reduce((s, e) => s + (e.debit || 0), 0);
+                                const gC = g.entries.reduce((s, e) => s + (e.credit || 0), 0);
+                                const gDiff = gD - gC;
+                                if (Math.abs(gDiff) > 0.01) {
+                                  addJournalEntry({
+                                    tenantId: currentUser?.tenantId || 'tenant_default',
+                                    date: g.date || new Date().toISOString(),
+                                    account: '9999 - Akun Selisih/Suspense',
+                                    description: `[Koreksi Otomatis] Menyeimbangkan selisih jurnal ini`,
+                                    debit: gDiff < 0 ? Math.abs(gDiff) : 0,
+                                    credit: gDiff > 0 ? Math.abs(gDiff) : 0,
+                                    referenceId: g.refId,
+                                    referenceType: 'MANUAL',
+                                    createdBy: currentUser?.name || 'System'
+                                  });
+                                  count++;
+                                }
+                              });
+                              alert(`✅ Berhasil membuat ${count} entri penyeimbang otomatis ke Akun Selisih/Suspense. Silakan hapus jika tidak diperlukan.`);
+                            }}
+                            className="w-full mt-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold py-1.5 px-3 rounded-lg transition-colors"
+                          >
+                            🔧 Buat Jurnal Koreksi Otomatis (Rp {Math.abs(totalDebit - totalCredit).toLocaleString('id-ID')})
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
             </div>

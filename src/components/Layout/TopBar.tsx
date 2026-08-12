@@ -75,55 +75,71 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   const day = String(now.getDate()).padStart(2, '0');
   const todayDateStr = `${year}-${month}-${day}`;
 
-  // Today's total sales (Excluding PPOB)
-  const todaySales = transactions
-    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
-    .reduce((sum, tx) => {
-      const physicalSales = tx.items.reduce((itemSum, item) => {
-        const prod = products.find(p => p.id === item.productId);
-        if (prod?.isPPOB) return itemSum; // Skip PPOB
-        return itemSum + (item.price * item.quantity);
-      }, 0);
-      return sum + physicalSales;
-    }, 0);
+  // Today's total sales breakdown
+  let todaySales = 0;
+  let todayPPOBSales = 0;
 
-  // Today's margin (Excluding PPOB)
-  const todayMargin = transactions
+  transactions
     .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
-    .reduce((sum, tx) => {
-      const physicalMargin = tx.items.reduce((itemSum, item) => {
+    .forEach(tx => {
+      let itemPhys = 0;
+      let itemPpob = 0;
+      tx.items?.forEach((item: any) => {
         const prod = products.find(p => p.id === item.productId);
-        if (prod?.isPPOB) return itemSum; // Skip PPOB
-        const cogs = item.costPrice || prod?.costPrice || 0;
-        return itemSum + ((item.price - cogs) * item.quantity);
-      }, 0);
-      return sum + physicalMargin;
-    }, 0);
+        const line = Number(item.price || 0) * Number(item.quantity || 0);
+        if (prod?.isPPOB) itemPpob += line;
+        else itemPhys += line;
+      });
+      const itemSum = itemPhys + itemPpob;
+      if (itemSum > 0) {
+        const physShare = Math.round(tx.totalAmount * (itemPhys / itemSum));
+        todaySales += physShare;
+        todayPPOBSales += (tx.totalAmount - physShare);
+      } else {
+        todaySales += tx.totalAmount;
+      }
+    });
 
-  // Today's PPOB Sales
-  const todayPPOBSales = transactions
-    .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
-    .reduce((sum, tx) => {
-      const ppobSales = tx.items.reduce((itemSum, item) => {
-        const prod = products.find(p => p.id === item.productId);
-        if (!prod?.isPPOB) return itemSum;
-        return itemSum + (item.price * item.quantity);
-      }, 0);
-      return sum + ppobSales;
-    }, 0);
+  // Today's margin breakdown
+  let todayMargin = 0;
+  let todayPPOBMargin = 0;
 
-  // Today's PPOB Margin
-  const todayPPOBMargin = transactions
+  transactions
     .filter(tx => String(tx.timestamp || '').startsWith(todayDateStr) && !tx.isVoided)
-    .reduce((sum, tx) => {
-      const ppobMargin = tx.items.reduce((itemSum, item) => {
-        const prod = products.find(p => p.id === item.productId);
-        if (!prod?.isPPOB) return itemSum;
-        const cogs = item.costPrice || prod?.costPrice || 0;
-        return itemSum + ((item.price - cogs) * item.quantity);
-      }, 0);
-      return sum + ppobMargin;
-    }, 0);
+    .forEach(tx => {
+      const hasPPOB = tx.items?.some(i => {
+        const prod = products.find(p => p.id === i.productId);
+        return prod?.isPPOB;
+      });
+      const hasPhysical = tx.items?.some(i => {
+        const prod = products.find(p => p.id === i.productId);
+        return !prod?.isPPOB;
+      });
+
+      if (hasPPOB && !hasPhysical) {
+        todayPPOBMargin += (tx.marginContribution || 0);
+      } else if (!hasPPOB && hasPhysical) {
+        todayMargin += (tx.marginContribution || 0);
+      } else {
+        let pMargin = 0;
+        let ppobMargin = 0;
+        tx.items.forEach(i => {
+          const prod = products.find(p => p.id === i.productId);
+          const cogs = i.costPrice || prod?.costPrice || 0;
+          const m = (i.price - cogs) * i.quantity;
+          if (prod?.isPPOB) ppobMargin += m;
+          else pMargin += m;
+        });
+        const totalCalcM = pMargin + ppobMargin;
+        if (totalCalcM > 0) {
+          const ratio = (tx.marginContribution || 0) / totalCalcM;
+          todayMargin += pMargin * ratio;
+          todayPPOBMargin += ppobMargin * ratio;
+        } else {
+          todayMargin += (tx.marginContribution || 0);
+        }
+      }
+    });
 
   // Check how many items low stock
   const lowStockCount = products.filter(p => p.stock <= p.minStock).length;

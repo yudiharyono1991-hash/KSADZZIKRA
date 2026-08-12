@@ -65,6 +65,15 @@ export default function TrendPage() {
   }, [transactions, activeBranchId]);
 
   const dynamicPettyCash = getCalculatedPettyCash();
+  const balanceKasKecil = useMemo(() => {
+    return (journalEntries || []).reduce((sum, j) => {
+      const acc = j.account ? j.account.toLowerCase() : '';
+      if (acc.includes('1102') || acc.includes('kas kecil')) {
+        return sum + (Number(j.debit || 0) - Number(j.credit || 0));
+      }
+      return sum;
+    }, 0);
+  }, [journalEntries]);
 
   const { chartData, totals, comparisons, ratios } = useMemo(() => {
     const today = new Date().toLocaleDateString('en-CA');
@@ -171,13 +180,37 @@ export default function TrendPage() {
           }
         });
         
-        a.omset += txPhysicalOmset;
-        a.omset_ppob += txPpobOmset;
+        const itemSum = txPhysicalOmset + txPpobOmset;
+        let finalPhysOmset = txPhysicalOmset;
+        let finalPpobOmset = txPpobOmset;
+        if (itemSum > 0) {
+          finalPhysOmset = Math.round((Number(t.totalAmount) || 0) * (txPhysicalOmset / itemSum));
+          finalPpobOmset = (Number(t.totalAmount) || 0) - finalPhysOmset;
+        } else {
+          finalPhysOmset = Number(t.totalAmount) || 0;
+          finalPpobOmset = 0;
+        }
+
+        const totalCalcM = (txPhysicalOmset - txPhysicalHpp) + (txPpobOmset - txPpobHpp);
+        let finalPhysMargin = txPhysicalOmset - txPhysicalHpp;
+        let finalPpobMargin = txPpobOmset - txPpobHpp;
+        const totalTxMargin = Number(t.marginContribution || 0);
+        if (totalCalcM > 0) {
+          const ratio = totalTxMargin / totalCalcM;
+          finalPhysMargin = Math.round((txPhysicalOmset - txPhysicalHpp) * ratio);
+          finalPpobMargin = totalTxMargin - finalPhysMargin;
+        } else {
+          finalPhysMargin = totalTxMargin;
+          finalPpobMargin = 0;
+        }
+
+        a.omset += finalPhysOmset;
+        a.omset_ppob += finalPpobOmset;
         a.hpp_fisik += txPhysicalHpp;
         a.hpp_ppob += txPpobHpp;
-        a.margin += (t.marginContribution || 0);
-        a.margin_fisik += (txPhysicalOmset - txPhysicalHpp);
-        a.margin_ppob += (txPpobOmset - txPpobHpp);
+        a.margin += totalTxMargin;
+        a.margin_fisik += finalPhysMargin;
+        a.margin_ppob += finalPpobMargin;
         a.count += 1;
         return a;
       }, { omset: 0, omset_ppob: 0, hpp_fisik: 0, hpp_ppob: 0, margin: 0, margin_fisik: 0, margin_ppob: 0, count: 0 });
@@ -451,23 +484,38 @@ export default function TrendPage() {
           </div>
       </div>
 
-      {/* Saldo Kas Kecil Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-amber-50 rounded-xl">
-            <Wallet className="w-6 h-6 text-amber-600" />
+      {/* Saldo Kas Utama & Kas Kecil Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex justify-between items-center p-4 bg-teal-50/60 dark:bg-teal-950/40 rounded-2xl border border-teal-200 dark:border-teal-800 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-teal-100 dark:bg-teal-900/60 rounded-xl">
+              <Wallet className="w-6 h-6 text-teal-700 dark:text-teal-300" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider">Kas Utama Toko (1101 - Laci)</p>
+              <h3 className="text-xl font-black text-teal-950 dark:text-teal-100">Rp {dynamicPettyCash.toLocaleString('id-ID')}</h3>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Saldo Kas Kecil (Fisik)</p>
-            <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Rp {dynamicPettyCash.toLocaleString('id-ID')}</h3>
-          </div>
+          <span className="text-[10px] font-bold bg-teal-100 text-teal-800 dark:bg-teal-900/80 dark:text-teal-200 px-2.5 py-1 rounded-full">Uang Laci POS</span>
         </div>
-        <button 
-          onClick={() => setShowTopUpModal(true)}
-          className="mt-4 md:mt-0 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition-colors"
-        >
-          + Top Up Modal Kas Kecil
-        </button>
+
+        <div className="flex justify-between items-center p-4 bg-amber-50/60 dark:bg-amber-950/40 rounded-2xl border border-amber-200 dark:border-amber-800 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-100 dark:bg-amber-900/60 rounded-xl">
+              <Wallet className="w-6 h-6 text-amber-700 dark:text-amber-300" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Saldo Kas Kecil Toko (1102)</p>
+              <h3 className="text-xl font-black text-amber-950 dark:text-amber-100">Rp {balanceKasKecil.toLocaleString('id-ID')}</h3>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowTopUpModal(true)}
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition-colors shadow-sm"
+          >
+            + Top Up Kas Kecil
+          </button>
+        </div>
       </div>
 
       {/* Visual Analytics Quick Stats - Vibrant Gradients */}
