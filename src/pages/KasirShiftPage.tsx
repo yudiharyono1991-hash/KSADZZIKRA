@@ -737,19 +737,8 @@ export default function KasirShiftPage() {
             </p>
             <div className="mb-4 bg-amber-100/50 p-2 rounded-lg border border-amber-200/50 flex justify-between items-center">
               <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Saldo Kas Kecil (1102)</span>
-              <span className="text-sm font-black text-amber-900">
-                Rp {(() => {
-                  const kasKecilCoa = coaList?.find(c => c.name.toLowerCase().includes('kas kecil') || c.code === '1102');
-                  const targetCode = kasKecilCoa ? kasKecilCoa.code : '1102';
-                  const bal = (journalEntries || []).reduce((sum, j) => {
-                    const accCode = j.account?.includes(' - ') ? j.account.split(' - ')[0].trim() : j.account?.trim();
-                    if (accCode === targetCode || accCode === '1102') {
-                      return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
-                    }
-                    return sum;
-                  }, 0);
-                  return bal.toLocaleString('id-ID');
-                })()}
+              <span className="text-sm font-black text-amber-900 font-mono">
+                Rp {getCalculatedPettyCash().toLocaleString('id-ID')}
               </span>
             </div>
             <form onSubmit={handleAddPettyCash} className="space-y-3 relative z-10">
