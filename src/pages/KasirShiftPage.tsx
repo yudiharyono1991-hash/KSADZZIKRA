@@ -593,7 +593,7 @@ export default function KasirShiftPage() {
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
           <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center">
             <h2 className="font-bold text-gray-800 dark:text-slate-200 text-md">Rekapitulasi Shift Hari Ini</h2>
-            <span className="text-[10px] font-bold text-teal-700 bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800">Kas Utama 1101</span>
+            <span className="text-[10px] font-bold text-teal-700 bg-teal-50 dark:bg-teal-900/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800">Kas Kecil 1102</span>
           </div>
           <div className="p-5 space-y-4 text-sm text-gray-600 dark:text-slate-400">
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
@@ -611,7 +611,7 @@ export default function KasirShiftPage() {
             <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-slate-800">
               <div>
                 <span className="font-medium block">Pembayaran Tunai</span>
-                <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold">(Uang Tunai Masuk Laci 1101)</span>
+                <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold">(Uang Tunai Masuk Laci 1102)</span>
               </div>
               <span className="font-bold text-gray-800 dark:text-slate-200">Rp {totalTunai.toLocaleString('id-ID')}</span>
             </div>
@@ -648,14 +648,14 @@ export default function KasirShiftPage() {
               <div className="flex justify-between items-center py-2.5 px-3.5 bg-teal-50/70 dark:bg-teal-950/40 rounded-lg border border-teal-200/80 dark:border-teal-800/80">
                 <div>
                   <span className="font-bold text-teal-900 dark:text-teal-200 text-xs block">Estimasi Fisik Tunai di Laci</span>
-                  <span className="text-[9.5px] font-semibold text-teal-700 dark:text-teal-400 uppercase">(Kas Utama 1101)</span>
+                  <span className="text-[9.5px] font-semibold text-teal-700 dark:text-teal-400 uppercase">(Kas Kecil 1102)</span>
                 </div>
                 <span className="font-extrabold text-base text-teal-800 dark:text-teal-200 font-mono">Rp {expectedCash.toLocaleString('id-ID')}</span>
               </div>
 
               <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200/60 dark:border-slate-700/60 text-[10px] text-slate-600 dark:text-slate-400">
                 <p className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1 leading-snug">
-                  💡 Komposisi Uang Laci = Modal Awal Kas Utama (1101) + Penjualan Tunai + Pelunasan Kasbon Tunai - Mutasi Kas Kecil.
+                  💡 Komposisi Uang Laci = Modal Awal Kas Kecil (1102) + Penjualan Tunai + Pelunasan Kasbon Tunai - Mutasi Kas Kecil.
                 </p>
               </div>
             </div>
@@ -909,7 +909,7 @@ export default function KasirShiftPage() {
                               payAmount: 0,
                               paymentMethod: 'CASH',
                               selectedInvoices: [],
-                              debitAccountId: '1101 - Kas',
+                              debitAccountId: '1102 - Kas Kecil',
                               creditAccountId: '1030 - Piutang Kasbon Pelanggan'
                             });
                             setCustomerSearchTerm('');

@@ -402,8 +402,8 @@ export default function NeracaRugiPage() {
   });
 
   // Calculate separate cash balances directly from ALL journals
-  let balanceKasTunai = initialStoreCapital; // modal awal dianggap masuk ke kas tunai
-  let balanceKasKecil = 0;
+  let balanceKasTunai = 0;
+  let balanceKasKecil = initialStoreCapital; // modal awal dianggap masuk ke kas kecil/toko
   let balanceBank = 0;
   let balanceQris = 0;
   let balanceRadar = 0;
@@ -413,7 +413,7 @@ export default function NeracaRugiPage() {
     const jd = String(j.date || '').split('T')[0];
     if (jd && jd <= endDate) {
       const acc = j.account ? j.account.toLowerCase() : '';
-      if (acc.includes('1102') || acc.includes('kas kecil')) {
+      if (acc.includes('1102') || acc.includes('1101') || acc.includes('kas kecil') || acc.includes('kas utama') || acc.includes('kas tunai') || acc.startsWith('1-100')) {
         balanceKasKecil += (j.debit - j.credit);
       } else if (acc.includes('1020') || acc.includes('1-1020') || acc.includes('qris')) {
         balanceQris += (j.debit - j.credit);
@@ -423,8 +423,6 @@ export default function NeracaRugiPage() {
         balanceRadar += (j.debit - j.credit);
       } else if (acc.includes('1117') || acc.includes('1054') || acc.includes('1-1054') || acc.includes('dokuku') || acc.includes('saldo dana')) {
         balanceDana += (j.debit - j.credit);
-      } else if (acc.includes('1101') || acc.includes('kas tunai') || acc.includes('kas utama') || acc.startsWith('1-100')) {
-        balanceKasTunai += (j.debit - j.credit);
       }
     }
   });

@@ -484,35 +484,26 @@ export default function TrendPage() {
           </div>
       </div>
 
-      {/* Saldo Kas Utama & Kas Kecil Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex justify-between items-center p-4 bg-teal-50/60 dark:bg-teal-950/40 rounded-2xl border border-teal-200 dark:border-teal-800 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-teal-100 dark:bg-teal-900/60 rounded-xl">
-              <Wallet className="w-6 h-6 text-teal-700 dark:text-teal-300" />
+      {/* Saldo Kas Toko / Kas Kecil (1102) Section */}
+      <div>
+        <div className="flex justify-between items-center p-5 bg-teal-50/80 dark:bg-teal-950/40 rounded-2xl border border-teal-200/80 dark:border-teal-800 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3.5 bg-teal-500 text-white rounded-xl shadow-md">
+              <Wallet className="w-7 h-7" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider">Kas Utama Toko (1101 - Laci)</p>
-              <h3 className="text-xl font-black text-teal-950 dark:text-teal-100">Rp {dynamicPettyCash.toLocaleString('id-ID')}</h3>
-            </div>
-          </div>
-          <span className="text-[10px] font-bold bg-teal-100 text-teal-800 dark:bg-teal-900/80 dark:text-teal-200 px-2.5 py-1 rounded-full">Uang Laci POS</span>
-        </div>
-
-        <div className="flex justify-between items-center p-4 bg-amber-50/60 dark:bg-amber-950/40 rounded-2xl border border-amber-200 dark:border-amber-800 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-amber-100 dark:bg-amber-900/60 rounded-xl">
-              <Wallet className="w-6 h-6 text-amber-700 dark:text-amber-300" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Saldo Kas Kecil Toko (1102)</p>
-              <h3 className="text-xl font-black text-amber-950 dark:text-amber-100">Rp {balanceKasKecil.toLocaleString('id-ID')}</h3>
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-xs font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider">Saldo Kas Toko / Kas Kecil (1102)</p>
+                <span className="text-[9.5px] font-extrabold bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200 px-2 py-0.5 rounded-full border border-teal-300/60 dark:border-teal-700">Kas Utama Operasional & Laci POS</span>
+              </div>
+              <h3 className="text-2xl font-black text-teal-950 dark:text-teal-100 font-mono">Rp {dynamicPettyCash.toLocaleString('id-ID')}</h3>
             </div>
           </div>
           <button 
             onClick={() => setShowTopUpModal(true)}
-            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition-colors shadow-sm"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5"
           >
+            <Wallet className="w-4 h-4" />
             + Top Up Kas Kecil
           </button>
         </div>

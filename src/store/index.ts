@@ -515,9 +515,9 @@ const getSavedJournalEntries = (): JournalEntry[] => {
           changed = true;
         }
 
-        // Auto-correct Penjualan CASH journals that were mistakenly saved to 1102 (Kas Kecil)
-        if (e.referenceType === 'AUTO_TRANSAKSI' && e.account?.startsWith('1102') && (e.description?.includes('Penjualan') || e.description?.includes('CASH'))) {
-          e.account = '1101';
+        // Consolidate all legacy 1101 cash journals to 1102 (Kas Kecil) as store uses Kas Kecil for all drawer operations
+        if (e.referenceType === 'AUTO_TRANSAKSI' && (e.account?.startsWith('1101') || e.account === 'KAS' || e.account === '1-1000') && (e.description?.includes('Penjualan') || e.description?.includes('CASH'))) {
+          e.account = '1102';
           changed = true;
         }
       });
@@ -2214,10 +2214,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
 
     const getPrimaryCashCoa = () => {
-      const kasUtamaCoa = get().coaList.find(c => c.code === '1101') || 
-                          get().coaList.find(c => c.name.toLowerCase() === 'kas' || c.name.toLowerCase() === 'kas utama') ||
-                          get().coaList.find(c => c.name.toLowerCase().includes('kas utama'));
-      return kasUtamaCoa ? kasUtamaCoa.code : '1101';
+      const kasKecilCoa = get().coaList.find(c => c.code === '1102') || 
+                          get().coaList.find(c => c.name.toLowerCase().includes('kas kecil')) ||
+                          get().coaList.find(c => c.code === '1101');
+      return kasKecilCoa ? kasKecilCoa.code : '1102';
     };
 
     const getPaymentCoa = (method: string) => {
