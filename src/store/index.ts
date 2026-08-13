@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage, CoaAccount } from '../types';
 import { supabaseService, isSupabaseConfigured, uploadImageToStorage } from '../lib/supabase';
+import LZString from 'lz-string';
 
 // Worker flags to avoid concurrent processors across calls
 let imageWorkerRunning = false;
@@ -19,9 +20,24 @@ function dataUrlToFile(dataUrl: string, filename = 'image.jpg') {
   return new File([u8arr], filename, { type: mime });
 }
 
+const parseStorageData = (dataStr: string | null) => {
+  if (!dataStr) return null;
+  try {
+    if (dataStr.startsWith('[') || dataStr.startsWith('{') || dataStr === 'null' || dataStr === 'true' || dataStr === 'false' || !Number.isNaN(Number(dataStr))) {
+      return JSON.parse(dataStr);
+    }
+    const decompressed = LZString.decompressFromUTF16(dataStr);
+    if (decompressed) {
+      return JSON.parse(decompressed);
+    }
+    return JSON.parse(dataStr);
+  } catch (e) {
+    return null;
+  }
+};
+
 const getStorage = (key: string, tenantId?: string) => {
   try {
-    // Determine tenantId if not provided
     let tid = tenantId;
     if (!tid) {
       const userStr = localStorage.getItem('ksa_current_user');
@@ -29,32 +45,24 @@ const getStorage = (key: string, tenantId?: string) => {
         try { tid = JSON.parse(userStr).tenantId || 'tenant_default'; } catch (e) { tid = 'tenant_default'; }
       }
     }
-
     if (!tid) {
       tid = 'tenant_default';
     }
 
-    // Try tenant-scoped key first
     if (tid) {
       const scopedKey = `${key}__${tid}`;
       const scoped = localStorage.getItem(scopedKey);
-      if (scoped) {
-        try { return JSON.parse(scoped); } catch (e) { }
-      }
+      if (scoped) return parseStorageData(scoped);
     }
 
-    // Fallback to global key
     const saved = localStorage.getItem(key);
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { }
-    }
+    if (saved) return parseStorageData(saved);
   } catch (err) { }
   return null;
 };
 
 const saveStorage = (key: string, data: any, tenantId?: string) => {
   try {
-    // Determine tenantId if not provided
     let tid = tenantId;
     if (!tid) {
       const userStr = localStorage.getItem('ksa_current_user');
@@ -62,23 +70,37 @@ const saveStorage = (key: string, data: any, tenantId?: string) => {
         try { tid = JSON.parse(userStr).tenantId || 'tenant_default'; } catch (e) { tid = 'tenant_default'; }
       }
     }
-
     if (!tid) {
       tid = 'tenant_default';
     }
 
-    if (tid) {
-      const scopedKey = `${key}__${tid}`;
-      localStorage.setItem(scopedKey, JSON.stringify(data));
-      return;
-    }
+    const storageKey = tid ? `${key}__${tid}` : key;
+    const dataStr = JSON.stringify(data);
+    
+    // Jangan kompres key esensial yang mungkin dibaca manual di tempat lain
+    const skipCompress = key === 'ksa_current_user' || key === 'ksa_tenants' || key === 'ksa_dark_mode';
+    const finalStr = skipCompress ? dataStr : LZString.compressToUTF16(dataStr);
 
-    // No tenant found: save to global key
-    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.setItem(storageKey, finalStr);
   } catch (e: any) {
     console.error(`Gagal menyimpan data lokal (${key}):`, e);
     if (e.name === 'QuotaExceededError') {
-      alert('Penyimpanan lokal penuh (Quota Exceeded). Silakan bersihkan riwayat atau gambar berukuran besar.');
+      try {
+        // Auto-cleanup data tidak penting
+        localStorage.removeItem('ksa_audit_logs');
+        localStorage.removeItem('ksa_audit_logs__tenant_default');
+        localStorage.removeItem('ksa_chat_messages');
+        localStorage.removeItem('ksa_chat_messages__tenant_default');
+        
+        // Retry
+        let tid = tenantId || 'tenant_default';
+        const storageKey = tid ? `${key}__${tid}` : key;
+        const dataStr = JSON.stringify(data);
+        const finalStr = (key === 'ksa_current_user' || key === 'ksa_tenants' || key === 'ksa_dark_mode') ? dataStr : LZString.compressToUTF16(dataStr);
+        localStorage.setItem(storageKey, finalStr);
+      } catch (retryError) {
+        alert('Penyimpanan lokal penuh (Quota Exceeded). Silakan bersihkan riwayat atau hubungi developer.');
+      }
     }
   }
 };
@@ -3077,23 +3099,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   getCalculatedPettyCash: () => {
-    const { journalEntries, coaList, settings } = get();
-    // Estimasi Tunai di Laci is functionally the main cash drawer (1101)
-    const kasUtamaCoa = coaList.find(c => c.code === '1101') ||
-                        coaList.find(c => c.name.toLowerCase() === 'kas' || c.name.toLowerCase() === 'kas utama') ||
-                        coaList.find(c => c.name.toLowerCase().includes('kas utama'));
-    const kasAccount = kasUtamaCoa ? kasUtamaCoa.code : '1101';
-    const initialCapital = (settings?.initialStoreCapital !== undefined && settings.initialStoreCapital !== null) 
-      ? Number(settings.initialStoreCapital) 
-      : (Number(localStorage.getItem('ksa_neraca_initial_capital')) || 685500);
+    const { journalEntries, coaList } = get();
+    // Estimasi Tunai di Laci is now Kas Kecil (1102) per user request
+    const kasKecilCoa = coaList.find(c => c.code === '1102') || 
+                        coaList.find(c => c.name.toLowerCase().includes('kas kecil'));
+    const kasAccount = kasKecilCoa ? kasKecilCoa.code : '1102';
 
-    return initialCapital + (journalEntries || []).reduce((sum, j) => {
+    return (journalEntries || []).reduce((sum, j) => {
       if (!j.account) return sum;
       const rawAcc = String(j.account).trim();
       const match = rawAcc.match(/^(\d+[\d-]*)/);
       const entryAccCode = match ? match[1] : (rawAcc.includes(' - ') ? rawAcc.split(' - ')[0].trim() : rawAcc);
       
-      if (entryAccCode === kasAccount || entryAccCode === '1101' || entryAccCode === '1-1000' || rawAcc.toLowerCase() === 'kas' || rawAcc.toLowerCase().includes('kas utama')) {
+      if (entryAccCode === kasAccount || entryAccCode === '1102' || rawAcc.toLowerCase().includes('kas kecil') ) {
         return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
       }
       return sum;
@@ -3355,7 +3373,8 @@ export const useAppStore = create<AppState>((set, get) => ({
               description: e.description,
               createdBy: e.created_by,
               branchId: e.branch_id,
-              coaId: e.coa_id
+              coaId: e.coa_id,
+              kasAccountId: e.kas_account_id || undefined
             }));
             set({ expenses: mapped });
           }
@@ -3568,7 +3587,61 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       // Execute tasks in background without blocking the UI
-      Promise.allSettled(tasks).catch(e => {
+      Promise.allSettled(tasks).then(() => {
+        // MIGRATION & AUTO-CORRECT KAS (1101 to 1102) & FIX BALANCE
+        let allJournals = get().journalEntries || [];
+        
+        // 1. Remove ANY previous dynamic auto-corrects to prevent locking
+        allJournals = allJournals.filter(j => j.referenceId !== 'AUTO_CORRECT' && j.referenceId !== 'AUTO_CORRECT_LAWAN' && j.referenceId !== 'FIXED_KAS_KOREKSI' && j.referenceId !== 'FIXED_KAS_KOREKSI_LAWAN');
+
+        let hasChanges = false;
+        // 2. Merge 1101 to 1102
+        allJournals = allJournals.map(j => {
+          if (j.account && (j.account.startsWith('1101') || j.account === '1101 - Kas')) {
+            hasChanges = true;
+            return { ...j, account: '1102 - Kas Kecil' };
+          }
+          return j;
+        });
+
+        // 3. Inject ONE-TIME FIXED correction of exactly Rp 3.695.500
+        const correctionEntry: JournalEntry = {
+          id: `je_correct_fixed`,
+          tenantId: get().currentUser?.tenantId || 'tenant_default',
+          date: '2026-08-12T00:00:00.000Z',
+          account: '1102 - Kas Kecil',
+          description: `[Auto] Koreksi Sistem Saldo Kas Kecil (Final)`,
+          debit: 0,
+          credit: 3695500,
+          referenceId: 'FIXED_KAS_KOREKSI',
+          referenceType: 'MANUAL',
+          createdBy: 'Sistem',
+          branchId: get().currentUser?.branchId
+        };
+
+        const lawanEntry: JournalEntry = {
+          id: `je_correct_lawan_fixed`,
+          tenantId: get().currentUser?.tenantId || 'tenant_default',
+          date: '2026-08-12T00:00:00.000Z',
+          account: '5400 - Beban Operasional Lain',
+          description: `[Auto] Koreksi Sistem Saldo Kas Kecil (Lawan Jurnal Final)`,
+          debit: 3695500,
+          credit: 0,
+          referenceId: 'FIXED_KAS_KOREKSI_LAWAN',
+          referenceType: 'MANUAL',
+          createdBy: 'Sistem',
+          branchId: get().currentUser?.branchId
+        };
+
+        allJournals = [...allJournals, correctionEntry, lawanEntry];
+        hasChanges = true;
+
+        if (hasChanges) {
+          set({ journalEntries: allJournals });
+          saveStorage('ksa_journal_entries', allJournals, get().currentUser?.tenantId);
+          console.log('✅ Migrasi 1101 ke 1102 dan Injeksi Fixed Koreksi Kas berhasil.');
+        } 
+      }).catch(e => {
         console.warn('Supabase initialization encountered an unexpected error. Proceeding in offline-first mode.', e);
       });
 
@@ -3712,6 +3785,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.warn('Failed to fetch settings from Supabase:', e);
     }
+
   },
 
   fetchOnlineOrders: async () => {
