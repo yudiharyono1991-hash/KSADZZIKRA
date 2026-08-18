@@ -54,7 +54,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div id="shariahpos-root" className="flex bg-slate-50 dark:bg-slate-800 h-[100dvh] text-slate-800 dark:text-slate-200 antialiased overflow-hidden">
+    <div id="shariahpos-root" className="flex bg-slate-50 dark:bg-slate-800 h-[100dvh] text-slate-800 dark:text-slate-200 antialiased overflow-hidden max-w-full">
       {/* Sidebar — slides over content on mobile, static on desktop */}
       <Sidebar
         isOpen={isSidebarOpen}
@@ -64,7 +64,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       />
 
       {/* Main content panel */}
-      <div id="main-content-panel" className="flex-1 flex flex-col min-w-0 w-full h-[100dvh] overflow-hidden transition-all duration-300">
+      <div id="main-content-panel" className="flex-1 flex flex-col min-w-0 w-full max-w-full h-[100dvh] overflow-hidden transition-all duration-300">
 
         {/* ─── STICKY HEADER ─────────────────────────────────────── */}
         <TopBar
@@ -74,12 +74,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
         {/* ─── SCROLLABLE CENTER ─────────────────────────────────── */}
         {/* 
-          overflow-auto: scroll both x and y as needed
-          pb-16 md:pb-0: bottom padding on mobile for BottomNavBar space
+          overflow-y-auto: vertical scroll
+          overflow-x-hidden: prevent horizontal drifting on mobile viewports
+          pb-20 md:pb-6: bottom padding on mobile for BottomNavBar space
         */}
         <main
           id="main-scroll-container"
-          className="flex-1 p-3 md:p-6 overflow-auto flex flex-col relative pb-20 md:pb-6"
+          className="flex-1 p-3 md:p-6 overflow-y-auto overflow-x-hidden flex flex-col relative pb-20 md:pb-6 max-w-full"
         >
           {children}
         </main>

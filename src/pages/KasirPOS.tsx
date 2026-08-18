@@ -476,9 +476,9 @@ export default function KasirPOS() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-2 md:gap-4 flex-1 h-full w-full min-w-0 overflow-y-auto md:overflow-hidden pb-20 md:pb-0">
-      {/* Product Catalog Grid - Left */}
-      <div className="flex-1 flex flex-col min-w-0 md:h-[calc(100vh-100px)] space-y-3">
+    <div className="flex flex-col md:flex-row h-auto md:h-[calc(100vh-64px)] md:overflow-hidden relative">
+      {/* Product Catalog - Left */}
+      <div className="w-full md:flex-1 flex flex-col pt-4 px-2 md:px-4 pb-6 md:pb-0 relative md:overflow-y-auto space-y-3">
         
         {/* Type Tabs */}
         <div className="flex gap-2">
@@ -550,7 +550,7 @@ export default function KasirPOS() {
         </div>
 
         {/* Catalog List scrollable area */}
-        <div ref={listContainerRef} className="flex-1 overflow-y-auto pr-1 pb-20">
+        <div ref={listContainerRef} className="flex-1 pr-1 pb-4">
           {filteredProducts.length === 0 ? (
             <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700">
               <AlertCircle className="w-12 h-12 text-amber-600 mx-auto mb-3" />
@@ -577,7 +577,10 @@ export default function KasirPOS() {
                         isOutOfStock ? 'opacity-65 border-gray-200 dark:border-slate-700' : 'border-gray-200 dark:border-slate-700 hover:shadow-md hover:border-green-300'
                       }`}
                     >
-                      <div className="absolute top-2 right-2 z-10">
+                      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 items-end">
+                        {p.isPromoActive && p.promoPrice ? (
+                          <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm border border-red-400 shadow uppercase animate-pulse">PROMO</span>
+                        ) : null}
                         <span className="bg-green-50 text-green-700 text-[8px] font-bold px-1 py-0.5 rounded-sm border border-green-100 uppercase tracking-widest shadow-sm backdrop-blur-md">Halal</span>
                       </div>
                       <div className="w-full aspect-[4/3] bg-slate-100 dark:bg-slate-800 flex-shrink-0 relative p-1">
@@ -597,7 +600,16 @@ export default function KasirPOS() {
                         </div>
                         <div className="mt-auto pt-1.5 border-t border-gray-50">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="font-bold text-gray-800 dark:text-slate-200 text-xs">Rp {p.price.toLocaleString('id-ID')}</span>
+                            <div className="flex flex-col">
+                              {p.isPromoActive && p.promoPrice ? (
+                                <>
+                                  <span className="text-[10px] text-gray-400 line-through">Rp {p.price.toLocaleString('id-ID')}</span>
+                                  <span className="font-bold text-red-600 text-xs">Rp {p.promoPrice.toLocaleString('id-ID')}</span>
+                                </>
+                              ) : (
+                                <span className="font-bold text-gray-800 dark:text-slate-200 text-xs">Rp {p.price.toLocaleString('id-ID')}</span>
+                              )}
+                            </div>
                             {!p.isPPOB ? (
                               isOutOfStock ? (
                                 <span className="text-[9px] font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded-full">Habis</span>
@@ -654,7 +666,7 @@ export default function KasirPOS() {
       </div>
 
       {/* Shopping Cart Section - Right */}
-      <div id="cart-section" className="w-full md:w-[300px] lg:w-[320px] xl:w-[400px] 2xl:w-[450px] shrink-0 h-auto md:max-h-[calc(100vh-100px)] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 shadow-xs overflow-hidden mt-4 md:mt-0">
+      <div id="cart-section" className="w-full md:w-[300px] lg:w-[320px] xl:w-[400px] 2xl:w-[450px] shrink-0 h-auto md:max-h-[calc(100vh-100px)] flex flex-col bg-white dark:bg-slate-900 md:rounded-xl border-t md:border border-gray-200 dark:border-slate-700 shadow-xs md:overflow-hidden mt-4 md:mt-0 pb-20 md:pb-0">
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -1604,15 +1616,18 @@ export default function KasirPOS() {
 
       {/* Mobile Floating Cart Button */}
       {cart.length > 0 && (
-        <div className="md:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-5">
+        <div className="md:hidden fixed bottom-20 right-4 z-50 animate-in fade-in slide-in-from-bottom-5">
           <button 
             onClick={() => {
-              document.getElementById('cart-section')?.scrollIntoView({ behavior: 'smooth' });
+              const el = document.getElementById('cart-section');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
             }}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-2 border-[3px] border-white/50 backdrop-blur-md"
+            className="bg-green-700 hover:bg-green-800 text-white px-4 py-2.5 rounded-full font-bold shadow-[0_8px_30px_rgb(0,0,0,0.3)] flex items-center gap-2 border-2 border-white/80 active:scale-95 transition-all text-xs"
           >
-            <ShoppingCart className="w-5 h-5" />
-            Keranjang ({cart.reduce((s, c) => s + c.quantity, 0)}) - Rp {cartTotal.toLocaleString('id-ID')}
+            <ShoppingCart className="w-4 h-4" />
+            <span>{cart.reduce((s, c) => s + c.quantity, 0)} Item = Rp {cartTotal.toLocaleString('id-ID')}</span>
           </button>
         </div>
       )}

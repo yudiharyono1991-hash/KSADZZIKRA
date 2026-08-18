@@ -93,7 +93,7 @@ export default function SupplierManagementPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 w-full max-w-5xl mx-auto space-y-6 overflow-hidden">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-100 text-blue-800 rounded-xl">
@@ -147,8 +147,8 @@ export default function SupplierManagementPage() {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs whitespace-nowrap min-w-[800px]">
             <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium">
               <tr>
                 <th className="px-6 py-4">Perusahaan</th>

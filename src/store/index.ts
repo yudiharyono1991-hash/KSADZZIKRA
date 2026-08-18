@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage, CoaAccount } from '../types';
+import { Product, CartItem, Transaction, AuditLog, ZakatCalculation, ZakatDistribution, CurrentUser, Expense, ClosingRecord, UserRole, UserAccount, PurchaseOrder, JournalEntry, JournalSourceType, Branch, Customer, Supplier, Promo, Banner, Attendance, StoreSettings, StockMovement, OnlineOrder, ChatMessage, CoaAccount } from '../types';
 import { supabaseService, isSupabaseConfigured, uploadImageToStorage } from '../lib/supabase';
 import LZString from 'lz-string';
 
@@ -171,6 +171,7 @@ interface AppState {
   customers: Customer[];
   suppliers: Supplier[];
   promos: Promo[];
+  banners: Banner[];
   attendances: Attendance[];
   imageQueue: string[];
   enqueueImageGeneration: (productId: string) => void;
@@ -218,11 +219,19 @@ interface AppState {
   deleteSupplier: (id: string) => void;
 
   // Promos
-  addPromo: (promo: Omit<Promo, 'id' | 'createdAt'>) => void;
-  updatePromo: (id: string, updates: Partial<Promo>) => void;
+  setPromos: (promos: Promo[]) => void;
+  addPromo: (promo: Promo) => void;
+  updatePromo: (promo: Promo) => void;
   deletePromo: (id: string) => void;
 
+  // Banners
+  setBanners: (banners: Banner[]) => void;
+  addBanner: (banner: Banner) => void;
+  updateBanner: (banner: Banner) => void;
+  deleteBanner: (id: string) => void;
+
   // Attendance
+  setAttendances: (attendances: Attendance[]) => void;
   clockIn: (userId: string, userName: string, photoUrl?: string, latitude?: number, longitude?: number) => void;
   clockOut: (attendanceId: string, photoUrl?: string, latitude?: number, longitude?: number) => void;
 
@@ -302,6 +311,8 @@ interface AppState {
   // Supabase Initial Sync
   initializeStore: (options?: { showLoading?: boolean; catalogOnly?: boolean }) => Promise<void>;
   fetchProducts: () => Promise<void>;
+  fetchPromos: () => Promise<void>;
+  fetchBanners: () => Promise<void>;
   fetchStoreSettings: () => Promise<void>;
   fetchOnlineOrders: () => Promise<void>;
   forceSyncAllToCloud: () => Promise<void>;
@@ -710,6 +721,12 @@ const getSavedPromos = (): Promo[] => {
   return [];
 };
 
+const getSavedBanners = (): Banner[] => {
+  const saved = getStorage('ksa_banners');
+  if (saved) { try { return saved as Banner[]; } catch (e) { } }
+  return [];
+};
+
 const getSavedAttendances = (): Attendance[] => {
   const saved = getStorage('ksa_attendances');
   if (saved) { try { return saved as Attendance[]; } catch (e) { } }
@@ -857,6 +874,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   customers: getSavedCustomers(),
   suppliers: getSavedSuppliers(),
   promos: getSavedPromos(),
+  banners: getSavedBanners(),
   attendances: getSavedAttendances(),
   settings: getStorage('ksa_settings', undefined) || {
     tenantId: 'tenant_default',
@@ -1089,6 +1107,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ kasbonPayments: updated });
     saveStorage('ksa_kasbon_payments', updated, get().currentUser?.tenantId);
     get().addLog('KASBON_PAY', 'FINANCE', `Pelunasan kasbon ${payment.customerName} sisa: ${payment.remainingDebt}`);
+    // Sync kasbon payment ke Supabase agar tidak hilang antar tab/device
+    if (isSupabaseConfigured) {
+      try { (supabaseService as any).saveKasbonPayment(newPayment); } catch (e) {}
+    }
   },
 
   // Notifications
@@ -1373,27 +1395,61 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Promos
-  addPromo: (promoData) => {
-    const newPromo: Promo = { ...promoData, id: `prm_${Date.now()}`, createdAt: new Date().toISOString() };
-    const updated = [...get().promos, newPromo];
+  setPromos: (promos) => set({ promos }),
+  addPromo: (promo) => {
+    const updated = [promo, ...get().promos];
     set({ promos: updated });
     saveStorage('ksa_promos', updated, get().currentUser?.tenantId);
-    get().addLog('PROMO_ADD', 'SYSTEM', `Menambah promo: ${newPromo.name}`);
+    get().addLog('PROMO_ADD', 'SYSTEM', `Menambah promo: ${promo.name}`);
+
+    if (isSupabaseConfigured) {
+      supabaseService.savePromo(promo);
+    }
   },
-  updatePromo: (id, updates) => {
-    const updated = get().promos.map(p => p.id === id ? { ...p, ...updates } : p);
+  updatePromo: (promo) => {
+    const updated = get().promos.map(p => p.id === promo.id ? promo : p);
     set({ promos: updated });
     saveStorage('ksa_promos', updated, get().currentUser?.tenantId);
-    get().addLog('PROMO_UPDATE', 'SYSTEM', `Update promo ID: ${id}`);
+    get().addLog('PROMO_UPDATE', 'SYSTEM', `Update promo ID: ${promo.id}`);
+
+    if (isSupabaseConfigured) {
+      supabaseService.savePromo(promo);
+    }
   },
   deletePromo: (id) => {
     const updated = get().promos.filter(p => p.id !== id);
     set({ promos: updated });
     saveStorage('ksa_promos', updated, get().currentUser?.tenantId);
     get().addLog('PROMO_DELETE', 'SYSTEM', `Menghapus promo ID: ${id}`);
+
+    if (isSupabaseConfigured) {
+      supabaseService.deletePromo(id);
+    }
+  },
+
+  // Banners
+  setBanners: (banners) => set({ banners }),
+  addBanner: (banner) => {
+    const updated = [banner, ...get().banners];
+    set({ banners: updated });
+    saveStorage('ksa_banners', updated, get().currentUser?.tenantId);
+    if (isSupabaseConfigured) (supabaseService as any).addBanner(banner);
+  },
+  updateBanner: (banner) => {
+    const updated = get().banners.map(b => b.id === banner.id ? banner : b);
+    set({ banners: updated });
+    saveStorage('ksa_banners', updated, get().currentUser?.tenantId);
+    if (isSupabaseConfigured) (supabaseService as any).updateBanner(banner);
+  },
+  deleteBanner: (id) => {
+    const updated = get().banners.filter(b => b.id !== id);
+    set({ banners: updated });
+    saveStorage('ksa_banners', updated, get().currentUser?.tenantId);
+    if (isSupabaseConfigured) (supabaseService as any).deleteBanner(id);
   },
 
   // Attendance
+  setAttendances: (attendances) => set({ attendances }),
   clockIn: (userId, userName, photoUrl, latitude, longitude) => {
     const newAtt: Attendance = {
       id: `att_${Date.now()}`,
@@ -1541,6 +1597,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const customersSaved = getStorage('ksa_customers', tenantId) as Customer[] | null;
     const suppliersSaved = getStorage('ksa_suppliers', tenantId) as Supplier[] | null;
     const promosSaved = getStorage('ksa_promos', tenantId) as Promo[] | null;
+    const bannersSaved = getStorage('ksa_banners', tenantId) as Banner[] | null;
     const attendancesSaved = getStorage('ksa_attendances', tenantId) as Attendance[] | null;
     const onlineOrdersSaved = getStorage('ksa_online_orders', tenantId) as OnlineOrder[] | null;
     const chatSaved = getStorage('ksa_chat_messages', tenantId) as ChatMessage[] | null;
@@ -1574,6 +1631,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       customers: customersSaved || [],
       suppliers: suppliersSaved || [],
       promos: promosSaved || [],
+      banners: bannersSaved || [],
       attendances: attendancesSaved || [],
       onlineOrders: onlineOrdersSaved || [],
       chatMessages: chatSaved || [],
@@ -1594,6 +1652,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!customersSaved) saveStorage('ksa_customers', [], tenantId);
     if (!suppliersSaved) saveStorage('ksa_suppliers', [], tenantId);
     if (!promosSaved) saveStorage('ksa_promos', [], tenantId);
+    if (!bannersSaved) saveStorage('ksa_banners', [], tenantId);
     if (!auditSaved) saveStorage('ksa_audit_logs', [], tenantId);
   },
 
@@ -1605,7 +1664,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Fetch users dynamically for new devices that haven't synced yet
       const remoteUsers = await supabaseService.getUsers();
       if (remoteUsers) {
-        const defaultUsers = getStorage('ksa_users') || [];
+        const defaultUsers = getSavedUsers();
         const merged = [...remoteUsers];
         defaultUsers.forEach((du: any) => {
           if (!merged.some(ru => ru.username === du.username)) {
@@ -3185,6 +3244,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       customers: [],
       suppliers: [],
       promos: [],
+      banners: [],
       attendances: [],
       stockMovements: []
     };
@@ -3196,7 +3256,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       'ksa_products', 'ksa_transactions', 'ksa_online_orders', 'ksa_chat_messages',
       'ksa_audit_logs', 'ksa_zakat_records', 'ksa_zakat_distributions', 'ksa_expenses',
       'ksa_closings', 'ksa_purchase_orders', 'ksa_journal_entries', 'ksa_customers',
-      'ksa_suppliers', 'ksa_promos', 'ksa_attendances', 'ksa_stock_movements'
+      'ksa_suppliers', 'ksa_promos', 'ksa_banners', 'ksa_attendances', 'ksa_stock_movements'
     ];
 
     keysToClear.forEach(key => {
@@ -3285,7 +3345,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               isKoperasiMember: Boolean(c.is_koperasi_member),
               createdAt: c.created_at || new Date().toISOString()
             }));
-            set({ customers: mapped });
+            const remoteIds = new Set(mapped.map((c) => c.id));
+            const localOnly = (get().customers || []).filter((lc) => !remoteIds.has(lc.id));
+            const merged = [...mapped, ...localOnly];
+            set({ customers: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((lc) => {
+                try { supabaseService.saveCustomer(lc); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3335,13 +3403,25 @@ export const useAppStore = create<AppState>((set, get) => ({
               requestedClockOut: a.requested_clock_out,
               isRevised: a.is_revised
             }));
-            set({ attendances: mapped });
+            const remoteIds = new Set(mapped.map((a) => a.id));
+            const localOnly = (get().attendances || []).filter((la) => !remoteIds.has(la.id));
+            const merged = [...mapped, ...localOnly];
+            set({ attendances: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((la) => {
+                try { supabaseService.saveAttendance(la); } catch (e) {}
+              });
+            }
           }
         }));
       }
 
       tasks.push(runSupabaseTask('fetchProducts', async () => {
         await get().fetchProducts();
+      }, () => { }));
+
+      tasks.push(runSupabaseTask('fetchBanners', async () => {
+        await get().fetchBanners();
       }, () => { }));
 
       if (!isCatalogOnly) {
@@ -3376,7 +3456,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               coaId: e.coa_id,
               kasAccountId: e.kas_account_id || undefined
             }));
-            set({ expenses: mapped });
+            const remoteIds = new Set(mapped.map((e) => e.id));
+            const localOnly = (get().expenses || []).filter((le) => !remoteIds.has(le.id));
+            const merged = [...mapped, ...localOnly];
+            set({ expenses: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((le) => {
+                try { supabaseService.saveExpense(le); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3424,7 +3512,20 @@ export const useAppStore = create<AppState>((set, get) => ({
               voidReason: t.void_reason,
               taxAmount: Number(t.tax_amount || 0)
             }; });
-            set({ transactions: transactionsMap });
+            // BUGFIX: Merge data Supabase dengan data lokal - jangan overwrite.
+            // Transaksi baru yang belum ter-sync ke Supabase (delay jaringan) tetap dipertahankan.
+            // Versi Supabase diprioritaskan untuk ID yang sama.
+            const remoteIds = new Set(transactionsMap.map((t) => t.id));
+            const localOnlyTxs = (get().transactions || []).filter((lt) => !remoteIds.has(lt.id));
+            const merged = [...transactionsMap, ...localOnlyTxs];
+            merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            set({ transactions: merged });
+            // Upload balik transaksi lokal yang belum ada di Supabase
+            if (localOnlyTxs.length > 0) {
+              localOnlyTxs.forEach((lt) => {
+                try { supabaseService.saveTransaction(lt); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3465,7 +3566,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               zakatDue: Number(zk.zakat_due),
               notes: zk.notes
             }));
-            set({ zakatRecords: zkMap });
+            const remoteIds = new Set(zkMap.map((zk) => zk.id));
+            const localOnly = (get().zakatRecords || []).filter((lz) => !remoteIds.has(lz.id));
+            const merged = [...zkMap, ...localOnly];
+            set({ zakatRecords: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((lz) => {
+                try { supabaseService.saveZakatRecord(lz); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3482,7 +3591,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               esgCategory: zkd.esg_category,
               description: zkd.description
             }));
-            set({ zakatDistributions: zkdMap });
+            const remoteIds = new Set(zkdMap.map((zkd) => zkd.id));
+            const localOnly = (get().zakatDistributions || []).filter((lz) => !remoteIds.has(lz.id));
+            const merged = [...zkdMap, ...localOnly];
+            set({ zakatDistributions: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((lz) => {
+                try { supabaseService.saveZakatDistribution(lz); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3536,7 +3653,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               createdBy: j.created_by,
               branchId: j.branch_id
             }));
-            set({ journalEntries: mapped });
+            const remoteIds = new Set(mapped.map((j) => j.id));
+            const localOnly = (get().journalEntries || []).filter((lj) => !remoteIds.has(lj.id));
+            const merged = [...mapped, ...localOnly];
+            set({ journalEntries: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((lj) => {
+                try { (supabaseService as any).saveJournalEntry(lj); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3555,7 +3680,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               branchId: s.branch_id,
               createdAt: s.created_at || new Date().toISOString()
             }));
-            set({ suppliers: mapped });
+            const remoteIds = new Set(mapped.map((s) => s.id));
+            const localOnly = (get().suppliers || []).filter((ls) => !remoteIds.has(ls.id));
+            const merged = [...mapped, ...localOnly];
+            set({ suppliers: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((ls) => {
+                try { (supabaseService as any).saveSupplier(ls); } catch (e) {}
+              });
+            }
           }
         }));
 
@@ -3577,13 +3710,41 @@ export const useAppStore = create<AppState>((set, get) => ({
               branchId: po.branch_id,
               invoiceSupplier: po.invoice_supplier
             }));
-            set({ purchaseOrders: mapped });
+            const remoteIds = new Set(mapped.map((po) => po.id));
+            const localOnly = (get().purchaseOrders || []).filter((lpo) => !remoteIds.has(lpo.id));
+            const merged = [...mapped, ...localOnly];
+            set({ purchaseOrders: merged });
+            if (localOnly.length > 0) {
+              localOnly.forEach((lpo) => {
+                try { (supabaseService as any).savePurchaseOrder(lpo); } catch (e) {}
+              });
+            }
           }
         }));
 
         tasks.push(runSupabaseTask('fetchOnlineOrders', async () => {
           await get().fetchOnlineOrders();
         }, () => { }));
+
+        // Fetch kasbon payments dari Supabase dan merge dengan lokal
+        tasks.push(runSupabaseTask('getKasbonPayments', async () => {
+          return await (supabaseService as any).getKasbonPayments();
+        }, (remoteKp) => {
+          if (remoteKp && remoteKp.length > 0) {
+            const remoteKpIds = new Set(remoteKp.map((kp: any) => kp.id));
+            const localOnlyKp = (get().kasbonPayments || []).filter((lkp: any) => !remoteKpIds.has(lkp.id));
+            const mergedKp = [...remoteKp, ...localOnlyKp];
+            mergedKp.sort((a: any, b: any) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+            set({ kasbonPayments: mergedKp });
+            saveStorage('ksa_kasbon_payments', mergedKp, get().currentUser?.tenantId);
+            // Upload kasbon lokal yang belum ada di Supabase
+            if (localOnlyKp.length > 0) {
+              localOnlyKp.forEach((lkp: any) => {
+                try { (supabaseService as any).saveKasbonPayment(lkp); } catch (e) {}
+              });
+            }
+          }
+        }));
       }
 
       // Execute tasks in background without blocking the UI
@@ -3657,6 +3818,46 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  fetchBanners: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const remoteBanners = await supabaseService.getBanners();
+      if (remoteBanners) {
+        const tenantId = get().currentUser?.tenantId || supabaseService.getTenantId();
+        const sorted = remoteBanners.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        set({ banners: sorted });
+        saveStorage('ksa_banners', sorted, tenantId);
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchBanners error:', e);
+    }
+  },
+
+  fetchPromos: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const remotePromos = await supabaseService.getPromos();
+      if (remotePromos) {
+        const tenantId = get().currentUser?.tenantId || supabaseService.getTenantId();
+        const mapped = remotePromos.map(p => ({
+          id: p.id,
+          tenantId: p.tenant_id,
+          name: p.name,
+          type: p.type as any,
+          value: Number(p.value),
+          minPurchase: Number(p.min_purchase),
+          isActive: p.is_active,
+          branchId: p.branch_id || undefined,
+          createdAt: p.created_at
+        }));
+        set({ promos: mapped });
+        saveStorage('ksa_promos', mapped, tenantId);
+      }
+    } catch (e) {
+      console.warn('[Supabase] fetchPromos error:', e);
+    }
+  },
+
   fetchProducts: async () => {
     if (!isSupabaseConfigured) return;
     const doFetch = async (): Promise<void> => {
@@ -3681,7 +3882,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             isHalal: p.is_halal,
             isPPOB: Boolean(p.is_ppob),
             image: p.image || localP?.image || undefined,
-            expiryDate: p.expiry_date || localP?.expiryDate || undefined
+            expiryDate: p.expiry_date || localP?.expiryDate || undefined,
+            isPromoActive: p.is_promo_active || false,
+            promoPrice: Number(p.promo_price || 0)
           };
         });
         set({ products: productsMap });

@@ -13,30 +13,34 @@ export default function PrintHeader({ title, period }: PrintHeaderProps) {
   const tenantName = tenants.find(t => t.id === currentUser?.tenantId)?.name || 'KSA Mart Syariah';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', marginBottom: '24px', borderBottom: '2px solid black', paddingBottom: '12px', color: 'black' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div className="flex flex-col mb-4 md:mb-6 border-b-2 border-black pb-3 text-black w-full">
+      <div className="flex flex-col sm:flex-row print:flex-row justify-between items-start gap-3 sm:gap-0">
         {/* Left: Logo + Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '56px', height: '56px', border: '1px solid #cbd5e1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', flexShrink: 0 }}>
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-10 h-10 md:w-14 md:h-14 print:w-14 print:h-14 border border-slate-300 rounded-lg flex items-center justify-center p-1 shrink-0">
             <img
               src="/ksa_mart_logo.png"
               alt="Logo KSA Mart"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              className="max-w-full max-h-full object-contain"
             />
           </div>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>{tenantName}</h1>
-            <h2 style={{ fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>{title}</h2>
-            {period && <p style={{ fontSize: '12px', fontWeight: '600', marginTop: '2px', margin: 0 }}>Periode: {period}</p>}
+            <h1 className="text-sm md:text-lg print:text-xl font-black uppercase tracking-wider m-0 leading-tight">{tenantName}</h1>
+            <h2 className="text-xs md:text-sm print:text-base font-bold uppercase m-0 leading-tight mt-0.5">{title}</h2>
+            {period && <p className="text-[10px] md:text-xs print:text-xs font-semibold mt-1 mb-0">Periode: {period}</p>}
           </div>
         </div>
 
         {/* Right: Date/Time/Printed by */}
-        <div style={{ textAlign: 'right', fontSize: '11px' }}>
-          <p style={{ fontWeight: '600', margin: '0 0 2px 0' }}>Tanggal Cetak: {new Date().toLocaleDateString('id-ID')}</p>
-          <p style={{ fontWeight: '600', margin: '0 0 2px 0' }}>Jam Cetak: {new Date().toLocaleTimeString('id-ID')}</p>
-          <p style={{ fontWeight: '600', marginTop: '6px', marginBottom: '2px' }}>Dicetak oleh:</p>
-          <p style={{ fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>{currentUser?.name || 'Sistem'}</p>
+        <div className="text-left sm:text-right print:text-right text-[9px] md:text-[11px] print:text-[11px] w-full sm:w-auto mt-2 sm:mt-0 print:mt-0 flex flex-row sm:flex-col print:flex-col justify-between sm:justify-start print:justify-start">
+          <div>
+            <p className="font-semibold m-0 mb-0.5">Tanggal Cetak: {new Date().toLocaleDateString('id-ID')}</p>
+            <p className="font-semibold m-0 mb-0.5">Jam Cetak: {new Date().toLocaleTimeString('id-ID')}</p>
+          </div>
+          <div className="text-right sm:text-right print:text-right sm:mt-1.5 print:mt-1.5">
+            <p className="font-semibold m-0 mb-0.5">Dicetak oleh:</p>
+            <p className="font-bold uppercase m-0">{currentUser?.name || 'Sistem'}</p>
+          </div>
         </div>
       </div>
     </div>

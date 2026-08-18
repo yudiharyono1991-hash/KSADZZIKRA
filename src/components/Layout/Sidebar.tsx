@@ -31,7 +31,8 @@ import {
   Package,
   HelpCircle,
   Newspaper,
-  Smartphone
+  Smartphone,
+  Image
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -67,6 +68,12 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
   const pendingOrdersCount = onlineOrders?.filter(o => o.status === 'PENDING').length || 0;
   const lowStockCount = products?.filter(p => !p.isPPOB && p.stock <= p.minStock).length || 0;
+  const expiredOrNearExpiredCount = products?.filter(p => {
+    if (p.isPPOB || !p.expiryDate) return false;
+    const daysToExpiry = (new Date(p.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+    return daysToExpiry <= 30;
+  }).length || 0;
+  const inventoryAlertCount = lowStockCount + expiredOrNearExpiredCount;
   const pendingCorrectionsCount = (attendances as any[])?.filter(a => a.correctionStatus === 'PENDING').length || 0;
 
   const notifications = useAppStore(state => state.notifications);
@@ -130,7 +137,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: lowStockCount },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: inventoryAlertCount },
           { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
@@ -141,6 +148,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Database,
         items: [
           { path: '/cabang', label: 'Manajemen Cabang', icon: Store },
+          { path: '/banners', label: 'Manajemen Banner Promo', icon: Image },
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
           { path: '/kasbon-rekap', label: 'Master Kasbon Pelanggan', icon: Wallet },
@@ -203,7 +211,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: inventoryAlertCount },
           { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
@@ -213,6 +221,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Data Master',
         icon: Database,
         items: [
+          { path: '/banners', label: 'Manajemen Banner Promo', icon: Image },
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
           { path: '/kasbon-rekap', label: 'Master Kasbon Pelanggan', icon: Wallet },
@@ -254,7 +263,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: inventoryAlertCount },
           { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },

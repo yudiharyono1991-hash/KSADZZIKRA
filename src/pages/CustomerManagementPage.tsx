@@ -383,7 +383,7 @@ export default function CustomerManagementPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-5xl mx-auto space-y-4 md:space-y-6 w-full min-w-0 pb-10">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-blue-100 text-blue-800 rounded-xl">
@@ -394,10 +394,10 @@ export default function CustomerManagementPage() {
             <p className="text-sm text-gray-500 dark:text-slate-400">Kelola data pelanggan, loyalitas, dan catatan piutang/kasbon.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto w-full hide-scrollbar pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
           <button
             onClick={() => { resetForm(); setIsAdding(!isAdding); }}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all"
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all flex-shrink-0 whitespace-nowrap"
           >
             {isAdding ? 'Batal' : <><Plus className="w-4 h-4" /> Pelanggan Baru</>}
           </button>
@@ -408,10 +408,10 @@ export default function CustomerManagementPage() {
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Template Master Pelanggan');
             XLSX.writeFile(wb, 'template_master_pelanggan_ksa_mart.xlsx');
-          }} className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2">
+          }} className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2 flex-shrink-0 whitespace-nowrap">
             <Download className="w-4 h-4" /> Unduh Template
           </button>
-          <label className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2 cursor-pointer">
+          <label className="ml-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800 flex items-center gap-2 cursor-pointer flex-shrink-0 whitespace-nowrap">
             <Upload className="w-4 h-4" /> Import
             <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => {
               const file = e.target.files?.[0]; if (!file) return;
@@ -679,7 +679,7 @@ export default function CustomerManagementPage() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden w-full min-w-0">
         <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-4">
           <div className="relative flex-1 w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -708,8 +708,8 @@ export default function CustomerManagementPage() {
           </select>
         </div>
 
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-[10px] sm:text-xs">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-[10px] sm:text-xs min-w-[1000px]">
             <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium whitespace-nowrap">
               <tr>
                 <th className="px-1 py-2 sm:px-2 sm:py-3 align-middle text-center">No</th>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { ShoppingBag, Package, ArrowLeft, Send, HelpCircle, AlertTriangle, MessageCircle, Loader, Search, ChevronLeft, ChevronRight, ShoppingCart, X, Sun, Moon } from 'lucide-react';
 import { calculateDistanceKm } from '../utils/distance';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const PAGE_SIZE = 24;
 
@@ -48,10 +48,23 @@ export default function KatalogUmumPage() {
   } = useAppStore();
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [activeTab, setActiveTab] = useState<'CATALOG' | 'PPOB' | 'CART' | 'GUIDE'>('CATALOG');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Semua');
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('category') || 'Semua';
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const cat = params.get('category');
+    if (cat) {
+      setSelectedCategory(cat);
+    }
+  }, [location.search]);
+
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isDataSyncing, setIsDataSyncing] = useState(false);
@@ -133,6 +146,10 @@ export default function KatalogUmumPage() {
       return true;
     });
     const cats = Array.from(new Set(tabProducts.map(p => p.category))).filter(Boolean).sort();
+    const hasPromos = tabProducts.some(p => p.isPromoActive);
+    if (hasPromos) {
+      return ['Semua', 'Promo', ...cats];
+    }
     return ['Semua', ...cats];
   }, [availableProducts, activeTab]);
 
@@ -143,7 +160,9 @@ export default function KatalogUmumPage() {
       if (activeTab === 'CATALOG' && p.isPPOB) return false;
       if (activeTab === 'PPOB' && !p.isPPOB) return false;
 
-      const matchCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
+      const matchCategory = selectedCategory === 'Semua' ? true :
+                            selectedCategory === 'Promo' ? p.isPromoActive :
+                            p.category === selectedCategory;
       const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (p.category && p.category.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchCategory && matchSearch;
@@ -157,7 +176,11 @@ export default function KatalogUmumPage() {
     return filteredProducts.slice(start, start + PAGE_SIZE);
   }, [filteredProducts, currentPage]);
 
-  const cartTotal = customerCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const cartTotal = customerCart.reduce((sum, item) => {
+    const p = item.product;
+    const finalPrice = p.isPromoActive ? p.promoPrice : (p.wholesaleMinQty && item.quantity >= p.wholesaleMinQty ? p.wholesalePrice : p.price);
+    return sum + ((finalPrice || p.price) * item.quantity);
+  }, 0);
   const cartCount = customerCart.reduce((sum, item) => sum + item.quantity, 0);
   const isAllPPOB = customerCart.length > 0 && customerCart.every(item => item.product.isPPOB);
 
@@ -414,13 +437,16 @@ export default function KatalogUmumPage() {
                 </div>
                 <div>
                   <p className="font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    {availableProducts.length === 0 ? 'Belum Ada Produk' : 'Tidak Ada Produk Ditemukan'}
+                    {selectedCategory === 'Promo' 
+                      ? 'Mohon Maaf, Promo Belum Tersedia 🙏' 
+                      : (availableProducts.length === 0 ? 'Belum Ada Produk' : 'Tidak Ada Produk Ditemukan')}
                   </p>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm">
-                    {availableProducts.length === 0
-                      ? 'Produk sedang dimuat. Hubungi admin jika terus kosong.'
-                      : `Tidak ada produk yang cocok dengan "${searchQuery}"`
-                    }
+                  <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xs mx-auto">
+                    {selectedCategory === 'Promo'
+                      ? 'Saat ini belum ada produk promo yang aktif. Pastikan untuk selalu mengunjungi aplikasi kami agar tidak ketinggalan update produk promo terbaru!'
+                      : (availableProducts.length === 0
+                        ? 'Produk sedang dimuat. Hubungi admin jika terus kosong.'
+                        : `Tidak ada produk yang cocok dengan "${searchQuery}"`)}
                   </p>
                 </div>
                 {searchQuery && (
@@ -446,11 +472,17 @@ export default function KatalogUmumPage() {
                           <ProductPlaceholder name={p.name} category={p.category} />
                         )}
                         {/* Category Badge */}
-                        <div className="absolute top-1.5 left-1.5">
-                          <span className="bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+                        <div className="absolute top-1.5 left-1.5 z-10">
+                          <span className="bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-sm">
                             {p.category}
                           </span>
                         </div>
+                        {/* Promo Badge */}
+                        {p.isPromoActive && (
+                          <div className="absolute top-0 right-0 bg-gradient-to-r from-rose-600 to-rose-500 text-white text-[10px] font-black px-2.5 py-1 rounded-bl-xl shadow-lg z-10 animate-pulse border-b border-l border-rose-400/30">
+                            PROMO SPESIAL
+                          </div>
+                        )}
                         {inCart > 0 && (
                           <div className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 shadow">
                             {inCart}
@@ -461,7 +493,14 @@ export default function KatalogUmumPage() {
                       {/* Product Info */}
                       <div className="p-2 flex flex-col flex-1 gap-1.5">
                         <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-xs leading-tight line-clamp-2 flex-1">{p.name}</h3>
-                        <p className="text-green-700 font-black text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
+                        {p.isPromoActive ? (
+                          <div>
+                            <p className="text-[10px] text-slate-400 line-through">Rp {p.price.toLocaleString('id-ID')}</p>
+                            <p className="text-rose-600 font-black text-sm">Rp {p.promoPrice?.toLocaleString('id-ID')}</p>
+                          </div>
+                        ) : (
+                          <p className="text-green-700 font-black text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
+                        )}
                         {p.isPPOB ? (
                           <p className="text-[10px] text-blue-500 font-semibold">Layanan Digital</p>
                         ) : (
@@ -574,7 +613,12 @@ export default function KatalogUmumPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm leading-tight truncate">{item.product.name}</h4>
-                        <p className="text-green-600 font-bold text-sm">Rp {item.product.price.toLocaleString('id-ID')}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-green-600 font-bold text-sm">Rp {(item.product.isPromoActive ? item.product.promoPrice : (item.product.wholesaleMinQty && item.quantity >= item.product.wholesaleMinQty ? item.product.wholesalePrice : item.product.price))?.toLocaleString('id-ID')}</p>
+                          {item.product.isPromoActive && (
+                            <span className="bg-rose-100 text-rose-700 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">Harga Promo</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => updateCustomerCartQuantity(item.product.id, item.quantity - 1)} className="w-8 h-8 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200">-</button>

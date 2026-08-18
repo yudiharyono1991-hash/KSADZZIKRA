@@ -146,7 +146,7 @@ export default function StaffManagementPage() {
   const canApproveHR = ['OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '');
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-5xl mx-auto space-y-4 md:space-y-6 w-full min-w-0 pb-20">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-teal-100 text-teal-800 rounded-xl">
@@ -232,7 +232,7 @@ export default function StaffManagementPage() {
               </div>
             </div>
             
-            <div className="overflow-x-auto border-b border-gray-100 dark:border-slate-800 p-4 bg-gray-50/50 dark:bg-slate-800/20">
+            <div className="overflow-x-auto border-b border-gray-100 dark:border-slate-800 p-2 md:p-4 bg-gray-50/50 dark:bg-slate-800/20 hide-scrollbar w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
               <table className="w-full text-left text-[10px] bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden min-w-[800px]">
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wide">
                   <tr>
@@ -272,8 +272,8 @@ export default function StaffManagementPage() {
                 </tbody>
               </table>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto max-h-[400px] hide-scrollbar w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="w-full text-left text-[10px] sm:text-xs min-w-[700px]">
                 <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wide sticky top-0">
                   <tr>
                     <th className="px-4 py-3">Tanggal</th>

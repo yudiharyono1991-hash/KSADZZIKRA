@@ -383,7 +383,7 @@ export default function KasirRiwayatPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-5xl mx-auto space-y-4 md:space-y-6 w-full min-w-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
@@ -394,7 +394,7 @@ export default function KasirRiwayatPage() {
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200 dark:border-slate-700">
+      <div className="flex overflow-x-auto w-full hide-scrollbar border-b border-gray-200 dark:border-slate-700">
         <button 
           onClick={() => setActiveTab('UMUM')}
           className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${activeTab === 'UMUM' ? 'border-green-600 text-green-700 dark:text-green-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
@@ -409,10 +409,10 @@ export default function KasirRiwayatPage() {
         </button>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4">
-          <div className="relative flex-1 w-full max-w-md flex gap-2">
-            <div className="relative flex-1">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden w-full min-w-0">
+        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col md:flex-row items-center gap-4 w-full">
+          <div className="relative flex-1 w-full flex flex-col md:flex-row gap-2">
+            <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -427,7 +427,7 @@ export default function KasirRiwayatPage() {
                 <select
                   value={txTypeFilter}
                   onChange={(e) => setTxTypeFilter(e.target.value as 'ALL' | 'FISIK' | 'PPOB')}
-                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold text-gray-700 dark:text-slate-300"
+                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold text-gray-700 dark:text-slate-300 w-full md:w-auto"
                 >
                   <option value="ALL">Semua Tipe</option>
                   <option value="FISIK">Fisik</option>
@@ -436,7 +436,7 @@ export default function KasirRiwayatPage() {
                 <select
                   value={cashierFilter}
                   onChange={(e) => setCashierFilter(e.target.value)}
-                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold text-gray-700 dark:text-slate-300 max-w-[150px]"
+                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 font-bold text-gray-700 dark:text-slate-300 w-full md:w-auto md:max-w-[150px]"
                 >
                   <option value="ALL">Semua Kasir</option>
                   {uniqueCashiers.map(c => <option key={c} value={c}>{c}</option>)}
@@ -445,8 +445,8 @@ export default function KasirRiwayatPage() {
             )}
           </div>
           <div className="w-full md:w-auto flex flex-col md:flex-row gap-2">
-            <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
-              <Calendar className="w-4 h-4 text-slate-400" />
+            <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden w-full md:w-auto overflow-x-auto hide-scrollbar">
+              <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
               <input 
                 type="date" 
                 value={startDate} 
@@ -458,7 +458,7 @@ export default function KasirRiwayatPage() {
                 type="date" 
                 value={endDate} 
                 onChange={e => setEndDate(e.target.value)}
-                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32 shrink-0"
               />
             </div>  
             <button
@@ -498,8 +498,8 @@ export default function KasirRiwayatPage() {
 
         {activeTab === 'UMUM' && cashierFilter === 'ALL' && cashierBreakdowns.length > 0 && (
           <div className="bg-slate-50 dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-4 pb-4">
-             <div className="bg-white dark:bg-slate-900 rounded-lg p-0 border border-gray-200 dark:border-slate-700 overflow-x-auto">
-               <table className="w-full text-left text-[11px] sm:text-xs">
+             <div className="bg-white dark:bg-slate-900 rounded-lg p-0 border border-gray-200 dark:border-slate-700 overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+               <table className="w-full text-left text-[10px] sm:text-xs min-w-[600px]">
                  <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-bold uppercase">
                    <tr>
                      <th className="px-3 py-2 border-b">Nama Kasir</th>
@@ -528,39 +528,39 @@ export default function KasirRiwayatPage() {
         )}
 
         {activeTab === 'UMUM' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-[10px] sm:text-xs min-w-[800px]">
             <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium">
               <tr>
-                <th className="px-6 py-4">Waktu</th>
-                <th className="px-6 py-4">No. Invoice</th>
-                <th className="px-6 py-4">Kasir</th>
-                <th className="px-6 py-4">Pelanggan</th>
-                <th className="px-6 py-4">Metode</th>
-                <th className="px-6 py-4 text-right">Total Belanja</th>
-                <th className="px-6 py-4 text-center">Aksi</th>
+                <th className="px-3 py-3">Waktu</th>
+                <th className="px-3 py-3">No. Invoice</th>
+                <th className="px-3 py-3">Kasir</th>
+                <th className="px-3 py-3">Pelanggan</th>
+                <th className="px-3 py-3">Metode</th>
+                <th className="px-3 py-3 text-right">Total Belanja</th>
+                <th className="px-3 py-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginatedTx.map(tx => (
                 <tr key={tx.id} className="hover:bg-gray-50 dark:bg-slate-800/50">
-                  <td className="px-6 py-4 text-gray-600 dark:text-slate-400">
+                  <td className="px-3 py-3 text-gray-600 dark:text-slate-400">
                     {new Date(tx.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                   </td>
-                  <td className="px-6 py-4 font-bold text-gray-800 dark:text-slate-200">{tx.invoiceNo}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-slate-400">{tx.cashierName}</td>
-                  <td className="px-6 py-4 text-gray-800 dark:text-slate-200 font-medium">
+                  <td className="px-3 py-3 font-bold text-gray-800 dark:text-slate-200">{tx.invoiceNo}</td>
+                  <td className="px-3 py-3 text-gray-600 dark:text-slate-400">{tx.cashierName}</td>
+                  <td className="px-3 py-3 text-gray-800 dark:text-slate-200 font-medium">
                     {tx.customerName || (tx.customerId ? customers.find(c => c.id === tx.customerId)?.name : undefined) || 'Umum'}
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                  <td className="px-3 py-3">
+                    <span className="px-2.5 py-1 rounded-full text-[9px] sm:text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
                       {tx.paymentMethod}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right font-bold text-green-700">
+                  <td className="px-3 py-3 text-right font-bold text-green-700">
                     Rp {tx.totalAmount.toLocaleString('id-ID')}
                   </td>
-                  <td className="px-6 py-4 text-center space-x-2">
+                  <td className="px-3 py-3 text-center space-x-2">
                     <button
                       onClick={() => {
                         setSelectedTx(tx);
@@ -609,7 +609,7 @@ export default function KasirRiwayatPage() {
               ))}
               {filteredTx.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
+                  <td colSpan={7} className="px-3 py-12 text-center text-gray-500 dark:text-slate-400">
                     <History className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                     Belum ada transaksi di shift hari ini.
                   </td>
@@ -619,52 +619,52 @@ export default function KasirRiwayatPage() {
             {filteredTx.length > 0 && (
               <tfoot className="bg-green-50/80 border-t border-green-100 font-bold sticky bottom-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-right text-green-900 uppercase text-xs tracking-wider whitespace-nowrap">
+                  <td colSpan={5} className="px-3 py-4 text-right text-green-900 uppercase text-[10px] sm:text-xs tracking-wider whitespace-nowrap">
                     <div className="flex flex-col items-end">
                       <span>Total Transaksi ({filteredTx.filter(t => !t.isVoided).length} Struk)</span>
-                      <span className="text-[10px] text-green-700 font-normal capitalize mt-0.5">{totalBarang} barang terjual</span>
+                      <span className="text-[9px] text-green-700 font-normal capitalize mt-0.5">{totalBarang} barang terjual</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                  <td className="px-3 py-4 text-right whitespace-nowrap">
                     <div className="flex flex-col items-end">
-                      <span className="text-green-800 text-lg font-extrabold tracking-tight whitespace-nowrap">Rp {totalOmset.toLocaleString('id-ID')}</span>
-                      <span className="text-[10px] text-amber-600 font-normal mt-0.5 whitespace-nowrap">Margin: Rp {totalMargin.toLocaleString('id-ID')}</span>
+                      <span className="text-green-800 text-[11px] sm:text-sm font-extrabold tracking-tight whitespace-nowrap">Rp {totalOmset.toLocaleString('id-ID')}</span>
+                      <span className="text-[9px] text-amber-600 font-normal mt-0.5 whitespace-nowrap">Margin: Rp {totalMargin.toLocaleString('id-ID')}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4"></td>
+                  <td className="px-3 py-4"></td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <table className="w-full text-left text-[10px] sm:text-xs min-w-[700px]">
               <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-medium">
                 <tr>
-                  <th className="px-6 py-4">Waktu</th>
-                  <th className="px-6 py-4">Tipe</th>
-                  <th className="px-6 py-4">Pelanggan</th>
-                  <th className="px-6 py-4 text-right">Nominal</th>
-                  <th className="px-6 py-4 text-center">Aksi</th>
+                  <th className="px-3 py-3">Waktu</th>
+                  <th className="px-3 py-3">Tipe</th>
+                  <th className="px-3 py-3">Pelanggan</th>
+                  <th className="px-3 py-3 text-right">Nominal</th>
+                  <th className="px-3 py-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginatedKasbon.map((item, idx) => (
                   <tr key={`${item.id}-${idx}`} className="hover:bg-gray-50 dark:bg-slate-800/50">
-                    <td className="px-6 py-4 text-gray-600 dark:text-slate-400">
+                    <td className="px-3 py-3 text-gray-600 dark:text-slate-400">
                       {new Date(item.date).toLocaleString('id-ID')}
                     </td>
-                    <td className="px-6 py-4 font-bold text-gray-800 dark:text-slate-200">
+                    <td className="px-3 py-3 font-bold text-gray-800 dark:text-slate-200">
                       {item.type === 'PURCHASE' ? (
-                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">PENGAMBILAN</span>
+                        <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-[9px] sm:text-[10px]">PENGAMBILAN</span>
                       ) : (
-                        <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">PELUNASAN</span>
+                        <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-[9px] sm:text-[10px]">PELUNASAN</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-800 dark:text-slate-200 font-medium">{item.customerName}</td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-700">Rp {item.amount.toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4 text-center space-x-2">
+                    <td className="px-3 py-3 text-gray-800 dark:text-slate-200 font-medium">{item.customerName}</td>
+                    <td className="px-3 py-3 text-right font-bold text-gray-700">Rp {item.amount.toLocaleString('id-ID')}</td>
+                    <td className="px-3 py-3 text-center space-x-2">
                       <button
                         onClick={() => {
                           if (item.type === 'PURCHASE') {
@@ -688,7 +688,7 @@ export default function KasirRiwayatPage() {
                 ))}
                 {filteredKasbonHistory.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-slate-400">
+                    <td colSpan={5} className="px-3 py-12 text-center text-gray-500 dark:text-slate-400">
                       <CreditCard className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                       Belum ada riwayat Kasbon / Pelunasan.
                     </td>

@@ -38,7 +38,7 @@ import {
 
 export default function TrendPage() {
   const { transactions, expenses, products, activeBranchId } = useBranchData();
-  const { settings, addPettyCashDeposit, journalEntries, getCalculatedPettyCash, customers } = useAppStore();
+  const { settings, coaList, addJournalEntry, journalEntries, getCalculatedPettyCash, customers, isLoading, currentUser } = useAppStore();
   const todayObj = new Date();
   const firstDay = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toLocaleDateString('en-CA');
   const currentDay = todayObj.toLocaleDateString('en-CA');
@@ -46,19 +46,6 @@ export default function TrendPage() {
   const [startDateStr, setStartDateStr] = useState(firstDay);
   const [endDateStr, setEndDateStr] = useState(currentDay);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
-  const [topUpAmount, setTopUpAmount] = useState('');
-  const [topUpDesc, setTopUpDesc] = useState('');
-
-  const handleTopUpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (Number(topUpAmount) > 0) {
-      addPettyCashDeposit(Number(topUpAmount), topUpDesc || 'Top Up Rutin');
-      setShowTopUpModal(false);
-      setTopUpAmount('');
-      setTopUpDesc('');
-      alert('Top Up Kas Kecil berhasil dicatat!');
-    }
-  };
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => !tx.isVoided && (!activeBranchId || tx.branchId === activeBranchId || !tx.branchId));
@@ -393,27 +380,29 @@ export default function TrendPage() {
       color: palette[idx % palette.length]
     })).sort((a, b) => b.totalRp - a.totalRp);
     
-    // Group small categories (< 2%) into 'Lainnya' if there are too many
-    let finalResult = [];
-    let othersValue = 0;
-    let othersRp = 0;
-    let othersQty = 0;
+    // Ambil Top 10
+    const top10 = result.slice(0, 10);
+    const others = result.slice(10);
     
-    result.forEach((item, idx) => {
-      if (idx > 6 || item.value < 2) {
-        othersValue += item.value;
-        othersRp += item.totalRp;
-        othersQty += item.qty;
-      } else {
-        finalResult.push(item);
-      }
-    });
-    
-    if (othersValue > 0) {
-      finalResult.push({ name: 'Lainnya', value: othersValue, totalRp: othersRp, qty: othersQty, color: '#475569' });
+    if (others.length > 0) {
+      // Ambil 3 nama terbesar dari others untuk memperjelas isi "Lainnya"
+      const topOthersNames = others.slice(0, 3).map(o => o.name).join(', ');
+      const othersName = `Lainnya (${topOthersNames}${others.length > 3 ? ', dll' : ''})`;
+      
+      const othersValue = others.reduce((sum, item) => sum + item.value, 0);
+      const othersRp = others.reduce((sum, item) => sum + item.totalRp, 0);
+      const othersQty = others.reduce((sum, item) => sum + item.qty, 0);
+      
+      top10.push({
+        name: othersName,
+        value: othersValue,
+        totalRp: othersRp,
+        qty: othersQty,
+        color: '#475569'
+      });
     }
 
-    return finalResult.sort((a, b) => b.value - a.value);
+    return top10.sort((a, b) => b.value - a.value);
   }, [filteredTransactions, products, startDateStr, endDateStr]);
 
   const averageTxValue = totals.count > 0 ? totals.omset / totals.count : 0;
@@ -456,7 +445,7 @@ export default function TrendPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 w-full min-w-0 pb-10">
       {/* Date Filter Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div>
@@ -486,24 +475,33 @@ export default function TrendPage() {
 
       {/* Saldo Kas Toko / Kas Kecil (1102) Section */}
       <div>
-        <div className="flex justify-between items-center p-5 bg-teal-50/80 dark:bg-teal-950/40 rounded-2xl border border-teal-200/80 dark:border-teal-800 shadow-sm">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3.5 bg-teal-500 text-white rounded-xl shadow-md">
-              <Wallet className="w-7 h-7" />
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 gap-4 bg-teal-50/80 dark:bg-teal-950/40 rounded-2xl border border-teal-200/80 dark:border-teal-800 shadow-sm">
+          <div className="flex items-center gap-3 md:gap-3.5 w-full">
+            <div className="p-2.5 md:p-3.5 bg-teal-500 text-white rounded-xl shadow-md shrink-0">
+              <Wallet className="w-5 h-5 md:w-7 md:h-7" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-xs font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider">Saldo Kas Toko / Kas Kecil (1102)</p>
-                <span className="text-[9.5px] font-extrabold bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200 px-2 py-0.5 rounded-full border border-teal-300/60 dark:border-teal-700">Kas Utama Operasional & Laci POS</span>
+            <div className="min-w-0">
+              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-0.5">
+                <p className="text-[10px] md:text-xs font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider truncate">Saldo Kas Toko / Kas Kecil (1102)</p>
+                <span className="text-[8px] md:text-[9.5px] font-extrabold bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200 px-2 py-0.5 rounded-full border border-teal-300/60 dark:border-teal-700 w-fit">Kas Utama Operasional & Laci POS</span>
               </div>
-              <h3 className="text-2xl font-black text-teal-950 dark:text-teal-100 font-mono">Rp {dynamicPettyCash.toLocaleString('id-ID')}</h3>
+              <h3 className="text-lg md:text-2xl font-black text-teal-950 dark:text-teal-100 font-mono truncate">
+                {isLoading ? (
+                  <span className="flex items-center gap-2 text-sm md:text-lg text-teal-700 dark:text-teal-400">
+                    <span className="w-4 h-4 md:w-5 md:h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></span>
+                    Menyelaraskan...
+                  </span>
+                ) : (
+                  `Rp ${dynamicPettyCash.toLocaleString('id-ID')}`
+                )}
+              </h3>
             </div>
           </div>
           <button 
             onClick={() => setShowTopUpModal(true)}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+            className="w-full md:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-[10px] md:text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
           >
-            <Wallet className="w-4 h-4" />
+            <Wallet className="w-3.5 h-3.5 md:w-4 md:h-4" />
             + Top Up Kas Kecil
           </button>
         </div>
@@ -517,10 +515,10 @@ export default function TrendPage() {
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <LineChartIcon className="w-32 h-32" />
           </div>
-          <div className="relative z-10">
-            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Total Omset {totals.label}</p>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Total Omset {totals.label}</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {(totals.omset + totals.omset_ppob).toLocaleString('id-ID')}</h3>
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {(totals.omset + totals.omset_ppob).toLocaleString('id-ID')}</h3>
             </div>
             <div className="mt-3 flex flex-col gap-1">
               <div className="flex justify-between items-center text-[10px]">
@@ -540,10 +538,10 @@ export default function TrendPage() {
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <TrendingUp className="w-32 h-32" />
           </div>
-          <div className="relative z-10">
-            <p className="text-white/80 text-[11px] font-bold uppercase tracking-wider mb-2">Total HPP (Modal Pokok)</p>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-[11px] font-bold uppercase tracking-wide mb-2 truncate">Total HPP (Modal Pokok)</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {(totals.hpp_fisik + totals.hpp_ppob).toLocaleString('id-ID')}</h3>
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {(totals.hpp_fisik + totals.hpp_ppob).toLocaleString('id-ID')}</h3>
             </div>
             <div className="mt-3 flex flex-col gap-1">
               <div className="flex justify-between items-center text-[10px]">
@@ -563,10 +561,10 @@ export default function TrendPage() {
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <PieChartIcon className="w-32 h-32" />
           </div>
-          <div className="relative z-10">
-            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Sirkulasi Profit (Margin)</p>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Sirkulasi Profit (Margin)</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {totals.margin.toLocaleString('id-ID')}</h3>
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {totals.margin.toLocaleString('id-ID')}</h3>
             </div>
             <div className="mt-3 flex flex-col gap-1">
               <div className="flex justify-between items-center text-[10px]">
@@ -586,10 +584,10 @@ export default function TrendPage() {
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <AlertTriangle className="w-32 h-32" />
           </div>
-          <div className="relative z-10">
-            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Himpunan Zakat (Est.)</p>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Himpunan Zakat (Est.)</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {Math.round(totals.zakat).toLocaleString('id-ID')}</h3>
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {Math.round(totals.zakat).toLocaleString('id-ID')}</h3>
             </div>
             <div className="mt-3 flex items-center justify-between">
               {renderGrowth(comparisons.zakat, true)}
@@ -603,10 +601,10 @@ export default function TrendPage() {
           <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
             <Users className="w-32 h-32" />
           </div>
-          <div className="relative z-10">
-            <p className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Rata-rata Transaksi</p>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Rata-rata Transaksi</p>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-extrabold">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
             </div>
             <div className="mt-3 flex items-center justify-between">
               <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{totals.count} Struk</span>
@@ -928,46 +926,142 @@ export default function TrendPage() {
 
 
       {/* Top Up Kas Kecil Modal */}
-      {showTopUpModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
-              <h3 className="font-bold text-lg">Top Up Kas Kecil</h3>
-              <button onClick={() => setShowTopUpModal(false)} className="text-white/70 hover:text-white text-xl font-bold">×</button>
-            </div>
-            <form onSubmit={handleTopUpSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Nominal Top Up (Rp) *</label>
-                <input
-                  type="number"
-                  required
-                  min="1000"
-                  value={topUpAmount}
-                  onChange={(e) => setTopUpAmount(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-xl font-bold bg-white dark:bg-slate-900"
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-slate-300 mb-1">Keterangan Tambahan</label>
-                <input
-                  type="text"
-                  value={topUpDesc}
-                  onChange={(e) => setTopUpDesc(e.target.value)}
-                  className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900"
-                  placeholder="Misal: Dari kas utama / ATM"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl mt-4"
-              >
-                Simpan Saldo Masuk
-              </button>
-            </form>
-          </div>
+      <TopUpModal 
+        isOpen={showTopUpModal} 
+        onClose={() => setShowTopUpModal(false)}
+        coaList={coaList}
+        addJournalEntry={addJournalEntry}
+        currentUser={currentUser}
+      />
+    </div>
+  );
+}
+
+// Komponen Modal Terpisah untuk mencegah lag saat mengetik (menghindari re-render grafik berat)
+function TopUpModal({ isOpen, onClose, coaList, addJournalEntry, currentUser }: any) {
+  const [amount, setAmount] = useState('');
+  const [desc, setDesc] = useState('');
+  
+  // Cari default COA
+  const defaultDebit = coaList.find((c: any) => c.code === '1102' || c.name.toLowerCase().includes('kas kecil'))?.code || '1102';
+  const defaultCredit = coaList.find((c: any) => c.code === '3-1000' || c.name.toLowerCase().includes('modal'))?.code || '3-1000';
+  
+  const [debitCoa, setDebitCoa] = useState(defaultDebit);
+  const [creditCoa, setCreditCoa] = useState(defaultCredit);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = Number(amount);
+    if (numAmount > 0 && debitCoa && creditCoa) {
+      const dCoa = coaList.find((c: any) => c.code === debitCoa);
+      const cCoa = coaList.find((c: any) => c.code === creditCoa);
+      const dName = dCoa ? `${dCoa.code} - ${dCoa.name}` : debitCoa;
+      const cName = cCoa ? `${cCoa.code} - ${cCoa.name}` : creditCoa;
+      
+      const refId = `TOPUP_${Date.now()}`;
+      const isoDate = new Date().toISOString();
+
+      // Jurnal Debit
+      addJournalEntry({
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: isoDate,
+        account: dName,
+        description: `[Top Up] ${desc || 'Top Up Rutin'}`,
+        debit: numAmount,
+        credit: 0,
+        referenceId: refId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name || 'System'
+      });
+
+      // Jurnal Kredit
+      addJournalEntry({
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: isoDate,
+        account: cName,
+        description: `[Top Up] ${desc || 'Top Up Rutin'}`,
+        debit: 0,
+        credit: numAmount,
+        referenceId: refId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name || 'System'
+      });
+
+      alert('Top Up berhasil dicatat ke Jurnal!');
+      setAmount('');
+      setDesc('');
+      onClose();
+    } else {
+      alert('Mohon isi nominal dan pilih akun COA dengan benar.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
+          <h3 className="font-bold text-lg">Top Up Saldo</h3>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl font-bold">×</button>
         </div>
-      )}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Nominal (Rp) *</label>
+            <input
+              type="number"
+              required
+              min="1000"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-lg font-bold bg-white dark:bg-slate-900"
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Keterangan Tambahan</label>
+            <input
+              type="text"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900"
+              placeholder="Misal: Dari kas utama / ATM"
+            />
+          </div>
+          <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
+            <label className="block text-xs font-bold text-teal-700 mb-1">Akun Debit (Tujuan) *</label>
+            <select
+              value={debitCoa}
+              onChange={(e) => setDebitCoa(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-900"
+              required
+            >
+              {coaList.filter((c: any) => c.isActive).map((c: any) => (
+                <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-rose-700 mb-1">Akun Kredit (Sumber) *</label>
+            <select
+              value={creditCoa}
+              onChange={(e) => setCreditCoa(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-xs focus:ring-2 focus:ring-rose-500 outline-none bg-white dark:bg-slate-900"
+              required
+            >
+              {coaList.filter((c: any) => c.isActive).map((c: any) => (
+                <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl mt-4"
+          >
+            Simpan Transaksi
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

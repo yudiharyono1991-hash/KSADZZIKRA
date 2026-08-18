@@ -62,4 +62,10 @@ ADD COLUMN IF NOT EXISTS enable_points BOOLEAN DEFAULT false,
 ADD COLUMN IF NOT EXISTS point_earning_rate NUMERIC DEFAULT 1000,
 ADD COLUMN IF NOT EXISTS point_redemption_value NUMERIC DEFAULT 10;
 
+-- 13. Tambahkan kolom yang hilang pada tabel expenses (PENTING: mempengaruhi Laporan Laba Rugi)
+ALTER TABLE public.expenses
+ADD COLUMN IF NOT EXISTS created_by TEXT,
+ADD COLUMN IF NOT EXISTS coa_id TEXT,
+ADD COLUMN IF NOT EXISTS kas_account_id TEXT;
+
 -- Selesai! Script ini aman dijalankan berkali-kali tanpa error.

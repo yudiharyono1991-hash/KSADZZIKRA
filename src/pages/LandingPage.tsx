@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store, MonitorPlay, LogIn, Globe, BookOpen, Clock, HeartHandshake, Sun, Moon, ShoppingBag, Newspaper, Phone, Mail, MapPin, ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
-import MiniJadwalShalat from '../components/MiniJadwalShalat';
 import { useAppStore } from '../store';
+import BannerCarousel from '../components/CustomerDisplay/BannerCarousel';
+import MiniJadwalShalat from '../components/MiniJadwalShalat';
 import { useBranchData } from '../hooks/useBranchData';
 
 export default function LandingPage() {
@@ -12,6 +13,7 @@ export default function LandingPage() {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [language, setLanguage] = useState('ID');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const banners = useAppStore(state => state.banners);
 
   const contactUs = {
     address: settings.landingPageConfig?.contactUs?.address || settings.storeAddress,
@@ -126,9 +128,18 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 z-10 py-8 sm:py-12">
+      <main className="flex-1 flex flex-col items-center justify-center pt-8 md:pt-12 relative z-10 px-4 sm:px-6">
+        
+        {/* Banner Carousel */}
+        {banners && banners.filter(b => b.isActive).length > 0 && (
+          <div className="w-full max-w-5xl mx-auto mb-8 animate-fade-in-up">
+            <BannerCarousel banners={banners} autoPlayInterval={4000} />
+          </div>
+        )}
+
+        {/* Hero Section */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           className="max-w-3xl text-center space-y-2 sm:space-y-4"
         >

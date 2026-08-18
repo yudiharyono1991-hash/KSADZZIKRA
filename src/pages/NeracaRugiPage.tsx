@@ -33,6 +33,15 @@ export default function NeracaRugiPage() {
   const isReadOnlyRole = !isOwner && currentUser?.role !== 'MANAGER';
 
   // WIB (Asia/Jakarta) Date Initialization
+
+  const getDateFromTimestamp = (isoString: string | Date | number | undefined) => {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString).split('T')[0];
+    const formatter = new Intl.DateTimeFormat('fr-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' });
+    return formatter.format(d);
+  };
+
   const getLocalDateString = (offsetDays = 0) => {
     const d = new Date();
     if (offsetDays !== 0) {
@@ -68,7 +77,7 @@ export default function NeracaRugiPage() {
           if (!lastActivityDate || tx.timestamp > lastActivityDate) {
             lastActivityDate = tx.timestamp;
           }
-          const txDateOnly = String(tx.timestamp).split('T')[0];
+          const txDateOnly = getDateFromTimestamp(tx.timestamp);
           if (txDateOnly >= startDate && txDateOnly <= endDate) {
             hadActivityThisMonth = true;
           }
@@ -82,7 +91,7 @@ export default function NeracaRugiPage() {
           if (!lastActivityDate || je.date > lastActivityDate) {
             lastActivityDate = je.date;
           }
-          const jeDateOnlyManual = String(je.date).split('T')[0];
+          const jeDateOnlyManual = getDateFromTimestamp(je.date);
           if (jeDateOnlyManual >= startDate && jeDateOnlyManual <= endDate) {
             hadActivityThisMonth = true;
           }
@@ -99,7 +108,7 @@ export default function NeracaRugiPage() {
           }
 
           if (isRelated) {
-            const jeDateOnly = String(je.date).split('T')[0];
+            const jeDateOnly = getDateFromTimestamp(je.date);
             if (jeDateOnly > endDate) {
               // Revert transactions that happened AFTER the endDate
               futureDebits += (Number(je.debit) || 0);
@@ -187,13 +196,13 @@ export default function NeracaRugiPage() {
     if (!tx || !tx.timestamp) return false;
     // Exclude voided transactions from financial reports
     if (tx.isVoided) return false;
-    const txDate = String(tx.timestamp).split('T')[0];
+    const txDate = getDateFromTimestamp(tx.timestamp);
     return txDate >= startDate && txDate <= endDate;
   });
 
   const filteredAllExpenses = (expenses || []).filter(exp => {
     if (!exp || !exp.date) return false;
-    const expDate = String(exp.date).split('T')[0];
+    const expDate = getDateFromTimestamp(exp.date);
     return expDate >= startDate && expDate <= endDate;
   });
 
@@ -240,10 +249,41 @@ export default function NeracaRugiPage() {
       if (coa.category === 'EXPENSE') return false;       // Beban → ya, ini beban operasional
     }
 
+    // 2. Transaksi stok
+    if (exp.kasAccountId && (exp.kasAccountId.startsWith('1110') || exp.kasAccountId.startsWith('1109'))) return true;
+
     // --- STEP 3: Fallback - jika tidak ada COA terdaftar dan tidak ada keyword →  anggap beban ---
     return false;
   };
   
+  const isInventoryJournal = (j: any) => {
+    const acc = j.account?.toLowerCase() || '';
+    const desc = j.description?.toLowerCase() || '';
+    
+    // Cegah uang masuk ke Kas / Bank tercatat sebagai Persediaan
+    if (acc.includes('kas') || acc.includes('1102') || acc.includes('1101') || acc.includes('1103') || acc.includes('1020')) {
+      return false;
+    }
+    
+    // Cegah pelunasan piutang pelanggan tercatat sebagai Persediaan
+    if (desc.includes('bayar belanja') || desc.includes('pelunasan') || desc.includes('piutang')) {
+      return false;
+    }
+
+    return (j.referenceType === 'AUTO_BEBAN' || j.referenceType === 'MANUAL') && Number(j.debit) > 0 && (
+      acc.includes('persediaan') ||
+      acc.includes('1110') ||
+      acc.includes('1109') ||
+      desc.includes('persediaan') ||
+      desc.includes('stok') ||
+      desc.includes('kulakan') ||
+      (desc.includes('belanja') && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air') && !desc.includes('operasional')) ||
+      desc.includes('paket cod') ||
+      desc.includes('cadar') ||
+      desc.includes('telur') || desc.includes('roti') || desc.includes('cimory') || desc.includes('sosis') || desc.includes('basreng') || desc.includes('snack') || desc.includes('minuman') || desc.includes('aqua') || desc.includes('indomaret') || desc.includes('alfagift') || desc.includes('sales ') || desc.includes('wings') || desc.includes('pokka') || desc.includes('tango') || desc.includes('permen') || desc.includes('croisant') || desc.includes('crois') || desc.includes('donasin') || desc.includes('kontak') || desc.includes('setor roti') || desc.includes('crystal') || desc.includes('indogrosir') || desc.includes('indomart') || desc.includes('stop kontak') || desc.includes('kopi') || desc.includes('pisang') || desc.includes('plastik')
+    );
+  };
+
   const isOtherIncome = (exp: any) => {
     if ((Number(exp.amount) || 0) >= 0) return false;
     
@@ -259,76 +299,153 @@ export default function NeracaRugiPage() {
     return true;
   };
 
-  const filteredExpenses = filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp));
-  const filteredOtherIncome = filteredAllExpenses.filter(exp => isOtherIncome(exp));
+  const filteredExpenses = useMemo(() => filteredAllExpenses.filter(exp => (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp)), [filteredAllExpenses, coaList]);
+  const filteredOtherIncome = useMemo(() => filteredAllExpenses.filter(exp => isOtherIncome(exp)), [filteredAllExpenses, coaList]);
 
-  let periodPhysicalRevenue = 0;
-  let periodPpobRevenue = 0;
-  let periodPhysicalHPP = 0;
-  let periodPpobHPP = 0;
+  const productMap = useMemo(() => new Map((products || []).map((p: any) => [p.id, p])), [products]);
 
-  filteredTransactions.forEach(tx => {
-    let itemPhysRev = 0;
-    let itemPpobRev = 0;
+  const {
+    periodPhysicalRevenue,
+    periodPpobRevenue,
+    periodPhysicalHPP,
+    periodPpobHPP
+  } = useMemo(() => {
+    let pPhysRev = 0;
+    let pPpobRev = 0;
+    let pPhysHpp = 0;
+    let pPpobHpp = 0;
 
-    (tx.items || []).forEach(it => {
-      let cp = Number(it.costPrice || 0);
-      const productData = products?.find((p: any) => p.id === it.productId);
-      
-      if (!cp && productData) {
-        const isBox = it.productName?.toLowerCase().includes('(box)');
-        cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
-      }
+    filteredTransactions.forEach(tx => {
+      let itemPhysRev = 0;
+      let itemPpobRev = 0;
 
-      const itemRevenue = (Number(it.price) || 0) * (Number(it.quantity) || 0);
-      const itemHpp = cp * (Number(it.quantity) || 0);
+      (tx.items || []).forEach(it => {
+        let cp = Number(it.costPrice || 0);
+        const productData = productMap.get(it.productId);
+        
+        if (!cp && productData) {
+          const isBox = it.productName?.toLowerCase().includes('(box)');
+          cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+        }
 
-      if (productData?.isPPOB) {
-        itemPpobRev += itemRevenue;
-        periodPpobHPP += itemHpp;
+        const itemRevenue = (Number(it.price) || 0) * (Number(it.quantity) || 0);
+        let itemHpp = cp * (Number(it.quantity) || 0);
+
+        if (productData?.isPPOB) {
+          itemPpobRev += itemRevenue;
+          pPpobHpp += itemHpp;
+        } else {
+          itemPhysRev += itemRevenue;
+          pPhysHpp += itemHpp;
+        }
+      });
+
+      const itemSum = itemPhysRev + itemPpobRev;
+      if (itemSum > 0) {
+        const physShare = Math.round((Number(tx.totalAmount) || 0) * (itemPhysRev / itemSum));
+        pPhysRev += physShare;
+        pPpobRev += ((Number(tx.totalAmount) || 0) - physShare);
       } else {
-        itemPhysRev += itemRevenue;
-        periodPhysicalHPP += itemHpp;
+        pPhysRev += (Number(tx.totalAmount) || 0);
       }
     });
 
-    const itemSum = itemPhysRev + itemPpobRev;
-    if (itemSum > 0) {
-      const physShare = Math.round((Number(tx.totalAmount) || 0) * (itemPhysRev / itemSum));
-      periodPhysicalRevenue += physShare;
-      periodPpobRevenue += ((Number(tx.totalAmount) || 0) - physShare);
-    } else {
-      periodPhysicalRevenue += (Number(tx.totalAmount) || 0);
-    }
-  });
+    return {
+      periodPhysicalRevenue: pPhysRev,
+      periodPpobRevenue: pPpobRev,
+      periodPhysicalHPP: pPhysHpp,
+      periodPpobHPP: pPpobHpp
+    };
+  }, [filteredTransactions, productMap]);
 
   const periodTransactionsRevenue = periodPhysicalRevenue + periodPpobRevenue;
   const periodTransactionsHPP = periodPhysicalHPP + periodPpobHPP;
-  const periodTransactionsExpenses = filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
-  const periodOtherIncome = filteredOtherIncome.reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
+  const periodTransactionsExpenses = useMemo(() => filteredExpenses.reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0), [filteredExpenses]);
+  let periodOtherIncome = useMemo(() => filteredOtherIncome.reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0), [filteredOtherIncome]);
 
   // Manual Journals
-  const manualJournals = (journalEntries || []).filter(j => j.referenceType === 'MANUAL');
+  const manualJournals = useMemo(() => (journalEntries || []).filter(j => j.referenceType === 'MANUAL'), [journalEntries]);
   
-  const periodManualJournals = manualJournals.filter(j => {
-    const jd = String(j.date || '').split('T')[0];
+  const periodManualJournals = useMemo(() => manualJournals.filter(j => {
+    const jd = getDateFromTimestamp(j.date);
     return jd && jd >= startDate && jd <= endDate;
-  });
+  }), [manualJournals, startDate, endDate]);
 
-  let periodManualRevenue = 0;
-  let periodManualHPP = 0;
-  let periodManualExpenses = 0;
+  const {
+    periodManualRevenue,
+    periodManualHPP,
+    periodManualExpenses,
+    manualExpenseItems,
+    manualOtherIncomeItems,
+    periodManualOtherIncomeAmount
+  } = useMemo(() => {
+    let rev = 0;
+    let hpp = 0;
+    let exp = 0;
+    let othInc = 0;
+    const expItems: any[] = [];
+    const othIncItems: any[] = [];
 
-  periodManualJournals.forEach(j => {
-    if (!j.account) return;
-    const acc = j.account.toLowerCase();
-    if (j.account.startsWith('4-') || j.account.startsWith('4')) periodManualRevenue += (j.credit - j.debit);
-    else if (j.account.startsWith('5-') || j.account.startsWith('5')) periodManualHPP += (j.debit - j.credit);
-    else if (j.account.startsWith('6-') || j.account.startsWith('6')) periodManualExpenses += (j.debit - j.credit);
-  });
+    periodManualJournals.forEach(j => {
+      if (!j.account) return;
+      if (isInventoryJournal(j)) return; // Exclude inventory purchases from expenses!
 
-  const totalRevenue = periodTransactionsRevenue + periodManualRevenue;
-  const totalHPP = periodTransactionsHPP + periodManualHPP;
+      const acc = j.account.toLowerCase();
+      
+      // 1a. Pendapatan Lainnya (42xx atau 7-xx)
+      if (j.account.startsWith('42') || j.account.startsWith('7-') || j.account.startsWith('7')) {
+        const amt = j.credit - j.debit;
+        othInc += amt;
+        othIncItems.push({
+          id: j.id || Math.random().toString(),
+          date: j.date || new Date().toISOString(),
+          description: j.description || j.account,
+          category: 'JURNAL UMUM',
+          amount: amt
+        });
+      }
+      // 1b. Penjualan Manual (4-xx selain 42xx)
+      else if (j.account.startsWith('4-') || j.account.startsWith('4')) {
+        rev += (j.credit - j.debit);
+      }
+      // 2. Beban Operasional Lain (5400) or Beban (6-)
+      else if (j.account.startsWith('6-') || j.account.startsWith('6') || j.account.startsWith('54') || acc.includes('beban operasional')) {
+        const amt = j.debit - j.credit;
+        exp += amt;
+        expItems.push({
+          id: j.id || Math.random().toString(),
+          date: j.date || new Date().toISOString(),
+          description: j.description || j.account,
+          category: 'JURNAL UMUM',
+          amount: amt
+        });
+      }
+      // 3. HPP
+      else if (j.account.startsWith('5-') || j.account.startsWith('5')) {
+        hpp += (j.debit - j.credit);
+      }
+    });
+
+    return {
+      periodManualRevenue: rev,
+      periodManualHPP: hpp,
+      periodManualExpenses: exp,
+      manualExpenseItems: expItems,
+      manualOtherIncomeItems: othIncItems,
+      periodManualOtherIncomeAmount: othInc
+    };
+  }, [periodManualJournals]);
+  
+  periodOtherIncome += periodManualOtherIncomeAmount;
+
+  const displayExpenses = [...filteredExpenses, ...manualExpenseItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const displayOtherIncome = [...filteredOtherIncome, ...manualOtherIncomeItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const totalPhysicalRevenue = periodPhysicalRevenue + periodManualRevenue;
+  let totalPhysicalHPP = periodPhysicalHPP + periodManualHPP;
+
+  const totalRevenue = totalPhysicalRevenue + periodPpobRevenue;
+  const totalHPP = totalPhysicalHPP + periodPpobHPP;
   const grossProfit = totalRevenue - totalHPP;
   const totalExpenses = periodTransactionsExpenses + periodManualExpenses;
   const netProfit = grossProfit + periodOtherIncome - totalExpenses;
@@ -340,7 +457,7 @@ export default function NeracaRugiPage() {
     .filter(tx => {
       if (!tx || !tx.timestamp) return false;
       if (tx.isVoided) return false;
-      const txDate = String(tx.timestamp).split('T')[0];
+      const txDate = getDateFromTimestamp(tx.timestamp);
       return txDate <= endDate;
     })
     .reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
@@ -348,7 +465,7 @@ export default function NeracaRugiPage() {
   const allTimeTransactionsExpenses = (expenses || [])
     .filter(exp => {
       if (!exp || !exp.date) return false;
-      const expDate = String(exp.date).split('T')[0];
+      const expDate = getDateFromTimestamp(exp.date);
       return expDate <= endDate && (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp);
     })
     .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
@@ -356,7 +473,7 @@ export default function NeracaRugiPage() {
   const allTimeTransactionsOtherIncome = (expenses || [])
     .filter(exp => {
       if (!exp || !exp.date) return false;
-      const expDate = String(exp.date).split('T')[0];
+      const expDate = getDateFromTimestamp(exp.date);
       return expDate <= endDate && isOtherIncome(exp);
     })
     .reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
@@ -365,15 +482,23 @@ export default function NeracaRugiPage() {
     .filter(tx => {
       if (!tx || !tx.timestamp) return false;
       if (tx.isVoided) return false;
-      const txDate = String(tx.timestamp).split('T')[0];
+      const txDate = getDateFromTimestamp(tx.timestamp);
       return txDate <= endDate;
     })
     .reduce((sum, tx) =>
-      sum + (tx.items || []).reduce((s, it) => s + ((Number(it.costPrice) || 0) * (Number(it.quantity) || 0)), 0), 0
+      sum + (tx.items || []).reduce((s, it) => {
+        let cp = Number(it.costPrice || 0);
+        let itemHpp = cp * (Number(it.quantity) || 0);
+        return s + itemHpp;
+      }, 0), 0
     );
 
+  // Global Auto-Koreksi untuk All-Time HPP
+  // Karena transaksi diskon besar bisa membuat HPP > Revenue secara global
+  let finalAllTimeTransactionsHPP = allTimeTransactionsHPP;
+
   const cumulativeManualJournals = manualJournals.filter(j => {
-    const jd = String(j.date || '').split('T')[0];
+    const jd = getDateFromTimestamp(j.date);
     return jd && jd <= endDate;
   });
 
@@ -384,10 +509,12 @@ export default function NeracaRugiPage() {
 
   cumulativeManualJournals.forEach(j => {
     if (!j.account) return;
+    if (isInventoryJournal(j)) return; // Exclude inventory purchases from expenses!
+
     const acc = j.account.toLowerCase();
-    if (j.account.startsWith('4-') || j.account.startsWith('4')) allTimeManualRevenue += (j.credit - j.debit);
+    if (j.account.startsWith('4-') || j.account.startsWith('4') || j.account.startsWith('7-') || j.account.startsWith('7')) allTimeManualRevenue += (j.credit - j.debit);
+    else if (j.account.startsWith('6-') || j.account.startsWith('6') || j.account.startsWith('54') || acc.includes('beban operasional')) allTimeManualExpenses += (j.debit - j.credit);
     else if (j.account.startsWith('5-') || j.account.startsWith('5')) allTimeManualHPP += (j.debit - j.credit);
-    else if (j.account.startsWith('6-') || j.account.startsWith('6')) allTimeManualExpenses += (j.debit - j.credit);
     else if (
       j.account.startsWith('1-100') || 
       j.account.startsWith('1-101') || 
@@ -402,61 +529,55 @@ export default function NeracaRugiPage() {
   });
 
   // Calculate separate cash balances directly from ALL journals
-  let balanceKasTunai = 0;
   let balanceKasKecil = initialStoreCapital; // modal awal dianggap masuk ke kas kecil/toko
+  let balanceKasUtamaUsang = 0; // The old 1101 balance to be written off
   let balanceBank = 0;
   let balanceQris = 0;
   let balanceRadar = 0;
   let balanceDana = 0;
 
   (journalEntries || []).forEach(j => {
-    const jd = String(j.date || '').split('T')[0];
+    const jd = getDateFromTimestamp(j.date);
     if (jd && jd <= endDate) {
       const acc = j.account ? j.account.toLowerCase() : '';
-      if (acc.includes('1102') || acc.includes('1101') || acc.includes('kas kecil') || acc.includes('kas utama') || acc.includes('kas tunai') || acc.startsWith('1-100')) {
-        balanceKasKecil += (j.debit - j.credit);
+      const rawAcc = String(j.account || '').trim();
+      const match = rawAcc.match(/^(\d+[\d-]*)/);
+      const accCode = match ? match[1] : (rawAcc.includes(' - ') ? rawAcc.split(' - ')[0].trim() : rawAcc);
+
+      if (accCode === '1101' || acc.includes('kas utama') || acc.includes('kas tunai') || acc.startsWith('1-100') || accCode === '1100') {
+        balanceKasUtamaUsang += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      } else if (accCode === '1102' || acc.includes('kas kecil')) {
+        balanceKasKecil += (Number(j.debit) || 0) - (Number(j.credit) || 0);
       } else if (acc.includes('1020') || acc.includes('1-1020') || acc.includes('qris')) {
-        balanceQris += (j.debit - j.credit);
+        balanceQris += (Number(j.debit) || 0) - (Number(j.credit) || 0);
       } else if (acc.includes('1103') || acc.includes('1104') || acc.includes('bank')) {
-        balanceBank += (j.debit - j.credit);
+        balanceBank += (Number(j.debit) || 0) - (Number(j.credit) || 0);
       } else if (acc.includes('1050') || acc.includes('1-1050') || acc.includes('radar pulsa')) {
-        balanceRadar += (j.debit - j.credit);
+        balanceRadar += (Number(j.debit) || 0) - (Number(j.credit) || 0);
       } else if (acc.includes('1117') || acc.includes('1054') || acc.includes('1-1054') || acc.includes('dokuku') || acc.includes('saldo dana')) {
-        balanceDana += (j.debit - j.credit);
+        balanceDana += (Number(j.debit) || 0) - (Number(j.credit) || 0);
       }
     }
   });
 
-  const allTimeRevenue = allTimeTransactionsRevenue + allTimeManualRevenue;
-  const allTimeExpenses = allTimeTransactionsExpenses + allTimeManualExpenses;
-  const allTimeHPP = allTimeTransactionsHPP + allTimeManualHPP;
+  const allTimePhysicalRevenue = allTimeTransactionsRevenue + allTimeManualRevenue;
+  let allTimePhysicalHPP = finalAllTimeTransactionsHPP + allTimeManualHPP;
 
-  const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses + allTimeTransactionsOtherIncome;
+  const allTimeRevenue = allTimePhysicalRevenue;
+  const allTimeExpenses = allTimeTransactionsExpenses + allTimeManualExpenses;
+  const allTimeHPP = allTimePhysicalHPP;
+
+  const allTimeProfit = allTimeRevenue - allTimeHPP - allTimeExpenses + allTimeTransactionsOtherIncome - balanceKasUtamaUsang;
 
   // Sound liquid capital: sum of the separated cash accounts
-  const cashOnHand = balanceKasTunai + balanceKasKecil + balanceBank + balanceQris + balanceRadar + balanceDana;
+  const cashOnHand = balanceKasKecil + balanceBank + balanceQris + balanceRadar + balanceDana;
 
   // Unsold merchandise stock valuation (asset)
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
   const physicalInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
 
-  const kasKecilInventoryEntries = (journalEntries || []).filter(j => {
-    const acc = j.account?.toLowerCase() || '';
-    const desc = j.description?.toLowerCase() || '';
-    return j.referenceType === 'AUTO_BEBAN' && Number(j.debit) > 0 && (
-      acc.includes('persediaan') || 
-      acc.includes('1110') || 
-      acc.includes('1109') || 
-      acc.includes('1110') ||
-      desc.includes('persediaan') ||
-      desc.includes('stok') ||
-      desc.includes('kulakan') ||
-      (desc.includes('belanja') && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air')) ||
-      desc.includes('paket cod') ||
-      desc.includes('cadar') ||
-      desc.includes('telur')
-    );
-  }).sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  const kasKecilInventoryEntries = (journalEntries || []).filter(j => isInventoryJournal(j))
+    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
   const kasKecilInventory = kasKecilInventoryEntries.reduce((sum, j) => {
     return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
@@ -712,7 +833,7 @@ export default function NeracaRugiPage() {
                 </div>
                 <div className="flex justify-between items-center pl-4 py-1">
                   <span className="text-gray-500 dark:text-slate-400 font-medium">Pendapatan Fisik</span>
-                  <span className="text-slate-600 font-medium font-mono">Rp {(periodPhysicalRevenue + periodManualRevenue).toLocaleString('id-ID')}</span>
+                  <span className="text-slate-600 font-medium font-mono">Rp {totalPhysicalRevenue.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between items-center pl-4 py-1">
                   <span className="text-gray-500 dark:text-slate-400 font-medium">Pendapatan PPOB</span>
@@ -727,7 +848,7 @@ export default function NeracaRugiPage() {
                 </div>
                 <div className="flex justify-between items-center pl-4 py-1">
                   <span className="text-gray-500 dark:text-slate-400 font-medium">HPP Produk Fisik</span>
-                  <span className="text-red-700/80 font-semibold font-mono">- Rp {(periodPhysicalHPP + periodManualHPP).toLocaleString('id-ID')}</span>
+                  <span className="text-red-700/80 font-semibold font-mono">- Rp {totalPhysicalHPP.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="flex justify-between items-center pl-4 py-1">
                   <span className="text-gray-500 dark:text-slate-400 font-medium">HPP Layanan PPOB</span>
@@ -750,47 +871,51 @@ export default function NeracaRugiPage() {
                 </div>
               </div>
 
-              {filteredOtherIncome.length > 0 && (
-                <div className="pt-2 pb-1">
-                  <div className="flex justify-between items-center font-bold text-blue-800 border-b pb-1 mb-2">
-                    <span>PENDAPATAN LAINNYA (DARI KASIR)</span>
-                    <span className="text-[10px] text-gray-400 font-medium">{filteredOtherIncome.length} transaksi</span>
-                  </div>
-                  <div className="space-y-2 pl-4 max-h-96 overflow-y-auto pr-1">
-                    {filteredOtherIncome.map((exp) => (
-                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 py-0.5">
+              <div className="pt-2 pb-1">
+                <div className="flex justify-between items-center font-bold text-blue-800 border-b pb-1 mb-2">
+                  <span>PENDAPATAN LAINNYA (DARI KASIR)</span>
+                  <span className="text-[10px] text-gray-400 font-medium">{displayOtherIncome.length} transaksi</span>
+                </div>
+                <div className="space-y-2 pl-4 max-h-48 overflow-y-auto pr-1">
+                  {displayOtherIncome.length === 0 ? (
+                    <p className="text-gray-400 text-[11px] italic">Tidak ada pendapatan lainnya terjurnal.</p>
+                  ) : (
+                    displayOtherIncome.map((exp) => (
+                      <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors py-0.5">
                         <span className="pr-4 flex-1">
                           <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span>
-                          • {exp.description.replace('Pemasukan Kas: ', '')}
+                          • {exp.description} {exp.category !== 'MANUAL' && exp.category !== 'JURNAL UMUM' ? `(${exp.category})` : ''}
                         </span>
-                        <span className="text-blue-700 font-mono whitespace-nowrap">+ Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
+                        <span className="text-blue-700 font-mono whitespace-nowrap">
+                          {exp.amount >= 0 ? '+ Rp ' : '- Rp '}{Math.abs(exp.amount).toLocaleString('id-ID')}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between font-bold text-blue-700 pl-4 py-1.5 mt-1 border-t border-blue-100/50 text-[11px]">
-                    <span>Total Pendapatan Lainnya</span>
-                    <span className="font-mono">+ Rp {periodOtherIncome.toLocaleString('id-ID')}</span>
-                  </div>
+                    ))
+                  )}
                 </div>
-              )}
+                <div className="flex justify-between font-bold text-blue-700 pl-4 py-1.5 mt-1 border-t border-blue-100/50 text-[11px]">
+                  <span>Total Pendapatan Lainnya</span>
+                  <span className="font-mono">+ Rp {periodOtherIncome.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
 
               <div className="pt-2">
                 <div className="flex justify-between items-center font-bold text-slate-755 border-b pb-1 mb-2">
                   <span>RINCIAN BEBAN OPERASIONAL (EXPENSES)</span>
-                  <span className="text-[10px] text-gray-400 font-medium">{filteredExpenses.length} transaksi</span>
+                  <span className="text-[10px] text-gray-400 font-medium">{displayExpenses.length} transaksi</span>
                 </div>
 
                 <div className="space-y-2 pl-4 max-h-96 overflow-y-auto pr-1">
-                  {filteredExpenses.length === 0 ? (
+                  {displayExpenses.length === 0 ? (
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
                   ) : (
-                    filteredExpenses.map((exp) => (
+                    displayExpenses.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors py-0.5">
                         <span className="pr-4 flex-1">
                           <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span> 
-                          • {exp.description} ({exp.category})
+                          • {exp.description} {exp.category ? `(${exp.category})` : ''}
                         </span>
-                        <span className="text-red-700 font-mono whitespace-nowrap">- Rp {exp.amount.toLocaleString('id-ID')}</span>
+                        <span className="text-red-700 font-mono whitespace-nowrap">- Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
                       </div>
                     ))
                   )}
@@ -853,12 +978,7 @@ export default function NeracaRugiPage() {
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1101 - Kas</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {balanceKasTunai.toLocaleString('id-ID')}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1102 - Kas Kecil</span>
+                  <span className="text-gray-600 dark:text-slate-400 font-semibold ml-4">↳ 1102 - Kas (Terintegrasi)</span>
                   <span className="font-mono font-bold text-slate-900 dark:text-white">Rp {balanceKasKecil.toLocaleString('id-ID')}</span>
                 </div>
 
@@ -895,7 +1015,7 @@ export default function NeracaRugiPage() {
                       </div>
                       <div className="max-h-96 overflow-y-auto space-y-1 mt-1 pr-1">
                         {kasKecilInventoryEntries.map(entry => {
-                          const dateStr = entry.date ? String(entry.date).split('T')[0] : '';
+                          const dateStr = getDateFromTimestamp(entry.date);
                           const desc = entry.description.replace('[Auto] Beban OPERASIONAL: Kas Kecil: ', '');
                           return (
                             <div key={entry.id} className="flex justify-between text-[9px] text-gray-400 ml-6 border-l border-gray-200 dark:border-slate-700 pl-2">
@@ -1080,23 +1200,19 @@ export default function NeracaRugiPage() {
         return (
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden mt-6 mb-8">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" />
-                Daftar Piutang Kasbon Pelanggan
-              </h3>
-              <span className="text-xs font-bold text-slate-500 bg-white dark:bg-slate-700 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">
+<span className="text-xs font-bold text-slate-500 bg-white dark:bg-slate-700 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">
                 Total: {kasbonCustomers.length} Orang
               </span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs uppercase bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+            <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="w-full text-[10px] sm:text-xs min-w-[700px] text-left">
+                <thead className="text-[9px] sm:text-[10px] uppercase bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3">Akun Pelanggan / No HP</th>
-                    <th className="px-4 py-3 text-center">Update Terakhir</th>
-                    <th className="px-4 py-3 text-right">Sisa Kasbon (Rp)</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                    <th className="px-4 py-3 text-center">Aksi</th>
+                    <th className="px-3 py-3">Akun Pelanggan / No HP</th>
+                    <th className="px-3 py-3 text-center">Update Terakhir</th>
+                    <th className="px-3 py-3 text-right">Sisa Kasbon (Rp)</th>
+                    <th className="px-3 py-3 text-center">Status</th>
+                    <th className="px-3 py-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1104,32 +1220,32 @@ export default function NeracaRugiPage() {
                     const isLunas = customer.historicalDebt <= 0;
                     return (
                       <tr key={customer.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <div className="font-medium text-slate-800 dark:text-slate-200">{customer.name}</div>
-                          {customer.phone && <div className="text-xs text-slate-500">{customer.phone}</div>}
+                          {customer.phone && <div className="text-[9px] text-slate-500">{customer.phone}</div>}
                         </td>
-                        <td className="px-4 py-3 text-center text-xs text-slate-500">
+                        <td className="px-3 py-3 text-center text-[10px] sm:text-xs text-slate-500">
                           {customer.lastActivityDate ? new Date(customer.lastActivityDate).toLocaleDateString('id-ID') : '-'}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-amber-600">
+                        <td className="px-3 py-3 text-right font-mono font-bold text-amber-600">
                           Rp {Math.max(0, customer.historicalDebt).toLocaleString('id-ID')}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-3 text-center">
                           {isLunas ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                               <CheckCircle2 className="w-3 h-3" />
                               LUNAS
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                               BELUM LUNAS
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-3 text-center">
                           <button 
                             onClick={() => navigate('/customers', { state: { selectedCustomerId: customer.id } })}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-[9px] sm:text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800"
                           >
                             Update Kasbon
                           </button>
@@ -1138,8 +1254,8 @@ export default function NeracaRugiPage() {
                     );
                   })}
                   <tr className="bg-slate-50 dark:bg-slate-800/80 font-bold">
-                    <td colSpan={2} className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">TOTAL KASBON AKTIF:</td>
-                    <td className="px-4 py-3 text-right font-mono text-amber-700">
+                    <td colSpan={2} className="px-3 py-3 text-right text-slate-700 dark:text-slate-300">TOTAL KASBON AKTIF:</td>
+                    <td className="px-3 py-3 text-right font-mono text-amber-700">
                       Rp {totalKasbon.toLocaleString('id-ID')}
                     </td>
                     <td colSpan={2}></td>

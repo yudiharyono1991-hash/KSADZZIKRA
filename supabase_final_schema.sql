@@ -123,7 +123,10 @@ CREATE TABLE IF NOT EXISTS public.expenses (
     amount NUMERIC NOT NULL,
     description TEXT NOT NULL,
     category TEXT,
-    date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by TEXT,
+    coa_id TEXT,
+    kas_account_id TEXT
 );
 
 -- 10. Tabel Pengaturan Toko (Store Settings)

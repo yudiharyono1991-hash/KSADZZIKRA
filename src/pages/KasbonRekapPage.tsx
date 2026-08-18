@@ -416,7 +416,7 @@ export default function KasbonRekapPage() {
   };
 
   return (
-    <div className="space-y-6 bg-slate-50 dark:bg-slate-900 p-4 md:p-6 pb-24 md:pb-6">
+    <div className="space-y-4 md:space-y-6 bg-slate-50 dark:bg-slate-900 p-3 md:p-6 pb-24 md:pb-6 w-full min-w-0">
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -428,7 +428,7 @@ export default function KasbonRekapPage() {
           </p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto w-full hide-scrollbar pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
           <input 
             type="file" 
             accept=".xlsx, .xls, .csv" 
@@ -438,14 +438,14 @@ export default function KasbonRekapPage() {
           />
           <button 
             onClick={handleImport}
-            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 font-medium text-sm transition-colors"
+            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 font-medium text-sm transition-colors flex-shrink-0 whitespace-nowrap"
           >
             <FileUp className="w-4 h-4" />
             <span>Import</span>
           </button>
           <button 
             onClick={handleExportExcel}
-            className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl font-medium text-sm transition-colors shadow-sm"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-medium text-sm transition-colors shadow-sm flex-shrink-0 whitespace-nowrap"
           >
             <FileDown className="w-4 h-4" />
             <span>Export Laporan</span>
@@ -541,7 +541,7 @@ export default function KasbonRekapPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto w-full">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
           {filteredCustomers.length === 0 ? (
             <div className="p-8 text-center text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center h-full">
               <FileText className="w-12 h-12 mb-3 text-slate-300 dark:text-slate-600" />

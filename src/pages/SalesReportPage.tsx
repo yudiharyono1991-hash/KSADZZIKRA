@@ -119,6 +119,9 @@ export default function SalesReportPage() {
     let finalProfit = 0;
 
     resultArr.forEach(item => {
+      item.omset = Math.round(item.omset);
+      item.profit = Math.round(item.profit);
+      
       finalQty += item.qty;
       finalOmset += item.omset;
       finalProfit += item.profit;
@@ -311,18 +314,18 @@ export default function SalesReportPage() {
 
       {/* Aggregated Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 dark:bg-slate-800 uppercase tracking-widest text-[10px] text-gray-500 dark:text-slate-400 font-bold border-b border-gray-200 dark:border-slate-700">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left text-[10px] sm:text-xs min-w-[800px] border-collapse">
+            <thead className="bg-slate-50 dark:bg-slate-800 uppercase tracking-widest text-[9px] sm:text-[10px] text-gray-500 dark:text-slate-400 font-bold border-b border-gray-200 dark:border-slate-700">
               <tr>
-                <th className="py-3.5 px-5">Nama Barang</th>
-                <th className="py-3.5 px-3 text-center">Qty</th>
-                <th className="py-3.5 px-3 text-right">Harga Pokok</th>
-                <th className="py-3.5 px-3 text-right">Harga Jual</th>
-                <th className="py-3.5 px-3 text-center">Margin</th>
-                <th className="py-3.5 px-4 text-right">Omset</th>
-                <th className="py-3.5 px-4 text-right">Profit</th>
-                <th className="py-3.5 px-4 text-right">Zakat</th>
+                <th className="px-3 py-3">Nama Barang</th>
+                <th className="px-3 py-3 text-center">Qty</th>
+                <th className="px-3 py-3 text-right">Harga Pokok</th>
+                <th className="px-3 py-3 text-right">Harga Jual</th>
+                <th className="px-3 py-3 text-center">Margin</th>
+                <th className="px-3 py-3 text-right">Omset</th>
+                <th className="px-3 py-3 text-right">Profit</th>
+                <th className="px-3 py-3 text-right">Zakat</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-700 dark:text-slate-300">
@@ -340,26 +343,26 @@ export default function SalesReportPage() {
 
                   return (
                     <tr key={item.productId} className="hover:bg-slate-50 dark:bg-slate-800/50">
-                      <td className="py-3 px-5 font-bold text-gray-900 dark:text-white">{item.productName} <span className="text-[9px] font-normal text-green-600 block">(Akad Jual Beli)</span></td>
-                      <td className="py-3 px-3 text-center text-green-700 font-bold bg-green-50/30">
+                      <td className="px-3 py-3 font-bold text-gray-900 dark:text-white">{item.productName} <span className="text-[8px] sm:text-[9px] font-normal text-green-600 block">(Akad Jual Beli)</span></td>
+                      <td className="px-3 py-3 text-center text-green-700 font-bold bg-green-50/30">
                         {item.qty}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-gray-500 dark:text-slate-400">
+                      <td className="px-3 py-3 text-right font-mono text-gray-500 dark:text-slate-400">
                         Rp {Math.round(avgCost).toLocaleString('id-ID')}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-gray-700 dark:text-slate-300 font-semibold">
+                      <td className="px-3 py-3 text-right font-mono text-gray-700 dark:text-slate-300 font-semibold">
                         Rp {Math.round(avgSell).toLocaleString('id-ID')}
                       </td>
-                      <td className="py-3 px-3 text-center font-mono text-blue-600">
+                      <td className="px-3 py-3 text-center font-mono text-blue-600">
                         {marginPct}%
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-gray-800 dark:text-slate-200">
+                      <td className="px-3 py-3 text-right font-mono font-bold text-gray-800 dark:text-slate-200">
                         Rp {item.omset.toLocaleString('id-ID')}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-blue-700 font-bold">
+                      <td className="px-3 py-3 text-right font-mono text-blue-700 font-bold">
                         Rp {item.profit.toLocaleString('id-ID')}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-semibold text-amber-600">
+                      <td className="px-3 py-3 text-right font-mono font-semibold text-amber-600">
                         Rp {item.zakat.toLocaleString('id-ID')}
                       </td>
                     </tr>
@@ -370,19 +373,19 @@ export default function SalesReportPage() {
             {aggregatedData.length > 0 && (
               <tfoot className="bg-slate-50 dark:bg-slate-800 font-bold text-gray-800 dark:text-slate-200 border-t-2 border-gray-200 dark:border-slate-700">
                 <tr>
-                  <td className="py-3 px-5 text-right uppercase text-[10px] tracking-widest">Grand Total:</td>
-                  <td className="py-3 px-3 text-center text-green-700">{grandTotal.qty}</td>
-                  <td className="py-3 px-3"></td>
-                  <td className="py-3 px-3"></td>
-                  <td className="py-3 px-3 text-center font-bold text-blue-600">
+                  <td className="px-3 py-3 text-right uppercase text-[9px] sm:text-[10px] tracking-widest">Grand Total:</td>
+                  <td className="px-3 py-3 text-center text-green-700">{grandTotal.qty}</td>
+                  <td className="px-3 py-3"></td>
+                  <td className="px-3 py-3"></td>
+                  <td className="px-3 py-3 text-center font-bold text-blue-600">
                     {(() => {
                       const totalHpp = grandTotal.omset - grandTotal.profit;
                       return totalHpp > 0 ? ((grandTotal.profit / totalHpp) * 100).toFixed(1) + '%' : '0%';
                     })()}
                   </td>
-                  <td className="py-3 px-4 text-right">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
-                  <td className="py-3 px-4 text-right text-blue-700">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
-                  <td className="py-3 px-4 text-right text-amber-600">Rp {grandTotal.zakat.toLocaleString('id-ID')}</td>
+                  <td className="px-3 py-3 text-right">Rp {grandTotal.omset.toLocaleString('id-ID')}</td>
+                  <td className="px-3 py-3 text-right text-blue-700">Rp {grandTotal.profit.toLocaleString('id-ID')}</td>
+                  <td className="px-3 py-3 text-right text-amber-600">Rp {grandTotal.zakat.toLocaleString('id-ID')}</td>
                 </tr>
               </tfoot>
             )}

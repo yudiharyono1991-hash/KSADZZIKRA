@@ -64,8 +64,8 @@ export default function PromoProdukPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-green-100">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6 w-full min-w-0 pb-10">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-green-100 w-full min-w-0">
         <div className="flex items-center space-x-4">
           <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg shadow-green-500/20">
             <Percent className="w-8 h-8 text-white" />
@@ -94,15 +94,15 @@ export default function PromoProdukPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left border-collapse text-[10px] sm:text-xs min-w-[700px]">
             <thead>
-              <tr className="bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
-                <th className="p-4">Info Produk</th>
-                <th className="p-4">Harga Normal</th>
-                <th className="p-4">Status Promo</th>
-                <th className="p-4">Harga Promo</th>
-                <th className="p-4 text-center">Aksi</th>
+              <tr className="bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-bold">
+                <th className="px-3 py-3">Info Produk</th>
+                <th className="px-3 py-3">Harga Normal</th>
+                <th className="px-3 py-3">Status Promo</th>
+                <th className="px-3 py-3">Harga Promo</th>
+                <th className="px-3 py-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -110,14 +110,14 @@ export default function PromoProdukPage() {
                 const isEditing = editingId === p.id;
                 return (
                   <tr key={p.id} className="hover:bg-slate-50 dark:bg-slate-800 transition-colors">
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 dark:text-slate-200">{p.name}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">SKU: {p.sku} | Kat: {p.category}</div>
+                    <td className="px-3 py-3">
+                      <div className="font-bold text-slate-800 dark:text-slate-200 max-w-[200px] truncate">{p.name}</div>
+                      <div className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400">SKU: {p.sku} | Kat: {p.category}</div>
                     </td>
-                    <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                    <td className="px-3 py-3 font-bold text-slate-700 dark:text-slate-300">
                       Rp {p.price.toLocaleString('id-ID')}
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       {isEditing ? (
                         <select
                           value={tempActive ? 'true' : 'false'}
@@ -132,10 +132,10 @@ export default function PromoProdukPage() {
                           <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] uppercase font-black rounded flex items-center w-max gap-1">
                             <CheckCircle2 className="w-3 h-3" /> AKTIF
                           </span> : 
-                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] uppercase font-bold rounded">Tidak Aktif</span>
+                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] sm:text-[10px] uppercase font-bold rounded">Tidak Aktif</span>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       {isEditing ? (
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Rp</span>
@@ -152,7 +152,7 @@ export default function PromoProdukPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="px-3 py-3 text-center">
                       {isEditing ? (
                         <button
                           onClick={() => handleSave(p)}
@@ -174,7 +174,7 @@ export default function PromoProdukPage() {
               })}
               {filteredProducts.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500 dark:text-slate-400 font-medium">
+                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500 dark:text-slate-400 font-medium">
                     Tidak ada produk ditemukan.
                   </td>
                 </tr>

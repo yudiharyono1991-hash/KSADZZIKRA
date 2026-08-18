@@ -166,7 +166,7 @@ export default function BukuBesarPage() {
   }, [processedEntries.entries, currentPage, itemsPerPage]);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6 w-full min-w-0 pb-10">
       <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
@@ -185,7 +185,7 @@ export default function BukuBesarPage() {
         </div>
       </div>
 
-      <div className="print:hidden bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col md:flex-row gap-4 items-end">
+      <div className="print:hidden bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col md:flex-row gap-4 items-end w-full min-w-0">
         <div className="flex-1 w-full relative" ref={dropdownRef}>
           <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-1 uppercase">Cari & Pilih Akun COA</label>
           <div 
@@ -260,7 +260,7 @@ export default function BukuBesarPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden" ref={reportRef}>
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden w-full min-w-0" ref={reportRef}>
         <PrintHeader title="Laporan Buku Besar" period={`Periode: ${new Date(startDate).toLocaleDateString('id-ID')} - ${new Date(endDate).toLocaleDateString('id-ID')}`} />
         
         <div className="p-5 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-between items-center">
@@ -270,24 +270,24 @@ export default function BukuBesarPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto ui-paginated-table">
-          <table className="w-full text-left border-collapse text-sm">
+        <div className="overflow-x-auto w-full hide-scrollbar ui-paginated-table" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left border-collapse text-sm min-w-[600px]">
             <thead>
-              <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                <th className="p-3 border-b border-gray-200 dark:border-slate-700 font-bold whitespace-nowrap">Tanggal</th>
-                <th className="p-3 border-b border-gray-200 dark:border-slate-700 font-bold w-1/3">Keterangan</th>
-                <th className="p-3 border-b border-gray-200 dark:border-slate-700 font-bold">No. Ref</th>
-                <th className="p-3 border-b border-gray-200 dark:border-slate-700 font-bold text-right">Debit</th>
-                <th className="p-3 border-b border-gray-200 dark:border-slate-700 font-bold text-right">Kredit</th>
-                <th className="p-3 border-b border-gray-200 dark:border-slate-700 font-bold text-right">Saldo Berjalan</th>
+              <tr className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] sm:text-xs">
+                <th className="px-3 py-2.5 border-b border-gray-200 dark:border-slate-700 font-bold whitespace-nowrap">Tanggal</th>
+                <th className="px-3 py-2.5 border-b border-gray-200 dark:border-slate-700 font-bold w-1/3">Keterangan</th>
+                <th className="px-3 py-2.5 border-b border-gray-200 dark:border-slate-700 font-bold">No. Ref</th>
+                <th className="px-3 py-2.5 border-b border-gray-200 dark:border-slate-700 font-bold text-right">Debit</th>
+                <th className="px-3 py-2.5 border-b border-gray-200 dark:border-slate-700 font-bold text-right">Kredit</th>
+                <th className="px-3 py-2.5 border-b border-gray-200 dark:border-slate-700 font-bold text-right">Saldo Berjalan</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-[10px] sm:text-[11px]">
               <tr className="bg-indigo-50/50 dark:bg-indigo-900/10">
-                <td className="p-3 font-semibold text-gray-600 dark:text-slate-400" colSpan={3}>Saldo Awal Per {new Date(startDate).toLocaleDateString('id-ID')}</td>
-                <td className="p-3 text-right"></td>
-                <td className="p-3 text-right"></td>
-                <td className="p-3 text-right font-bold text-indigo-700 dark:text-indigo-400">Rp {processedEntries.saldoAwal?.toLocaleString('id-ID') || 0}</td>
+                <td className="px-3 py-2.5 font-semibold text-gray-600 dark:text-slate-400" colSpan={3}>Saldo Awal Per {new Date(startDate).toLocaleDateString('id-ID')}</td>
+                <td className="px-3 py-2.5 text-right"></td>
+                <td className="px-3 py-2.5 text-right"></td>
+                <td className="px-3 py-2.5 text-right font-bold text-indigo-700 dark:text-indigo-400">Rp {processedEntries.saldoAwal?.toLocaleString('id-ID') || 0}</td>
               </tr>
               {processedEntries.entries?.length === 0 ? (
                 <tr>
@@ -296,16 +296,16 @@ export default function BukuBesarPage() {
               ) : (
                 paginatedEntries.map((entry: any, i: number) => (
                   <tr key={entry.id || i} className="border-b border-gray-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800/50 transition-colors">
-                    <td className="p-3 text-gray-700 dark:text-slate-300 font-medium whitespace-nowrap">{new Date(entry.date).toLocaleDateString('id-ID')}</td>
-                    <td className="p-3 text-gray-600 dark:text-slate-400">{entry.description}</td>
-                    <td className="p-3 text-xs text-gray-500 font-mono">{entry.referenceId}</td>
-                    <td className="p-3 text-right font-semibold text-gray-800 dark:text-slate-200 whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-gray-700 dark:text-slate-300 font-medium whitespace-nowrap">{new Date(entry.date).toLocaleDateString('id-ID')}</td>
+                    <td className="px-3 py-2.5 text-gray-600 dark:text-slate-400 max-w-[150px] sm:max-w-[200px] truncate" title={entry.description}>{entry.description}</td>
+                    <td className="px-3 py-2.5 text-[9px] sm:text-[10px] text-gray-500 font-mono truncate" title={entry.referenceId}>{entry.referenceId}</td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-gray-800 dark:text-slate-200 whitespace-nowrap">
                       {entry.debit > 0 ? `Rp ${Number(entry.debit).toLocaleString('id-ID')}` : '-'}
                     </td>
-                    <td className="p-3 text-right font-semibold text-gray-800 dark:text-slate-200 whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-right font-semibold text-gray-800 dark:text-slate-200 whitespace-nowrap">
                       {entry.credit > 0 ? `Rp ${Number(entry.credit).toLocaleString('id-ID')}` : '-'}
                     </td>
-                    <td className="p-3 text-right font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-right font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
                       Rp {entry.runningBalance?.toLocaleString('id-ID')}
                     </td>
                   </tr>
@@ -313,15 +313,15 @@ export default function BukuBesarPage() {
               )}
               {/* Total Mutasi */}
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <td className="p-4 font-bold text-gray-700 dark:text-slate-300 uppercase text-right" colSpan={3}>Total Mutasi Periode</td>
-                <td className="p-4 text-right font-bold text-gray-700 dark:text-slate-300 whitespace-nowrap">Rp {processedEntries.totalDebit?.toLocaleString('id-ID') || 0}</td>
-                <td className="p-4 text-right font-bold text-gray-700 dark:text-slate-300 whitespace-nowrap">Rp {processedEntries.totalCredit?.toLocaleString('id-ID') || 0}</td>
+                <td className="px-3 py-3 font-bold text-gray-700 dark:text-slate-300 uppercase text-right" colSpan={3}>Total Mutasi Periode</td>
+                <td className="px-3 py-3 text-right font-bold text-gray-700 dark:text-slate-300 whitespace-nowrap">Rp {processedEntries.totalDebit?.toLocaleString('id-ID') || 0}</td>
+                <td className="px-3 py-3 text-right font-bold text-gray-700 dark:text-slate-300 whitespace-nowrap">Rp {processedEntries.totalCredit?.toLocaleString('id-ID') || 0}</td>
                 <td></td>
               </tr>
               {/* Saldo Akhir */}
               <tr className="bg-indigo-100/50 dark:bg-indigo-900/30">
-                <td className="p-4 font-black text-gray-800 dark:text-slate-200 uppercase tracking-wider text-right" colSpan={5}>Saldo Akhir</td>
-                <td className="p-4 text-right font-black text-lg text-indigo-700 dark:text-indigo-400 whitespace-nowrap">Rp {processedEntries.akhir?.toLocaleString('id-ID') || 0}</td>
+                <td className="px-3 py-3 font-black text-gray-800 dark:text-slate-200 uppercase tracking-wider text-right" colSpan={5}>Saldo Akhir</td>
+                <td className="px-3 py-3 text-right font-black text-sm text-indigo-700 dark:text-indigo-400 whitespace-nowrap">Rp {processedEntries.akhir?.toLocaleString('id-ID') || 0}</td>
               </tr>
             </tbody>
           </table>

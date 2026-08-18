@@ -245,7 +245,7 @@ export default function AdminManagementPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300 p-3 md:p-6 pb-20 w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <div className="flex items-center space-x-3">
@@ -339,24 +339,24 @@ export default function AdminManagementPage() {
       {/* Tab Content: Petugas Toko */}
       {activeTab === 'STAFF' && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <table className="w-full text-left border-collapse text-[10px] sm:text-xs min-w-[800px]">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
-                  <th className="p-4">Petugas</th>
-                  <th className="p-4">Username</th>
-                  <th className="p-4">Cabang</th>
-                  <th className="p-4">Tanggal Daftar</th>
-                  <th className="p-4">Disetujui Oleh</th>
-                  <th className="p-4 text-center">Role Akses</th>
-                  <th className="p-4 text-right">Piutang (Kasbon)</th>
-                  <th className="p-4 text-center">Aksi</th>
+                <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-bold">
+                  <th className="px-3 py-3">Petugas</th>
+                  <th className="px-3 py-3">Username</th>
+                  <th className="px-3 py-3">Cabang</th>
+                  <th className="px-3 py-3">Tanggal Daftar</th>
+                  <th className="px-3 py-3">Disetujui Oleh</th>
+                  <th className="px-3 py-3 text-center">Role Akses</th>
+                  <th className="px-3 py-3 text-right">Piutang (Kasbon)</th>
+                  <th className="px-3 py-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {activeStaff.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((user) => (
                   <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       {editingId === user.id ? (
                         <div className="space-y-1.5 min-w-[140px]">
                           <input
@@ -381,7 +381,7 @@ export default function AdminManagementPage() {
                         </div>
                       )}
                     </td>
-                    <td className="p-4 font-mono text-xs text-slate-500 dark:text-slate-400">
+                    <td className="px-3 py-3 font-mono text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400">
                       {editingId === user.id ? (
                         <div className="space-y-1.5 min-w-[140px]">
                           <input
@@ -404,12 +404,12 @@ export default function AdminManagementPage() {
                         `@${user.username}`
                       )}
                     </td>
-                    <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    <td className="px-3 py-3 text-[10px] sm:text-xs font-semibold text-slate-600 dark:text-slate-400">
                       {editingId === user.id ? (
                         <select
                           value={editBranch}
                           onChange={(e) => setEditBranch(e.target.value)}
-                          className="bg-white dark:bg-slate-900 border border-green-300 text-slate-800 dark:text-slate-200 text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-green-500 focus:outline-none"
+                          className="bg-white dark:bg-slate-900 border border-green-300 text-slate-800 dark:text-slate-200 text-[10px] sm:text-xs rounded-lg px-2 py-1 w-full focus:ring-2 focus:ring-green-500 focus:outline-none"
                         >
                           <option value="">Pusat/Global</option>
                           {branches.map(b => (
@@ -417,7 +417,7 @@ export default function AdminManagementPage() {
                           ))}
                         </select>
                       ) : user.branchId ? (
-                        <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 px-2 py-1 rounded w-fit">
+                        <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 px-2 py-1 rounded w-fit text-[9px] sm:text-[10px]">
                           <Store className="w-3 h-3" />
                           {branches.find(b => b.id === user.branchId)?.name || 'Cabang Tidak Dikenal'}
                         </div>
@@ -425,13 +425,13 @@ export default function AdminManagementPage() {
                         <span className="text-slate-400 italic">Pusat/Global</span>
                       )}
                     </td>
-                    <td className="p-4 text-xs text-slate-600 dark:text-slate-400">
+                    <td className="px-3 py-3 text-[10px] sm:text-xs text-slate-600 dark:text-slate-400">
                       {new Date(user.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
-                    <td className="p-4 text-xs text-slate-600 dark:text-slate-400">
+                    <td className="px-3 py-3 text-[10px] sm:text-xs text-slate-600 dark:text-slate-400">
                       {user.approvedBy || <span className="text-slate-400 italic">Akun Bawaan Sistem</span>}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="px-3 py-3 text-center">
                       {editingId === user.id ? (
                         <div className="space-y-1.5">
                           <select
@@ -470,7 +470,7 @@ export default function AdminManagementPage() {
                         </div>
                       )}
                     </td>
-                    <td className="p-4 text-right font-bold text-red-600 dark:text-red-400">
+                    <td className="px-3 py-3 text-right font-bold text-red-600 dark:text-red-400">
                       {editingId === user.id ? (
                         <input
                           type="number"
@@ -513,7 +513,7 @@ export default function AdminManagementPage() {
                         </div>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       <div className="flex justify-center space-x-2">
                         {editingId === user.id ? (
                           <>
@@ -588,16 +588,16 @@ export default function AdminManagementPage() {
               <p className="text-xs text-slate-400 mt-1">Semua akun telah diproses.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="w-full text-left border-collapse text-[10px] sm:text-xs min-w-[700px]">
                 <thead>
-                  <tr className="bg-amber-50 border-b border-amber-100 text-amber-700 text-[11px] uppercase tracking-wider font-bold">
-                    <th className="p-4">Nama</th>
-                    <th className="p-4">Username</th>
-                    <th className="p-4">Cabang</th>
-                    <th className="p-4">Tanggal Daftar</th>
-                    <th className="p-4 text-center">Status</th>
-                    <th className="p-4 text-center">Tindakan</th>
+                  <tr className="bg-amber-50 border-b border-amber-100 text-amber-700 uppercase tracking-wider font-bold">
+                    <th className="px-3 py-3">Nama</th>
+                    <th className="px-3 py-3">Username</th>
+                    <th className="px-3 py-3">Cabang</th>
+                    <th className="px-3 py-3">Tanggal Daftar</th>
+                    <th className="px-3 py-3 text-center">Status</th>
+                    <th className="px-3 py-3 text-center">Tindakan</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">

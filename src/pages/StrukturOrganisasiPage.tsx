@@ -33,7 +33,7 @@ export default function StrukturOrganisasiPage() {
   const pelangganUsers = getRoleUsers('PELANGGAN').length;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-20">
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300 p-3 md:p-6 pb-20 w-full min-w-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center space-x-3">
           <div className="p-3 bg-green-100 text-green-800 rounded-xl">
@@ -46,9 +46,10 @@ export default function StrukturOrganisasiPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-4 md:p-12 w-full mx-auto overflow-x-auto flex flex-col items-center min-w-[700px]">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-4 md:p-12 w-full mx-auto overflow-x-auto hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex flex-col items-center min-w-[700px] mx-auto pb-4">
         
-        {/* Level 1: R.A.T / ANGGOTA (TOP LEVEL) */}
+          {/* Level 1: R.A.T / ANGGOTA (TOP LEVEL) */}
         <div className="flex flex-col items-center w-full">
           <div className="bg-rose-50 border-2 border-rose-400 p-6 rounded-2xl w-full max-w-lg text-center shadow-lg relative z-10">
             <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-rose-100 p-2 rounded-full border-2 border-rose-400">
@@ -182,6 +183,7 @@ export default function StrukturOrganisasiPage() {
           </div>
         </div>
 
+        </div>
       </div>
     </div>
   );

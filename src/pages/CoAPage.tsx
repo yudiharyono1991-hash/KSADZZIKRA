@@ -127,7 +127,7 @@ export default function CoAPage() {
   const paginatedCoa = filteredCoa.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4 md:space-y-6 w-full min-w-0 pb-10">
       {/* Header Banner */}
       <div className="bg-[#135d25] text-white p-8 rounded-2xl shadow-lg relative overflow-hidden flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="absolute -top-12 -right-12 text-[#0e441b] opacity-25">
@@ -137,11 +137,11 @@ export default function CoAPage() {
           <h1 className="text-3xl font-black flex items-center gap-2">
             <BookOpen className="w-8 h-8 text-amber-400" /> Chart of Accounts (CoA)
           </h1>
-          <p className="text-green-100 text-sm max-w-2xl">
+          <p className="text-green-100 text-[11px] sm:text-sm max-w-2xl">
             Manajemen Daftar Akun Perkiraan untuk memetakan pencatatan transaksi keuangan, HPP barang, modal investasi, hingga laporan neraca rugi laba koperasi syariah secara tertib.
           </p>
         </div>
-        <div className="relative z-10 flex items-center gap-2">
+        <div className="relative z-10 flex items-center gap-2 overflow-x-auto w-full hide-scrollbar pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
           {canEditCoa && (
             <>
               <button
@@ -253,7 +253,7 @@ export default function CoAPage() {
       )}
 
       {/* Filters & Search Control */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+      <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs w-full min-w-0">
         <div className="relative flex-1">
           <Search className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
           <input
@@ -267,7 +267,7 @@ export default function CoAPage() {
             className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2 overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
           {categories.map((cat) => (
             <button
               key={cat.value}
@@ -287,16 +287,16 @@ export default function CoAPage() {
       </div>
 
       {/* CoA Table Grid */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-xs font-medium text-slate-700 dark:text-slate-300">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden w-full min-w-0">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full border-collapse text-left text-[11px] sm:text-xs font-medium text-slate-700 dark:text-slate-300 min-w-[500px]">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-extrabold text-[10px]">
               <tr>
-                <th className="px-6 py-4">Kode</th>
-                <th className="px-6 py-4">Nama Akun</th>
-                <th className="px-6 py-4">Kategori</th>
-                <th className="px-6 py-4">Status</th>
-                {canEditCoa && <th className="px-6 py-4 text-right">Aksi</th>}
+                <th className="px-3 py-2.5">Kode</th>
+                <th className="px-3 py-2.5">Nama Akun</th>
+                <th className="px-3 py-2.5">Kategori</th>
+                <th className="px-3 py-2.5">Status</th>
+                {canEditCoa && <th className="px-3 py-2.5 text-right">Aksi</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-semibold text-slate-800 dark:text-slate-200">
@@ -309,22 +309,22 @@ export default function CoAPage() {
               ) : (
                 paginatedCoa.map((acc) => (
                   <tr key={acc.id} className={acc.isActive ? 'hover:bg-slate-50 dark:bg-slate-800' : 'bg-slate-50 dark:bg-slate-800/50 opacity-60'}>
-                    <td className="px-6 py-4 font-mono text-sm text-slate-900 dark:text-white font-bold">{acc.code}</td>
-                    <td className="px-6 py-4 text-sm text-slate-900 dark:text-white">{acc.name}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${getCategoryColor(acc.category)}`}>
+                    <td className="px-3 py-2.5 font-mono text-[11px] sm:text-sm text-slate-900 dark:text-white font-bold">{acc.code}</td>
+                    <td className="px-3 py-2.5 text-[11px] sm:text-sm text-slate-900 dark:text-white max-w-[200px] truncate" title={acc.name}>{acc.name}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${getCategoryColor(acc.category)}`}>
                         {acc.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-2.5">
                       {acc.isActive ? (
-                        <span className="text-green-700 flex items-center gap-1"><CheckCircle className="w-4 h-4" /> Aktif</span>
+                        <span className="text-green-700 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Aktif</span>
                       ) : (
-                        <span className="text-slate-400 flex items-center gap-1"><AlertCircle className="w-4 h-4" /> Nonaktif</span>
+                        <span className="text-slate-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Nonaktif</span>
                       )}
                     </td>
                     {canEditCoa && (
-                      <td className="px-6 py-4 text-right space-x-1">
+                      <td className="px-3 py-2.5 text-right space-x-1 whitespace-nowrap">
                         <button
                           onClick={() => handleOpenEdit(acc)}
                           className="p-1.5 hover:bg-slate-100 dark:bg-slate-800 rounded text-slate-600 dark:text-slate-400 hover:text-green-700 transition cursor-pointer"

@@ -109,7 +109,15 @@ export default function CustomerPortal() {
 
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (p.category && p.category.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesCategory = selectedCategory === 'Semua' || p.category === selectedCategory;
+      
+      let matchesCategory = false;
+      if (selectedCategory === 'Semua') {
+        matchesCategory = true;
+      } else if (selectedCategory === 'Promo') {
+        matchesCategory = p.isPromoActive === true;
+      } else {
+        matchesCategory = p.category === selectedCategory;
+      }
       return matchesSearch && matchesCategory;
     });
   }, [products, searchQuery, selectedCategory, activeTab]);
@@ -155,7 +163,7 @@ export default function CustomerPortal() {
       return true;
     });
     const cats = Array.from(new Set(tabProducts.map(p => p.category))).filter(Boolean).sort();
-    return ['Semua', ...cats];
+    return activeTab === 'CATALOG' ? ['Semua', 'Promo', ...cats] : ['Semua', ...cats];
   }, [products, activeTab]);
 
   // Protect route loosely
@@ -345,8 +353,8 @@ export default function CustomerPortal() {
               onClick={() => setActiveTab(tab as any)}
               className={`flex-1 min-w-[80px] py-2 text-xs font-bold transition-colors relative flex items-center justify-center gap-1 ${
                 activeTab === tab
-                  ? 'text-white bg-white dark:bg-slate-900/20'
-                  : 'text-green-200 hover:text-white hover:bg-white dark:bg-slate-900/10'
+                  ? 'text-green-900 bg-white dark:bg-slate-900/20 dark:text-white'
+                  : 'text-green-200 hover:text-white hover:bg-white/10 dark:bg-slate-900/10'
               }`}
             >
               {label}
@@ -497,11 +505,17 @@ export default function CustomerPortal() {
                           <ProductPlaceholder name={p.name} category={p.category} />
                         )}
                         {/* Category Badge */}
-                        <div className="absolute top-1.5 left-1.5">
-                          <span className="bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+                        <div className="absolute top-1.5 left-1.5 z-10">
+                          <span className="bg-black/50 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-sm shadow-sm">
                             {p.category}
                           </span>
                         </div>
+                        {/* Promo Badge */}
+                        {p.isPromoActive && (
+                          <div className="absolute top-0 right-0 bg-gradient-to-r from-rose-600 to-rose-500 text-white text-[10px] font-black px-2.5 py-1 rounded-bl-xl shadow-lg z-10 animate-pulse border-b border-l border-rose-400/30">
+                            PROMO SPESIAL
+                          </div>
+                        )}
                         {inCart > 0 && (
                           <div className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center px-0.5 shadow">
                             {inCart}
@@ -512,7 +526,14 @@ export default function CustomerPortal() {
                       {/* Product Info */}
                       <div className="p-2 flex flex-col flex-1 gap-1.5">
                         <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-xs leading-tight line-clamp-2 flex-1">{p.name}</h3>
-                        <p className="text-green-700 font-black text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
+                        {p.isPromoActive ? (
+                          <div>
+                            <p className="text-[10px] text-slate-400 line-through">Rp {p.price.toLocaleString('id-ID')}</p>
+                            <p className="text-rose-600 font-black text-sm">Rp {p.promoPrice?.toLocaleString('id-ID')}</p>
+                          </div>
+                        ) : (
+                          <p className="text-green-700 font-black text-sm">Rp {p.price.toLocaleString('id-ID')}</p>
+                        )}
                         {p.isPPOB ? (
                           <p className="text-[10px] text-blue-500 font-semibold">Layanan Digital</p>
                         ) : (

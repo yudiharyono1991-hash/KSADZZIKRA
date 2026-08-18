@@ -149,6 +149,22 @@ export function compressImage(file: File, maxWidth = 800, quality = 0.75): Promi
 /**
  * Robust DB helpers with automatic local fallback when offline/unconfigured.
  */
+// Universal Pagination Helper to prevent 1000 row limits
+async function fetchPaginated(queryBuilder: any): Promise<any[]> {
+  const pageSize = 1000;
+  let offset = 0;
+  const fetched: any[] = [];
+  while (true) {
+    const { data, error } = await queryBuilder.range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    fetched.push(...data);
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+  return fetched;
+}
+
 export const supabaseService = {
   // Helper untuk mendapatkan tenant ID dari localStorage
   getTenantId(): string {
@@ -226,7 +242,9 @@ export const supabaseService = {
         box_price: product.boxPrice || null,
         box_cost_price: product.boxCostPrice || null,
         sales_coa_code: product.salesCoaCode || null,
-        cogs_coa_code: product.cogsCoaCode || null
+        cogs_coa_code: product.cogsCoaCode || null,
+        is_promo_active: product.isPromoActive || false,
+        promo_price: product.promoPrice || 0
       };
 
       const { error } = await supabase
@@ -249,7 +267,9 @@ export const supabaseService = {
             barcode: product.barcode || null,
             is_halal: product.isHalal,
             is_ppob: Boolean(product.isPPOB),
-            image: product.image || null
+            image: product.image || null,
+            is_promo_active: product.isPromoActive || false,
+            promo_price: product.promoPrice || 0
           };
           const { error: retryError } = await supabase
             .from('products')
@@ -295,7 +315,9 @@ export const supabaseService = {
         box_price: p.boxPrice || null,
         box_cost_price: p.boxCostPrice || null,
         sales_coa_code: p.salesCoaCode || null,
-        cogs_coa_code: p.cogsCoaCode || null
+        cogs_coa_code: p.cogsCoaCode || null,
+        is_promo_active: p.isPromoActive || false,
+        promo_price: p.promoPrice || 0
       }));
 
       const { error } = await supabase
@@ -339,10 +361,65 @@ export const supabaseService = {
         : supabase.from('products').delete().eq('tenant_id', tenantId);
       const { error } = await query;
       if (error) throw error;
-      logSync(`Deleted all products for tenant ${tenantId}.`);
+      logSync(`Deleted products for tenant ${tenantId}.`);
       return true;
     } catch (err: any) {
       logSync(`Failed to delete products for tenant ${tenantId}: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  // Promos API
+  async getPromos(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      let query = supabase.from('promos').select('*');
+      query = tenantId === 'tenant_default'
+        ? query.or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+        : query.eq('tenant_id', tenantId);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      logSync(`Failed to fetch promos: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async savePromo(promo: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const tenantId = this.getTenantId();
+      const payload: any = {
+        id: promo.id,
+        tenant_id: promo.tenantId || tenantId,
+        name: promo.name,
+        type: promo.type,
+        value: Number(promo.value),
+        min_purchase: Number(promo.minPurchase || 0),
+        is_active: promo.isActive,
+        branch_id: promo.branchId || null
+      };
+
+      const { error } = await supabase.from('promos').upsert(payload);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save promo: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async deletePromo(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('promos').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete promo: ${err.message}`, true);
       return false;
     }
   },
@@ -352,20 +429,12 @@ export const supabaseService = {
     if (!supabase) return null;
     try {
       const tenantId = this.getTenantId();
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('timestamp', { ascending: false });
-      if (error) {
-        // Fallback: If 'timestamp' column is missing or query fails, try ordering by id or created_at
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .order('id', { ascending: false });
-        if (fallbackError) throw error; // If fallback also fails, throw original
-        return fallbackData;
+      let query = supabase.from('transactions').select('*').eq('tenant_id', tenantId);
+      let data;
+      try {
+        data = await fetchPaginated(query.order('timestamp', { ascending: false }));
+      } catch (e: any) {
+        data = await fetchPaginated(query.order('id', { ascending: false }));
       }
       return data;
     } catch (err: any) {
@@ -611,15 +680,10 @@ export const supabaseService = {
     }
   },
 
-  // Expenses API
   async getExpenses(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
+      const data = await fetchPaginated(supabase.from('expenses').select('*').order('created_at', { ascending: false }));
       return data.map((e: any) => ({
         id: e.id,
         tenantId: e.tenant_id,
@@ -649,7 +713,8 @@ export const supabaseService = {
         description: expense.description,
         created_by: expense.createdBy,
         branch_id: expense.branchId || null,
-        coa_id: expense.coaId || null
+        coa_id: expense.coaId || null,
+        kas_account_id: expense.kasAccountId || null
       };
       const { error } = await supabase.from('expenses').upsert(payload);
       if (error) throw error;
@@ -672,67 +737,81 @@ export const supabaseService = {
     }
   },
 
-  // Promos API
-  async getPromos(): Promise<any[] | null> {
+  // Banners API
+  async getBanners(): Promise<any[] | null> {
     if (!supabase) return null;
     try {
-      const { data, error } = await supabase.from('promos').select('*').order('created_at', { ascending: false });
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase.from('banners').select('*').eq('tenant_id', tenantId).order('sort_order', { ascending: true }).order('created_at', { ascending: false });
       if (error) throw error;
-      return data.map((p: any) => ({
-        id: p.id,
-        tenantId: p.tenant_id,
-        code: p.code,
-        description: p.description,
-        discountType: p.discount_type,
-        discountValue: Number(p.discount_value),
-        minPurchase: Number(p.min_purchase),
-        validFrom: p.valid_from,
-        validUntil: p.valid_until,
-        isActive: p.is_active,
-        branchId: p.branch_id
+      return data.map((b: any) => ({
+        id: b.id,
+        title: b.title,
+        imageUrl: b.image_url,
+        isActive: b.is_active,
+        sortOrder: b.sort_order,
+        targetUrl: b.target_url,
+        tenantId: b.tenant_id,
+        createdAt: b.created_at,
+        updatedAt: b.updated_at
       }));
     } catch (err: any) {
-      logSync(`Failed to fetch promos: ${err.message}`, true);
+      logSync(`Failed to fetch banners: ${err.message}`, true);
       return null;
     }
   },
 
-  async savePromo(promo: any): Promise<boolean> {
+  async addBanner(banner: any): Promise<boolean> {
     if (!supabase) return false;
     try {
-      const payload = {
-        id: promo.id,
-        tenant_id: promo.tenantId || this.getTenantId(),
-        code: promo.code,
-        description: promo.description,
-        discount_type: promo.discountType,
-        discount_value: Number(promo.discountValue),
-        min_purchase: Number(promo.minPurchase),
-        valid_from: promo.validFrom,
-        valid_until: promo.validUntil,
-        is_active: promo.isActive,
-        branch_id: promo.branchId || null
-      };
-      const { error } = await supabase.from('promos').upsert(payload);
+      const { error } = await supabase.from('banners').insert([{
+        id: banner.id,
+        title: banner.title,
+        image_url: banner.imageUrl,
+        is_active: banner.isActive,
+        sort_order: banner.sortOrder,
+        target_url: banner.targetUrl,
+        tenant_id: banner.tenantId
+      }]);
       if (error) throw error;
       return true;
     } catch (err: any) {
-      logSync(`Failed to save promo: ${err.message}`, true);
+      logSync(`Failed to add banner: ${err.message}`, true);
       return false;
     }
   },
 
-  async deletePromo(id: string): Promise<boolean> {
+  async updateBanner(banner: any): Promise<boolean> {
     if (!supabase) return false;
     try {
-      const { error } = await supabase.from('promos').delete().eq('id', id);
+      const { error } = await supabase.from('banners').update({
+        title: banner.title,
+        image_url: banner.imageUrl,
+        is_active: banner.isActive,
+        sort_order: banner.sortOrder,
+        target_url: banner.targetUrl,
+        updated_at: new Date().toISOString()
+      }).eq('id', banner.id);
       if (error) throw error;
       return true;
     } catch (err: any) {
-      logSync(`Failed to delete promo: ${err.message}`, true);
+      logSync(`Failed to update banner: ${err.message}`, true);
       return false;
     }
   },
+
+  async deleteBanner(id: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.from('banners').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to delete banner: ${err.message}`, true);
+      return false;
+    }
+  },
+
 
   // Closings API
   async getClosings(): Promise<any[] | null> {
@@ -836,6 +915,73 @@ export const supabaseService = {
       return true;
     } catch (err: any) {
       logSync(`Failed to save stock movement: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  // Kasbon Payments API
+  async getKasbonPayments(): Promise<any[] | null> {
+    if (!supabase) return null;
+    try {
+      const tenantId = this.getTenantId();
+      const { data, error } = await supabase
+        .from('kasbon_payments')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('payment_date', { ascending: false });
+      if (error) {
+        // Tabel mungkin belum ada — kembalikan null agar tidak crash
+        if (error.code === '42P01' || error.message?.includes('does not exist')) return null;
+        throw error;
+      }
+      return (data || []).map((kp: any) => ({
+        id: kp.id,
+        tenantId: kp.tenant_id,
+        customerId: kp.customer_id,
+        customerName: kp.customer_name,
+        paymentDate: kp.payment_date,
+        amountPaid: Number(kp.amount_paid),
+        remainingDebt: Number(kp.remaining_debt),
+        paymentMethod: kp.payment_method,
+        cashierName: kp.cashier_name,
+        isFullyPaid: Boolean(kp.is_fully_paid),
+        notes: kp.notes || undefined,
+        targetInvoiceNos: kp.target_invoice_nos || undefined
+      }));
+    } catch (err: any) {
+      logSync(`Failed to fetch kasbon payments: ${err.message}`, true);
+      return null;
+    }
+  },
+
+  async saveKasbonPayment(payment: any): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const tenantId = this.getTenantId();
+      const payload = {
+        id: payment.id,
+        tenant_id: payment.tenantId || tenantId,
+        customer_id: payment.customerId,
+        customer_name: payment.customerName,
+        payment_date: payment.paymentDate,
+        amount_paid: Number(payment.amountPaid),
+        remaining_debt: Number(payment.remainingDebt),
+        payment_method: payment.paymentMethod,
+        cashier_name: payment.cashierName,
+        is_fully_paid: Boolean(payment.isFullyPaid),
+        notes: payment.notes || null,
+        target_invoice_nos: payment.targetInvoiceNos || null
+      };
+      const { error } = await supabase.from('kasbon_payments').upsert(payload);
+      if (error) {
+        // Tabel belum ada — simpan diam-diam
+        if (error.code === '42P01' || error.message?.includes('does not exist')) return false;
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate')) return true;
+        throw error;
+      }
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save kasbon payment: ${err.message}`, true);
       return false;
     }
   },

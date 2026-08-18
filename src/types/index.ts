@@ -515,3 +515,14 @@ export interface CoaAccount {
   isActive: boolean;
 }
 
+export interface Banner {
+  id?: string;
+  title: string;
+  imageUrl: string;
+  isActive: boolean;
+  sortOrder: number;
+  targetUrl?: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

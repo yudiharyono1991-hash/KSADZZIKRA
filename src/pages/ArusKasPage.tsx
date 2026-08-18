@@ -28,103 +28,106 @@ export default function ArusKasPage() {
       .reduce((sum, j) => sum + (Number(j.debit) || 0) - (Number(j.credit) || 0), 0);
   }, [journalEntries]);
 
-  const cashMovements: any[] = [];
-  
-  transactions.forEach(t => {
-    // Exclude voided transactions from cash flow report
-    if (t.isVoided) return;
+  const allMovements = React.useMemo(() => {
+    const productMap = new Map(products.map((p: any) => [p.id, p]));
+    const cashMovements: any[] = [];
     
-    const txTotal = t.totalAmount;
-    let fisikTotal = 0;
-    let ppobTotal = 0;
-    
-    t.items?.forEach((item: any) => {
-      const p = products.find((prod: any) => prod.id === item.productId);
-      const isPPOB = p ? p.isPPOB : false;
-      const lineTotal = item.price * item.quantity;
-      if (isPPOB) ppobTotal += lineTotal;
-      else fisikTotal += lineTotal;
-    });
+    transactions.forEach(t => {
+      // Exclude voided transactions from cash flow report
+      if (t.isVoided) return;
+      
+      const txTotal = t.totalAmount;
+      let fisikTotal = 0;
+      let ppobTotal = 0;
+      
+      t.items?.forEach((item: any) => {
+        const p = productMap.get(item.productId) as any;
+        const isPPOB = p ? p.isPPOB : false;
+        const lineTotal = item.price * item.quantity;
+        if (isPPOB) ppobTotal += lineTotal;
+        else fisikTotal += lineTotal;
+      });
 
-    const fisikRatio = txTotal > 0 ? fisikTotal / (fisikTotal + ppobTotal) : (ppobTotal === 0 ? 1 : 0);
-    const ppobRatio = txTotal > 0 ? ppobTotal / (fisikTotal + ppobTotal) : (fisikTotal === 0 && ppobTotal > 0 ? 1 : 0);
+      const fisikRatio = txTotal > 0 ? fisikTotal / (fisikTotal + ppobTotal) : (ppobTotal === 0 ? 1 : 0);
+      const ppobRatio = txTotal > 0 ? ppobTotal / (fisikTotal + ppobTotal) : (fisikTotal === 0 && ppobTotal > 0 ? 1 : 0);
 
-    if (t.splitPayments && t.splitPayments.length > 0) {
-      t.splitPayments.forEach((sp: any, i: number) => {
-        const amt = sp.amount - (i === 0 ? t.changeAmount : 0);
+      if (t.splitPayments && t.splitPayments.length > 0) {
+        t.splitPayments.forEach((sp: any, i: number) => {
+          const amt = sp.amount - (i === 0 ? t.changeAmount : 0);
+          if (fisikRatio > 0) {
+            cashMovements.push({
+              id: `${t.id}_${i}_F`,
+              date: t.timestamp,
+              description: `Pendapatan Penjualan Fisik ${t.invoiceNo} (Split: ${sp.method})`,
+              type: 'IN',
+              amount: amt * fisikRatio,
+              method: sp.method,
+              category: 'FISIK'
+            });
+          }
+          if (ppobRatio > 0) {
+            cashMovements.push({
+              id: `${t.id}_${i}_P`,
+              date: t.timestamp,
+              description: `Pendapatan Penjualan PPOB ${t.invoiceNo} (Split: ${sp.method})`,
+              type: 'IN',
+              amount: amt * ppobRatio,
+              method: sp.method,
+              category: 'PPOB'
+            });
+          }
+        });
+      } else if (t.paymentMethod !== 'KASBON') {
+        const amt = t.totalAmount;
         if (fisikRatio > 0) {
           cashMovements.push({
-            id: `${t.id}_${i}_F`,
+            id: `${t.id}_F`,
             date: t.timestamp,
-            description: `Pendapatan Penjualan Fisik ${t.invoiceNo} (Split: ${sp.method})`,
+            description: `Pendapatan Penjualan Fisik ${t.invoiceNo} (${t.paymentMethod})`,
             type: 'IN',
             amount: amt * fisikRatio,
-            method: sp.method,
+            method: t.paymentMethod,
             category: 'FISIK'
           });
         }
         if (ppobRatio > 0) {
           cashMovements.push({
-            id: `${t.id}_${i}_P`,
+            id: `${t.id}_P`,
             date: t.timestamp,
-            description: `Pendapatan Penjualan PPOB ${t.invoiceNo} (Split: ${sp.method})`,
+            description: `Pendapatan Penjualan PPOB ${t.invoiceNo} (${t.paymentMethod})`,
             type: 'IN',
             amount: amt * ppobRatio,
-            method: sp.method,
+            method: t.paymentMethod,
             category: 'PPOB'
           });
         }
-      });
-    } else if (t.paymentMethod !== 'KASBON') {
-      const amt = t.totalAmount;
-      if (fisikRatio > 0) {
-        cashMovements.push({
-          id: `${t.id}_F`,
-          date: t.timestamp,
-          description: `Pendapatan Penjualan Fisik ${t.invoiceNo} (${t.paymentMethod})`,
-          type: 'IN',
-          amount: amt * fisikRatio,
-          method: t.paymentMethod,
-          category: 'FISIK'
-        });
       }
-      if (ppobRatio > 0) {
-        cashMovements.push({
-          id: `${t.id}_P`,
-          date: t.timestamp,
-          description: `Pendapatan Penjualan PPOB ${t.invoiceNo} (${t.paymentMethod})`,
-          type: 'IN',
-          amount: amt * ppobRatio,
-          method: t.paymentMethod,
-          category: 'PPOB'
-        });
-      }
-    }
-  });
+    });
 
-  const allMovements = [
-    ...cashMovements,
-    ...expenses.map(e => ({
-      id: e.id,
-      date: e.date,
-      description: `Kas Kecil: ${e.description}`,
-      type: (e.amount < 0 ? 'IN' : 'OUT') as 'IN' | 'OUT',
-      amount: Math.abs(e.amount),
-      method: 'CASH',
-      category: 'FISIK'
-    })),
-    ...journalEntries
-      .filter(je => je.account === 'KAS' && je.description.includes('Pelunasan piutang'))
-      .map(je => ({
-        id: je.id,
-        date: je.date,
-        description: je.description,
-        type: 'IN' as const,
-        amount: je.debit,
+    return [
+      ...cashMovements,
+      ...expenses.map(e => ({
+        id: e.id,
+        date: e.date,
+        description: `Kas Kecil: ${e.description}`,
+        type: (e.amount < 0 ? 'IN' : 'OUT') as 'IN' | 'OUT',
+        amount: Math.abs(e.amount),
         method: 'CASH',
         category: 'FISIK'
-      }))
-  ];
+      })),
+      ...journalEntries
+        .filter(je => je.account === 'KAS' && je.description.includes('Pelunasan piutang'))
+        .map(je => ({
+          id: je.id,
+          date: je.date,
+          description: je.description,
+          type: 'IN' as const,
+          amount: je.debit,
+          method: 'CASH',
+          category: 'FISIK'
+        }))
+    ];
+  }, [transactions, products, expenses, journalEntries]);
 
   const now = new Date();
   const todayYear = now.getFullYear();
@@ -183,7 +186,7 @@ export default function ArusKasPage() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 print:m-0 print:p-0">
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300 print:m-0 print:p-0 w-full min-w-0 pb-10">
       
       <PrintHeader title="Laporan Arus Kas" />
 
@@ -301,7 +304,7 @@ export default function ArusKasPage() {
         
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl flex items-center justify-between shadow-sm">
           <div>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Saldo Bersih</p>
+            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Net Arus Kas (Periode)</p>
             <p className="text-xl font-mono font-black text-slate-800 dark:text-slate-200">Rp {netCash.toLocaleString('id-ID')}</p>
           </div>
           <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full flex-shrink-0">
@@ -314,17 +317,17 @@ export default function ArusKasPage() {
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
           <h3 className="font-bold text-slate-700 dark:text-slate-300">Rincian Pergerakan Kas</h3>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left border-collapse min-w-[500px]">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
-                <th className="p-4">Tanggal</th>
-                <th className="p-4">Keterangan</th>
-                <th className="p-4 text-center">Tipe</th>
-                <th className="p-4 text-right">Nominal (Rp)</th>
+              <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider font-bold">
+                <th className="px-3 py-2.5">Tanggal</th>
+                <th className="px-3 py-2.5">Keterangan</th>
+                <th className="px-3 py-2.5 text-center">Tipe</th>
+                <th className="px-3 py-2.5 text-right">Nominal (Rp)</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="text-[11px] sm:text-xs divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredMovements.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="p-12 text-center text-slate-500 dark:text-slate-400 font-medium">
@@ -335,21 +338,21 @@ export default function ArusKasPage() {
                   ) : (
                     paginatedMovements.map((movement) => (
                 <tr key={movement.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
-                  <td className="p-4 text-xs text-slate-500 dark:text-slate-400">
+                  <td className="px-3 py-2.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">
                     {new Date(movement.date).toLocaleString('id-ID')}
                   </td>
-                  <td className="p-4 font-semibold text-slate-700 dark:text-slate-300">{movement.description}</td>
-                  <td className="p-4 text-center">
-                    <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${
+                  <td className="px-3 py-2.5 font-semibold text-slate-700 dark:text-slate-300 max-w-[200px] truncate" title={movement.description}>{movement.description}</td>
+                  <td className="px-3 py-2.5 text-center">
+                    <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider ${
                       movement.type === 'IN' 
                         ? (movement.method === 'CASH' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800') 
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {movement.type === 'IN' ? <ArrowDownLeft className="w-3 h-3"/> : <ArrowUpRight className="w-3 h-3"/>}
+                      {movement.type === 'IN' ? <ArrowDownLeft className="w-2.5 h-2.5"/> : <ArrowUpRight className="w-2.5 h-2.5"/>}
                       <span>{movement.type === 'IN' ? (movement.method === 'CASH' ? 'MASUK TUNAI' : 'MASUK NON-TUNAI') : 'KELUAR'}</span>
                     </span>
                   </td>
-                  <td className={`p-4 text-right font-mono font-bold whitespace-nowrap ${movement.type === 'IN' ? (movement.method === 'CASH' ? 'text-green-600' : 'text-blue-600') : 'text-red-600'}`}>
+                  <td className={`px-3 py-2.5 text-right font-mono font-bold whitespace-nowrap text-[11px] sm:text-xs ${movement.type === 'IN' ? (movement.method === 'CASH' ? 'text-green-600' : 'text-blue-600') : 'text-red-600'}`}>
                     {movement.type === 'IN' ? '+' : '-'}{movement.amount.toLocaleString('id-ID')}
                   </td>
                 </tr>
@@ -405,7 +408,7 @@ export default function ArusKasPage() {
             </tbody>
           <tfoot>
             <tr className="font-bold border-t-2 border-gray-800">
-              <td colSpan={3} className="py-2 px-2 text-right">SALDO BERSIH:</td>
+              <td colSpan={3} className="py-2 px-2 text-right">NET ARUS KAS:</td>
               <td className="py-2 px-2 text-right">Rp {netCash.toLocaleString('id-ID')}</td>
             </tr>
           </tfoot>

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X, Bluetooth, MessageCircle, Download, Search } from 'lucide-react';
+import { Lock, Printer, Plus, AlertCircle, CheckCircle, Calculator, Banknote, MapPin, Camera, Image as ImageIcon, Edit2, X, Bluetooth, MessageCircle, Download, Search, Clock } from 'lucide-react';
 import { printKasbonPaymentToBluetooth } from '../lib/bluetoothPrinter';
 import * as XLSX from 'xlsx';
 
@@ -22,7 +22,7 @@ const getLocalTodayDate = () => {
 };
 
 export default function KasirShiftPage() {
-  const { transactions, products, currentUser, addExpense, updateExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash, customers, kasbonPayments, updateCustomer, addKasbonPayment, coaList, addJournalEntries } = useAppStore();
+  const { transactions, products, currentUser, addExpense, updateExpense, expenses, journalEntries, addJournalEntry, addLog, attendances, clockIn, clockOut, activeBranchId, requestAttendanceCorrection, settings, getCalculatedPettyCash, customers, kasbonPayments, updateCustomer, addKasbonPayment, coaList, addJournalEntries, auditLogs } = useAppStore();
   const [pettyCashAmount, setPettyCashAmount] = useState('');
   const [pettyCashDesc, setPettyCashDesc] = useState('');
   const [pettyCashCustomDesc, setPettyCashCustomDesc] = useState('');
@@ -245,11 +245,42 @@ export default function KasirShiftPage() {
     .filter(t => t.paymentMethod === 'KASBON' && !t.isVoided)
     .reduce((sum, t) => sum + t.totalAmount, 0);
 
+  const totalPelunasanKasbonMasuk = manualJournalsToday
+    .filter(j => (j.description.toLowerCase().includes('pelunasan') && j.description.toLowerCase().includes('kasbon')) && j.debit > 0)
+    .reduce((sum, j) => sum + (j.debit || 0), 0);
+
   const totalPettyCash = myExpenses.reduce((sum, exp) => sum + exp.amount, 0) + 
     manualJournalsToday.reduce((sum, j) => sum + (j.credit || 0) - (j.debit || 0), 0);
 
   // Fisik Tunai yang Diharapkan adalah SISA SALDO BENAR di Jurnal Kas (1-1000)
   const expectedCash = getCalculatedPettyCash();
+
+  const shiftLogs = (auditLogs || []).filter(log => log.action === 'SHIFT_CLOSED');
+const sortedShiftLogs = shiftLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+const lastShiftLog = sortedShiftLogs[0];
+  let lastShiftInfo = null;
+  if (lastShiftLog) {
+    const d = new Date(lastShiftLog.timestamp);
+    const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const match = lastShiftLog.details.match(/Fisik:\s*Rp\s*([\d.,]+)/);
+    let cashValue = 'Rp 0';
+    if (match) {
+      const rawNum = parseInt(match[1].replace(/\./g, '').replace(/,/g, ''), 10);
+      if (!isNaN(rawNum)) {
+        const roundedNum = Math.round(rawNum / 100) * 100;
+        cashValue = `Rp ${roundedNum.toLocaleString('id-ID')}`;
+      } else {
+        cashValue = `Rp ${match[1]}`;
+      }
+    }
+    lastShiftInfo = {
+      date: dateStr,
+      time: timeStr,
+      cash: cashValue,
+      user: lastShiftLog.user || 'Unknown'
+    };
+  }
 
   const handleAddPettyCash = (e: React.FormEvent) => {
     e.preventDefault();
@@ -397,9 +428,9 @@ export default function KasirShiftPage() {
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="print:hidden space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4 md:space-y-6 w-full min-w-0">
+      <div className="print:hidden space-y-4 md:space-y-6 w-full min-w-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
             <Lock className="w-6 h-6 text-green-600" />
@@ -631,20 +662,44 @@ export default function KasirShiftPage() {
             </div>
             <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800">
               <div>
-                <span className="font-medium block">Pembayaran Kasbon</span>
-                <span className="text-[10px] text-rose-500 font-semibold">(Piutang Pelanggan 1-1030)</span>
+                <span className="font-medium block">Kasbon Pelanggan (Shift Ini)</span>
+                <span className="text-[10px] text-rose-500 font-semibold">(Barang diambil tapi belum dibayar)</span>
               </div>
               <span className="font-bold text-rose-600">Rp {totalKasbon.toLocaleString('id-ID')}</span>
             </div>
+            {totalPelunasanKasbonMasuk > 0 && (
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800">
+                <div>
+                  <span className="font-medium block">Penerimaan Cicilan/Pelunasan Kasbon</span>
+                  <span className="text-[10px] text-emerald-500 font-semibold">(Kas Masuk Tunai ke Kas Kecil 1102)</span>
+                </div>
+                <span className="font-bold text-emerald-600">+ Rp {totalPelunasanKasbonMasuk.toLocaleString('id-ID')}</span>
+              </div>
+            )}
             <div className={`flex justify-between items-center py-3 border-b border-gray-100 dark:border-slate-800 ${totalPettyCash < 0 ? 'text-green-600' : 'text-rose-600'}`}>
               <div>
                 <span className="font-medium block">Mutasi Kas Kecil Shift Ini</span>
-                <span className="text-[10px] text-gray-500 font-semibold">(Dipakai dari / Disetor ke Kas Kecil 1102)</span>
+                <span className="text-[10px] text-gray-500 font-semibold">(Pengeluaran / Pemasukan Kas Kecil 1102)</span>
               </div>
               <span className="font-bold">{totalPettyCash < 0 ? '+' : '-'} Rp {Math.abs(totalPettyCash).toLocaleString('id-ID')}</span>
             </div>
             
             <div className="pt-3 pb-1 border-t border-teal-200 dark:border-teal-800">
+              {lastShiftInfo && (
+                <div className="mb-3 p-3 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/50">
+                  <h4 className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300 mb-1 uppercase tracking-wider flex items-center gap-1"><Clock className="w-3 h-3"/> Histori Tutup Shift Terakhir</h4>
+                  <div className="flex justify-between items-center text-xs text-indigo-900 dark:text-indigo-200">
+                    <div>
+                      <span className="font-semibold block">{lastShiftInfo.date} • {lastShiftInfo.time} WIB</span>
+                      <span className="text-[10px] opacity-80">Kasir: {lastShiftInfo.user}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[10px] opacity-80">Saldo Fisik Dilaporkan</span>
+                      <span className="font-mono font-bold text-sm">{lastShiftInfo.cash}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center py-2.5 px-3.5 bg-teal-50/70 dark:bg-teal-950/40 rounded-lg border border-teal-200/80 dark:border-teal-800/80">
                 <div>
                   <span className="font-bold text-teal-900 dark:text-teal-200 text-xs block">Estimasi Fisik Tunai di Laci</span>
@@ -684,12 +739,12 @@ export default function KasirShiftPage() {
                 Opsional: Isi saldo sisa di masing-masing aplikasi untuk dicocokkan otomatis oleh sistem. Kosongkan jika tidak ada perubahan.
               </p>
               
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                <div className="w-full">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Radar Pulsa</label>
                   <input type="number" value={digitalBalances.radar} onChange={e => setDigitalBalances(d => ({...d, radar: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
-                <div>
+                <div className="w-full">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Kemenkuota</label>
                   <input type="number" value={digitalBalances.kemenkuota} onChange={e => setDigitalBalances(d => ({...d, kemenkuota: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
@@ -697,11 +752,11 @@ export default function KasirShiftPage() {
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Boss Pulsa</label>
                   <input type="number" value={digitalBalances.bosspulsa} onChange={e => setDigitalBalances(d => ({...d, bosspulsa: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
-                <div>
+                <div className="w-full">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Tokopedia</label>
                   <input type="number" value={digitalBalances.tokopedia} onChange={e => setDigitalBalances(d => ({...d, tokopedia: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2 w-full">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Dana Dokuku (1117)</label>
                   <input type="number" value={digitalBalances.dana} onChange={e => setDigitalBalances(d => ({...d, dana: e.target.value}))} className="w-full border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 outline-none focus:border-orange-400" placeholder="Rp..." />
                 </div>
@@ -713,10 +768,10 @@ export default function KasirShiftPage() {
             <button
               onClick={handleCloseShift}
               disabled={isShiftClosed}
-              className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors flex-1 text-white text-lg shadow-lg shadow-orange-900/20 active:scale-95 disabled:opacity-50 ${
+              className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors flex-1 text-white text-lg shadow-lg shadow-black/30 active:scale-95 disabled:opacity-50 ${
                 isShiftClosed 
-                ? 'bg-orange-600 cursor-not-allowed opacity-50' 
-                : 'bg-orange-600 hover:bg-orange-700'
+                ? 'bg-gray-500 cursor-not-allowed opacity-50' 
+                : 'bg-gray-900 hover:bg-black'
               }`}
             >
               {isShiftClosed ? <CheckCircle className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
@@ -742,23 +797,23 @@ export default function KasirShiftPage() {
               </span>
             </div>
             <form onSubmit={handleAddPettyCash} className="space-y-3 relative z-10">
-              <div className="flex bg-amber-100 rounded-lg p-1">
+              <div className="flex bg-amber-100 rounded-lg p-1 border border-amber-400">
                 <button
                   type="button"
                   onClick={() => setPettyCashType('PENGELUARAN')}
-                  className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${pettyCashType === 'PENGELUARAN' ? 'bg-amber-500 text-white shadow-sm' : 'text-amber-800 hover:bg-amber-200'}`}
+                  className={`flex-1 text-xs font-extrabold py-2 rounded-md transition-colors border-2 ${pettyCashType === 'PENGELUARAN' ? 'bg-amber-600 text-white border-amber-900 shadow-sm' : 'text-amber-900 border-transparent hover:bg-amber-200'}`}
                 >
                   Pengeluaran
                 </button>
                 <button
                   type="button"
                   onClick={() => setPettyCashType('PEMASUKAN')}
-                  className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${pettyCashType === 'PEMASUKAN' ? 'bg-amber-500 text-white shadow-sm' : 'text-amber-800 hover:bg-amber-200'}`}
+                  className={`flex-1 text-xs font-extrabold py-2 rounded-md transition-colors border-2 ${pettyCashType === 'PEMASUKAN' ? 'bg-amber-600 text-white border-amber-900 shadow-sm' : 'text-amber-900 border-transparent hover:bg-amber-200'}`}
                 >
                   Pemasukan
                 </button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1">
                   <label className="text-[10px] font-bold text-amber-800 uppercase">Tanggal Input</label>
                   <input 
@@ -852,7 +907,7 @@ export default function KasirShiftPage() {
               <button 
                 type="submit"
                 disabled={isShiftClosed}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-lg transition-colors flex justify-center items-center gap-1 disabled:opacity-50 shadow-md shadow-amber-900/10"
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-3 rounded-lg transition-colors flex justify-center items-center gap-1 disabled:opacity-50 shadow-md border-2 border-amber-900"
               >
                 <Plus className="w-4 h-4" /> {pettyCashType === 'PEMASUKAN' ? 'Tambah Pemasukan' : 'Tambah Pengeluaran'}
               </button>
@@ -1011,7 +1066,7 @@ export default function KasirShiftPage() {
                  </button>
                </div>
              </div>
-             <div className="p-2 space-y-1 max-h-60 overflow-y-auto overflow-x-auto">
+             <div className="p-2 space-y-1 max-h-60 overflow-y-auto overflow-x-hidden w-full">
                 {(() => {
                   const baseExpenses = (expenses || []).filter(exp => 
                     exp.category === 'OPERASIONAL' &&
@@ -1063,10 +1118,10 @@ export default function KasirShiftPage() {
                           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
                         </div>
                       </div>
-                      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-2">
-                        <button onClick={() => setPettyCashFilter('ALL')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'ALL' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>Semua</button>
-                        <button onClick={() => setPettyCashFilter('IN')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'IN' ? 'bg-white dark:bg-slate-700 shadow-sm text-green-600' : 'text-slate-500 hover:text-green-600'}`}>Pemasukan</button>
-                        <button onClick={() => setPettyCashFilter('OUT')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${pettyCashFilter === 'OUT' ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600' : 'text-slate-500 hover:text-rose-600'}`}>Pengeluaran</button>
+                      <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 mb-2 border border-slate-300">
+                        <button onClick={() => setPettyCashFilter('ALL')} className={`flex-1 text-[10px] font-extrabold py-2 rounded-md transition-colors border-2 ${pettyCashFilter === 'ALL' ? 'bg-slate-700 shadow-sm text-white border-slate-900' : 'text-slate-700 border-transparent hover:bg-slate-300'}`}>Semua</button>
+                        <button onClick={() => setPettyCashFilter('IN')} className={`flex-1 text-[10px] font-extrabold py-2 rounded-md transition-colors border-2 ${pettyCashFilter === 'IN' ? 'bg-green-700 shadow-sm text-white border-green-900' : 'text-green-800 border-transparent hover:bg-green-200'}`}>Pemasukan</button>
+                        <button onClick={() => setPettyCashFilter('OUT')} className={`flex-1 text-[10px] font-extrabold py-2 rounded-md transition-colors border-2 ${pettyCashFilter === 'OUT' ? 'bg-red-700 shadow-sm text-white border-red-900' : 'text-red-800 border-transparent hover:bg-red-200'}`}>Pengeluaran</button>
                       </div>
 
                       <div className="space-y-1 overflow-y-auto max-h-60 mb-2">
@@ -1074,7 +1129,7 @@ export default function KasirShiftPage() {
                           <p className="text-xs text-slate-400 text-center py-4 italic">Belum ada transaksi.</p>
                         ) : (
                           displayedPettyCash.map(exp => (
-                            <div key={exp.id} className="min-w-[320px] flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 rounded text-xs transition-colors border-b border-slate-100 dark:border-slate-700/50">
+                            <div key={exp.id} className="w-full flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:bg-slate-800 rounded text-xs transition-colors border-b border-slate-100 dark:border-slate-700/50">
                               <div className="flex flex-col">
                                 <span className="font-bold text-slate-700 dark:text-slate-300">{exp.description}</span>
                                 <span className="text-[9px] text-slate-400">
@@ -1152,7 +1207,7 @@ export default function KasirShiftPage() {
       </div>
 
       {/* Riwayat Absensi */}
-      <div className="print:hidden bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+      <div className="print:hidden bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 min-w-0">
         <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <h2 className="font-bold text-slate-800 dark:text-slate-200 text-md flex items-center gap-2">
             Riwayat Absensi Anda
@@ -1168,34 +1223,34 @@ export default function KasirShiftPage() {
             <option value="ALL">Semua Riwayat</option>
           </select>
         </div>
-        <div className="p-0 overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px]">
+        <div className="p-0 overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full text-left border-collapse min-w-[700px] text-[10px] sm:text-xs">
             <thead>
-              <tr className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs uppercase">
-                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Tanggal</th>
-                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Jam Masuk</th>
-                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Jam Keluar</th>
-                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Bukti Kehadiran</th>
-                <th className="p-4 font-bold border-b border-slate-200 dark:border-slate-700">Aksi</th>
+              <tr className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase">
+                <th className="px-3 py-3 font-bold border-b border-slate-200 dark:border-slate-700">Tanggal</th>
+                <th className="px-3 py-3 font-bold border-b border-slate-200 dark:border-slate-700">Jam Masuk</th>
+                <th className="px-3 py-3 font-bold border-b border-slate-200 dark:border-slate-700">Jam Keluar</th>
+                <th className="px-3 py-3 font-bold border-b border-slate-200 dark:border-slate-700">Bukti Kehadiran</th>
+                <th className="px-3 py-3 font-bold border-b border-slate-200 dark:border-slate-700">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500 dark:text-slate-400 text-sm">Tidak ada riwayat absensi.</td>
+                  <td colSpan={5} className="p-8 text-center text-slate-500 dark:text-slate-400">Tidak ada riwayat absensi.</td>
                 </tr>
               ) : (
                 filteredHistory.map(att => (
                   <tr key={att.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800">
-                    <td className="p-4 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="px-3 py-3 font-semibold text-slate-800 dark:text-slate-200">
                       {new Date(att.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
-                      {att.isRevised && <span className="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Direvisi</span>}
-                      {att.correctionStatus === 'PENDING' && <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1 rounded">Menunggu Koreksi</span>}
-                      {att.correctionStatus === 'REJECTED' && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1 rounded">Koreksi Ditolak</span>}
+                      {att.isRevised && <span className="ml-1 text-[9px] bg-amber-100 text-amber-700 px-1 rounded">Direvisi</span>}
+                      {att.correctionStatus === 'PENDING' && <span className="ml-1 text-[9px] bg-blue-100 text-blue-700 px-1 rounded">Menunggu Koreksi</span>}
+                      {att.correctionStatus === 'REJECTED' && <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded">Koreksi Ditolak</span>}
                     </td>
-                    <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{new Date(att.clockIn).toLocaleTimeString('id-ID')}</td>
-                    <td className="p-4 text-sm text-slate-700 dark:text-slate-300">{att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-'}</td>
-                    <td className="p-4 flex gap-2 items-center">
+                    <td className="px-3 py-3 text-slate-700 dark:text-slate-300">{new Date(att.clockIn).toLocaleTimeString('id-ID')}</td>
+                    <td className="px-3 py-3 text-slate-700 dark:text-slate-300">{att.clockOut ? new Date(att.clockOut).toLocaleTimeString('id-ID') : '-'}</td>
+                    <td className="px-3 py-3 flex gap-2 items-center">
                       {att.photoUrl ? (
                         <div className="flex flex-col gap-1 items-center" title="Foto Masuk">
                           <img src={att.photoUrl} alt="Masuk" className="w-8 h-8 object-cover rounded border border-green-500" />
@@ -1212,7 +1267,7 @@ export default function KasirShiftPage() {
                         att.clockOut && <span className="text-xs text-slate-400">Tidak ada foto keluar</span>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       {att.correctionStatus !== 'PENDING' && att.correctionStatus !== 'APPROVED' && (
                         <button
                           onClick={() => { setCorrectionModal({open: true, attendanceId: att.id}); setCorrType('CLOCK_IN'); setCorrReason(''); setCorrReqClockIn(''); setCorrReqClockOut(''); }}
@@ -1681,7 +1736,7 @@ export default function KasirShiftPage() {
                     className="w-full p-3 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                   <datalist id="debit-options">
-                    {coaList?.filter((c: any) => c.isActive && c.name.toLowerCase().includes('kas') || c.name.toLowerCase().includes('bank')).map((c: any) => (
+                    {coaList?.filter((c: any) => c.isActive && (c.name.toLowerCase().includes('kas') || c.name.toLowerCase().includes('bank') || c.name.toLowerCase().includes('qris'))).map((c: any) => (
                       <option key={c.id} value={`${c.code} - ${c.name}`} />
                     ))}
                   </datalist>
@@ -1756,7 +1811,7 @@ export default function KasirShiftPage() {
                     const getAccountForMethod = (method: string) => {
                       if (method === 'QRIS_SHARIAH') return '1-1020';
                       if (method === 'TRANSFER_BSI') return '1103';
-                      return '1101';
+                      return '1102';
                     };
 
                     let targetAccount = getAccountForMethod(paymentMethod);

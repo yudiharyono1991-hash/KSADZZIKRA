@@ -768,8 +768,8 @@ export default function InventoryPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-2 overflow-x-auto w-full hide-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <input
                 type="text"
                 placeholder="Tambah kategori baru"
@@ -796,12 +796,12 @@ export default function InventoryPage() {
 
             <button
               onClick={downloadTemplate}
-              className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 border border-slate-350 font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              className="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-900 dark:text-slate-100 border-2 border-slate-700 font-extrabold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-sm active:scale-98 transition-all flex-shrink-0 whitespace-nowrap"
             >
               <span>📥 Template Excel</span>
             </button>
 
-            <label className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all cursor-pointer">
+            <label className="bg-blue-700 hover:bg-blue-800 text-white font-extrabold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-sm border-2 border-blue-950 active:scale-98 transition-all cursor-pointer flex-shrink-0 whitespace-nowrap">
               <Upload className="w-4 h-4" />
               <span>Import Excel</span>
               <input
@@ -814,7 +814,7 @@ export default function InventoryPage() {
 
             <button
               onClick={handleExportExcel}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              className="bg-indigo-700 hover:bg-indigo-800 text-white font-extrabold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-sm border-2 border-indigo-950 active:scale-98 transition-all flex-shrink-0 whitespace-nowrap"
             >
               <Download className="w-4 h-4" />
               <span>Export Excel</span>
@@ -822,7 +822,7 @@ export default function InventoryPage() {
 
             <button
               onClick={handleClearInventory}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              className="bg-red-700 hover:bg-red-800 text-white font-extrabold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-sm border-2 border-red-950 active:scale-98 transition-all flex-shrink-0 whitespace-nowrap"
             >
               <Trash2 className="w-4 h-4" />
               <span>Hapus Semua Produk</span>
@@ -831,7 +831,7 @@ export default function InventoryPage() {
             {selectedProductIds.length > 0 && (
               <button
                 onClick={handleBulkDelete}
-                className="bg-red-500 hover:bg-red-600 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+                className="bg-red-700 hover:bg-red-800 text-white font-extrabold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-sm border-2 border-red-950 active:scale-98 transition-all flex-shrink-0 whitespace-nowrap"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Hapus Terpilih ({selectedProductIds.length})</span>
@@ -840,7 +840,7 @@ export default function InventoryPage() {
 
             <button
               onClick={handleOpenAdd}
-              className="bg-green-700 hover:bg-green-800 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
+              className="bg-green-700 hover:bg-green-800 text-white font-extrabold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-sm border-2 border-green-950 active:scale-98 transition-all flex-shrink-0 whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah SKU</span>
@@ -849,8 +849,8 @@ export default function InventoryPage() {
         </div>
 
         {/* Master Products Listing Table (virtualized list for performance) */}
-        <div className="overflow-x-auto">
-          <div className="min-w-[1000px] text-left text-xs border-collapse">
+        <div className="overflow-x-auto w-full hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="min-w-[1000px] text-left text-[11px] sm:text-xs border-collapse">
             <div className="bg-slate-50 dark:bg-slate-800 uppercase tracking-widest text-[10px] text-gray-500 dark:text-slate-400 font-bold border-b border-gray-100 dark:border-slate-800 py-3 px-4 grid grid-cols-12 gap-3 items-center">
               <div className="col-span-1 flex items-center gap-2 whitespace-nowrap">
                 <input 
