@@ -1172,50 +1172,52 @@ export default function CustomerManagementPage() {
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 bg-slate-50 dark:bg-slate-900/50">
-              <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 font-bold border-b border-gray-200 dark:border-slate-700">
-                    <tr>
-                      <th className="px-4 py-3">Tanggal & Waktu</th>
-                      <th className="px-4 py-3">Ref ID</th>
-                      <th className="px-4 py-3">Keterangan</th>
-                      <th className="px-4 py-3 text-right">Debit (Penambahan)</th>
-                      <th className="px-4 py-3 text-right">Kredit (Pelunasan)</th>
-                      <th className="px-4 py-3 text-right text-blue-600 dark:text-blue-400">Saldo Akhir</th>
-                      <th className="px-4 py-3">Kasir</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                    {getKasbonHistory(kasbonHistoryModal.customerId).map((item, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-4 py-3 text-gray-600 dark:text-slate-400 whitespace-nowrap">{item.date.toLocaleString('id-ID')}</td>
-                        <td className="px-4 py-3 text-xs font-mono text-gray-400">{item.ref.substring(0, 8)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${
-                            item.type === 'PEMBELIAN' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {item.type === 'PEMBELIAN' ? (item.isLunas ? 'Kasbon (Lunas)' : 'Kasbon (Belum Lunas)') : 'Pelunasan Kasbon'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-rose-600 dark:text-rose-400">
-                          {item.type === 'PEMBELIAN' ? `Rp ${item.amount.toLocaleString('id-ID')}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                          {item.type === 'PELUNASAN' ? `Rp ${item.amount.toLocaleString('id-ID')}` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          Rp {item.balance.toLocaleString('id-ID')}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500 dark:text-slate-400 text-xs">{item.cashier}</td>
-                      </tr>
-                    ))}
-                    {getKasbonHistory(kasbonHistoryModal.customerId).length === 0 && (
+              <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-xs min-w-max">
+                    <thead className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 font-bold border-b border-gray-200 dark:border-slate-700 whitespace-nowrap">
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400 italic">Belum ada riwayat kasbon untuk pelanggan ini.</td>
+                        <th className="px-3 py-2">Tanggal & Waktu</th>
+                        <th className="px-3 py-2">Ref ID</th>
+                        <th className="px-3 py-2">Keterangan</th>
+                        <th className="px-3 py-2 text-right">Debit (Penambahan)</th>
+                        <th className="px-3 py-2 text-right">Kredit (Pelunasan)</th>
+                        <th className="px-3 py-2 text-right text-blue-600 dark:text-blue-400">Saldo Akhir</th>
+                        <th className="px-3 py-2">Kasir</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                      {getKasbonHistory(kasbonHistoryModal.customerId).map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="px-3 py-2 text-gray-600 dark:text-slate-400 whitespace-nowrap">{item.date.toLocaleString('id-ID')}</td>
+                          <td className="px-3 py-2 text-[10px] font-mono text-gray-400 whitespace-nowrap">{item.ref.substring(0, 8)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${
+                              item.type === 'PEMBELIAN' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {item.type === 'PEMBELIAN' ? (item.isLunas ? 'Kasbon (Lunas)' : 'Kasbon (Belum Lunas)') : 'Pelunasan Kasbon'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                            {item.type === 'PEMBELIAN' ? `Rp ${item.amount.toLocaleString('id-ID')}` : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                            {item.type === 'PELUNASAN' ? `Rp ${item.amount.toLocaleString('id-ID')}` : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right font-bold text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10 whitespace-nowrap">
+                            Rp {item.balance.toLocaleString('id-ID')}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500 dark:text-slate-400 text-[10px] whitespace-nowrap">{item.cashier}</td>
+                        </tr>
+                      ))}
+                      {getKasbonHistory(kasbonHistoryModal.customerId).length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-8 text-center text-gray-400 italic">Belum ada riwayat kasbon untuk pelanggan ini.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
