@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     cashier_name TEXT,
     items JSONB DEFAULT '[]'::jsonb,
     total_amount NUMERIC NOT NULL DEFAULT 0,
+    shipping_fee NUMERIC DEFAULT 0,
     payment_method TEXT,
     amount_paid NUMERIC NOT NULL DEFAULT 0,
     change_amount NUMERIC NOT NULL DEFAULT 0,
@@ -122,6 +123,8 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     points_redeemed NUMERIC DEFAULT 0,
     points_discount NUMERIC DEFAULT 0,
     branch_id TEXT,
+    customer_rating TEXT,
+    customer_feedback TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
@@ -145,6 +148,7 @@ CREATE TABLE IF NOT EXISTS public.online_orders (
     distance_km NUMERIC,
     items JSONB DEFAULT '[]'::jsonb,
     total_amount NUMERIC DEFAULT 0,
+    shipping_fee NUMERIC DEFAULT 0,
     status TEXT DEFAULT 'PENDING',
     branch_id TEXT,
     notes TEXT,
@@ -181,11 +185,14 @@ CREATE TABLE IF NOT EXISTS public.store_settings (
     qris_image_url TEXT,
     maintenance_mode BOOLEAN DEFAULT false,
     minimum_cash_balance NUMERIC DEFAULT 1000000,
+    petty_cash_balance NUMERIC DEFAULT 0,
     zakat_rate NUMERIC DEFAULT 2.5,
     auto_approve_transactions BOOLEAN DEFAULT false,
     owner_bank_name TEXT,
     owner_bank_account TEXT,
     payment_methods JSONB DEFAULT '{"bankTransfer": [], "ewallet": []}'::jsonb,
+    landing_page_config JSONB DEFAULT '{}'::jsonb,
+    operational_hours JSONB DEFAULT '{"isOpen": true, "openTime": "07:00", "closeTime": "21:00", "closedMessage": "Maaf, toko sedang tutup."}'::jsonb,
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
@@ -318,6 +325,7 @@ CREATE TABLE IF NOT EXISTS public.ksa_users (
     role TEXT NOT NULL DEFAULT 'KASIR',
     phone TEXT,
     branch_id TEXT,
+    debt_amount NUMERIC DEFAULT 0,
     is_active BOOLEAN DEFAULT true,
     is_approved BOOLEAN DEFAULT false,
     approved_by TEXT,
@@ -340,7 +348,10 @@ CREATE TABLE IF NOT EXISTS public.ksa_branches (
     name TEXT NOT NULL,
     address TEXT,
     phone TEXT,
+    whatsapp TEXT,
     is_active BOOLEAN DEFAULT true,
+    qris_image_url TEXT,
+    payment_methods JSONB,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.ksa_branches ENABLE ROW LEVEL SECURITY;
@@ -374,6 +385,21 @@ DROP POLICY IF EXISTS "attendance_all" ON public.attendance;
 CREATE POLICY "attendance_select" ON public.attendance FOR SELECT USING (true);
 CREATE POLICY "attendance_all" ON public.attendance FOR ALL USING (true) WITH CHECK (true);
 
+
+-- ============================================================
+-- 14. TABEL: product_categories (Kategori Produk)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.product_categories (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "product_categories_select" ON public.product_categories;
+DROP POLICY IF EXISTS "product_categories_all" ON public.product_categories;
+CREATE POLICY "product_categories_select" ON public.product_categories FOR SELECT USING (true);
+CREATE POLICY "product_categories_all" ON public.product_categories FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- SELESAI! Semua tabel KSA Mart - KSADZZIKRA sudah siap.

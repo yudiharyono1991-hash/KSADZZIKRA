@@ -52,7 +52,7 @@ export default function JadwalShalatWidget() {
     'Dzuhur': <Sun className="w-8 h-8 text-amber-500" />,
     'Ashar': <Sun className="w-8 h-8 text-orange-500" />,
     'Maghrib': <Sunset className="w-8 h-8 text-rose-500" />,
-    'Isya': <Moon className="w-8 h-8 text-slate-700" />,
+    'Isya': <Moon className="w-8 h-8 text-slate-700 dark:text-slate-300" />,
   };
 
   return (
@@ -76,15 +76,15 @@ export default function JadwalShalatWidget() {
       </div>
 
       {/* CITY SELECTOR */}
-      <div className="mt-6 flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-        <div className="flex items-center gap-2 text-slate-500 font-medium whitespace-nowrap">
+      <div className="mt-6 flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
           <MapPin className="w-5 h-5" />
           <span>Pilih Kota Lokasi:</span>
         </div>
         <select 
           value={cityId}
           onChange={(e) => setCityId(e.target.value)}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold text-green-800 focus:ring-2 focus:ring-green-500 focus:outline-none"
+          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 font-bold text-green-800 focus:ring-2 focus:ring-green-500 focus:outline-none"
         >
           <option value="1301">Kota Jakarta</option>
           <option value="1219">Kota Bandung</option>
@@ -107,11 +107,11 @@ export default function JadwalShalatWidget() {
       ) : jadwal ? (
         <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
           {['Subuh', 'Dzuhur', 'Ashar', 'Maghrib', 'Isya'].map((waktu) => (
-            <div key={waktu} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center hover:border-green-300 hover:shadow-md transition-all">
-              <div className="mb-3 bg-slate-50 p-3 rounded-full">
+            <div key={waktu} className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center text-center hover:border-green-300 hover:shadow-md transition-all">
+              <div className="mb-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-full">
                 {prayerIcons[waktu]}
               </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">{waktu}</h3>
+              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">{waktu}</h3>
               <p className="text-2xl font-black font-mono text-green-800">
                 {jadwal[waktu.toLowerCase() as keyof PrayerTimes]}
               </p>

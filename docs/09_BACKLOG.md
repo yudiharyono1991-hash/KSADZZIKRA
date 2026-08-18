@@ -5,6 +5,18 @@
 **Last Updated:** Juli 2026  
 **Status Legend:** 🟢 Done | 🟡 In Progress | 🔵 Planned | ⚪ Wishlist
 
+
+---
+
+## Hotfixes (Agustus 2026)
+
+| # | Item | Status |
+|---|------|--------|
+| HF.1 | Perbaikan filter Saldo Kas/Bank agar tidak terbaca sebagai Persediaan | 🟢 Done |
+| HF.2 | Perbaikan filter Pembayaran Piutang Pelanggan di Neraca | 🟢 Done |
+| HF.3 | Sinkronisasi Auto-Correct Nama Owner (Dr. Grandis) dengan Supabase | 🟢 Done |
+| HF.4 | Opsi Pembayaran Transfer Bank di Pelunasan Kasbon | 🟢 Done |
+
 ---
 
 ## EPIC 1: Core POS

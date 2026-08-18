@@ -1,45 +1,49 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/Layout/MainLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import { useAppStore } from './store';
 import { isSupabaseConfigured, subscribeToTable } from './lib/supabase';
-import {
-  LandingPage,
-  KasirPOS,
-  InventoryPage,
-  TrendPage,
-  SalesReportPage,
-  JurnalUmumPage,
-  ArusKasPage,
-  ZakatPage,
-  AuditLogPage,
-  NeracaRugiPage,
-  AdminManagementPage,
-  PurchaseOrderPage,
-  BranchManagementPage,
-  KasirRiwayatPage,
-  CustomerManagementPage,
-  SupplierManagementPage,
-  PromoManagementPage,
-  StaffManagementPage,
-  SettingsPage,
-  StockOpnamePage,
-  StrukturOrganisasiPage,
-  CustomerPortal,
-  OnlineOrdersPage,
-  QuranPage,
-  JadwalShalatPage,
-  ArtikelIslamiPage,
-  BukuPanduanPage,
-  RegisterPage,
-  KatalogUmumPage,
-  CoAPage,
-  BeritaPusatPage,
-  LoyaltyProgramPage,
-  PPOBInventoryPage
-} from './pages';
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const KasirPOS = lazy(() => import('./pages/KasirPOS'));
+const InventoryPage = lazy(() => import('./pages/InventoryPage'));
+const TrendPage = lazy(() => import('./pages/TrendPage'));
+const SalesReportPage = lazy(() => import('./pages/SalesReportPage'));
+const JurnalUmumPage = lazy(() => import('./pages/JurnalUmumPage'));
+const ArusKasPage = lazy(() => import('./pages/ArusKasPage'));
+const ZakatPage = lazy(() => import('./pages/ZakatPage'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const NeracaRugiPage = lazy(() => import('./pages/NeracaRugiPage'));
+const AdminManagementPage = lazy(() => import('./pages/AdminManagementPage'));
+const PurchaseOrderPage = lazy(() => import('./pages/PurchaseOrderPage'));
+const BranchManagementPage = lazy(() => import('./pages/BranchManagementPage'));
+const KasirRiwayatPage = lazy(() => import('./pages/KasirRiwayatPage'));
+const KasirShiftPage = lazy(() => import('./pages/KasirShiftPage'));
+const CustomerManagementPage = lazy(() => import('./pages/CustomerManagementPage'));
+const SupplierManagementPage = lazy(() => import('./pages/SupplierManagementPage'));
+const PromoManagementPage = lazy(() => import('./pages/PromoManagementPage'));
+const StaffManagementPage = lazy(() => import('./pages/StaffManagementPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const StockOpnamePage = lazy(() => import('./pages/StockOpnamePage'));
+const StrukturOrganisasiPage = lazy(() => import('./pages/StrukturOrganisasiPage'));
+const BannerManagementPage = lazy(() => import('./pages/BannerManagementPage'));
+const CustomerPortal = lazy(() => import('./pages/CustomerPortal'));
+const OnlineOrdersPage = lazy(() => import('./pages/OnlineOrdersPage'));
+const QuranPage = lazy(() => import('./pages/QuranPage'));
+const JadwalShalatPage = lazy(() => import('./pages/JadwalShalatPage'));
+const ArtikelIslamiPage = lazy(() => import('./pages/ArtikelIslamiPage'));
+const BukuPanduanPage = lazy(() => import('./pages/BukuPanduanPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const KatalogUmumPage = lazy(() => import('./pages/KatalogUmumPage'));
+const CoAPage = lazy(() => import('./pages/CoAPage'));
+const BeritaPusatPage = lazy(() => import('./pages/BeritaPusatPage'));
+const LoyaltyProgramPage = lazy(() => import('./pages/LoyaltyProgramPage'));
+const PPOBInventoryPage = lazy(() => import('./pages/PPOBInventoryPage'));
+const PromoProdukPage = lazy(() => import('./pages/PromoProdukPage'));
+const CustomerDisplayPage = lazy(() => import('./pages/CustomerDisplayPage'));
+const KasbonRekapPage = lazy(() => import('./pages/KasbonRekapPage'));
+const BukuBesarPage = lazy(() => import('./pages/BukuBesarPage'));
 
 // Komponen pembungkus untuk route yang membutuhkan otentikasi
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -81,13 +85,41 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
-  const { initializeStore, fetchProducts, fetchStoreSettings, fetchOnlineOrders, isLoading } = useAppStore();
+  const { initializeStore, fetchProducts, fetchStoreSettings, fetchOnlineOrders, isLoading, isDarkMode } = useAppStore();
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const initApp = async () => {
       try {
         const isCatalogOnly = window.location.hash.includes('/katalog') || !localStorage.getItem('ksa_current_user');
         await initializeStore({ catalogOnly: isCatalogOnly, showLoading: !isCatalogOnly });
+
+        // Backup Reminder Logic (H-3)
+        if (!isCatalogOnly) {
+          const today = new Date();
+          const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+          const currentDay = today.getDate();
+          if (currentDay >= lastDayOfMonth - 3 && currentDay <= lastDayOfMonth) {
+            const hasSeenReminder = localStorage.getItem(`ksa_backup_reminder_${today.getFullYear()}_${today.getMonth()}`);
+            if (!hasSeenReminder) {
+              const { addNotification } = useAppStore.getState();
+              addNotification({
+                title: 'Pengingat Backup Data',
+                message: `Menjelang akhir bulan (${lastDayOfMonth - currentDay} hari lagi). Segera lakukan Backup Data Toko (Export Laporan/Database) agar data bulan ini aman.`,
+                type: 'WARNING',
+                targetRole: ['OWNER', 'ADMIN', 'SUPERADMIN', 'MANAGER']
+              });
+              localStorage.setItem(`ksa_backup_reminder_${today.getFullYear()}_${today.getMonth()}`, 'true');
+            }
+          }
+        }
 
         // Avoid triggering a full bulk background sync immediately on every page load.
         // Background sync is still available manually from settings when the user wants to
@@ -104,6 +136,15 @@ export default function App() {
     let productsTimeoutId: any = null;
     let settingsTimeoutId: any = null;
     let ordersTimeoutId: any = null;
+    let generalTimeoutId: any = null;
+
+    const triggerGeneralSync = (tableName: string) => {
+      console.log(`[Realtime] ${tableName} updated, scheduling sync...`);
+      if (generalTimeoutId) clearTimeout(generalTimeoutId);
+      generalTimeoutId = setTimeout(() => {
+        initializeStore({ showLoading: false }).catch(e => console.warn(`Realtime general sync error from ${tableName}:`, e));
+      }, 4000);
+    };
 
     if (isSupabaseConfigured) {
       try {
@@ -128,6 +169,16 @@ export default function App() {
             fetchOnlineOrders().catch(e => console.warn('Realtime orders sync error:', e));
           }, 3000);
         }));
+
+        // Subscribe to other tables for general sync
+        const generalTables = [
+          'transactions', 'expenses', 'journal_entries', 'ksa_users', 
+          'ksa_branches', 'purchase_orders', 'suppliers', 
+          'zakat_records', 'zakat_distributions', 'product_categories', 'customers'
+        ];
+        generalTables.forEach(table => {
+          unsubscribers.push(subscribeToTable(table, () => triggerGeneralSync(table)));
+        });
       } catch (e) {
         console.warn('Realtime subscription setup failed:', e);
       }
@@ -147,7 +198,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-green-950 flex flex-col justify-center items-center text-white">
         <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-xs font-mono tracking-wider font-semibold">Mensinkronisasikan Data Supabase Syariah...</p>
+        <p className="text-xs font-mono tracking-wider font-semibold">Menyiapkan Sistem KSA Mart...</p>
       </div>
     );
   }
@@ -155,58 +206,71 @@ export default function App() {
   return (
     <ErrorBoundary>
       <HashRouter>
-        <Routes>
-          {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/katalog" element={<KatalogUmumPage />} />
-        <Route path="/member" element={<CustomerPortal />} />
-        <Route path="/quran" element={<QuranPage />} />
-        <Route path="/jadwal-shalat" element={<JadwalShalatPage />} />
-        <Route path="/artikel-islami" element={<ArtikelIslamiPage />} />
-        
-        <Route path="/berita" element={<BeritaPusatPage />} />
-        
-        {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
-        <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
-        <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
-        <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
-        <Route path="/inventory-ppob" element={<ProtectedRoute><PPOBInventoryPage /></ProtectedRoute>} />
-        <Route path="/trend" element={<ProtectedRoute><TrendPage /></ProtectedRoute>} />
-        <Route path="/laporan-penjualan" element={<ProtectedRoute><SalesReportPage /></ProtectedRoute>} />
-        <Route path="/jurnal-umum" element={<ProtectedRoute><JurnalUmumPage /></ProtectedRoute>} />
-        <Route path="/coa" element={<ProtectedRoute><CoAPage /></ProtectedRoute>} />
-        <Route path="/arus-kas" element={<ProtectedRoute><ArusKasPage /></ProtectedRoute>} />
-        <Route path="/neraca-rugi" element={<ProtectedRoute><NeracaRugiPage /></ProtectedRoute>} />
-        <Route path="/zakat" element={<ProtectedRoute><ZakatPage /></ProtectedRoute>} />
-        <Route path="/audit-log" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
-        <Route path="/admin-management" element={<ProtectedRoute><AdminManagementPage /></ProtectedRoute>} />
-        <Route path="/loyalty" element={<ProtectedRoute><LoyaltyProgramPage /></ProtectedRoute>} />
-        <Route path="/cabang" element={<ProtectedRoute><BranchManagementPage /></ProtectedRoute>} />
-        <Route path="/purchase-order" element={<ProtectedRoute><PurchaseOrderPage /></ProtectedRoute>} />
-        <Route path="/customers" element={<ProtectedRoute><CustomerManagementPage /></ProtectedRoute>} />
-        <Route path="/online-orders" element={<ProtectedRoute><OnlineOrdersPage /></ProtectedRoute>} />
-        <Route path="/suppliers" element={<ProtectedRoute><SupplierManagementPage /></ProtectedRoute>} />
-        <Route path="/promos" element={<ProtectedRoute><PromoManagementPage /></ProtectedRoute>} />
-        <Route path="/stock-opname" element={<ProtectedRoute><StockOpnamePage /></ProtectedRoute>} />
-        <Route path="/staff" element={<ProtectedRoute><StaffManagementPage /></ProtectedRoute>} />
-        <Route path="/struktur-organisasi" element={<ProtectedRoute><StrukturOrganisasiPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-        
-        {/* Berita Koperasi */}
-        <Route path="/berita-koperasi" element={
-          <ProtectedRoute>
-            <BeritaPusatPage />
-          </ProtectedRoute>
-        } />
+        <Suspense fallback={
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col justify-center items-center text-slate-800 dark:text-slate-200">
+            <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-sm font-bold opacity-70">Memuat Halaman...</p>
+          </div>
+        }>
+          <Routes>
+            {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/katalog" element={<KatalogUmumPage />} />
+          <Route path="/member" element={<CustomerPortal />} />
+          <Route path="/quran" element={<QuranPage />} />
+          <Route path="/jadwal-shalat" element={<JadwalShalatPage />} />
+          <Route path="/artikel-islami" element={<ArtikelIslamiPage />} />
+          
+          <Route path="/berita" element={<BeritaPusatPage />} />
+          <Route path="/customer-display" element={<CustomerDisplayPage />} />
+          
+          {/* Protected Navigation Routes with MainLayout (Admin/Cashier) */}
+          <Route path="/kasir" element={<ProtectedRoute><KasirPOS /></ProtectedRoute>} />
+          <Route path="/absen" element={<ProtectedRoute><KasirShiftPage /></ProtectedRoute>} />
+          <Route path="/kasir-riwayat" element={<ProtectedRoute><KasirRiwayatPage /></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
+          <Route path="/inventory-ppob" element={<ProtectedRoute><PPOBInventoryPage /></ProtectedRoute>} />
+          <Route path="/trend" element={<ProtectedRoute><TrendPage /></ProtectedRoute>} />
+          <Route path="/laporan-penjualan" element={<ProtectedRoute><SalesReportPage /></ProtectedRoute>} />
+          <Route path="/jurnal-umum" element={<ProtectedRoute><JurnalUmumPage /></ProtectedRoute>} />
+          <Route path="/buku-besar" element={<ProtectedRoute><BukuBesarPage /></ProtectedRoute>} />
+          <Route path="/coa" element={<ProtectedRoute><CoAPage /></ProtectedRoute>} />
+          <Route path="/arus-kas" element={<ProtectedRoute><ArusKasPage /></ProtectedRoute>} />
+          <Route path="/neraca-rugi" element={<ProtectedRoute><NeracaRugiPage /></ProtectedRoute>} />
+          <Route path="/zakat" element={<ProtectedRoute><ZakatPage /></ProtectedRoute>} />
+          <Route path="/audit-log" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
+          <Route path="/admin-management" element={<ProtectedRoute><AdminManagementPage /></ProtectedRoute>} />
+          <Route path="/loyalty" element={<ProtectedRoute><LoyaltyProgramPage /></ProtectedRoute>} />
+          <Route path="/cabang" element={<ProtectedRoute><BranchManagementPage /></ProtectedRoute>} />
+          <Route path="/purchase-order" element={<ProtectedRoute><PurchaseOrderPage /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><CustomerManagementPage /></ProtectedRoute>} />
+          <Route path="/kasbon-rekap" element={<ProtectedRoute><KasbonRekapPage /></ProtectedRoute>} />
+          <Route path="/online-orders" element={<ProtectedRoute><OnlineOrdersPage /></ProtectedRoute>} />
+          <Route path="/suppliers" element={<ProtectedRoute><SupplierManagementPage /></ProtectedRoute>} />
+          <Route path="/promos" element={<ProtectedRoute><PromoManagementPage /></ProtectedRoute>} />
+          <Route path="/promo-produk" element={<ProtectedRoute><PromoProdukPage /></ProtectedRoute>} />
+          <Route path="/stock-opname" element={<ProtectedRoute><StockOpnamePage /></ProtectedRoute>} />
+          <Route path="/staff" element={<ProtectedRoute><StaffManagementPage /></ProtectedRoute>} />
+          <Route path="/struktur-organisasi" element={<ProtectedRoute><StrukturOrganisasiPage /></ProtectedRoute>} />
+          <Route path="/banners" element={<ProtectedRoute><BannerManagementPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          
+          {/* Berita Koperasi */}
+          <Route path="/berita-koperasi" element={
+            <ProtectedRoute>
+              <BeritaPusatPage />
+            </ProtectedRoute>
+          } />
 
-        {/* Buku Panduan */}
-        <Route path="/buku-panduan" element={<ProtectedRoute><BukuPanduanPage /></ProtectedRoute>} />
-        
-        {/* Fallback Catch-all Route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          {/* Buku Panduan */}
+          <Route path="/buku-panduan" element={<ProtectedRoute><BukuPanduanPage /></ProtectedRoute>} />
+          
+          {/* Fallback Catch-all Route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </HashRouter>
     </ErrorBoundary>
   );

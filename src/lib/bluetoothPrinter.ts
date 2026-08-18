@@ -1,4 +1,4 @@
-import { Transaction } from '../types';
+import { Transaction, KasbonPaymentRecord } from '../types';
 
 export class EscPosEncoder {
   private buffer: number[] = [];
@@ -92,8 +92,16 @@ export const generateReceiptEscPos = (tx: Transaction, storeName = "Toko KSA Mar
   // Do not truncate cashier name so it wraps automatically if too long
   encoder.line(`Kasir: ${tx.cashierName}`);
   encoder.line(`Pelanggan: ${tx.customerName || 'Umum'}`);
-  encoder.line(`Metode: ${tx.paymentMethod}`);
-  encoder.line("--------------------------------");
+  encoder.line(`Status: ${tx.paymentMethod === 'KASBON' ? 'Belum Dibayar' : tx.paymentMethod}`);
+  encoder.line('--------------------------------');
+  if (tx.paymentMethod === 'KASBON') {
+    encoder.alignCenter();
+    encoder.bold(true);
+    encoder.line('BUKTI PENGAMBILAN KASBON');
+    encoder.bold(false);
+    encoder.alignLeft();
+    encoder.line('--------------------------------');
+  }
 
   // Items
   tx.items.forEach(item => {
@@ -273,6 +281,84 @@ export const printToBluetooth = async (tx: Transaction, storeName?: string, stor
   }
 };
 
+export async function printKasbonPaymentToBluetooth(
+  payment: KasbonPaymentRecord,
+  storeName: string,
+  storeAddress: string,
+  storePhone: string
+) {
+  try {
+    const device = await (navigator as any).bluetooth.requestDevice({
+      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    }).catch((e: any) => {
+      throw new Error('Bluetooth printer tidak ditemukan atau dibatalkan.');
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+    const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+    const encoder = new EscPosEncoder();
+    encoder.initialize();
+
+    encoder.alignCenter();
+    encoder.bold(true);
+    encoder.line(storeName.toUpperCase());
+    encoder.bold(false);
+    encoder.line(storeAddress);
+    encoder.line(storePhone);
+    encoder.line('--------------------------------');
+
+    encoder.bold(true);
+    if (payment.isFullyPaid) {
+      encoder.line('BUKTI KASBON LUNAS');
+    } else {
+      encoder.line('BUKTI PEMBAYARAN KASBON');
+    }
+    encoder.bold(false);
+    encoder.line('--------------------------------');
+
+    encoder.alignLeft();
+    encoder.line(`Tanggal : ${new Date(payment.paymentDate).toLocaleString('id-ID')}`);
+    encoder.line(`Pelanggan: ${payment.customerName}`);
+    encoder.line(`Kasir   : ${payment.cashierName}`);
+    encoder.line(`Metode  : ${payment.paymentMethod}`);
+    encoder.line('--------------------------------');
+
+    encoder.line('Detail Pembayaran:');
+    encoder.line(`Dibayar : Rp ${payment.amountPaid.toLocaleString('id-ID')}`);
+    encoder.line(`Sisa Kasbon: Rp ${payment.remainingDebt.toLocaleString('id-ID')}`);
+    if (payment.notes) {
+      encoder.line(`Catatan: ${payment.notes}`);
+    }
+
+    encoder.line('--------------------------------');
+    encoder.alignCenter();
+    if (payment.isFullyPaid) {
+      encoder.bold(true);
+      encoder.line('** L U N A S **');
+      encoder.bold(false);
+    }
+    encoder.line('Terima Kasih atas Kepercayaannya');
+    encoder.newline();
+    encoder.newline();
+    encoder.newline();
+
+    const buffer = encoder.encode();
+    const CHUNK_SIZE = 512;
+    for (let i = 0; i < buffer.byteLength; i += CHUNK_SIZE) {
+      const chunk = buffer.slice(i, i + CHUNK_SIZE);
+      await characteristic.writeValue(chunk);
+    }
+
+    device.gatt.disconnect();
+    return true;
+  } catch (err: any) {
+    throw err;
+  }
+}
+
 export const openCashDrawerBluetooth = async () => {
   try {
     const device = await (navigator as any).bluetooth.requestDevice({
@@ -311,7 +397,92 @@ export const openCashDrawerBluetooth = async () => {
 
     await device.gatt.disconnect();
   } catch (error) {
-    console.error('Bluetooth drawer error:', error);
+    console.error('Print error:', error);
+    throw error;
+  }
+}
+export async function printKasbonCardToBluetooth(
+  receiptCustomer: any,
+  storeName: string,
+  storeAddress: string,
+  storePhone: string,
+  cashierName: string = 'Sistem'
+) {
+  try {
+    const device = await (navigator as any).bluetooth.requestDevice({
+      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+    }).catch((e: any) => {
+      throw new Error('Bluetooth printer tidak ditemukan atau dibatalkan.');
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+    const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+    const encoder = new EscPosEncoder();
+    encoder.initialize();
+
+    encoder.alignCenter();
+    encoder.bold(true);
+    encoder.line(storeName.toUpperCase());
+    encoder.bold(false);
+    if (storeAddress) encoder.line(storeAddress);
+    if (storePhone) encoder.line(storePhone);
+    encoder.line('--------------------------------');
+
+    encoder.bold(true);
+    encoder.line('KARTU KASBON PELANGGAN');
+    encoder.bold(false);
+    encoder.line('--------------------------------');
+
+    encoder.alignLeft();
+    encoder.line(`Nama : ${receiptCustomer.name}`);
+    encoder.line(`Telp : ${receiptCustomer.phone || '-'}`);
+    encoder.line(`Tgl Cetak: ${new Date().toLocaleString('id-ID')}`);
+    encoder.line(`Kasir: ${cashierName}`);
+    encoder.line('--------------------------------');
+
+    encoder.line('TGL       REF      NOMINAL');
+    receiptCustomer.history.forEach((h: any) => {
+      const date = new Date(h.date);
+      const tgl = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear().toString().slice(2)}`;
+      
+      const ref = h.ref.substring(0, 8).padEnd(8, ' ');
+      const prefix = h.type === 'PEMBELIAN' ? '+' : '-';
+      const nom = `${prefix}${h.amount.toLocaleString('id-ID')}`.padStart(10, ' ');
+      
+      // format to fit 32 chars
+      encoder.line(`${tgl} ${ref}  ${nom}`);
+      const method = h.paymentMethod ? ` (${h.paymentMethod})` : '';
+      encoder.line(`(${h.type === 'PEMBELIAN' ? (h.isPaid ? 'KASBON (LUNAS)' : 'KASBON (BELUM LUNAS)') : `PELUNASAN${method}`})`);
+    });
+
+    encoder.line('--------------------------------');
+    encoder.bold(true);
+    encoder.line(`SISA KASBON : Rp ${receiptCustomer.debtAmount.toLocaleString('id-ID')}`);
+    if (receiptCustomer.debtAmount === 0) {
+      encoder.line('** L U N A S **');
+    }
+    encoder.bold(false);
+    
+    encoder.newline();
+    encoder.alignCenter();
+    encoder.line('Simpan struk ini sebagai bukti');
+    encoder.line('transaksi kasbon Anda yang sah.');
+    encoder.newline();
+    encoder.newline();
+    encoder.newline();
+
+    const buffer = encoder.encode();
+    const CHUNK_SIZE = 512;
+    for (let i = 0; i < buffer.byteLength; i += CHUNK_SIZE) {
+      const chunk = buffer.slice(i, i + CHUNK_SIZE);
+      await characteristic.writeValue(chunk);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  } catch (error) {
+    console.error('Print error:', error);
     throw error;
   }
 };

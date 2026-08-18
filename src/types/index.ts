@@ -18,7 +18,19 @@ export interface Branch {
   phone: string;
   whatsapp?: string;
   isActive: boolean;
+  qrisImageUrl?: string;
+  paymentMethods?: {
+    bankTransfer?: { bankName: string; accountNumber: string; accountName: string }[];
+    ewallet?: { provider: string; number: string; accountName: string }[];
+  };
   createdAt: string;
+}
+
+export interface WorkShift {
+  id: string;
+  name: string; // e.g. "Shift Pagi"
+  startTime: string; // e.g. "07:00"
+  endTime: string; // e.g. "14:00"
 }
 
 export interface StoreSettings {
@@ -44,20 +56,53 @@ export interface StoreSettings {
   storeLocationLat?: number;
   storeLocationLng?: number;
   maxDeliveryRadiusKm?: number;
+  attendanceRadiusMeters?: number;
   // Advanced Config
   maintenanceMode?: boolean;
   minimumCashBalance?: number;
+  pettyCashBalance?: number;
+  initialStoreCapital?: number;
   zakatRate?: number; // e.g. 2.5
   autoApproveTransactions?: boolean;
+  defaultPpobAdminFee?: number; // Biaya admin default untuk PPOB
   // Upload protection: optional password required for importing/uploading templates or files
   uploadPassword?: string;
   // Roles allowed to manage (set/clear) the upload password. Example: ['OWNER','ADMIN','MANAGER']
   uploadPasswordRoles?: string[];
   
+  // Operational Hours Management
+  operationalHours?: {
+    isOpen: boolean; // Master toggle (True = Open, False = Closed completely)
+    openTime: string; // e.g., '07:00'
+    closeTime: string; // e.g., '21:00'
+    closedMessage: string; // Custom message to show when closed
+    shifts?: WorkShift[]; // Daftar Shift (Pagi, Siang, dll)
+    shiftAssignments?: Record<string, Record<number, string>>; // Mapping userId -> { 0: shiftId/LIBUR, 1: shiftId, ... } (0=Sun, 1=Mon, ..., 6=Sat)
+  };
+  
+  // Landing Page Config
+  landingPageConfig?: {
+    showTopDropdowns?: boolean;
+    contactUs?: {
+      phone: string;
+      email: string;
+      address: string;
+      description: string;
+    };
+    faqs?: {
+      question: string;
+      answer: string;
+    }[];
+  };
+  
   // Points System
   enablePoints?: boolean;
   pointEarningRate?: number; // Spend this much to earn 1 point (default 1000)
   pointRedemptionValue?: number; // 1 point equals this much IDR discount (default 10)
+
+  // Server & Database Integration
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   
   // Charity / Zakat Receipt
   enableCharityZakat?: boolean;
@@ -69,6 +114,39 @@ export interface StoreSettings {
   enablePpobIntegration?: boolean;
   ppobProviderUrl?: string;
   ppobApiKey?: string;
+}
+
+export interface KasbonPaymentRecord {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  customerName: string;
+  paymentDate: string;
+  amountPaid: number;
+  remainingDebt: number;
+  paymentMethod: string;
+  cashierName: string;
+  isFullyPaid: boolean;
+  notes?: string;
+  targetInvoiceNos?: string[];
+}
+
+export interface StockOpnameRequest {
+  id: string;
+  tenantId: string;
+  productId: string;
+  productName: string;
+  branchId?: string;
+  systemStock: number;
+  physicalStock: number;
+  variance: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedBy: string;
+  requestDate: string;
+  approvalReason?: string;
+  approvedBy?: string;
+  approvalDate?: string;
 }
 
 export interface StockMovement {
@@ -129,9 +207,9 @@ export interface Attendance {
   userId: string;
   userName: string;
   date: string; // YYYY-MM-DD
-  clockIn: string; // ISO String
+  clockIn: string; // ISO String, can be dummy for leaves
   clockOut?: string; // ISO String
-  status: 'PRESENT' | 'LATE';
+  status: 'PRESENT' | 'LATE' | 'IZIN' | 'SAKIT' | 'CUTI' | 'ALFA';
   branchId?: string;
   photoUrl?: string;
   latitude?: number;
@@ -143,7 +221,8 @@ export interface Attendance {
   // Correction Request Fields
   correctionStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   correctionReason?: string;
-  correctionType?: 'CLOCK_IN' | 'CLOCK_OUT' | 'BOTH';
+  correctionType?: 'CLOCK_IN' | 'CLOCK_OUT' | 'BOTH' | 'LEAVE';
+  leaveType?: 'IZIN' | 'SAKIT' | 'CUTI_TAHUNAN' | 'CUTI';
   requestedClockIn?: string;
   requestedClockOut?: string;
   isRevised?: boolean;
@@ -175,6 +254,8 @@ export interface Product {
   salesCoaCode?: string; // Akun Pendapatan
   cogsCoaCode?: string;  // Akun HPP
   isPPOB?: boolean; // PPOB/Digital Product flag
+  isPromoActive?: boolean; // Flag to indicate if product promo is active
+  promoPrice?: number; // Custom promo price
 }
 
 export interface CartItem {
@@ -199,7 +280,8 @@ export interface Transaction {
     targetNumber?: string;
   }[];
   totalAmount: number;
-  paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON';
+  shippingFee?: number;
+  paymentMethod: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'KASBON' | 'EWALLET' | 'BANK_LAIN';
   amountPaid: number;
   changeAmount: number;
   zakatContribution: number; // 2.5% on pure profit if applicable
@@ -215,10 +297,13 @@ export interface Transaction {
   voidReason?: string;
   voidRequestedBy?: string;
   taxAmount?: number;
-  splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI'; amount: number }[];
+  splitPayments?: { method: 'CASH' | 'QRIS_SHARIAH' | 'TRANSFER_BSI' | 'EWALLET' | 'BANK_LAIN'; amount: number }[];
   pointsEarned?: number;
   pointsRedeemed?: number;
   pointsDiscount?: number;
+  customerRating?: 'PUAS' | 'TIDAK_PUAS';
+  customerFeedback?: string;
+  infaqContribution?: number;
 }
 
 export interface AuditLog {
@@ -258,7 +343,7 @@ export interface ZakatDistribution {
   description: string;
 }
 
-export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'MANAGER' | 'PENGURUS' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'PELANGGAN';
+export type UserRole = 'SUPERADMIN' | 'CASHIER' | 'ADMIN' | 'MANAGER' | 'PENGURUS' | 'OWNER' | 'STAFF_GUDANG' | 'STAFF_LAPANGAN' | 'CLEANING_SERVICE' | 'PELANGGAN';
 
 export interface CurrentUser {
   name: string;
@@ -280,6 +365,8 @@ export interface Expense {
   description: string;
   createdBy: string;
   branchId?: string;
+  coaId?: string;
+  kasAccountId?: string;
 }
 
 export interface ClosingRecord {
@@ -313,6 +400,7 @@ export interface UserAccount {
   phone?: string;
   approvedBy?: string;
   isKoperasiMember?: boolean;
+  debtAmount?: number;
 }
 
 export interface AppNotification {
@@ -398,6 +486,7 @@ export interface OnlineOrder {
     price: number;
   }[];
   totalAmount: number;
+  shippingFee?: number;
   status: 'PENDING' | 'PROCESSED' | 'READY' | 'COMPLETED' | 'CANCELLED';
   createdAt: string;
   updatedAt: string;
@@ -426,3 +515,14 @@ export interface CoaAccount {
   isActive: boolean;
 }
 
+export interface Banner {
+  id?: string;
+  title: string;
+  imageUrl: string;
+  isActive: boolean;
+  sortOrder: number;
+  targetUrl?: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

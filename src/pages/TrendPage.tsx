@@ -1,8 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
+import { useAppStore } from '../store';
 import { 
   AreaChart, 
   Area, 
+  ComposedChart,
+  Line,
+  LabelList,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -27,79 +31,180 @@ import {
   ShieldCheck,
   AlertTriangle,
   LineChart as LineChartIcon,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Wallet
 } from 'lucide-react';
 
-type DateRange = 'TODAY' | '7_DAYS' | '30_DAYS' | 'THIS_YEAR';
 
 export default function TrendPage() {
   const { transactions, expenses, products, activeBranchId } = useBranchData();
-  const [dateRange, setDateRange] = useState<DateRange>('7_DAYS');
+  const { settings, coaList, addJournalEntry, journalEntries, getCalculatedPettyCash, customers, isLoading, currentUser } = useAppStore();
+  const todayObj = new Date();
+  const firstDay = new Date(todayObj.getFullYear(), todayObj.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = todayObj.toLocaleDateString('en-CA');
+  
+  const [startDateStr, setStartDateStr] = useState(firstDay);
+  const [endDateStr, setEndDateStr] = useState(currentDay);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => !tx.isVoided && (!activeBranchId || tx.branchId === activeBranchId || !tx.branchId));
   }, [transactions, activeBranchId]);
 
+  const dynamicPettyCash = getCalculatedPettyCash();
+  const balanceKasKecil = useMemo(() => {
+    return (journalEntries || []).reduce((sum, j) => {
+      const acc = j.account ? j.account.toLowerCase() : '';
+      if (acc.includes('1102') || acc.includes('kas kecil')) {
+        return sum + (Number(j.debit || 0) - Number(j.credit || 0));
+      }
+      return sum;
+    }, 0);
+  }, [journalEntries]);
+
   const { chartData, totals, comparisons, ratios } = useMemo(() => {
-    const now = new Date();
-    let startDate = new Date();
-    let prevStartDate = new Date();
-    let prevEndDate = new Date();
-    let label = '7 Hari Terakhir';
+    const today = new Date().toLocaleDateString('en-CA');
+    const todayTransactions = filteredTransactions.filter(tx => String(tx.timestamp || '').startsWith(today));
+    
+    // Summary Metrics (Excluding PPOB)
+    const calculatePhysicalOmset = (txs: any[]) => txs.reduce((sum, tx) => sum + (tx.items?.reduce((s: number, it: any) => {
+      const prod = products.find((p: any) => p.id === it.productId);
+      if (prod?.isPPOB) return s;
+      return s + ((Number(it.price) || 0) * (Number(it.quantity) || 0));
+    }, 0) || 0), 0);
+    
+    const totalOmset = calculatePhysicalOmset(filteredTransactions);
+    const todayOmset = calculatePhysicalOmset(todayTransactions);
+    const totalTransactions = filteredTransactions.length;
+    const todayTransactionsCount = todayTransactions.length;
+    
+    const totalItemsSold = filteredTransactions.reduce((sum, tx) => sum + (tx.items?.reduce((s, item) => s + Number(item.quantity || 0), 0) || 0), 0);
+    const todayItemsSold = todayTransactions.reduce((sum, tx) => sum + (tx.items?.reduce((s, item) => s + Number(item.quantity || 0), 0) || 0), 0);
 
-    if (dateRange === 'TODAY') {
-      startDate.setHours(0, 0, 0, 0);
-      prevStartDate.setDate(now.getDate() - 1);
-      prevStartDate.setHours(0, 0, 0, 0);
-      prevEndDate.setDate(now.getDate() - 1);
-      prevEndDate.setHours(23, 59, 59, 999);
-      label = 'Hari Ini';
-    } else if (dateRange === '7_DAYS') {
-      startDate.setDate(now.getDate() - 6);
-      startDate.setHours(0, 0, 0, 0);
-      prevStartDate.setDate(now.getDate() - 13);
-      prevStartDate.setHours(0, 0, 0, 0);
-      prevEndDate.setDate(now.getDate() - 7);
-      prevEndDate.setHours(23, 59, 59, 999);
-      label = '7 Hari Terakhir';
-    } else if (dateRange === '30_DAYS') {
-      startDate.setDate(now.getDate() - 29);
-      startDate.setHours(0, 0, 0, 0);
-      prevStartDate.setDate(now.getDate() - 59);
-      prevStartDate.setHours(0, 0, 0, 0);
-      prevEndDate.setDate(now.getDate() - 30);
-      prevEndDate.setHours(23, 59, 59, 999);
-      label = '30 Hari Terakhir';
-    } else if (dateRange === 'THIS_YEAR') {
-      startDate = new Date(now.getFullYear(), 0, 1);
-      prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
-      prevEndDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-      label = 'Tahun Ini';
-    }
+    const calculateMargin = (txs: any[]) => {
+      return txs.reduce((sum, tx) => {
+        return sum + (tx.items?.reduce((s: number, it: any) => {
+          let cp = Number(it.costPrice || 0);
+          if (!cp) {
+            const productData = products?.find((p: any) => p.id === it.productId);
+            if (productData) {
+              const isBox = it.productName?.toLowerCase().includes('(box)');
+              cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+            }
+          }
+          return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
+        }, 0) || 0);
+      }, 0);
+    };
 
-    const currentTxs = filteredTransactions.filter(t => new Date(t.timestamp) >= startDate);
+    const totalMargin = calculateMargin(filteredTransactions);
+    const todayMargin = calculateMargin(todayTransactions);
+    
+    const startObj = new Date(startDateStr);
+    const endObj = new Date(endDateStr);
+    const diffTime = Math.abs(endObj.getTime() - startObj.getTime());
+    const daysCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const isYearly = daysCount > 90;
+    const isWeekly = daysCount > 14 && daysCount <= 90;
+
+    let startDate = new Date(startObj);
+    startDate.setHours(0, 0, 0, 0);
+    let endDate = new Date(endObj);
+    endDate.setHours(23, 59, 59, 999);
+
+    let prevStartDate = new Date(startObj);
+    prevStartDate.setDate(startObj.getDate() - daysCount);
+    let prevEndDate = new Date(startObj);
+    prevEndDate.setDate(startObj.getDate() - 1);
+    prevEndDate.setHours(23, 59, 59, 999);
+
+    let label = `${startDateStr} s/d ${endDateStr}`;
+
+    const currentTxs = filteredTransactions.filter(t => {
+      const d = new Date(t.timestamp);
+      return d >= startDate && d <= endDate;
+    });
     const prevTxs = filteredTransactions.filter(t => {
       const d = new Date(t.timestamp);
       return d >= prevStartDate && d <= prevEndDate;
     });
 
-    const currentExps = (expenses || []).filter(e => new Date(e.date) >= startDate);
+    const currentExps = (expenses || []).filter(e => {
+      const d = new Date(e.date);
+      return d >= startDate && d <= endDate;
+    });
     const prevExps = (expenses || []).filter(e => {
       const d = new Date(e.date);
       return d >= prevStartDate && d <= prevEndDate;
     });
 
     const aggregate = (txs, exps) => {
-      const acc = txs.reduce((a, t) => {
-        a.omset += t.totalAmount;
-        a.margin += t.marginContribution || 0;
-        a.zakat += t.zakatContribution || 0;
+      const grouped = txs.reduce((a, t) => {
+        let txPhysicalOmset = 0;
+        let txPpobOmset = 0;
+        let txPhysicalHpp = 0;
+        let txPpobHpp = 0;
+
+        t.items?.forEach((it: any) => {
+          const prod = products.find((p: any) => p.id === it.productId);
+          const isPpob = prod?.isPPOB || false;
+          
+          let cp = Number(it.costPrice || 0);
+          if (!cp && prod) {
+            const isBox = it.productName?.toLowerCase().includes('(box)');
+            cp = isBox ? Number(prod.boxCostPrice || 0) : Number(prod.costPrice || 0);
+          }
+
+          const itemOmset = (Number(it.price) || 0) * (Number(it.quantity) || 0);
+          const itemHpp = cp * (Number(it.quantity) || 0);
+
+          if (isPpob) {
+            txPpobOmset += itemOmset;
+            txPpobHpp += itemHpp;
+          } else {
+            txPhysicalOmset += itemOmset;
+            txPhysicalHpp += itemHpp;
+          }
+        });
+        
+        const itemSum = txPhysicalOmset + txPpobOmset;
+        let finalPhysOmset = txPhysicalOmset;
+        let finalPpobOmset = txPpobOmset;
+        if (itemSum > 0) {
+          finalPhysOmset = Math.round((Number(t.totalAmount) || 0) * (txPhysicalOmset / itemSum));
+          finalPpobOmset = (Number(t.totalAmount) || 0) - finalPhysOmset;
+        } else {
+          finalPhysOmset = Number(t.totalAmount) || 0;
+          finalPpobOmset = 0;
+        }
+
+        const totalCalcM = (txPhysicalOmset - txPhysicalHpp) + (txPpobOmset - txPpobHpp);
+        let finalPhysMargin = txPhysicalOmset - txPhysicalHpp;
+        let finalPpobMargin = txPpobOmset - txPpobHpp;
+        const totalTxMargin = Number(t.marginContribution || 0);
+        if (totalCalcM > 0) {
+          const ratio = totalTxMargin / totalCalcM;
+          finalPhysMargin = Math.round((txPhysicalOmset - txPhysicalHpp) * ratio);
+          finalPpobMargin = totalTxMargin - finalPhysMargin;
+        } else {
+          finalPhysMargin = totalTxMargin;
+          finalPpobMargin = 0;
+        }
+
+        a.omset += finalPhysOmset;
+        a.omset_ppob += finalPpobOmset;
+        a.hpp_fisik += txPhysicalHpp;
+        a.hpp_ppob += txPpobHpp;
+        a.margin += totalTxMargin;
+        a.margin_fisik += finalPhysMargin;
+        a.margin_ppob += finalPpobMargin;
         a.count += 1;
         return a;
-      }, { omset: 0, margin: 0, zakat: 0, count: 0 });
+      }, { omset: 0, omset_ppob: 0, hpp_fisik: 0, hpp_ppob: 0, margin: 0, margin_fisik: 0, margin_ppob: 0, count: 0 });
       
       const totalExp = exps.reduce((a, e) => a + (Number(e.amount) || 0), 0);
-      return { ...acc, expenses: totalExp, netProfit: acc.margin - totalExp };
+      const zakat = grouped.margin > 0 ? Math.round(grouped.margin * 0.025) : 0;
+      return { ...grouped, zakat, expenses: totalExp, netProfit: grouped.margin - totalExp };
     };
 
     const curTotals = aggregate(currentTxs, currentExps);
@@ -114,8 +219,18 @@ export default function TrendPage() {
     currentTxs.forEach(t => {
       const d = new Date(t.timestamp);
       let key = '';
-      if (dateRange === 'THIS_YEAR') {
-        key = d.toLocaleString('id-ID', { month: 'short' });
+      if (isYearly) {
+        key = d.toLocaleString('id-ID', { month: 'short', year: 'numeric' });
+      } else if (isWeekly) {
+        const diff = Math.floor((d.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        const weekNum = Math.floor(diff / 7);
+        const weekStart = new Date(startDate);
+        weekStart.setDate(weekStart.getDate() + (weekNum * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
+        
+        key = `${weekStart.getDate()} - ${weekEnd.getDate()} ${weekEnd.toLocaleString('id-ID', { month: 'short' })}`;
       } else {
         key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
       }
@@ -124,24 +239,60 @@ export default function TrendPage() {
         mapData.set(key, { name: key, omset: 0, margin: 0, zakat: 0 });
       }
       const existing = mapData.get(key);
-      existing.omset += t.totalAmount;
-      existing.margin += t.marginContribution || 0;
-      existing.zakat += t.zakatContribution || 0;
+      
+      const tMargin = t.items?.reduce((s: number, it: any) => {
+        let cp = Number(it.costPrice || 0);
+        if (!cp) {
+          const productData = products?.find((p: any) => p.id === it.productId);
+          if (productData) {
+            const isBox = it.productName?.toLowerCase().includes('(box)');
+            cp = isBox ? Number(productData.boxCostPrice || 0) : Number(productData.costPrice || 0);
+          }
+        }
+        return s + ((Number(it.price || 0) - cp) * (Number(it.quantity) || 0));
+      }, 0) || 0;
+
+      const physicalOmset = t.items?.reduce((s: number, it: any) => {
+        const prod = products.find((p: any) => p.id === it.productId);
+        if (prod?.isPPOB) return s;
+        return s + ((Number(it.price) || 0) * (Number(it.quantity) || 0));
+      }, 0) || 0;
+      
+      existing.omset += physicalOmset;
+      existing.margin += tMargin;
+    });
+
+    // Recalculate Zakat once per aggregated period (e.g., per day/month)
+    mapData.forEach(value => {
+      value.zakat = value.margin > 0 ? Math.round(value.margin * 0.025) : 0;
     });
 
     let finalChartData = [];
-    if (dateRange !== 'THIS_YEAR') {
-      const daysCount = dateRange === 'TODAY' ? 1 : dateRange === '7_DAYS' ? 7 : 30;
-      for (let i = daysCount - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
-        const key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
+    if (isYearly) {
+      let curr = new Date(startObj);
+      curr.setDate(1);
+      while (curr <= endDate) {
+        const key = curr.toLocaleString('id-ID', { month: 'short', year: 'numeric' });
+        finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
+        curr.setMonth(curr.getMonth() + 1);
+      }
+    } else if (isWeekly) {
+      const numWeeks = Math.ceil(daysCount / 7);
+      for (let i = 0; i < numWeeks; i++) {
+        const weekStart = new Date(startObj);
+        weekStart.setDate(weekStart.getDate() + (i * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        if (weekEnd > endDate) weekEnd.setTime(endDate.getTime());
+        
+        const key = `${weekStart.getDate()} - ${weekEnd.getDate()} ${weekEnd.toLocaleString('id-ID', { month: 'short' })}`;
         finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
       }
     } else {
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(now.getFullYear(), i, 1);
-        const key = d.toLocaleString('id-ID', { month: 'short' });
+      for (let i = 0; i < daysCount; i++) {
+        const d = new Date(startObj);
+        d.setDate(startObj.getDate() + i);
+        const key = d.toLocaleString('id-ID', { day: '2-digit', month: 'short' });
         finalChartData.push(mapData.get(key) || { name: key, omset: 0, margin: 0, zakat: 0 });
       }
     }
@@ -185,183 +336,351 @@ export default function TrendPage() {
         der
       }
     };
-  }, [filteredTransactions, dateRange, expenses, transactions, products]);
+  }, [filteredTransactions, startDateStr, endDateStr, expenses, transactions, products]);
 
   const categoryShare = useMemo(() => {
     const counts: Record<string, number> = {};
+    const qtyCounts: Record<string, number> = {};
     let totalSales = 0;
-    filteredTransactions.forEach(tx => {
+    
+    // Vibrant colors for dynamic categories
+    const palette = ['#047857', '#fbbf24', '#34d399', '#3b82f6', '#f43f5e', '#8b5cf6', '#f97316', '#06b6d4', '#10b981', '#ec4899', '#6366f1'];
+    
+    const startObj = new Date(startDateStr);
+    startObj.setHours(0, 0, 0, 0);
+    const endObj = new Date(endDateStr);
+    endObj.setHours(23, 59, 59, 999);
+
+    const currentTxs = filteredTransactions.filter(t => {
+      const d = new Date(t.timestamp);
+      return d >= startObj && d <= endObj;
+    });
+
+    currentTxs.forEach(tx => {
       tx.items.forEach(item => {
-        // Simplified category mapping since we don't store category in tx.items
-        // We'd ideally join with products, but for mock display we'll infer
-        const isFood = item.productName.toLowerCase().includes('beras') || item.productName.toLowerCase().includes('gula') || item.productName.toLowerCase().includes('minyak');
-        const isFresh = item.productName.toLowerCase().includes('telur') || item.productName.toLowerCase().includes('ayam') || item.productName.toLowerCase().includes('ikan');
-        const isDrink = item.productName.toLowerCase().includes('teh') || item.productName.toLowerCase().includes('kopi') || item.productName.toLowerCase().includes('air');
-        const cat = isFood ? 'Sembako' : isFresh ? 'Fresh Food' : isDrink ? 'Minuman' : 'Lainnya';
+        let cat = 'Tanpa Kategori';
+        if (products && products.length > 0) {
+          const prod = products.find(p => p.id === item.productId);
+          if (prod && prod.category) {
+            cat = prod.category;
+          }
+        }
+        
         counts[cat] = (counts[cat] || 0) + (item.price * item.quantity);
+        qtyCounts[cat] = (qtyCounts[cat] || 0) + item.quantity;
         totalSales += (item.price * item.quantity);
       });
     });
 
-    const colors: Record<string, string> = {
-      'Sembako': '#047857',
-      'Fresh Food': '#fbbf24',
-      'Minuman': '#34d399',
-      'Lainnya': '#111827'
-    };
-
-    return Object.keys(counts).map(k => ({
+    const result = Object.keys(counts).map((k, idx) => ({
       name: k,
       value: totalSales > 0 ? Math.round((counts[k] / totalSales) * 100) : 0,
-      color: colors[k] || '#9ca3af'
-    })).sort((a, b) => b.value - a.value);
+      totalRp: counts[k],
+      qty: qtyCounts[k],
+      color: palette[idx % palette.length]
+    })).sort((a, b) => b.totalRp - a.totalRp);
+    
+    // Ambil Top 10
+    const top10 = result.slice(0, 10);
+    const others = result.slice(10);
+    
+    if (others.length > 0) {
+      // Ambil 3 nama terbesar dari others untuk memperjelas isi "Lainnya"
+      const topOthersNames = others.slice(0, 3).map(o => o.name).join(', ');
+      const othersName = `Lainnya (${topOthersNames}${others.length > 3 ? ', dll' : ''})`;
+      
+      const othersValue = others.reduce((sum, item) => sum + item.value, 0);
+      const othersRp = others.reduce((sum, item) => sum + item.totalRp, 0);
+      const othersQty = others.reduce((sum, item) => sum + item.qty, 0);
+      
+      top10.push({
+        name: othersName,
+        value: othersValue,
+        totalRp: othersRp,
+        qty: othersQty,
+        color: '#475569'
+      });
+    }
 
-  }, [filteredTransactions]);
+    return top10.sort((a, b) => b.value - a.value);
+  }, [filteredTransactions, products, startDateStr, endDateStr]);
 
   const averageTxValue = totals.count > 0 ? totals.omset / totals.count : 0;
 
-  const renderGrowth = (value: number) => {
-    if (value > 0) return <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded border border-green-100">+{value.toFixed(1)}%</span>;
-    if (value < 0) return <span className="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded border border-red-100">{value.toFixed(1)}%</span>;
-    return <span className="bg-slate-50 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200">0%</span>;
+  const topCustomers = useMemo(() => {
+    if (!customers) return [];
+    
+    // Hitung jumlah transaksi per customer
+    const txCounts: Record<string, number> = {};
+    filteredTransactions.forEach(tx => {
+      if (tx.customerId) {
+        txCounts[tx.customerId] = (txCounts[tx.customerId] || 0) + 1;
+      }
+    });
+
+    return [...customers]
+      .filter(c => (c.points || 0) > 0)
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .slice(0, 10)
+      .map(c => ({
+        id: c.id,
+        name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
+        fullName: c.name,
+        points: c.points || 0,
+        txCount: txCounts[c.id] || 0
+      }));
+  }, [customers, filteredTransactions]);
+
+  const formatSingkat = (val: number) => {
+    if (val >= 1000000000) return (val/1000000000).toFixed(1) + 'M'; // Milyar
+    if (val >= 1000000) return (val/1000000).toFixed(1) + 'Jt'; // Juta
+    if (val >= 1000) return (val/1000).toFixed(0) + 'Rb'; // Ribu
+    return val.toString();
+  };
+
+  const renderGrowth = (value: number, isDark = false) => {
+    if (value > 0) return <span className={`${isDark ? 'text-green-200' : 'bg-green-50 text-green-700 border border-green-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>+{value.toFixed(1)}%</span>;
+    if (value < 0) return <span className={`${isDark ? 'text-red-200' : 'bg-red-50 text-red-700 border border-red-100'} text-[11px] font-bold px-2 py-0.5 rounded`}>{value.toFixed(1)}%</span>;
+    return <span className={`${isDark ? 'text-white/70' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'} text-[11px] font-bold px-2 py-0.5 rounded`}>0%</span>;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 w-full min-w-0 pb-10">
       {/* Date Filter Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-xs">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-green-600" />
             Grafik Trend & Analitik
           </h1>
-          <p className="text-xs text-gray-500 mt-1">Bandingkan performa omset, margin, dan zakat.</p>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Bandingkan performa omset, margin, dan zakat.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-400" />
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as DateRange)}
-            className="text-sm font-bold text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-green-500 outline-none"
-          >
-            <option value="TODAY">Hari Ini</option>
-            <option value="7_DAYS">7 Hari Terakhir</option>
-            <option value="30_DAYS">30 Hari Terakhir</option>
-            <option value="THIS_YEAR">Tahun Ini</option>
-          </select>
-        </div>
+          <div className="flex items-center space-x-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 print:hidden">
+            <Calendar className="w-4 h-4 text-slate-400" />
+            <input 
+              type="date" 
+              value={startDateStr} 
+              onChange={e => setStartDateStr(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+            <span className="text-slate-400 text-sm">s/d</span>
+            <input 
+              type="date" 
+              value={endDateStr} 
+              onChange={e => setEndDateStr(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-300 outline-none w-32"
+            />
+          </div>
       </div>
 
-      {/* Visual Analytics Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Omset {totals.label}</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-gray-800">Rp {totals.omset.toLocaleString('id-ID')}</h3>
-            {renderGrowth(comparisons.omset)}
-          </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Berdasar periode kalender berjalan</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Sirkulasi Profit Bersih (Margin)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-gray-800">Rp {totals.margin.toLocaleString('id-ID')}</h3>
-            <div className="flex flex-col items-end gap-1">
-              {renderGrowth(comparisons.margin)}
-              <span className="text-green-700 text-[10px] font-bold font-mono">{(totals.omset > 0 ? (totals.margin/totals.omset) * 100 : 0).toFixed(1)}% Rate</span>
+      {/* Saldo Kas Toko / Kas Kecil (1102) Section */}
+      <div>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 gap-4 bg-teal-50/80 dark:bg-teal-950/40 rounded-2xl border border-teal-200/80 dark:border-teal-800 shadow-sm">
+          <div className="flex items-center gap-3 md:gap-3.5 w-full">
+            <div className="p-2.5 md:p-3.5 bg-teal-500 text-white rounded-xl shadow-md shrink-0">
+              <Wallet className="w-5 h-5 md:w-7 md:h-7" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2 mb-0.5">
+                <p className="text-[10px] md:text-xs font-bold text-teal-800 dark:text-teal-300 uppercase tracking-wider truncate">Saldo Kas Toko / Kas Kecil (1102)</p>
+                <span className="text-[8px] md:text-[9.5px] font-extrabold bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200 px-2 py-0.5 rounded-full border border-teal-300/60 dark:border-teal-700 w-fit">Kas Utama Operasional & Laci POS</span>
+              </div>
+              <h3 className="text-lg md:text-2xl font-black text-teal-950 dark:text-teal-100 font-mono truncate">
+                {isLoading ? (
+                  <span className="flex items-center gap-2 text-sm md:text-lg text-teal-700 dark:text-teal-400">
+                    <span className="w-4 h-4 md:w-5 md:h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></span>
+                    Menyelaraskan...
+                  </span>
+                ) : (
+                  `Rp ${dynamicPettyCash.toLocaleString('id-ID')}`
+                )}
+              </h3>
             </div>
           </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Margin berdasar transaksi rill kasir</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Himpunan Zakat (Est. Penjualan)</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-green-800">Rp {totals.zakat.toLocaleString('id-ID')}</h3>
-            {renderGrowth(comparisons.zakat)}
-          </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Potensi Zakat perniagaan yang terkumpul</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
-          <p className="text-gray-400 text-xs font-semibold">Rata-rata Transaksi Pembeli</p>
-          <div className="flex items-baseline justify-between mt-1">
-            <h3 className="text-xl font-extrabold text-gray-800">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
-            <span className="text-gray-400 text-xs font-medium font-mono">{totals.count} Struk</span>
-          </div>
-          <p className="text-[10px] text-gray-400 mt-2 font-medium">Rata-rata nilai per belanja struk</p>
+          <button 
+            onClick={() => setShowTopUpModal(true)}
+            className="w-full md:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-[10px] md:text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
+          >
+            <Wallet className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            + Top Up Kas Kecil
+          </button>
         </div>
       </div>
+
+      {/* Visual Analytics Quick Stats - Vibrant Gradients */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        
+        {/* Omset - Blue Gradient */}
+        <div className="relative overflow-hidden bg-blue-600 bg-gradient-to-br from-blue-500 to-cyan-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <LineChartIcon className="w-32 h-32" />
+          </div>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Total Omset {totals.label}</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {(totals.omset + totals.omset_ppob).toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">Fisik:</span>
+                <span className="font-bold">Rp {totals.omset.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">PPOB:</span>
+                <span className="font-bold">Rp {totals.omset_ppob.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* HPP - Slate Gradient */}
+        <div className="relative overflow-hidden bg-slate-600 bg-gradient-to-br from-slate-500 to-slate-700 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <TrendingUp className="w-32 h-32" />
+          </div>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-[11px] font-bold uppercase tracking-wide mb-2 truncate">Total HPP (Modal Pokok)</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {(totals.hpp_fisik + totals.hpp_ppob).toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">HPP Fisik:</span>
+                <span className="font-bold">Rp {totals.hpp_fisik.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">HPP PPOB:</span>
+                <span className="font-bold">Rp {totals.hpp_ppob.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Margin - Orange Gradient */}
+        <div className="relative overflow-hidden bg-orange-500 bg-gradient-to-br from-orange-400 to-orange-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <PieChartIcon className="w-32 h-32" />
+          </div>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Sirkulasi Profit (Margin)</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {totals.margin.toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">Profit Fisik:</span>
+                <span className="font-bold">Rp {totals.margin_fisik.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-white/80">Profit PPOB:</span>
+                <span className="font-bold">Rp {totals.margin_ppob.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Zakat - Green Gradient */}
+        <div className="relative overflow-hidden bg-emerald-500 bg-gradient-to-br from-emerald-400 to-emerald-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <AlertTriangle className="w-32 h-32" />
+          </div>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Himpunan Zakat (Est.)</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {Math.round(totals.zakat).toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              {renderGrowth(comparisons.zakat, true)}
+              <span className="text-white/70 text-[10px] font-medium">Potensi Zakat</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Average Tx - Purple Gradient */}
+        <div className="relative overflow-hidden bg-indigo-500 bg-gradient-to-br from-purple-500 to-indigo-600 p-5 rounded-2xl shadow-lg border-none text-white">
+          <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12">
+            <Users className="w-32 h-32" />
+          </div>
+          <div className="relative z-10 min-w-0">
+            <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wide mb-2 truncate">Rata-rata Transaksi</p>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg md:text-2xl font-extrabold truncate w-full">Rp {averageTxValue.toLocaleString('id-ID', {maximumFractionDigits: 0})}</h3>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-white bg-white dark:bg-slate-900/20 px-2 py-0.5 rounded text-[11px] font-bold">{totals.count} Struk</span>
+              <span className="text-white/70 text-[10px] font-medium">Per struk</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
 
       {/* Main Charts area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Sales Omset & Profit Trend chart Area - Left (8 Cols) */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+        <div className="lg:col-span-8 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="font-bold text-gray-800 text-sm">Grafik Perkembangan Penjualan</h2>
+              <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Grafik Perkembangan Penjualan</h2>
               <p className="text-[11px] text-gray-400 mt-0.5">Analisa komparatif harian omset dan margin bersih KSA Mart</p>
             </div>
             
             <div className="flex items-center space-x-4 text-xs font-semibold">
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                <span className="text-gray-500">Omset</span>
+                <span className="text-gray-500 dark:text-slate-400">Omset</span>
               </span>
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                <span className="text-gray-500">Margin</span>
+                <span className="text-gray-500 dark:text-slate-400">Margin</span>
               </span>
               <span className="flex items-center space-x-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                <span className="text-gray-500">Zakat</span>
+                <span className="text-gray-500 dark:text-slate-400">Zakat</span>
               </span>
             </div>
           </div>
 
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <div className="h-80 w-full mt-4">
+            <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+              <ComposedChart data={chartData} margin={{ top: 25, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorOmset" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.05}/>
-                  </linearGradient>
-                  <linearGradient id="colorMargin" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05}/>
-                  </linearGradient>
-                  <linearGradient id="colorZakat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.6}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.05}/>
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.2}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+                <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `Rp ${formatSingkat(val)}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
+                  cursor={{fill: '#f8fafc'}}
                 />
-                <Area type="monotone" dataKey="omset" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorOmset)" name="Omset Dagang" />
-                <Area type="monotone" dataKey="margin" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorMargin)" name="Margin Keuntungan" />
-                <Area type="monotone" dataKey="zakat" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorZakat)" name="Zakat Terkumpul" />
-              </AreaChart>
+                <Bar dataKey="omset" fill="url(#colorOmset)" radius={[4, 4, 0, 0]} barSize={40} name="Omset Dagang">
+                  {chartData.length <= 15 && (
+                    <LabelList dataKey="omset" position="top" fill="#64748b" fontSize={10} formatter={(val: number) => val > 0 ? formatSingkat(val) : ''} />
+                  )}
+                </Bar>
+                <Line type="monotone" dataKey="margin" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} name="Margin Keuntungan" />
+                <Line type="monotone" dataKey="zakat" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} name="Zakat Terkumpul" />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Categories distribution panel - Right (4 Cols) */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex flex-col justify-between">
           <div>
-            <h2 className="font-bold text-gray-800 text-sm">Distribusi Kategori Produk</h2>
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Distribusi Kategori Produk</h2>
             <p className="text-[11px] text-gray-400 mt-0.5">Penjualan berdasarkan kelompok barang halalan</p>
           </div>
 
           <div className="h-44 w-full flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
               <PieChart>
                 <Pie
                   data={categoryShare}
@@ -370,7 +689,7 @@ export default function TrendPage() {
                   innerRadius={55}
                   outerRadius={75}
                   paddingAngle={3}
-                  dataKey="value"
+                  dataKey="totalRp"
                 >
                   {categoryShare.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -378,7 +697,10 @@ export default function TrendPage() {
                 </Pie>
                 <Tooltip 
                   contentStyle={{ fontSize: '11px', borderRadius: '8px' }}
-                  formatter={(value) => [`${value}% Share`]}
+                  formatter={(value: any, name: any, props: any) => {
+                    const percent = props.payload.value;
+                    return [`Rp ${value.toLocaleString('id-ID')} (${percent}%)`];
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -387,31 +709,53 @@ export default function TrendPage() {
             <div className="absolute text-center">
               <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Utama</p>
               <p className="font-black text-green-950 text-md">{categoryShare.length > 0 ? categoryShare[0].name : 'N/A'}</p>
-              <p className="text-[10px] text-slate-500 font-semibold font-mono">{categoryShare.length > 0 ? categoryShare[0].value : 0}%</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold font-mono">{categoryShare.length > 0 ? categoryShare[0].value : 0}%</p>
             </div>
           </div>
 
           {/* Table index indicators */}
-          <div className="space-y-2 mt-4 text-xs font-semibold">
+          <div className="space-y-1 mt-4 text-[10px]">
             {categoryShare.map((entry, idx) => (
-              <div key={idx} className="flex items-center justify-between text-gray-600">
-                <div className="flex items-center space-x-2">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: entry.color }}></span>
-                  <span className="text-gray-700">{entry.name}</span>
+              <div key={idx} className="flex items-center justify-between text-gray-600 dark:text-slate-400 py-1 border-b border-dashed border-gray-100 dark:border-slate-800 last:border-0">
+                <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }}></span>
+                  <span className="text-gray-700 dark:text-slate-300 font-semibold truncate" title={entry.name}>{entry.name}</span>
                 </div>
-                <span className="font-mono">{entry.value}%</span>
+                <div className="flex items-center justify-end space-x-2 shrink-0">
+                  <span className="text-slate-500 font-mono w-6 text-right">{entry.qty}x</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200 w-12 text-right">
+                    {formatSingkat(entry.totalRp)}
+                  </span>
+                  <span className="font-bold text-slate-800 dark:text-white w-8 text-right bg-slate-100 dark:bg-slate-800 rounded px-1">{entry.value}%</span>
+                </div>
               </div>
             ))}
+            
+            {/* Grand Total Row */}
+            <div className="flex items-center justify-between text-gray-800 dark:text-slate-200 py-1.5 border-t border-gray-200 dark:border-slate-700 mt-2">
+              <div className="flex items-center space-x-1.5 min-w-0 flex-1">
+                <span className="font-bold uppercase text-[10px] tracking-wider text-slate-500">Total Kategori</span>
+              </div>
+              <div className="flex items-center justify-end space-x-2 shrink-0">
+                <span className="text-slate-600 dark:text-slate-300 font-mono font-bold w-6 text-right">
+                  {categoryShare.reduce((sum, item) => sum + item.qty, 0)}x
+                </span>
+                <span className="font-black text-slate-800 dark:text-slate-100 w-12 text-right">
+                  {formatSingkat(categoryShare.reduce((sum, item) => sum + item.totalRp, 0))}
+                </span>
+                <span className="font-black text-white w-8 text-right bg-blue-600 dark:bg-blue-500 rounded px-1">100%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       
       {/* Financial Ratios Panel */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm flex items-center gap-2">
               <Activity className="w-4 h-4 text-indigo-600" />
               Analisa Rasio Keuangan
             </h2>
@@ -423,82 +767,147 @@ export default function TrendPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <Percent className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Gross Margin (GPM)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.gpm.toFixed(1)}%</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.gpm.toFixed(1)}%</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.gpm >= 20 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Sangat Sehat (&gt;20%)</span> : <span className="text-amber-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Perlu Evaluasi HPP</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <Target className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Net Margin (NPM)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.npm.toFixed(1)}%</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.npm.toFixed(1)}%</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.npm >= 10 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Sangat Sehat (&gt;10%)</span> : <span className="text-amber-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Cek Beban Operasional</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <LineChartIcon className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Rasio Operasional (BOPO)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.bopo.toFixed(1)}%</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.bopo.toFixed(1)}%</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.bopo <= 70 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Sangat Efisien (&lt;70%)</span> : <span className="text-red-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Kurang Efisien</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <Activity className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Current Ratio (Lancar)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.currentRatio.toFixed(2)}x</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.currentRatio.toFixed(2)}x</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.currentRatio >= 1.5 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Likuiditas Aman (&gt;1.5x)</span> : <span className="text-amber-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Risiko Likuiditas</span>}
             </p>
           </div>
 
-          <div className="border border-gray-100 bg-gray-50/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
-            <div className="flex items-center gap-1.5 text-gray-500 mb-2">
+          <div className="border border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 hover:border-indigo-200 transition-colors">
+            <div className="flex items-center gap-1.5 text-gray-500 dark:text-slate-400 mb-2">
               <PieChartIcon className="w-3.5 h-3.5 text-indigo-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Rasio Solvabilitas (DER)</span>
             </div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-gray-800">{ratios.der.toFixed(2)}x</span>
+              <span className="text-2xl font-black text-gray-800 dark:text-slate-200">{ratios.der.toFixed(2)}x</span>
             </div>
-            <p className="text-[10px] mt-2 text-gray-500">
+            <p className="text-[10px] mt-2 text-gray-500 dark:text-slate-400">
               {ratios.der <= 1.0 ? <span className="text-green-600 font-bold flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Modal Kuat (&lt;1.0x)</span> : <span className="text-red-600 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Utang Tinggi</span>}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Top 10 Customers by Points (Moved above Zakat) */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs mt-6 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              Top 10 Pelanggan (Poin Terbanyak)
+            </h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">Tabel dan grafik loyalitas pelanggan berdasarkan transaksi</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
+              <BarChart data={topCustomers} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                <XAxis type="number" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={100} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value: any) => [`${value} Pts`, 'Poin']}
+                  labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label}
+                  cursor={{fill: '#f8fafc'}}
+                />
+                <Bar dataKey="points" radius={[0, 4, 4, 0]} barSize={20}>
+                  {
+                    topCustomers.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#8b5cf6' : (index < 3 ? '#a78bfa' : '#c4b5fd')} />
+                    ))
+                  }
+                  <LabelList dataKey="points" position="right" fill="#64748b" fontSize={10} formatter={(val: number) => `${val} pts`} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-700">
+                  <th className="py-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Nama Pelanggan</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center">Jml Transaksi</th>
+                  <th className="py-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Total Poin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                {topCustomers.map((c, i) => (
+                  <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="py-2 px-3 text-sm font-semibold text-gray-800 dark:text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</span>
+                        <span className="truncate max-w-[120px]" title={c.fullName}>{c.fullName}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 text-sm font-mono text-center text-gray-600 dark:text-slate-400">{c.txCount}x</td>
+                    <td className="py-2 px-3 text-sm font-black text-right text-purple-600 dark:text-purple-400">{c.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Bar graph comparing accumulated Zakat Funds */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs">
         <div className="mb-4">
-          <h2 className="font-bold text-gray-800 text-sm">Himpunan Dana Kebajikan (Zakat Perdagangan)</h2>
+          <h2 className="font-bold text-gray-800 dark:text-slate-200 text-sm">Himpunan Dana Kebajikan (Zakat Perdagangan)</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">Estimasi kontribusi dana zakat kemitraan per hari</p>
         </div>
 
         <div className="h-60 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="99%" height="100%" minWidth={1} minHeight={1}>
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
@@ -506,11 +915,152 @@ export default function TrendPage() {
               <Tooltip 
                 contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px' }}
                 formatter={(value: any) => [`Rp ${value.toLocaleString('id-ID')}`]}
+                cursor={{fill: '#f8fafc'}}
               />
-              <Bar dataKey="zakat" fill="#10b981" radius={[4, 4, 0, 0]} name="Zakat Terkumpul (Rp)" barSize={25} />
+              <Bar dataKey="zakat" fill="#059669" radius={[4, 4, 0, 0]} name="Zakat Terkumpul (Rp)" barSize={25} />
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+
+
+      {/* Top Up Kas Kecil Modal */}
+      <TopUpModal 
+        isOpen={showTopUpModal} 
+        onClose={() => setShowTopUpModal(false)}
+        coaList={coaList}
+        addJournalEntry={addJournalEntry}
+        currentUser={currentUser}
+      />
+    </div>
+  );
+}
+
+// Komponen Modal Terpisah untuk mencegah lag saat mengetik (menghindari re-render grafik berat)
+function TopUpModal({ isOpen, onClose, coaList, addJournalEntry, currentUser }: any) {
+  const [amount, setAmount] = useState('');
+  const [desc, setDesc] = useState('');
+  
+  // Cari default COA
+  const defaultDebit = coaList.find((c: any) => c.code === '1102' || c.name.toLowerCase().includes('kas kecil'))?.code || '1102';
+  const defaultCredit = coaList.find((c: any) => c.code === '3-1000' || c.name.toLowerCase().includes('modal'))?.code || '3-1000';
+  
+  const [debitCoa, setDebitCoa] = useState(defaultDebit);
+  const [creditCoa, setCreditCoa] = useState(defaultCredit);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = Number(amount);
+    if (numAmount > 0 && debitCoa && creditCoa) {
+      const dCoa = coaList.find((c: any) => c.code === debitCoa);
+      const cCoa = coaList.find((c: any) => c.code === creditCoa);
+      const dName = dCoa ? `${dCoa.code} - ${dCoa.name}` : debitCoa;
+      const cName = cCoa ? `${cCoa.code} - ${cCoa.name}` : creditCoa;
+      
+      const refId = `TOPUP_${Date.now()}`;
+      const isoDate = new Date().toISOString();
+
+      // Jurnal Debit
+      addJournalEntry({
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: isoDate,
+        account: dName,
+        description: `[Top Up] ${desc || 'Top Up Rutin'}`,
+        debit: numAmount,
+        credit: 0,
+        referenceId: refId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name || 'System'
+      });
+
+      // Jurnal Kredit
+      addJournalEntry({
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: isoDate,
+        account: cName,
+        description: `[Top Up] ${desc || 'Top Up Rutin'}`,
+        debit: 0,
+        credit: numAmount,
+        referenceId: refId,
+        referenceType: 'MANUAL',
+        createdBy: currentUser?.name || 'System'
+      });
+
+      alert('Top Up berhasil dicatat ke Jurnal!');
+      setAmount('');
+      setDesc('');
+      onClose();
+    } else {
+      alert('Mohon isi nominal dan pilih akun COA dengan benar.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-amber-500 text-white">
+          <h3 className="font-bold text-lg">Top Up Saldo</h3>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl font-bold">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Nominal (Rp) *</label>
+            <input
+              type="number"
+              required
+              min="1000"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 focus:ring-2 focus:ring-amber-500 outline-none text-lg font-bold bg-white dark:bg-slate-900"
+              placeholder="0"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Keterangan Tambahan</label>
+            <input
+              type="text"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-slate-900"
+              placeholder="Misal: Dari kas utama / ATM"
+            />
+          </div>
+          <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
+            <label className="block text-xs font-bold text-teal-700 mb-1">Akun Debit (Tujuan) *</label>
+            <select
+              value={debitCoa}
+              onChange={(e) => setDebitCoa(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none bg-white dark:bg-slate-900"
+              required
+            >
+              {coaList.filter((c: any) => c.isActive).map((c: any) => (
+                <option key={`d-${c.id}`} value={c.code}>{c.code} - {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-rose-700 mb-1">Akun Kredit (Sumber) *</label>
+            <select
+              value={creditCoa}
+              onChange={(e) => setCreditCoa(e.target.value)}
+              className="w-full border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-xs focus:ring-2 focus:ring-rose-500 outline-none bg-white dark:bg-slate-900"
+              required
+            >
+              {coaList.filter((c: any) => c.isActive).map((c: any) => (
+                <option key={`c-${c.id}`} value={c.code}>{c.code} - {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl mt-4"
+          >
+            Simpan Transaksi
+          </button>
+        </form>
       </div>
     </div>
   );

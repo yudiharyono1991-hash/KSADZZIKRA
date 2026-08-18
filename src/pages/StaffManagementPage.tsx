@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
-import { UserCheck, Clock, CheckCircle, Search, AlertTriangle, ThumbsUp, ThumbsDown, Banknote, Calculator, Printer, AlertCircle } from 'lucide-react';
+import { UserCheck, Clock, CheckCircle, Search, AlertTriangle, ThumbsUp, ThumbsDown, Banknote, Calculator, Printer, AlertCircle, Calendar } from 'lucide-react';
+import { useAppStore } from '../store';
 
 export default function StaffManagementPage() {
   const store = useBranchData();
@@ -10,12 +11,22 @@ export default function StaffManagementPage() {
   const addAttendanceCorrection = (store as any).addAttendanceCorrection || (() => {});
   const updateAttendanceCorrection = (store as any).updateAttendanceCorrection || (() => {});
   const reviewAttendanceCorrection = (store as any).reviewAttendanceCorrection || ((id: string, approve: boolean) => {});
+  const { settings, updateSettings } = useAppStore();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'LOG' | 'CORRECTIONS' | 'CASH_OPNAME'>('LOG');
+  const [shiftFilter, setShiftFilter] = useState('ALL');
+  
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+  const currentDay = today.toLocaleDateString('en-CA');
+  
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(currentDay);
+
+  const [activeTab, setActiveTab] = useState<'LOG' | 'CORRECTIONS' | 'CASH_OPNAME' | 'SCHEDULE'>('LOG');
 
   // Cash Opname State
-  const [opnameDate, setOpnameDate] = useState(new Date().toISOString().split('T')[0]);
+  const [opnameDate, setOpnameDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [physicalCash, setPhysicalCash] = useState('');
   const [opnameCashierName, setOpnameCashierName] = useState('');
   const [opnameNotes, setOpnameNotes] = useState('');
@@ -25,79 +36,250 @@ export default function StaffManagementPage() {
   }>>([]);
 
   if (!['ADMIN', 'OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '')) {
-    return <div className="p-6 text-red-500">Akses Ditolak. Khusus Admin/Owner.</div>;
+    return <div className="p-6 text-red-700">Akses Ditolak. Khusus Admin/Owner.</div>;
   }
 
-  // Calculate commission
-  const getCommission = (cashierName: string) => {
-    const totalSales = transactions
-      .filter(t => t.cashierName === cashierName)
-      .reduce((sum, t) => sum + t.totalAmount, 0);
-    return totalSales * 0.01;
+
+  const getDatesInRange = (start: string, end: string) => {
+    const dates = [];
+    let currDate = new Date(start);
+    const lastDate = new Date(end);
+    const limitDate = new Date(); 
+    limitDate.setHours(23, 59, 59, 999);
+    const maxDate = lastDate < limitDate ? lastDate : limitDate;
+    
+    while (currDate <= maxDate) {
+      dates.push(new Date(currDate).toLocaleDateString('en-CA'));
+      currDate.setDate(currDate.getDate() + 1);
+    }
+    return dates;
   };
 
-  const filteredAttendances = attendances.filter(a => a.userName.toLowerCase().includes(searchTerm.toLowerCase()));
+  const datesInRange = startDate && endDate ? getDatesInRange(startDate, endDate) : [];
+  // Proses semua Kasir & Staff, kecuali akun percobaan "Yudi Hariyono"
+  const staffUsers = users.filter(u => 
+    (u.role === 'CASHIER' || u.role.startsWith('STAFF')) &&
+    !u.name.toLowerCase().includes('yudi hariyono')
+  );
+
+  const fullAttendances = [...attendances];
+  
+  datesInRange.forEach(date => {
+    const dateObj = new Date(date);
+    const dayIndex = dateObj.getDay();
+    
+    staffUsers.forEach(user => {
+      const userAssigns = (settings.operationalHours?.shiftAssignments?.[user.id] as any) || {};
+      const assignedShiftId = userAssigns[dayIndex];
+      if (assignedShiftId === 'LIBUR') return;
+      
+      const hasRecord = fullAttendances.some(a => a.userId === user.id && a.date === date);
+      if (!hasRecord) {
+        fullAttendances.push({
+          id: `virtual-${user.id}-${date}`,
+          userId: user.id,
+          userName: user.name,
+          date: date,
+          clockIn: '',
+          status: 'ALFA',
+          isVirtual: true
+        });
+      }
+    });
+  });
+
+  const filteredAttendances = fullAttendances.filter(a => {
+    const matchName = a.userName.toLowerCase().includes(searchTerm.toLowerCase());
+    let matchDate = true;
+    if (startDate && new Date(a.date).getTime() < new Date(startDate).setHours(0,0,0,0)) matchDate = false;
+    if (endDate && new Date(a.date).getTime() > new Date(endDate).setHours(23,59,59,999)) matchDate = false;
+
+    let matchShift = true;
+    if (shiftFilter !== 'ALL') {
+       const dateObj = new Date(a.date);
+       const dayIndex = dateObj.getDay();
+       const userAssigns = (settings.operationalHours?.shiftAssignments?.[a.userId] as any) || {};
+       const assignedShiftId = userAssigns[dayIndex];
+       
+       if (shiftFilter === 'UNASSIGNED') {
+          matchShift = !assignedShiftId || assignedShiftId === 'LIBUR';
+       } else {
+          matchShift = assignedShiftId === shiftFilter;
+       }
+    }
+
+    return matchName && matchDate && matchShift;
+  });
+
+  const getEffectiveStatus = (a: any) => {
+    if (a.status === 'PRESENT' && a.clockIn) {
+      const clockInTime = new Date(a.clockIn);
+      const hours = clockInTime.getHours();
+      const minutes = clockInTime.getMinutes();
+      if (hours > 7 || (hours === 7 && minutes > 0)) {
+        return 'LATE';
+      }
+    }
+    return a.status;
+  };
+
+  const summaryByStaff = Array.from(new Set(filteredAttendances.map(a => a.userName))).map(name => {
+    const userRecords = filteredAttendances.filter(a => a.userName === name);
+    return {
+      name,
+      present: userRecords.filter(a => getEffectiveStatus(a) === 'PRESENT').length,
+      late: userRecords.filter(a => getEffectiveStatus(a) === 'LATE').length,
+      sakit: userRecords.filter(a => getEffectiveStatus(a) === 'SAKIT').length,
+      izin: userRecords.filter(a => getEffectiveStatus(a) === 'IZIN').length,
+      cuti: userRecords.filter(a => getEffectiveStatus(a) === 'CUTI').length,
+      alfa: userRecords.filter(a => getEffectiveStatus(a) === 'ALFA').length,
+      clockIn: userRecords.filter(a => (getEffectiveStatus(a) === 'PRESENT' || getEffectiveStatus(a) === 'LATE') && !!a.clockIn).length,
+      noClockIn: userRecords.filter(a => getEffectiveStatus(a) === 'ALFA').length,
+      clockOut: userRecords.filter(a => (getEffectiveStatus(a) === 'PRESENT' || getEffectiveStatus(a) === 'LATE') && !!a.clockOut).length,
+      noClockOut: userRecords.filter(a => (getEffectiveStatus(a) === 'PRESENT' || getEffectiveStatus(a) === 'LATE') && !a.clockOut).length,
+    };
+  });
 
   const pendingCorrections = attendances.filter(a => a.correctionStatus === 'PENDING');
 
+  // Hanya OWNER/SUPERADMIN/MANAGER yang boleh approve. ADMIN tidak boleh approve.
+  const canApproveHR = ['OWNER', 'SUPERADMIN', 'MANAGER', 'PENGURUS'].includes(currentUser?.role || '');
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-5xl mx-auto space-y-4 md:space-y-6 w-full min-w-0 pb-20">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-teal-100 text-teal-800 rounded-xl">
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Manajemen Karyawan (HR)</h1>
-            <p className="text-sm text-gray-500">Log absensi shift dan perhitungan komisi performa kasir.</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Manajemen Karyawan (HR)</h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400">Log absensi shift dan manajemen staf.</p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 gap-1 flex-wrap">
+      <div className="flex border-b border-gray-200 dark:border-slate-700 gap-1 flex-wrap">
         <button
           onClick={() => setActiveTab('LOG')}
-          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'LOG' ? 'border-b-2 border-teal-600 text-teal-700 bg-teal-50' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'LOG' ? 'border-b-2 border-teal-600 text-teal-700 bg-teal-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
           <Clock className="w-4 h-4 inline mr-1" /> Log Absensi
         </button>
         <button
           onClick={() => setActiveTab('CORRECTIONS')}
-          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CORRECTIONS' ? 'border-b-2 border-amber-500 text-amber-700 bg-amber-50' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CORRECTIONS' ? 'border-b-2 border-amber-500 text-amber-700 bg-amber-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
-          <AlertTriangle className="w-4 h-4" /> Permohonan Koreksi
+          <AlertTriangle className="w-4 h-4" /> Approval Absensi
           {pendingCorrections.length > 0 && (
             <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{pendingCorrections.length}</span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('CASH_OPNAME')}
-          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CASH_OPNAME' ? 'border-b-2 border-green-600 text-green-700 bg-green-50' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'CASH_OPNAME' ? 'border-b-2 border-green-600 text-green-700 bg-green-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
         >
           <Banknote className="w-4 h-4" /> Cash Opname
+        </button>
+        <button
+          onClick={() => setActiveTab('SCHEDULE')}
+          className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors flex items-center gap-2 ${activeTab === 'SCHEDULE' ? 'border-b-2 border-blue-600 text-blue-700 bg-blue-50' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:text-slate-300'}`}
+        >
+          <Calendar className="w-4 h-4" /> Jadwal Shift
         </button>
       </div>
 
       {activeTab === 'LOG' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Attendances Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-bold text-gray-800 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-teal-600" /> Log Absensi
               </h2>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-slate-800">
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={e => setStartDate(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none w-28"
+                  />
+                  <span className="text-gray-400 text-xs">s/d</span>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={e => setEndDate(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none w-28"
+                  />
+                </div>
+                <select 
+                  value={shiftFilter} 
+                  onChange={e => setShiftFilter(e.target.value)}
+                  className="border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-gray-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="ALL">Semua Shift</option>
+                  {settings.operationalHours?.shifts?.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                  <option value="UNASSIGNED">Reguler (Tanpa Shift)</option>
+                </select>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input type="text" placeholder="Cari nama..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 pr-3 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-teal-500 w-48" />
+                </div>
               </div>
             </div>
-            <div className="overflow-x-auto max-h-[400px]">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50/50 text-gray-500 font-bold uppercase tracking-wide sticky top-0">
+            
+            <div className="overflow-x-auto border-b border-gray-100 dark:border-slate-800 p-2 md:p-4 bg-gray-50/50 dark:bg-slate-800/20 hide-scrollbar w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="w-full text-left text-[10px] bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden min-w-[800px]">
+                <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wide">
+                  <tr>
+                    <th className="px-3 py-2 border-b dark:border-slate-700">Nama Staff</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-green-600">Tepat Wkt</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-amber-500">Terlambat</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-blue-500">Sakit</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-purple-500">Izin</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-teal-500">Cuti</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center text-red-700">Alfa</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center border-l bg-teal-50 dark:bg-teal-900/10 text-teal-700">Absen Masuk</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center bg-red-50 dark:bg-red-900/10 text-red-600">Tdk Absen Masuk</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center bg-blue-50 dark:bg-blue-900/10 text-blue-700">Absen Keluar</th>
+                    <th className="px-2 py-2 border-b dark:border-slate-700 text-center bg-amber-50 dark:bg-amber-900/10 text-amber-600">Tdk Absen Keluar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-700 font-medium">
+                  {summaryByStaff.length === 0 ? (
+                    <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-500">Tidak ada data</td></tr>
+                  ) : (
+                    summaryByStaff.map((s, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="px-3 py-2 font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">{s.name}</td>
+                        <td className="px-2 py-2 text-center">{s.present || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.late || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.sakit || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.izin || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.cuti || '-'}</td>
+                        <td className="px-2 py-2 text-center">{s.alfa || '-'}</td>
+                        <td className="px-2 py-2 text-center border-l bg-teal-50/50 dark:bg-teal-900/5 font-bold">{s.clockIn || '-'}</td>
+                        <td className="px-2 py-2 text-center bg-red-50/50 dark:bg-red-900/5 font-bold">{s.noClockIn || '-'}</td>
+                        <td className="px-2 py-2 text-center bg-blue-50/50 dark:bg-blue-900/5 font-bold">{s.clockOut || '-'}</td>
+                        <td className="px-2 py-2 text-center bg-amber-50/50 dark:bg-amber-900/5 font-bold">{s.noClockOut || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="overflow-x-auto max-h-[400px] hide-scrollbar w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className="w-full text-left text-[10px] sm:text-xs min-w-[700px]">
+                <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 font-bold uppercase tracking-wide sticky top-0">
                   <tr>
                     <th className="px-4 py-3">Tanggal</th>
+                    <th className="px-4 py-3">Shift</th>
                     <th className="px-4 py-3">Nama Staff</th>
+                    <th className="px-4 py-3 text-center">Foto Masuk</th>
                     <th className="px-4 py-3 text-center">Masuk</th>
                     <th className="px-4 py-3 text-center">Keluar</th>
                     <th className="px-4 py-3 text-center">Status</th>
@@ -105,66 +287,73 @@ export default function StaffManagementPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
                   {filteredAttendances.map(a => (
-                    <tr key={a.id} className="hover:bg-gray-50">
+                    <tr key={a.id} className="hover:bg-gray-50 dark:bg-slate-800">
                       <td className="px-4 py-3">
                         {a.date}
                         {a.isRevised && <span className="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Direvisi</span>}
                       </td>
-                      <td className="px-4 py-3 font-bold text-gray-800">{a.userName}</td>
-                      <td className="px-4 py-3 text-center text-teal-600">{new Date(a.clockIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                      <td className="px-4 py-3 text-center text-amber-600">
-                        {a.clockOut ? new Date(a.clockOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}
+                      <td className="px-4 py-3 text-[10px] text-gray-500 dark:text-slate-400 font-medium">
+                        {(() => {
+                          const dayIndex = new Date(a.date).getDay();
+                          const userAssigns = (settings.operationalHours?.shiftAssignments?.[a.userId] as any) || {};
+                          const shiftId = userAssigns[dayIndex];
+                          if (shiftId && shiftId !== 'LIBUR') {
+                            const shiftObj = settings.operationalHours?.shifts?.find(s => s.id === shiftId);
+                            return shiftObj ? shiftObj.name : 'Reguler';
+                          }
+                          return 'Reguler';
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gray-800 dark:text-slate-200">{a.userName}</td>
+                      <td className="px-4 py-3 text-center flex justify-center">
+                        {a.photoUrl ? (
+                          <div className="relative group cursor-pointer w-8 h-8 rounded-full overflow-hidden border-2 border-teal-500 shadow-sm">
+                            <img src={a.photoUrl} alt="Selfie" className="w-full h-full object-cover" />
+                            <div className="hidden group-hover:block absolute bottom-0 left-0 w-32 h-32 z-50 bg-white rounded shadow-xl overflow-hidden transform translate-x-4 -translate-y-4">
+                              <img src={a.photoUrl} alt="Selfie Zoom" className="w-full h-full object-cover" />
+                            </div>
+                          </div>
+                        ) : (
+                           <span className="text-[10px] text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center text-teal-600">
+                        {a.clockIn ? new Date(a.clockIn).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-amber-600 flex flex-col items-center justify-center gap-1">
+                        {a.clockOut ? new Date(a.clockOut).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) : '-'}
+                        {a.clockOut && (() => {
+                          const t = new Date(a.clockOut);
+                          if (t.getHours() > 21 || (t.getHours() === 21 && t.getMinutes() > 0)) {
+                            return <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[9px] rounded font-bold border border-purple-200">LEMBUR</span>;
+                          }
+                          return null;
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded border border-teal-100 text-[10px]">
-                          {a.status}
-                        </span>
+                        {(() => {
+                          const effStatus = getEffectiveStatus(a);
+                          return (
+                            <span className={`px-2 py-0.5 rounded border text-[10px] ${
+                              effStatus === 'PRESENT' ? 'bg-teal-50 text-teal-700 border-teal-100' :
+                              effStatus === 'LATE' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                              effStatus === 'ALFA' ? 'bg-red-50 text-red-700 border-red-100' :
+                              'bg-gray-50 text-gray-700 border-gray-100'
+                            }`}>
+                              {effStatus}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
                   {filteredAttendances.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500">Belum ada log absensi.</td>
+                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500 dark:text-slate-400">Belum ada log absensi.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          {/* Commission Report */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600" /> Estimasi Komisi (1% Sales)
-              </h2>
-            </div>
-            <div className="p-4">
-              <div className="space-y-4">
-                {users.filter(u => u.role === 'CASHIER').map(u => {
-                  const commission = getCommission(u.name);
-                  return (
-                    <div key={u.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
-                          {u.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-800 text-sm">{u.name}</p>
-                          <p className="text-[10px] text-gray-500">@{u.username}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] text-gray-500 font-bold mb-0.5">EST. KOMISI</p>
-                        <p className="font-extrabold text-green-600 text-sm">Rp {commission.toLocaleString('id-ID')}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                {users.filter(u => u.role === 'CASHIER').length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">Belum ada akun kasir terdaftar.</p>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -174,34 +363,42 @@ export default function StaffManagementPage() {
       {activeTab === 'CORRECTIONS' && (
         <div className="space-y-4">
           {pendingCorrections.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 border border-gray-100 shadow-sm text-center">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 border border-gray-100 dark:border-slate-800 shadow-sm text-center">
               <CheckCircle className="w-16 h-16 text-green-200 mx-auto mb-4" />
-              <h3 className="font-bold text-gray-700 text-lg">Tidak Ada Permohonan Koreksi</h3>
-              <p className="text-gray-500 text-sm mt-1">Semua absensi karyawan sudah berstatus normal.</p>
+              <h3 className="font-bold text-gray-700 dark:text-slate-300 text-lg">Tidak Ada Pengajuan</h3>
+              <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">Semua absensi karyawan sudah berstatus normal.</p>
             </div>
           ) : (
-            pendingCorrections.map(a => (
-              <div key={a.id} className="bg-white rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
+            pendingCorrections.map(a => {
+              // Larang approve/reject jika pengaju adalah diri sendiri
+              const isSelf = a.userName === currentUser?.name || a.userName === currentUser?.username;
+              const canAct = canApproveHR && !isSelf;
+
+              return (
+              <div key={a.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
                 <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-center gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold text-gray-800 text-sm">{a.userName} — <span className="text-amber-700">{a.date}</span></p>
-                    <p className="text-xs text-gray-500">Memohon koreksi: <strong>{a.correctionType === 'CLOCK_IN' ? 'Jam Masuk' : a.correctionType === 'CLOCK_OUT' ? 'Jam Keluar' : 'Jam Masuk & Keluar'}</strong></p>
+                    <p className="font-bold text-gray-800 dark:text-slate-200 text-sm">{a.userName} — <span className="text-amber-700">{a.date}</span></p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Memohon: <strong>{a.correctionType === 'LEAVE' ? `Izin/Cuti (${a.leaveType})` : a.correctionType === 'CLOCK_IN' ? 'Koreksi Jam Masuk' : a.correctionType === 'CLOCK_OUT' ? 'Koreksi Jam Keluar' : 'Koreksi Jam Masuk & Keluar'}</strong></p>
                   </div>
+                  {isSelf && (
+                    <span className="text-[10px] font-black bg-red-100 text-red-600 border border-red-200 px-2 py-1 rounded-full">PENGAJUAN ANDA SENDIRI</span>
+                  )}
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-500 mb-1">Jam Masuk Saat Ini</p>
-                      <p className="font-bold text-gray-800">{new Date(a.clockIn).toLocaleString('id-ID')}</p>
+                    <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Jam Masuk Saat Ini</p>
+                      <p className="font-bold text-gray-800 dark:text-slate-200">{new Date(a.clockIn).toLocaleString('id-ID')}</p>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-3">
                       <p className="text-xs text-blue-500 mb-1">Jam Masuk yang Diminta</p>
                       <p className="font-bold text-blue-800">{a.requestedClockIn ? new Date(a.requestedClockIn).toLocaleString('id-ID') : '(tidak diubah)'}</p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-500 mb-1">Jam Keluar Saat Ini</p>
-                      <p className="font-bold text-gray-800">{a.clockOut ? new Date(a.clockOut).toLocaleString('id-ID') : '(belum absen)'}</p>
+                    <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mb-1">Jam Keluar Saat Ini</p>
+                      <p className="font-bold text-gray-800 dark:text-slate-200">{a.clockOut ? new Date(a.clockOut).toLocaleString('id-ID') : '(belum absen)'}</p>
                     </div>
                     <div className="bg-blue-50 rounded-lg p-3">
                       <p className="text-xs text-blue-500 mb-1">Jam Keluar yang Diminta</p>
@@ -212,23 +409,33 @@ export default function StaffManagementPage() {
                     <p className="text-xs text-amber-600 font-bold mb-1">Alasan Karyawan:</p>
                     <p className="text-sm text-amber-900 italic">"{a.correctionReason}"</p>
                   </div>
+                  {!canAct && (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                      <p className="text-xs text-red-700 font-bold">
+                        {isSelf ? '🚫 Anda tidak dapat menyetujui pengajuan Anda sendiri.' : '🔒 Hanya Owner/Manager yang dapat memberikan persetujuan.'}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex gap-3 pt-1">
                     <button
-                      onClick={() => { reviewAttendanceCorrection(a.id, false); }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-sm transition-colors"
+                      onClick={() => { if (canAct) reviewAttendanceCorrection(a.id, false); }}
+                      disabled={!canAct}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 border rounded-xl font-bold text-sm transition-colors ${canAct ? 'border-red-200 text-red-600 hover:bg-red-50 cursor-pointer' : 'border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50'}`}
                     >
                       <ThumbsDown className="w-4 h-4" /> Tolak
                     </button>
                     <button
-                      onClick={() => { reviewAttendanceCorrection(a.id, true); alert(`Koreksi absen ${a.userName} berhasil disetujui. Data jam absen telah diperbarui.`); }}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-sm transition-colors"
+                      onClick={() => { if (canAct) { reviewAttendanceCorrection(a.id, true); alert(`Koreksi absen ${a.userName} berhasil disetujui. Data jam absen telah diperbarui.`); } }}
+                      disabled={!canAct}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-colors ${canAct ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                     >
                       <ThumbsUp className="w-4 h-4" /> Setujui Koreksi
                     </button>
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -266,45 +473,45 @@ export default function StaffManagementPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Input Form */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-                <h3 className="font-bold text-gray-800 border-b pb-3 flex items-center gap-2"><Calculator className="w-4 h-4 text-green-600"/> Form Penghitungan</h3>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 p-6 space-y-4">
+                <h3 className="font-bold text-gray-800 dark:text-slate-200 border-b pb-3 flex items-center gap-2"><Calculator className="w-4 h-4 text-green-600"/> Form Penghitungan</h3>
                 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Tanggal Opname</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">Tanggal Opname</label>
                   <input type="date" value={opnameDate} onChange={e => setOpnameDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"/>
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"/>
                 </div>
                 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Kasir yang Bertugas</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">Kasir yang Bertugas</label>
                   <select value={opnameCashierName} onChange={e => setOpnameCashierName(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none">
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none">
                     <option value="">-- Semua Kasir --</option>
                     {cashierNames.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-4 space-y-2 border border-slate-200">
-                  <h4 className="font-bold text-slate-700 text-sm mb-2">💻 Data Sistem</h4>
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 space-y-2 border border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-300 text-sm mb-2">💻 Data Sistem</h4>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Total Tunai Masuk</span>
+                    <span className="text-slate-600 dark:text-slate-400">Total Tunai Masuk</span>
                     <span className="font-bold text-green-700">Rp {systemCashIn.toLocaleString('id-ID')}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Total Pengeluaran Kas Kecil</span>
+                    <span className="text-slate-600 dark:text-slate-400">Total Pengeluaran Kas Kecil</span>
                     <span className="font-bold text-red-600">- Rp {systemExpenses.toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="flex justify-between text-sm border-t border-slate-300 pt-2 mt-1">
-                    <span className="font-bold text-slate-800">Kas Bersih Sistem</span>
-                    <span className="font-extrabold text-slate-900">Rp {systemNetCash.toLocaleString('id-ID')}</span>
+                  <div className="flex justify-between text-sm border-t border-slate-300 dark:border-slate-600 pt-2 mt-1">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Kas Bersih Sistem</span>
+                    <span className="font-extrabold text-slate-900 dark:text-white">Rp {systemNetCash.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">💵 Uang Fisik di Laci (Hasil Hitung)</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">💵 Uang Fisik di Laci (Hasil Hitung)</label>
                   <input type="number" value={physicalCash} onChange={e => setPhysicalCash(e.target.value)}
                     placeholder="Masukkan jumlah uang fisik..."
-                    className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold"/>
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold"/>
                 </div>
 
                 {physicalCash && (
@@ -326,11 +533,11 @@ export default function StaffManagementPage() {
                 )}
 
                 <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase mb-1 block">Catatan Opname</label>
+                  <label className="text-xs font-bold text-gray-600 dark:text-slate-400 uppercase mb-1 block">Catatan Opname</label>
                   <textarea value={opnameNotes} onChange={e => setOpnameNotes(e.target.value)}
                     placeholder="Contoh: Semua sesuai. / Selisih disebabkan uang kembalian rusak."
                     rows={2}
-                    className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"/>
+                    className="w-full border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"/>
                 </div>
 
                 <button
@@ -358,9 +565,9 @@ export default function StaffManagementPage() {
               </div>
 
               {/* History */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Printer className="w-4 h-4 text-gray-500"/> Riwayat Cash Opname</h3>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 overflow-hidden">
+                <div className="p-4 border-b border-gray-100 dark:border-slate-800">
+                  <h3 className="font-bold text-gray-800 dark:text-slate-200 flex items-center gap-2"><Printer className="w-4 h-4 text-gray-500 dark:text-slate-400"/> Riwayat Cash Opname</h3>
                 </div>
                 <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
                   {savedOpnameResults.length === 0 ? (
@@ -370,11 +577,11 @@ export default function StaffManagementPage() {
                     </div>
                   ) : (
                     savedOpnameResults.map((r, i) => (
-                      <div key={i} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div key={i} className="p-4 hover:bg-gray-50 dark:bg-slate-800 transition-colors">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-bold text-sm text-gray-800">{new Date(r.date + 'T00:00:00').toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'short', year:'numeric'})}</p>
-                            <p className="text-xs text-gray-500">Kasir: {r.cashierName} | Dicatat: {r.recordedBy}</p>
+                            <p className="font-bold text-sm text-gray-800 dark:text-slate-200">{new Date(r.date + 'T00:00:00').toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'short', year:'numeric'})}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Kasir: {r.cashierName} | Dicatat: {r.recordedBy}</p>
                           </div>
                           <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full ${
                             r.difference === 0 ? 'bg-green-100 text-green-700' :
@@ -384,24 +591,24 @@ export default function StaffManagementPage() {
                           </span>
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div className="bg-slate-50 rounded-lg p-2 text-center">
-                            <p className="text-gray-500">Sistem</p>
-                            <p className="font-bold text-gray-800">Rp {r.systemCash.toLocaleString('id-ID')}</p>
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2 text-center">
+                            <p className="text-gray-500 dark:text-slate-400">Sistem</p>
+                            <p className="font-bold text-gray-800 dark:text-slate-200">Rp {r.systemCash.toLocaleString('id-ID')}</p>
                           </div>
-                          <div className="bg-slate-50 rounded-lg p-2 text-center">
-                            <p className="text-gray-500">Fisik</p>
-                            <p className="font-bold text-gray-800">Rp {r.physicalCash.toLocaleString('id-ID')}</p>
+                          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2 text-center">
+                            <p className="text-gray-500 dark:text-slate-400">Fisik</p>
+                            <p className="font-bold text-gray-800 dark:text-slate-200">Rp {r.physicalCash.toLocaleString('id-ID')}</p>
                           </div>
                           <div className={`rounded-lg p-2 text-center ${
                             r.difference === 0 ? 'bg-green-50' : r.difference > 0 ? 'bg-blue-50' : 'bg-red-50'
                           }`}>
-                            <p className="text-gray-500">Selisih</p>
+                            <p className="text-gray-500 dark:text-slate-400">Selisih</p>
                             <p className={`font-extrabold ${
                               r.difference === 0 ? 'text-green-700' : r.difference > 0 ? 'text-blue-700' : 'text-red-700'
                             }`}>{r.difference >= 0 ? '+' : ''}Rp {r.difference.toLocaleString('id-ID')}</p>
                           </div>
                         </div>
-                        {r.notes && <p className="text-xs text-gray-500 mt-1 italic">📝 {r.notes}</p>}
+                        {r.notes && <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 italic">📝 {r.notes}</p>}
                       </div>
                     ))
                   )}
@@ -411,6 +618,91 @@ export default function StaffManagementPage() {
           </div>
         );
       })()}
+
+      {activeTab === 'SCHEDULE' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-gray-800 dark:text-slate-200">Penugasan Shift Karyawan</h3>
+          </div>
+          
+          {(!settings.operationalHours?.shifts || settings.operationalHours.shifts.length === 0) ? (
+            <div className="text-center py-10 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+              <Clock className="w-10 h-10 mx-auto text-slate-400 mb-3" />
+              <h4 className="font-bold text-slate-700 dark:text-slate-300">Belum Ada Shift</h4>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Anda belum mengatur shift operasional. Silakan atur shift di menu Pengaturan terlebih dahulu sebelum menugaskannya ke karyawan.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-[11px] uppercase tracking-wider font-bold">
+                    <th className="p-4 w-48 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Karyawan</th>
+                    <th className="p-2 text-center">Sen</th>
+                    <th className="p-2 text-center">Sel</th>
+                    <th className="p-2 text-center">Rab</th>
+                    <th className="p-2 text-center">Kam</th>
+                    <th className="p-2 text-center">Jum</th>
+                    <th className="p-2 text-center">Sab</th>
+                    <th className="p-2 text-center">Min</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {users.filter(u => u.isApproved && (u.role === 'CASHIER' || u.role.startsWith('STAFF'))).map((user) => (
+                    <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:bg-slate-800 transition-colors">
+                      <td className="p-4 font-bold text-slate-800 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10">
+                        {user.name}
+                        <div className="text-xs font-normal text-slate-500">{user.role}</div>
+                      </td>
+                      {[1, 2, 3, 4, 5, 6, 0].map(dayIndex => (
+                        <td key={dayIndex} className="p-2">
+                          <select
+                            value={(settings.operationalHours?.shiftAssignments?.[user.id] as any)?.[dayIndex] || ''}
+                            onChange={(e) => {
+                              const currentAssignments = settings.operationalHours?.shiftAssignments || {};
+                              const userAssigns = (currentAssignments[user.id] as any) || {};
+                              const newAssignments = { ...currentAssignments };
+                              
+                              if (e.target.value) {
+                                newAssignments[user.id] = { ...userAssigns, [dayIndex]: e.target.value } as any;
+                              } else {
+                                const updatedUserAssigns = { ...userAssigns };
+                                delete updatedUserAssigns[dayIndex];
+                                if (Object.keys(updatedUserAssigns).length === 0) {
+                                  delete newAssignments[user.id];
+                                } else {
+                                  newAssignments[user.id] = updatedUserAssigns as any;
+                                }
+                              }
+                              
+                              updateSettings({
+                                operationalHours: {
+                                  ...(settings.operationalHours || { isOpen: true, openTime: '07:00', closeTime: '21:00', closedMessage: '' }),
+                                  shiftAssignments: newAssignments
+                                }
+                              });
+                            }}
+                            className={`border border-slate-300 dark:border-slate-600 text-[11px] font-medium rounded p-1 w-full outline-none focus:ring-1 focus:ring-blue-500
+                              ${(settings.operationalHours?.shiftAssignments?.[user.id] as any)?.[dayIndex] === 'LIBUR' 
+                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200' 
+                                : 'bg-white text-slate-700 dark:bg-slate-900 dark:text-slate-300'}
+                            `}
+                          >
+                            <option value="">-- Reg --</option>
+                            <option value="LIBUR">LIBUR</option>
+                            {settings.operationalHours?.shifts?.map(s => (
+                              <option key={s.id} value={s.id}>{s.name.substring(0, 5)}</option>
+                            ))}
+                          </select>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -31,7 +31,8 @@ import {
   Package,
   HelpCircle,
   Newspaper,
-  Smartphone
+  Smartphone,
+  Image
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -57,11 +58,24 @@ type MenuGroup = {
 type MenuData = (MenuItem | MenuGroup)[];
 
 export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, onExpand }: SidebarProps) {
-  const { currentUser, logout, users, settings } = useAppStore();
+  const { currentUser, logout, users, settings, onlineOrders, products, attendances } = useAppStore();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [isHovered, setIsHovered] = useState(false);
   
+  const effectiveIsCollapsed = isCollapsed && !isHovered;
+
   const pendingUsersCount = users?.filter(u => !u.isApproved).length || 0;
+  const pendingOrdersCount = onlineOrders?.filter(o => o.status === 'PENDING').length || 0;
+  const lowStockCount = products?.filter(p => !p.isPPOB && p.stock <= p.minStock).length || 0;
+  const expiredOrNearExpiredCount = products?.filter(p => {
+    if (p.isPPOB || !p.expiryDate) return false;
+    const daysToExpiry = (new Date(p.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+    return daysToExpiry <= 30;
+  }).length || 0;
+  const inventoryAlertCount = lowStockCount + expiredOrNearExpiredCount;
+  const pendingCorrectionsCount = (attendances as any[])?.filter(a => a.correctionStatus === 'PENDING').length || 0;
+
   const notifications = useAppStore(state => state.notifications);
   const currentUserLocal = useAppStore(state => state.currentUser);
   const unreadNotificationsCount = (notifications || []).filter(n => {
@@ -94,8 +108,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: ShoppingCart,
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
-          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
+          { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag, badge: pendingOrdersCount },
         ]
       },
       {
@@ -114,6 +129,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: BookOpen,
         items: [
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
+          { path: '/buku-besar', label: 'Buku Besar', icon: BookOpen },
           { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
         ]
       },
@@ -121,7 +137,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: inventoryAlertCount },
           { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
@@ -132,10 +148,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Database,
         items: [
           { path: '/cabang', label: 'Manajemen Cabang', icon: Store },
+          { path: '/banners', label: 'Manajemen Banner Promo', icon: Image },
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
+          { path: '/kasbon-rekap', label: 'Master Kasbon Pelanggan', icon: Wallet },
           { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
-          { path: '/promos', label: 'Manajemen Promo', icon: Tag },
+          { path: '/promos', label: 'Promo Transaksi', icon: Tag },
+          { path: '/promo-produk', label: 'Promo Produk', icon: Tag },
         ]
       },
       {
@@ -143,6 +162,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck, badge: pendingCorrectionsCount },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
@@ -157,13 +177,14 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
-  } else if (currentUser.role === 'ADMIN' || currentUser.role === 'STAFF_GUDANG' || currentUser.role === 'STAFF_LAPANGAN') {
+  } else if (currentUser.role === 'ADMIN' || currentUser.role === 'STAFF_LAPANGAN') {
     menuData = [
       {
         label: 'Transaksi',
         icon: ShoppingCart,
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
@@ -182,6 +203,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: BookOpen,
         items: [
           { path: '/jurnal-umum', label: 'Jurnal Umum', icon: BookOpen },
+          { path: '/buku-besar', label: 'Buku Besar', icon: BookOpen },
           { path: '/coa', label: 'Daftar Akun (CoA)', icon: BookOpen },
         ]
       },
@@ -189,7 +211,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Inventory & Stok',
         icon: Package,
         items: [
-          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes },
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: inventoryAlertCount },
           { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
           { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
           { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
@@ -199,10 +221,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         label: 'Data Master',
         icon: Database,
         items: [
+          { path: '/banners', label: 'Manajemen Banner Promo', icon: Image },
           { path: '/suppliers', label: 'Master Supplier', icon: Truck },
           { path: '/customers', label: 'Master Pelanggan', icon: UsersRound },
+          { path: '/kasbon-rekap', label: 'Master Kasbon Pelanggan', icon: Wallet },
           { path: '/loyalty', label: 'Program Loyalitas Poin', icon: Tag },
-          { path: '/promos', label: 'Manajemen Promo', icon: Tag },
+          { path: '/promos', label: 'Promo Transaksi', icon: Tag },
+          { path: '/promo-produk', label: 'Promo Produk', icon: Tag },
         ]
       },
       ...(currentUser.role === 'ADMIN' ? [{
@@ -210,6 +235,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: Settings,
         items: [
           { path: '/struktur-organisasi', label: 'Struktur Organisasi', icon: Users },
+          { path: '/staff', label: 'Manajemen Karyawan (HR)', icon: UserCheck, badge: pendingCorrectionsCount },
           { path: '/admin-management', label: 'Akses & Akun Pengguna', icon: Users, badge: pendingUsersCount },
           { path: '/audit-log', label: 'Audit Log Sistem', icon: ShieldCheck },
           { path: '/settings', label: 'Pengaturan Toko', icon: Settings },
@@ -224,6 +250,50 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       }
     ];
 
+  } else if (currentUser.role === 'STAFF_GUDANG') {
+    menuData = [
+      {
+        label: 'Operasional',
+        icon: UsersRound,
+        items: [
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
+        ]
+      },
+      {
+        label: 'Inventory & Stok',
+        icon: Package,
+        items: [
+          { path: '/inventory', label: 'Inventory Barang Fisik', icon: Boxes, badge: inventoryAlertCount },
+          { path: '/inventory-ppob', label: 'Produk PPOB & Digital', icon: Smartphone },
+          { path: '/stock-opname', label: 'Stock Opname', icon: ClipboardList },
+          { path: '/purchase-order', label: 'Purchase Order', icon: ShoppingBag },
+        ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
+        ]
+      }
+    ];
+  } else if (currentUser.role === 'CLEANING_SERVICE') {
+    menuData = [
+      {
+        label: 'Operasional',
+        icon: UsersRound,
+        items: [
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
+        ]
+      },
+      {
+        label: 'Pusat Bantuan',
+        icon: HelpCircle,
+        items: [
+          { path: '/buku-panduan', label: 'Buku Panduan', icon: BookOpen },
+        ]
+      }
+    ];
   } else if (currentUser.role === 'PELANGGAN') {
     // Customer / Member portal - very limited menu
     menuData = [
@@ -246,6 +316,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         icon: ShoppingCart,
         items: [
           { path: '/kasir', label: 'Belanja Produk', icon: ShoppingCart },
+          { path: '/absen', label: 'Absensi Karyawan', icon: UsersRound },
           { path: '/kasir-riwayat', label: 'Riwayat Transaksi', icon: History },
           { path: '/online-orders', label: 'Pesanan Online', icon: ShoppingBag },
         ]
@@ -304,6 +375,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
       case 'SUPERADMIN': return 'Super Admin';
       case 'PENGURUS': return 'Pengurus Koperasi';
       case 'MANAGER': return 'Manager';
+      case 'CLEANING_SERVICE': return 'Cleaning Service';
+      case 'STAFF_GUDANG': return 'Admin Gudang';
+      case 'STAFF_LAPANGAN': return 'Staff Lapangan';
       case 'ADMIN': return 'Admin';
       case 'CASHIER': return 'Kasir';
       case 'PELANGGAN': return 'Pelanggan/Anggota';
@@ -323,7 +397,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
       <aside 
         id="app-sidebar" 
-        className={`fixed md:sticky top-0 left-0 h-screen ${isCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 ${
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed md:sticky top-0 left-0 h-[100dvh] ${effectiveIsCollapsed ? 'w-20' : 'w-64'} bg-green-800 text-white flex flex-col border-r border-green-950 font-sans z-50 flex-shrink-0 select-none transition-all duration-300 ease-in-out md:translate-x-0 print:hidden ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -348,13 +424,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
               onClick={onExpand}
             >
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-400 to-green-300 rounded-xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500"></div>
-              <div className={`relative ${isCollapsed ? 'w-10 h-10 md:w-12 md:h-12' : 'w-16 md:w-32 h-12 md:h-16'} bg-white rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition-all duration-300 overflow-hidden`}>
+              <div className={`relative ${effectiveIsCollapsed ? 'w-10 h-10 md:w-12 md:h-12' : 'w-16 md:w-32 h-12 md:h-16'} bg-white dark:bg-slate-900 rounded-xl border border-green-600/50 shadow-xl flex items-center justify-center p-1.5 md:p-2 transform group-hover:scale-105 transition-all duration-300 overflow-hidden`}>
                 {/* Clean Logo Display */}
                 <img src="/ksa_mart_logo.png" alt="KSA Mart Logo" className="w-full h-full object-contain" />
               </div>
             </div>
 
-            {!isCollapsed && (
+            {!effectiveIsCollapsed && (
               <div className="text-center transition-opacity duration-300 w-full px-2">
                 <h1 className="font-extrabold text-[12px] md:text-[14px] leading-tight tracking-tight text-white drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">KSA Mart</h1>
                 <div className="mt-1.5 flex justify-center w-full">
@@ -369,7 +445,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
 
         {/* Nav Menu */}
         <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto overflow-x-hidden">
-          {!isCollapsed && <p className="px-3 text-[10px] font-bold text-gray-200/65 uppercase tracking-wider mb-2">Navigasi Fitur</p>}
+          {!effectiveIsCollapsed && <p className="px-3 text-[10px] font-bold text-gray-200/65 uppercase tracking-wider mb-2">Navigasi Fitur</p>}
           
           {menuData.map((menuItem, idx) => {
             if ('items' in menuItem) {
@@ -381,21 +457,21 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                 <div key={idx} className="space-y-1">
                   <button
                     onClick={() => {
-                      if (isCollapsed && onExpand) onExpand();
+                      if (effectiveIsCollapsed && onExpand) onExpand();
                       toggleGroup(menuItem.label);
                     }}
-                    title={isCollapsed ? menuItem.label : undefined}
-                    className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group ${
+                    title={effectiveIsCollapsed ? menuItem.label : undefined}
+                    className={`w-full flex items-center ${effectiveIsCollapsed ? 'justify-center' : 'justify-between'} px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group ${
                       hasActiveChild && !isExpanded
                         ? 'bg-green-700 text-amber-400'
                         : 'text-gray-100 hover:bg-green-700/40 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center space-x-3 overflow-hidden">
-                      <GroupIcon className={`w-[18px] h-[18px] flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${isCollapsed && hasActiveChild ? 'text-amber-400' : ''}`} />
-                      {!isCollapsed && <span className="truncate">{menuItem.label}</span>}
+                      <GroupIcon className={`w-[18px] h-[18px] flex-shrink-0 transition-transform duration-300 group-hover:scale-110 ${effectiveIsCollapsed && hasActiveChild ? 'text-amber-400' : ''}`} />
+                      {!effectiveIsCollapsed && <span className="truncate">{menuItem.label}</span>}
                     </div>
-                    {!isCollapsed && (isExpanded ? (
+                    {!effectiveIsCollapsed && (isExpanded ? (
                       <ChevronDown className="w-4 h-4 flex-shrink-0 ml-2 opacity-70 group-hover:opacity-100 transition-opacity" />
                     ) : (
                       <ChevronRight className="w-4 h-4 flex-shrink-0 ml-2 opacity-70 group-hover:opacity-100 transition-opacity" />
@@ -403,7 +479,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                   </button>
 
                   {/* Sub items */}
-                  {isExpanded && !isCollapsed && (
+                  {isExpanded && !effectiveIsCollapsed && (
                     <div className="pl-3 space-y-1 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
                       {menuItem.items.map((subItem) => {
                         const SubIcon = subItem.icon;
@@ -422,7 +498,7 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                           >
                             <SubIcon className="w-4 h-4 flex-shrink-0 opacity-80 group-hover:scale-110 transition-transform duration-300" />
                             <span className="truncate flex-1">{subItem.label}</span>
-                            {((subItem.path === '/customers' && unreadNotificationsCount > 0) || (subItem.badge && subItem.badge > 0)) && !isCollapsed && (
+                            {((subItem.path === '/customers' && unreadNotificationsCount > 0) || (subItem.badge && subItem.badge > 0)) && !effectiveIsCollapsed && (
                               <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-xs">
                                 {subItem.path === '/customers' ? unreadNotificationsCount : subItem.badge}
                               </span>
@@ -441,9 +517,9 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                   key={menuItem.path}
                   to={menuItem.path}
                   onClick={onClose}
-                  title={isCollapsed ? menuItem.label : undefined}
+                  title={effectiveIsCollapsed ? menuItem.label : undefined}
                   className={({ isActive }) =>
-                    `flex items-center space-x-3 ${isCollapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group ${
+                    `flex items-center space-x-3 ${effectiveIsCollapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 group ${
                       isActive
                         ? 'bg-green-600 text-amber-400 font-bold shadow-sm shadow-green-950/20'
                         : 'text-gray-100 hover:bg-green-700/40 hover:text-white'
@@ -451,13 +527,13 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                   }
                 >
                   <Icon className="w-[18px] h-[18px] flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
-                  {!isCollapsed && <span className="truncate flex-1">{menuItem.label}</span>}
-                  {((menuItem.path === '/berita' && unreadNotificationsCount > 0) || (menuItem.badge && menuItem.badge > 0)) && !isCollapsed && (
+                  {!effectiveIsCollapsed && <span className="truncate flex-1">{menuItem.label}</span>}
+                  {((menuItem.path === '/berita' && unreadNotificationsCount > 0) || (menuItem.badge && menuItem.badge > 0)) && !effectiveIsCollapsed && (
                     <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-xs ml-auto">
                       {menuItem.path === '/berita' ? unreadNotificationsCount : menuItem.badge}
                     </span>
                   )}
-                  {menuItem.badge && menuItem.badge > 0 && isCollapsed && (
+                  {menuItem.badge && menuItem.badge > 0 && effectiveIsCollapsed && (
                     <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-sm shadow-red-500"></span>
                   )}
                 </NavLink>
@@ -474,11 +550,11 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                 logout();
               }
             }}
-            title={isCollapsed ? 'Keluar' : undefined}
-            className={`w-full flex items-center space-x-3 ${isCollapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-[13px] font-semibold text-red-100 hover:bg-red-950/40 hover:text-red-300 transition-colors group`}
+            title={effectiveIsCollapsed ? 'Keluar' : undefined}
+            className={`w-full flex items-center space-x-3 ${effectiveIsCollapsed ? 'justify-center' : ''} px-3 py-2.5 rounded-lg text-[13px] font-semibold text-red-100 hover:bg-red-950/40 hover:text-red-300 transition-colors group`}
           >
             <LogOut className="w-[18px] h-[18px] text-red-300 group-hover:scale-110 transition-transform duration-300" />
-            {!isCollapsed && <span>Keluar</span>}
+            {!effectiveIsCollapsed && <span>Keluar</span>}
           </button>
 
         </div>

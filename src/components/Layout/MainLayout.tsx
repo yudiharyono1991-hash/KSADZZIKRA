@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RefreshCcw } from 'lucide-react';
 import Sidebar from './Sidebar';
@@ -27,6 +27,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
+  const handleCloseSidebar = useCallback(() => setIsSidebarOpen(false), []);
+  const handleExpandSidebar = useCallback(() => setIsSidebarCollapsed(false), []);
+  const handleToggleSidebar = useCallback(() => setIsSidebarOpen(prev => !prev), []);
+  const handleToggleDesktopSidebar = useCallback(() => setIsSidebarCollapsed(prev => !prev), []);
+  const handleOpenMenu = useCallback(() => setIsSidebarOpen(true), []);
+
   const [hasUpdate, setHasUpdate] = useState(false);
 
   useEffect(() => {
@@ -48,45 +54,46 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div id="shariahpos-root" className="flex bg-slate-50 h-[100dvh] text-slate-800 antialiased overflow-hidden">
+    <div id="shariahpos-root" className="flex bg-slate-50 dark:bg-slate-800 h-[100dvh] text-slate-800 dark:text-slate-200 antialiased overflow-hidden max-w-full">
       {/* Sidebar — slides over content on mobile, static on desktop */}
       <Sidebar
         isOpen={isSidebarOpen}
         isCollapsed={isSidebarCollapsed}
-        onClose={() => setIsSidebarOpen(false)}
-        onExpand={() => setIsSidebarCollapsed(false)}
+        onClose={handleCloseSidebar}
+        onExpand={handleExpandSidebar}
       />
 
       {/* Main content panel */}
-      <div className="flex-1 flex flex-col min-w-0 w-full h-[100dvh] overflow-hidden transition-all duration-300">
+      <div id="main-content-panel" className="flex-1 flex flex-col min-w-0 w-full max-w-full h-[100dvh] overflow-hidden transition-all duration-300">
 
         {/* ─── STICKY HEADER ─────────────────────────────────────── */}
         <TopBar
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          onToggleDesktopSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onToggleSidebar={handleToggleSidebar}
+          onToggleDesktopSidebar={handleToggleDesktopSidebar}
         />
 
         {/* ─── SCROLLABLE CENTER ─────────────────────────────────── */}
         {/* 
-          overflow-auto: scroll both x and y as needed
-          pb-16 md:pb-0: bottom padding on mobile for BottomNavBar space
+          overflow-y-auto: vertical scroll
+          overflow-x-hidden: prevent horizontal drifting on mobile viewports
+          pb-20 md:pb-6: bottom padding on mobile for BottomNavBar space
         */}
         <main
           id="main-scroll-container"
-          className="flex-1 p-3 md:p-6 overflow-auto flex flex-col relative pb-20 md:pb-6"
+          className="flex-1 p-3 md:p-6 overflow-y-auto overflow-x-hidden flex flex-col relative pb-20 md:pb-6 max-w-full"
         >
           {children}
         </main>
         
         {/* ─── GLOBAL FOOTER ─────────────────────────────────────── */}
-        <footer className="bg-[#1e3a2b] text-white py-1.5 px-4 text-[10px] md:text-xs flex justify-between items-center z-40 hidden md:flex border-t border-[#0e441b] shrink-0">
+        <footer className="bg-[#1e3a2b] text-white py-1.5 px-4 text-[10px] md:text-xs flex justify-between items-center z-40 hidden md:flex border-t border-[#0e441b] shrink-0 print:hidden">
           <span>Copyright &copy; Team Development KSA Mart 2026. All rights reserved.</span>
           <span>ver 1.0</span>
         </footer>
       </div>
 
       {/* ─── MOBILE BOTTOM NAV BAR (STICKY FOOTER) ─────────────── */}
-      <BottomNavBar onOpenMenu={() => setIsSidebarOpen(true)} />
+      <BottomNavBar onOpenMenu={handleOpenMenu} />
 
       {/* Update notification banner */}
       {hasUpdate && (

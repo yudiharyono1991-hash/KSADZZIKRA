@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blueprint Komprehensif KSA Mart</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 2cm;
+            background-color: #fff;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        h3 {
+            color: #34495e;
+            margin-top: 20px;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 5px;
+        }
+
+        h4 {
+            color: #2c3e50;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+        }
+
+        .highlight {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-left: 5px solid #3498db;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .note {
+            background-color: #fdf5e6;
+            padding: 15px;
+            border-left: 5px solid #f39c12;
+            margin: 15px 0;
+            font-size: 0.9em;
+            border-radius: 5px;
+        }
+
+        .menu-box {
+            border: 1px solid #eee;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+            }
+
+            @page {
+                margin: 2cm;
+                size: A4 portrait;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            h2,
+            h3,
+            .menu-box {
+                page-break-inside: avoid;
+            }
+
+            table,
+            img {
+                page-break-inside: avoid;
+            }
+        }
+
+        .btn-print {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #27ae60;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        ul {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <button class="btn-print no-print" onclick="window.print()">Simpan sebagai PDF (Cetak)</button>
+
+    <h1>BLUEPRINT & SOP OPERASIONAL KSA MART</h1>
+    <p style="text-align: center;"><strong>Dokumen Induk Panduan Tata Kelola, Struktur Menu, Sistem Keamanan, dan
+            Mekanisme Fitur</strong></p>
+
+    <div class="highlight">
+        <strong>Tujuan Dokumen:</strong> Blueprint ini merangkum seluruh kerangka kerja teknis KSA Mart secara
+        komprehensif, mulai dari sistem keamanan, manajemen *Role*, pemetaan menu detail per modul, cara integrasi ke
+        provider PPOB, backup database, hingga prosedur operasional kasir.
+    </div>
+
+    <h2>1. Sistem Keamanan & Arsitektur Database</h2>
+    <p>KSA Mart dibangun menggunakan arsitektur hibrida (Offline-First & Cloud Sync) yang menjamin kelancaran
+        operasional toko walau internet terputus.</p>
+    <ul>
+        <li><strong>Keamanan Cloud (Supabase):</strong> Data tersimpan secara aman di server Supabase dengan enkripsi
+            data dan pembatasan akses (*Row Level Security/Authentication*). Autentikasi user dikendalikan secara
+            tersentralisasi.</li>
+        <li><strong>Keamanan Offline (Local Storage):</strong> Perangkat toko secara otomatis mencadangkan transaksi ke
+            dalam memori peramban (*LocalStorage*). Jika internet mati, kasir tetap bisa berbelanja. Saat internet
+            menyala kembali, sistem akan otomatis melakukan sinkronisasi (*Sync*) ke server Cloud.</li>
+        <li><strong>Pemisahan Akses Karyawan (RBAC):</strong> Tidak ada karyawan yang bisa mengakses fitur di luar
+            haknya (Role) karena menu akan disembunyikan dan dicegah oleh sistem verifikasi dari server.</li>
+    </ul>
+
+    <h2>2. Manajemen Peran (Role) & Visibilitas Menu</h2>
+    <p>Setiap akun staf KSA Mart diberikan "Role" yang menentukan batas akses fitur. Pengaturan dan pembuatan akun
+        (termasuk pemilihan rolenya) sudah tersedia dan diatur secara mutlak oleh Owner/Superadmin pada menu
+        <strong>Tata Kelola > Akses & Akun Pengguna</strong>.</p>
+    <table>
+        <tr>
+            <th width="20%">Role / Jabatan</th>
+            <th>Wewenang, Visibilitas, dan Hak Akses Operasional</th>
+        </tr>
+        <tr>
+            <td><strong>SUPERADMIN / OWNER</strong></td>
+            <td>Memiliki visibilitas 100% ke seluruh Modul (Transaksi, Laporan, Akuntansi, Inventory, Data Master, Tata
+                Kelola). Satu-satunya Role yang berhak mengubah URL Provider, memindahkan database (Export/Import), dan
+                menghapus aplikasi.</td>
+        </tr>
+        <tr>
+            <td><strong>MANAGER / SUPERVISOR</strong></td>
+            <td>Mengawasi operasional. Memiliki akses ke modul Laporan, Inventory, Data Master, dan Tata Kelola (HR).
+                Berhak melakukan <strong>Approve Batal Transaksi (Void)</strong> dan <strong>Approve Koreksi
+                    Absen</strong> dari stafnya.</td>
+        </tr>
+        <tr>
+            <td><strong>ADMIN / KEUANGAN</strong></td>
+            <td>Fokus pada pembukuan. Memiliki akses penuh ke menu Akuntansi & CoA, Jurnal Umum, Laporan Arus Kas, dan
+                Absensi untuk mengatur gaji.</td>
+        </tr>
+        <tr>
+            <td><strong>STAFF GUDANG</strong></td>
+            <td>Akses terbatas pada modul <strong>Inventory & Stok</strong> (Penerimaan PO, Stok Fisik, Opname) dan
+                Master Supplier. Sama sekali tidak dapat melihat grafik laba/rugi keuangan toko.</td>
+        </tr>
+        <tr>
+            <td><strong>KASIR (CASHIER)</strong></td>
+            <td>Akses layar utamanya dikunci ke menu <strong>Transaksi</strong> (Belanja Produk/POS, Shift Harian,
+                Riwayat Transaksi). Bertugas melayani konsumen dan mengatur laci uang kas kecil.</td>
+        </tr>
+    </table>
+
+    <h2>3. Pemetaan Komprehensif Seluruh Menu Aplikasi</h2>
+    <p>Berikut adalah struktur fungsi spesifik dari semua fitur yang <strong>telah berfungsi dan ada</strong> di dalam
+        aplikasi:</p>
+
+    <div class="menu-box">
+        <h3>A. Kelompok Menu: TRANSAKSI</h3>
+        <ul>
+            <li><strong>Belanja Produk (POS):</strong> Layar mesin kasir. Bisa mencari barang pakai Barcode Scanner,
+                merubah kuantitas, memilih pelanggan Umum atau Member, serta menerima multi-pembayaran
+                (Tunai/QRIS/Transfer). Kasir juga menekan "Buka Shift" / "Tutup Shift" dan input "Pengeluaran Kas Kecil"
+                di layar ini.</li>
+            <li><strong>Riwayat Transaksi:</strong> Berisi daftar struk nota harian. <em>(Di menu inilah fitur tombol
+                    pengajuan Void / Pembatalan Struk berada).</em></li>
+            <li><strong>Pesanan Online:</strong> Layar untuk memantau notifikasi orderan masuk dari pembeli yang
+                berbelanja dari rumah menggunakan Portal Pelanggan.</li>
+            <li><strong>Absensi Karyawan:</strong> Layar *Clock-In* (Datang) dan *Clock-Out* (Pulang) untuk perhitungan
+                gaji.</li>
+        </ul>
+    </div>
+
+    <div class="menu-box">
+        <h3>B. Kelompok Menu: DASHBOARD & LAPORAN</h3>
+        <ul>
+            <li><strong>Grafik Trend:</strong> Dashboard analitik performa toko, grafik omset mingguan/bulanan, rincian
+                biaya BOPO operasional, dan ranking barang terlaris.</li>
+            <li><strong>Neraca Laba Rugi:</strong> Mesin hitung keuangan yang menggabungkan Penjualan - HPP (Harga
+                Modal) - Beban Pengeluaran = Laba Bersih yang siap dibagikan (Dividen/SHU).</li>
+            <li><strong>Laporan Penjualan:</strong> Daftar panjang transaksi penjualan murni (tanpa biaya-biaya) untuk
+                analisa tren keramaian pelanggan.</li>
+            <li><strong>Laporan Arus Kas (Cash Flow):</strong> Laporan <em>real</em> uang tunai & saldo rekening (Berapa
+                uang yang sesungguhnya ada di brankas dan bank).</li>
+            <li><strong>Zakat & ESG:</strong> Kalkulator syariah yang menghitung 2,5% dari Aset Lancar akhir tahun untuk
+                dialokasikan menjadi CSR/Infaq toko.</li>
+        </ul>
+    </div>
+
+    <div class="menu-box">
+        <h3>C. Kelompok Menu: AKUNTANSI & CoA</h3>
+        <ul>
+            <li><strong>Jurnal Umum:</strong> Menu bagi Admin Keuangan untuk menjurnal beban bulanan rutin (Listrik,
+                WiFi, Gaji) dan transfer antar rekening.</li>
+            <li><strong>Buku Besar (General Ledger):</strong> Melacak semua mutasi mutlak berdasarkan satu nomor akun
+                akuntansi tertentu (misal: mutasi khusus akun "1-1000 Kas Tunai").</li>
+            <li><strong>Daftar Akun (CoA):</strong> Tempat membuat kategori dompet kas, beban, pendapatan, hutang, dan
+                piutang standar akuntansi.</li>
+        </ul>
+    </div>
+
+    <div class="menu-box">
+        <h3>D. Kelompok Menu: INVENTORY & STOK</h3>
+        <ul>
+            <li><strong>Inventory Barang Fisik:</strong> Database <em>Master Item</em> fisik. Terdapat fungsi cetak
+                Barcode, setting harga grosir berjenjang, alert stok menipis, dan harga modal rata-rata (Moving
+                Average).</li>
+            <li><strong>Produk PPOB & Digital:</strong> Inventory khusus barang non-fisik (Pulsa, Token, TopUp
+                E-Wallet). Memiliki settingan <em>Admin Fee</em> (Margin Jasa).</li>
+            <li><strong>Stock Opname:</strong> Kertas kerja digital penghitungan barang nyata (fisik) dengan barang
+                aplikasi. Approval selisih barang akan memotong laba sebagai <em>Beban Kerusakan (Shrinkage)</em>.</li>
+            <li><strong>Purchase Order (PO):</strong> Lembar kerja pembelian barang ke Supplier. Mengintegrasikan
+                penambahan Stok dan penambahan tagihan Hutang.</li>
+        </ul>
+    </div>
+
+    <div class="menu-box">
+        <h3>E. Kelompok Menu: DATA MASTER</h3>
+        <ul>
+            <li><strong>Manajemen Cabang:</strong> Mengatur profil cabang jika aplikasi terhubung ke banyak outlet.</li>
+            <li><strong>Master Supplier:</strong> Daftar agen/distributor tempat toko mengambil barang grosir.</li>
+            <li><strong>Master Pelanggan:</strong> Daftar identitas Member (User) agar pelanggan punya akses login ke
+                portal online.</li>
+            <li><strong>Program Loyalitas Poin:</strong> Fitur untuk menetapkan "Setiap belanja Rp 10.000 dapat 1 Poin"
+                atau sejenisnya. Poin nantinya bisa digunakan untuk memotong total belanja.</li>
+            <li><strong>Promo Transaksi & Promo Produk:</strong> Pembuatan kampanye diskon (misal: "Diskon 10% khusus
+                Hari Jumat").</li>
+        </ul>
+    </div>
+
+    <div class="menu-box">
+        <h3>F. Kelompok Menu: TATA KELOLA (Pengaturan Sistem Inti)</h3>
+        <ul>
+            <li><strong>Struktur Organisasi:</strong> Mapping jabatan.</li>
+            <li><strong>Manajemen Karyawan (HR):</strong> Pengaturan gaji pokok, bonus, dan <em>Approval Koreksi
+                    Absen</em>.</li>
+            <li><strong>Akses & Akun Pengguna:</strong> Pusat pembuatan username, password, dan penentuan <strong>Role
+                    (Jabatan)</strong> untuk login ke aplikasi.</li>
+            <li><strong>Audit Log Sistem:</strong> Buku hitam yang mencatat semua IP, Jam, dan Aktivitas klik pegawai
+                (mencegah fraud).</li>
+            <li><strong>Pengaturan Toko:</strong> Di sinilah fitur teknis inti dijalankan (Detail lihat Bab 4).</li>
+        </ul>
+    </div>
+
+    <h2>4. Penjelasan Detail Sub-Fitur: PENGATURAN TOKO (Settings)</h2>
+    <p>Hanya Role <strong>Owner / Superadmin</strong> yang diizinkan memodifikasi
+        <code>Tata Kelola &gt; Pengaturan Toko</code>. Fitur krusial di dalamnya meliputi:</p>
+    <ul>
+        <li><strong>Profil & Pembayaran:</strong> Mengganti Nama Toko, Alamat Struk Cetak, Persentase Pajak (PPN),
+            mengatur <em>QRIS Dinamis/Statis</em>, dan rekening toko.</li>
+        <li><strong>Kerjasama Provider PPOB & E-Wallet (Integrasi API):</strong>
+            Sistem KSA Mart sudah diprogram untuk bisa menarik data pulsa, PLN, PDAM, dan Top Up E-Wallet. Owner cukup
+            memasukkan <strong>URL Provider</strong> (Partner/Server Pulsa) dan <strong>API Key</strong> dari penyedia
+            layanan tersebut ke kolom yang disediakan. Secara otomatis sistem akan men-sinkronisasi pembelian kasir ke
+            server provider nyata.
+        </li>
+        <li><strong>Pemindahan & Backup Database (Migrasi PC):</strong>
+            Terdapat fitur <strong>Export Database (Raw JSON / Excel)</strong>. Jika PC Kasir rusak atau ingin pindah ke
+            perangkat baru (misal karena jaringan toko terputus selamanya dari Cloud):
+            <ol>
+                <li>Owner menekan <em>Export Raw JSON</em> di PC lama untuk mengunduh seluruh data (Barang, Transaksi,
+                    Hutang Piutang).</li>
+                <li>Di PC/Perangkat yang baru, Owner meng-install aplikasi dan masuk ke menu pengaturan lalu memilih
+                    <strong>Import Raw JSON</strong> (Restore).</li>
+                <li>Sistem akan menimpa 100% data perangkat baru dengan data lama toko secara instan.</li>
+            </ol>
+        </li>
+        <li><strong>Force Sync Jurnal Cloud:</strong> Terdapat tombol darurat untuk "memaksa" seluruh data *offline*
+            dari browser tersinkronisasi massal kembali ke server Supabase jika sebelumnya ada gangguan sinyal fatal.
+        </li>
+    </ul>
+
+    <h2>5. Prosedur Batal Transaksi (Void) & Koreksi Absen Secara Operasional</h2>
+    <div class="note">Fitur ini terintegrasi langsung dengan <em>Cloud Approval</em>.</div>
+
+    <h3>A. Pengajuan Batal Transaksi (Void)</h3>
+    <ol>
+        <li>Kasir menyadari salah input (atau batal dibeli). Ia buka menu <code>Transaksi &gt; Riwayat Transaksi</code>.
+        </li>
+        <li>Kasir menekan tombol Void (Tanda Silang) di struk tersebut dan mengetik alasan (misal: "Barang ditukar").
+        </li>
+        <li>Status struk di layar kasir berubah menjadi <strong>"PENDING"</strong> (Transaksi tertahan di Cloud, stok
+            belum kembali).</li>
+        <li><strong>Manager login</strong> (dari HP atau komputer terpisah), buka <code>Riwayat Transaksi</code>, akan
+            terlihat struk merah berstatus <em>Pending Void</em>. Manager menekan <strong>Approve</strong>.</li>
+        <li>Sistem secara seketika: (1) Mengembalikan nominal kasir, (2) Membalikkan Jurnal Akuntansi, (3) Menambahkan
+            kembali Stok Fisik barang tersebut. Kasir memisahkan barang fisik untuk dikembalikan ke rak.</li>
+    </ol>
+
+    <h3>B. Koreksi Absensi Terlupa</h3>
+    <ol>
+        <li>Karyawan/Kasir lupa *Clock-Out* saat pulang kemarin malam.</li>
+        <li>Keesokan harinya, Kasir masuk ke <code>Transaksi &gt; Absensi Karyawan</code>, klik <strong>Koreksi
+                Absen</strong>, input jam pulang seharusnya.</li>
+        <li>Manager masuk ke <code>Tata Kelola &gt; Manajemen Karyawan (HR)</code>, masuk ke profil staf tersebut, cek
+            tab Absensi, dan klik <strong>Approve</strong>.</li>
+    </ol>
+
+    <h2>6. Mekanisme Belanja Pelanggan & Integrasi Poin</h2>
+    <ul>
+        <li><strong>Pelanggan Umum (Walk-in):</strong> Datang, beli, bayar kasir. Nama pembeli di struk "Umum". Tidak
+            ada pencatatan poin.</li>
+        <li><strong>User Member (Offline):</strong> Pelanggan menyebutkan No. HP ke kasir. Kasir mengetik di layar POS.
+            Pelanggan ini <strong>otomatis dapat Poin Loyalitas</strong> sesuai settingan Pengaturan Toko.</li>
+        <li><strong>User Member (Login Aplikasi Sendiri / Online):</strong> Pelanggan mengunduh aplikasi Pelanggan,
+            memasukkan akun. Dari aplikasi, mereka bisa membuka menu <code>Katalog Produk</code> dan berbelanja
+            keranjang. Transaksinya akan masuk ke menu <strong>Pesanan Online</strong> milik Kasir KSA Mart untuk
+            dipacking dan dikirim.</li>
+    </ul>
+
+    <h2>7. Proses Operasional Closing Akhir Bulan (SOP)</h2>
+    <p>Closing Bulanan KSA Mart bukan berupa tombol yang mengunci/menghapus data. KSA Mart bersifat Auto-Journal
+        (laporan terbentuk otomatis saat kasir memindai barang). SOP wajib yang dilakukan:</p>
+    <ol>
+        <li><strong>Manager Memastikan Shift Kasir:</strong> H-1 akhir bulan, pastikan semua shift sudah ditutup agar
+            tidak ada omset menggantung.</li>
+        <li><strong>Bagian Keuangan (Admin):</strong> Menginput semua sisa tagihan/beban kasir bulan ini di menu
+            <code>Jurnal Umum</code> (listrik/gaji) agar laporan rugi laba akurat.</li>
+        <li><strong>Manager Menarik Laporan:</strong> Pada tanggal 1 pagi, Manager wajib masuk ke
+            <code>Dashboard & Laporan &gt; Neraca Laba Rugi</code>. Set rentang tanggal bulan sebelumnya (1-30), klik
+            <strong>Simpan PDF / Excel</strong>. Data PDF inilah acuan final bulanan yang sah untuk Owner toko. Jangan
+            ubah data ke tanggal mundur (backdate).</li>
+    </ol>
+
+    <div
+        style="margin-top: 50px; text-align: center; color: #7f8c8d; font-size: 0.9em; padding-top: 20px; border-top: 1px dashed #ccc;">
+        <p>Dokumen Blueprint Eksekutif Sistem KSA Mart - Generated 2026</p>
+    </div>
+
+    <div style="margin-top: 30px; background: #f9fafb; padding: 20px; border-radius: 8px; border-left: 4px solid #16a34a;">
+        <h3 style="margin-top: 0; color: #166534;">Update Sistem Ekstensif (Agustus 2026)</h3>
+        <p style="font-size: 0.9em; color: #4b5563; margin-bottom: 15px;">Berikut adalah daftar lengkap pembaruan sistem dan penambahan fitur skala besar yang telah diimplementasikan untuk mengoptimalkan operasional KSA Mart:</p>
+        
+        <ul style="margin-bottom: 0; padding-left: 20px; line-height: 1.8;">
+            <li><strong>Optimasi Transparansi & Laporan Laba Rugi:</strong>
+                <ul style="margin-top: 5px; margin-bottom: 10px; color: #374151;">
+                    <li>Pemisahan sumber dana PPOB secara spesifik antara Saldo DANA dan Radar Pulsa.</li>
+                    <li>Penambahan tabel <em>Breakdown</em> (Rekapitulasi) performa transaksi per-Kasir secara <em>real-time</em> di halaman PPOB.</li>
+                    <li>Pemilik toko (Owner) kini dapat memantau kontribusi penjualan fisik vs digital dari masing-masing petugas kasir.</li>
+                </ul>
+            </li>
+            <li><strong>Sistem Approval Berjenjang & Push Notification:</strong>
+                <ul style="margin-top: 5px; margin-bottom: 10px; color: #374151;">
+                    <li>Implementasi notifikasi lonceng 2 arah (Push Notification) yang menghubungkan layar Kasir/Admin langsung dengan layar Owner.</li>
+                    <li>Alur persetujuan super ketat untuk: <strong>Pembatalan (Void) Transaksi</strong>, <strong>Pengajuan Cuti/Izin & Koreksi Absensi</strong>, dan <strong>Penyesuaian Stock Opname</strong>.</li>
+                    <li>Pemberian alasan wajib saat Owner menyetujui atau menolak pengajuan, yang akan langsung terbaca oleh Kasir pemohon.</li>
+                </ul>
+            </li>
+            <li><strong>Digitalisasi & SOP Stock Opname:</strong>
+                <ul style="margin-top: 5px; margin-bottom: 10px; color: #374151;">
+                    <li>Penambahan <strong>Surat Berita Acara Penyesuaian Stok Resmi</strong> yang siap cetak.</li>
+                    <li>Fitur <strong>Cetak Template Kosong</strong> bagi petugas lapangan untuk mencatat selisih fisik di gudang.</li>
+                    <li>Fitur <strong>Cetak Rekapitulasi (Kolektif)</strong> untuk merangkum puluhan barang yang selisih ke dalam satu tabel otomatis, lengkap dengan alasan tervalidasi (CCTV/rusak) dan 2 tier Tanda Tangan (Pemohon & Owner).</li>
+                    <li><em>Print Layout</em> khusus yang secara cerdas menyembunyikan menu/navigasi aplikasi saat dicetak di kertas.</li>
+                </ul>
+            </li>
+            <li><strong>Akuntansi & Jurnal Persediaan:</strong>
+                <ul style="margin-top: 5px; margin-bottom: 10px; color: #374151;">
+                    <li>Fleksibilitas penyesuaian nama akun (CoA) khusus untuk persediaan barang <em>Murabahah</em>. Nama bisa diubah langsung dari menu Akuntansi dan otomatis tersinkronisasi.</li>
+                </ul>
+            </li>
+            <li><strong>Keamanan & Pembatasan Operasional:</strong>
+                <ul style="margin-top: 5px; margin-bottom: 10px; color: #374151;">
+                    <li><strong>Geofencing Radius 5 KM:</strong> Pembatasan jarak maksimal radius pengantaran kurir/pesanan online dari titik koordinat toko.</li>
+                    <li><strong>Reminder Backup Data:</strong> Notifikasi peringatan keamanan yang muncul otomatis pada H-3 setiap akhir bulan berjalan.</li>
+                </ul>
+            </li>
+            <li><strong>Dokumen & Administrasi:</strong>
+                <ul style="margin-top: 5px; margin-bottom: 10px; color: #374151;">
+                    <li><strong>Cetak PO (Purchase Order) Resmi:</strong> Berjenjang 3 level TTD (Pembuat, Manajer, Supplier) lengkap dengan Kop Surat Toko.</li>
+                    <li><strong>Rekap Kasbon Karyawan:</strong> Fitur Export dan Import menggunakan format Excel asli (Native `.xlsx`) untuk kemudahan pengolahan data HRD.</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</body>
+
+</html>

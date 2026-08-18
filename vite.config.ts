@@ -12,7 +12,7 @@ export default defineConfig(() => {
     plugins: [
       react(), 
       tailwindcss(),
-      !isDev && VitePWA({
+      VitePWA({
         registerType: 'autoUpdate',
         devOptions: { enabled: false }, // disable service worker in dev to avoid reload/cache issues during local browser testing
         manifest: {
@@ -24,9 +24,9 @@ export default defineConfig(() => {
           display: 'fullscreen',
           icons: [
             {
-              src: 'pwa-icon.svg',
+              src: 'ksa_mart_logo.png',
               sizes: '192x192 512x512',
-              type: 'image/svg+xml',
+              type: 'image/png',
               purpose: 'any maskable'
             }
           ]
@@ -54,7 +54,7 @@ export default defineConfig(() => {
           }
         }
       },
-      chunkSizeWarningLimit: 1000
+      chunkSizeWarningLimit: 2500
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

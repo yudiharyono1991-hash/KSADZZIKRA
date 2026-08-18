@@ -57,6 +57,15 @@ dist/assets/vendor-other-C3nofAmu.js   1,575.86 kB │ gzip: 474.96 kB ✅
 - ✅ Faster initial page load
 - ✅ Improved performance on slow networks
 
+### 4. 🎨 UI & Layout Optimization (Responsive & Windows 7 Fixes)
+**Deskripsi**: Tampilan tabel pada layar sempit/mobile terlihat hancur (squished) dan beberapa tombol tidak terlihat di OS lawas (Windows 7). Terdapat juga bug koma desimal panjang akibat dari persentase proporsi harga.
+
+**Perbaikan**:
+- ✅ Wrap semua tabel data dengan `overflow-x-auto` & `hide-scrollbar`.
+- ✅ Optimasi kepadatan teks (`text-[10px] sm:text-xs`) pada komponen Tabel.
+- ✅ Fix bug pembulatan desimal panjang menjadi integer bulat dengan `Math.round()` pada halaman *Laporan Penjualan* agar omset tidak terlihat salah kaprah (seperti Milyaran rupiah padahal koma desimal).
+- ✅ Mengubah warna-warna tombol aksi (seperti void/hapus) dari merah/biru gelap ke varian yang lebih bersahabat di monitor dengan kontras rendah.
+
 ---
 
 ## 🔄 Perubahan Code Detail
@@ -170,11 +179,13 @@ React.useEffect(() => {
 
 ## ✅ Test Results
 
+## ✅ Test Results
+
 ### Build Status
 ```
-✓ 2840 modules transformed
-✓ built in 1m 45s
-PWA v1.3.0 - 13 entries (3143.72 KiB)
+✓ modules transformed
+✓ built in ~1-2m
+PWA v1.3.0 - Ready
 ```
 
 ### Bundle Breakdown
@@ -245,6 +256,15 @@ VITE_SUPABASE_ANON_KEY=<your_anon_key_here>
 
 5. **package.json** (+7 -0)
    - Dependency updates
+
+5. **UI Pages & Components** 
+   - `src/pages/KasirRiwayatPage.tsx`
+   - `src/pages/KasirShiftPage.tsx`
+   - `src/pages/TrendPage.tsx`
+   - `src/pages/NeracaRugiPage.tsx`
+   - `src/pages/SalesReportPage.tsx`
+   - `src/components/Print/PrintHeader.tsx`
+   - Penambahan `min-w`, penyesuaian font sizes, perbaikan rounding number
 
 ### New Documentation:
 - `CLOUD_SYNC_FIX.md` - Detailed sync fixes
