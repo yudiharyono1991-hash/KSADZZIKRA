@@ -83,7 +83,7 @@ const BannerCarousel: React.FC<BannerCarouselProps> = ({ banners, autoPlayInterv
       {banner.targetUrl && (
         <div className="absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-20">
           <span className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-full font-bold shadow-xl transition-all hover:scale-105 hover:-translate-y-1 flex items-center gap-1.5 whitespace-nowrap text-xs md:text-sm border border-amber-400/50">
-            Lihat Katalog Promo <ChevronRight size={14} className="shrink-0" />
+            {banner.targetUrl.includes('wa.me') ? 'Chat WhatsApp' : 'Lihat Katalog Promo'} <ChevronRight size={14} className="shrink-0" />
           </span>
         </div>
       )}

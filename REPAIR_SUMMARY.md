@@ -4,9 +4,35 @@
 **Status**: ✅ SEMPURNA - Siap Produksi  
 **Build Status**: ✅ SUKSES (3143.72 KiB)
 
+## 📋 Update Terbaru (18 Agustus 2026)
+
+### 1. 🎨 Perbaikan PWA & Logo Instalasi (T-Icon Bug)
+**Deskripsi**: Google Chrome menolak logo instalasi PWA dan menggantinya dengan huruf "T" karena resolusi gambar tidak persegi sempurna (720x726) dan meta tag HTML menunjuk ke file lama.
+**Perbaikan**:
+- ✅ Membuat *script* otomatis untuk melakukan *resize* dan *crop* logo menjadi persegi sempurna berukuran presisi standar PWA (192x192 & 512x512).
+- ✅ Memperbarui `vite.config.ts` untuk menggunakan logo yang telah disempurnakan.
+- ✅ Memperbaiki *meta tag* `apple-touch-icon` dan `icon` pada `index.html` agar tidak terjadi *fallback* penolakan oleh browser.
+
+### 2. ⚡ TopBar Skeleton Loading
+**Deskripsi**: Tampilan omset dan margin sempat menampilkan "Rp 0" beberapa detik saat pertama kali login menunggu data dari Supabase.
+**Perbaikan**:
+- ✅ Menambahkan animasi *Skeleton Loading* (berkedip halus) pada komponen `TopBar.tsx` selama data `transactions` sedang diambil.
+- ✅ Membatasi waktu loading maksimal 2.5 detik untuk menghindari loading tanpa batas (infinite loading) jika tidak ada transaksi.
+
+### 3. 🎯 Dynamic Banner Button Text
+**Deskripsi**: Teks tombol pada Banner Promo statis "Lihat Katalog Promo" meskipun link diarahkan ke WhatsApp.
+**Perbaikan**:
+- ✅ Memodifikasi komponen `BannerCarousel.tsx` agar mampu mendeteksi URL target.
+- ✅ Jika tautan mengandung `wa.me`, teks tombol otomatis berubah menjadi "Chat WhatsApp".
+
+### 4. 🐛 Perbaikan TypeScript Exports
+**Deskripsi**: Terdapat 91 *error* akibat format ekspor yang salah pada `src/pages/index.ts`.
+**Perbaikan**:
+- ✅ Membersihkan dan merapikan seluruh deklarasi ekspor komponen agar proses *build* tidak berisiko gagal.
+
 ---
 
-## 📋 Masalah yang Diatasi
+## 📋 Masalah yang Diatasi Sebelumnya
 
 ### 1. ⚠️ Cloud Synchronization Issues
 **Deskripsi**: Produk dan data tidak sinkronisasi dengan baik antara perangkat lokal dan Netlify deployment.

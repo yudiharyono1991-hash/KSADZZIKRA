@@ -37,6 +37,21 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
   
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  
+  // State untuk animasi loading saat awal buka aplikasi
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 2500); // Tampilkan loading selama max 2.5 detik
+    
+    if (transactions && transactions.length > 0) {
+      setIsInitialLoading(false);
+    }
+    
+    return () => clearTimeout(timer);
+  }, [transactions]);
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,30 +297,42 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
             <div className="flex flex-col">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[9px] text-gray-500">FISIK:</span>
-                <span className="font-mono text-[9px]">Rp {todaySales.toLocaleString('id-ID')}</span>
+                <span className="font-mono text-[9px]">
+                  {isInitialLoading ? <span className="inline-block w-12 h-2.5 bg-gray-200 dark:bg-slate-700 rounded animate-pulse"></span> : `Rp ${todaySales.toLocaleString('id-ID')}`}
+                </span>
               </div>
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[9px] text-gray-500">PPOB:</span>
-                <span className="font-mono text-[9px]">Rp {todayPPOBSales.toLocaleString('id-ID')}</span>
+                <span className="font-mono text-[9px]">
+                  {isInitialLoading ? <span className="inline-block w-12 h-2.5 bg-gray-200 dark:bg-slate-700 rounded animate-pulse"></span> : `Rp ${todayPPOBSales.toLocaleString('id-ID')}`}
+                </span>
               </div>
                 <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center whitespace-nowrap">
                   <span className="text-gray-400 mr-2">TOTAL OMSET HARI INI</span>
-                  <span className="font-extrabold text-gray-900 dark:text-white font-mono">Rp {(todaySales + todayPPOBSales).toLocaleString('id-ID')}</span>
+                  <span className="font-extrabold text-gray-900 dark:text-white font-mono">
+                    {isInitialLoading ? <span className="inline-block w-16 h-3 bg-gray-300 dark:bg-slate-600 rounded animate-pulse"></span> : `Rp ${(todaySales + todayPPOBSales).toLocaleString('id-ID')}`}
+                  </span>
                 </div>
             </div>
             
             <div className="flex flex-col ml-4">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[9px] text-gray-500">FISIK:</span>
-                <span className="font-mono text-[9px] text-green-600">Rp {todayMargin.toLocaleString('id-ID')}</span>
+                <span className="font-mono text-[9px] text-green-600">
+                  {isInitialLoading ? <span className="inline-block w-12 h-2.5 bg-green-100 dark:bg-green-900/50 rounded animate-pulse"></span> : `Rp ${todayMargin.toLocaleString('id-ID')}`}
+                </span>
               </div>
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[9px] text-gray-500">PPOB:</span>
-                <span className="font-mono text-[9px] text-green-600">Rp {todayPPOBMargin.toLocaleString('id-ID')}</span>
+                <span className="font-mono text-[9px] text-green-600">
+                  {isInitialLoading ? <span className="inline-block w-12 h-2.5 bg-green-100 dark:bg-green-900/50 rounded animate-pulse"></span> : `Rp ${todayPPOBMargin.toLocaleString('id-ID')}`}
+                </span>
               </div>
                 <div className="border-t border-gray-200 dark:border-slate-700 mt-0.5 pt-0.5 flex justify-between items-center whitespace-nowrap">
                   <span className="text-gray-400 mr-2">MARGIN BERKAH</span>
-                  <span className="font-extrabold text-green-700 dark:text-green-500 font-mono">Rp {(todayMargin + todayPPOBMargin).toLocaleString('id-ID')}</span>
+                  <span className="font-extrabold text-green-700 dark:text-green-500 font-mono">
+                    {isInitialLoading ? <span className="inline-block w-16 h-3 bg-green-200 dark:bg-green-800/50 rounded animate-pulse"></span> : `Rp ${(todayMargin + todayPPOBMargin).toLocaleString('id-ID')}`}
+                  </span>
                 </div>
             </div>
           </div>
