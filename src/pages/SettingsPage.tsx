@@ -334,7 +334,27 @@ export default function SettingsPage() {
 
       const addSheet = (data: any[], name: string) => {
         if (data.length > 0) {
-          const ws = XLSX.utils.json_to_sheet(data);
+          // Sanitize data to prevent Excel 32767 character limit error
+          const sanitizedData = data.map(row => {
+            const newRow: any = {};
+            for (const key in row) {
+              let val = row[key];
+              if (typeof val === 'object' && val !== null) {
+                val = JSON.stringify(val);
+              }
+              if (typeof val === 'string' && val.length > 32000) {
+                if (val.startsWith('data:image')) {
+                  newRow[key] = '[GAMBAR BASE64 TERLALU BESAR]';
+                } else {
+                  newRow[key] = val.substring(0, 32000) + '... [DIPOTONG]';
+                }
+              } else {
+                newRow[key] = val;
+              }
+            }
+            return newRow;
+          });
+          const ws = XLSX.utils.json_to_sheet(sanitizedData);
           XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31)); // Max 31 chars
         } else {
           // Empty sheet with dummy column if no data
