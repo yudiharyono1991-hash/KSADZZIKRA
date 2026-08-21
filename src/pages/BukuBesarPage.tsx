@@ -100,14 +100,11 @@ export default function BukuBesarPage() {
     const accountObj = selectedAccount === 'SEMUA' ? { normalBalance: 'DEBIT' } : activeAccounts.find(a => a.code === selectedAccount);
     const normalBalance = accountObj?.normalBalance || 'DEBIT';
 
-    // 1. Sort all entries chronologically
-    const allSorted = [...journalEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    // 2. Separate into "Before Start Date" (Saldo Awal) and "Within Date Range"
+    // 1 & 2. Separate into "Before Start Date" (Saldo Awal) and "Within Date Range" WITHOUT sorting all entries first
     let saldoAwal = 0;
     const currentPeriodEntries: any[] = [];
 
-    allSorted.forEach(entry => {
+    journalEntries.forEach(entry => {
       // Ensure we match the account exactly, checking code
       const entryAccCode = entry.account?.includes(' - ') ? entry.account.split(' - ')[0].trim() : entry.account?.trim();
       const selectedAccCode = selectedAccount.includes(' - ') ? selectedAccount.split(' - ')[0].trim() : selectedAccount.trim();
@@ -126,14 +123,14 @@ export default function BukuBesarPage() {
           }
         } else if (entry.date >= startDate && entry.date <= endDate + 'T23:59:59') {
           // Add to current period
-          currentPeriodEntries.push({ ...entry });
+          currentPeriodEntries.push({ ...entry, _ts: entry.date ? new Date(entry.date).getTime() : 0 });
         }
       }
     });
 
     // 3. Calculate running balance for current period
     // Sort ascending by date for correct running balance calculation
-    currentPeriodEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    currentPeriodEntries.sort((a, b) => a._ts - b._ts);
 
     let runningBalance = saldoAwal;
     let totalDebit = 0;

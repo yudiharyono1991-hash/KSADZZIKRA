@@ -1369,10 +1369,36 @@ export const supabaseService = {
       return false;
     }
   },
-  async saveJournalEntriesBulk(entries: any[]): Promise<boolean> {
+  async saveJournalEntriesBulk(entries: any[], replaceExisting = false): Promise<boolean> {
     if (!supabase || entries.length === 0) return false;
     try {
       const tenantId = this.getTenantId();
+
+      // Safety: never delete remote journal rows during a normal sync.
+      // A partial local state can otherwise remove valid cloud transactions.
+      // Optional explicit replaceExisting=true is reserved for an intentional full-restore flow.
+      if (replaceExisting) {
+        const { data: cloudData, error: fetchError } = await supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('tenant_id', tenantId);
+
+        if (!fetchError && cloudData) {
+          const localIds = new Set(entries.map(e => e.id));
+          const idsToDelete = cloudData
+            .map(row => row.id)
+            .filter(id => !localIds.has(id));
+
+          if (idsToDelete.length > 0) {
+            const chunkSize = 100;
+            for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+              const chunk = idsToDelete.slice(i, i + chunkSize);
+              await supabase.from('journal_entries').delete().in('id', chunk);
+            }
+          }
+        }
+      }
+
       const payload = entries.map(entry => ({
         id: entry.id,
         tenant_id: tenantId,
@@ -1386,8 +1412,14 @@ export const supabaseService = {
         created_by: entry.createdBy,
         branch_id: entry.branchId
       }));
-      const { error } = await supabase.from('journal_entries').upsert(payload);
-      if (error) throw error;
+
+      const chunkSize = 500;
+      for (let i = 0; i < payload.length; i += chunkSize) {
+        const chunk = payload.slice(i, i + chunkSize);
+        const { error } = await supabase.from('journal_entries').upsert(chunk);
+        if (error) throw error;
+      }
+
       return true;
     } catch (err: any) {
       logSync(`Failed to save journal_entries bulk: ${err.message}`, true);

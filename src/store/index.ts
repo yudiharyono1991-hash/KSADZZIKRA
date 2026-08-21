@@ -312,6 +312,7 @@ interface AppState {
   initializeStore: (options?: { showLoading?: boolean; catalogOnly?: boolean }) => Promise<void>;
   fetchProducts: () => Promise<void>;
   fetchPromos: () => Promise<void>;
+  forceRebuildJournals: () => Promise<void>;
   fetchBanners: () => Promise<void>;
   fetchStoreSettings: () => Promise<void>;
   fetchOnlineOrders: () => Promise<void>;
@@ -3640,6 +3641,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           return await supabaseService.getJournalEntries();
         }, (remoteJournals) => {
           if (remoteJournals && remoteJournals.length > 0) {
+            // Cloud is the SINGLE SOURCE OF TRUTH.
+            // Map remote data to app format.
             const mapped = remoteJournals.map(j => ({
               id: j.id,
               tenantId: j.tenant_id,
@@ -3653,17 +3656,16 @@ export const useAppStore = create<AppState>((set, get) => ({
               createdBy: j.created_by,
               branchId: j.branch_id
             }));
-            const remoteIds = new Set(mapped.map((j) => j.id));
-            const localOnly = (get().journalEntries || []).filter((lj) => !remoteIds.has(lj.id));
-            const merged = [...mapped, ...localOnly];
-            set({ journalEntries: merged });
-            if (localOnly.length > 0) {
-              localOnly.forEach((lj) => {
-                try { (supabaseService as any).saveJournalEntry(lj); } catch (e) {}
-              });
-            }
+
+            // COMPLETELY replace local state & storage with Cloud data.
+            // This prevents any stale/deleted local entries from "resurrecting".
+            set({ journalEntries: mapped });
+            const { currentUser } = get();
+            saveStorage('ksa_journal_entries', mapped, currentUser?.tenantId);
           }
+          // If Cloud returns empty, keep local entries intact (offline safety).
         }));
+
 
         tasks.push(runSupabaseTask('getSuppliers', async () => {
           return await (supabaseService as any).getSuppliers();
@@ -3755,7 +3757,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         // 1. Remove ANY previous dynamic auto-corrects to prevent locking
         allJournals = allJournals.filter(j => j.referenceId !== 'AUTO_CORRECT' && j.referenceId !== 'AUTO_CORRECT_LAWAN' && j.referenceId !== 'FIXED_KAS_KOREKSI' && j.referenceId !== 'FIXED_KAS_KOREKSI_LAWAN');
 
+        // 1.5 USER REQUEST: Remove buggy [Auto] Penyesuaian Stock Opname Kas Fisik and Koreksi presisi entries
+        const buggyKeywords = ['[Auto] Penyesuaian Stock Opname', '[Auto] Koreksi final penyesuaian Kas Kecil', '[Auto] Koreksi presisi Kas Kecil', 'Koreksi Penjualan Tunai tgl 20'];
+        const isBuggy = (desc: string) => buggyKeywords.some(kw => (desc || '').toLowerCase().includes(kw.toLowerCase()));
+        
         let hasChanges = false;
+        
+        const initialJournalCount = allJournals.length;
+        allJournals = allJournals.filter(j => !isBuggy(j.description));
+        if (allJournals.length !== initialJournalCount) hasChanges = true;
+
+        let allExpenses = get().expenses || [];
+        const initialExpenseCount = allExpenses.length;
+        allExpenses = allExpenses.filter(e => !isBuggy(e.description));
+        if (allExpenses.length !== initialExpenseCount) {
+          set({ expenses: allExpenses });
+          saveStorage('ksa_expenses', allExpenses, get().currentUser?.tenantId);
+          console.log('✅ Deleted buggy expenses.');
+        }
+
         // 2. Merge 1101 to 1102
         allJournals = allJournals.map(j => {
           if (j.account && (j.account.startsWith('1101') || j.account === '1101 - Kas')) {
@@ -4106,71 +4126,202 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error('[Force Sync] Error:', e);
     }
-  }
-}));
+  },
 
-
-if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    const store = useAppStore.getState();
-    const { expenses, journalEntries, coaList, currentUser } = store;
+  forceRebuildJournals: async () => {
+    console.log('[Rebuild] Starting journal rebuild process...');
+    const state = get();
+    const { transactions, expenses, products, coaList, currentUser, addLog } = state;
     
-    let expensesChanged = false;
-    let journalsChanged = false;
+    // Get existing reference IDs to avoid duplicates
+    const existingRefIds = new Set(state.journalEntries.map(j => j.referenceId));
+    let newJournals: JournalEntry[] = [];
+    const nowStr = new Date().toISOString();
 
-    const getAutoCoaId = (desc: string) => {
-      const d = desc.toLowerCase();
-      if (d.includes('belanja') || d.includes('stok') || d.includes('kulakan') || d.includes('telur') || d.includes('persediaan') || d.includes('roti') || d.includes('cimory') || d.includes('sosis') || d.includes('minuman') || d.includes('basreng') || d.includes('snack') || d.includes('indomaret') || d.includes('alfagift')) {
-        if (d.includes('bensin') || d.includes('listrik') || d.includes('air')) return undefined;
-        return '1110';
-      }
-      if (d.includes('honor') || d.includes('gaji') || d.includes('tunjangan') || d.includes('bonus')) return '5101'; // Default ke Beban Gaji
-      if (d.includes('bensin') || d.includes('transport') || d.includes('parkir') || d.includes('bengkel')) return '5400';
-      if (d.includes('tarik tunai') || d.includes('kembalian transfer') || d.includes('nominal transfer') || d.includes('transfer bank')) return '1103';
-      
-      const findCoa = (nameQuery: string) => coaList.find(c => c.name.toLowerCase().includes(nameQuery))?.code;
-      
-      if (d.includes('talangan') || d.includes('cod')) return findCoa('qardh') || findCoa('piutang') || '1107'; // Piutang Qardh
-      if (d.includes('ipl')) return findCoa('ipl') || '2106'; // Titipan IPL
-      if (d.includes('simpanan')) return findCoa('simpanan') || '3103'; // Simpanan Sukarela
-      if (d.includes('pemeliharaan') || d.includes('perbaikan')) return findCoa('pemeliharaan') || '5400';
-      if (d.includes('jasa transfer')) return findCoa('pendapatan administrasi') || '4-1000';
-      
-      return undefined;
+    const resolveCoa = (keyword: string, fallback: string) => {
+      const exact = coaList.find(c => c.code === fallback || c.code === fallback.split(' ')[0]);
+      if (exact) return exact.code;
+      const fuzzyName = coaList.find(c => c.name.toLowerCase() === keyword.toLowerCase());
+      if (fuzzyName) return fuzzyName.code;
+      const partialName = coaList.find(c => c.name.toLowerCase().includes(keyword.toLowerCase()));
+      return partialName ? partialName.code : fallback;
     };
 
-    const newExpenses = expenses.map(exp => {
-      if (!exp.coaId || exp.coaId === '5400' || exp.coaId === '1101') {
-        const autoCoa = getAutoCoaId(exp.description);
-        if (autoCoa && exp.coaId !== autoCoa) {
-          expensesChanged = true;
-          return { ...exp, coaId: autoCoa };
-        }
-      }
-      return exp;
+    const getPrimaryCashCoa = () => {
+      const kasKecilCoa = coaList.find(c => c.code === '1102') || 
+                          coaList.find(c => c.name.toLowerCase().includes('kas kecil')) ||
+                          coaList.find(c => c.code === '1101');
+      return kasKecilCoa ? kasKecilCoa.code : '1102';
+    };
+
+    const getPaymentCoa = (method: string) => {
+      if (method === 'CASH') return getPrimaryCashCoa();
+      if (method === 'QRIS_SHARIAH' || method === 'QRIS') return resolveCoa('qris', '1020');
+      if (method === 'KASBON') return resolveCoa('piutang', '1030');
+      if (method === 'EWALLET') return resolveCoa('dana', '1117');
+      if (method === 'BANK_LAIN') return resolveCoa('bank', '1104');
+      return resolveCoa('bank', '1103');
+    };
+
+    console.log(`[Rebuild] Processing ${expenses.length} expenses...`);
+    // 1. Rebuild Expenses
+    expenses.forEach(exp => {
+      if (existingRefIds.has(exp.id)) return;
+      if (exp.description.includes('[Auto]')) return; // Skip buggy ones
+      
+      newJournals.push({
+        id: `je_exp_${exp.id}_1`,
+        tenantId: exp.tenantId || currentUser?.tenantId || 'tenant_default',
+        date: exp.date,
+        account: exp.coaId,
+        description: exp.description,
+        debit: exp.amount,
+        credit: 0,
+        referenceId: exp.id,
+        referenceType: 'AUTO_BEBAN',
+        createdBy: exp.createdBy || 'System',
+        branchId: currentUser?.branchId
+      });
+      newJournals.push({
+        id: `je_exp_${exp.id}_2`,
+        tenantId: exp.tenantId || currentUser?.tenantId || 'tenant_default',
+        date: exp.date,
+        account: exp.kasAccountId || '1102',
+        description: exp.description,
+        debit: 0,
+        credit: exp.amount,
+        referenceId: exp.id,
+        referenceType: 'AUTO_BEBAN',
+        createdBy: exp.createdBy || 'System',
+        branchId: currentUser?.branchId
+      });
+      existingRefIds.add(exp.id);
     });
 
-    if (expensesChanged) {
-      useAppStore.setState({ expenses: newExpenses });
-      saveStorage('ksa_expenses', newExpenses, currentUser?.tenantId);
-      console.log('Migrated legacy kas kecil expense COAs.');
-    }
-    
-    const newJournals = journalEntries.map(j => {
-      if (j.referenceType === 'AUTO_BEBAN' && j.account === '5400') {
-        const autoCoa = getAutoCoaId(j.description);
-        if (autoCoa && j.account !== autoCoa) {
-          journalsChanged = true;
-          return { ...j, account: autoCoa };
+    console.log(`[Rebuild] Processing ${transactions.length} transactions...`);
+    // 2. Rebuild Transactions
+    transactions.forEach(tx => {
+      if (existingRefIds.has(tx.id)) return;
+
+      const jId = `je_${tx.id}`;
+      
+      // Kas/Bank
+      const akunKas = getPaymentCoa(tx.paymentMethod);
+      newJournals.push({
+        id: `${jId}_1`,
+        tenantId: currentUser?.tenantId || 'tenant_default',
+        date: tx.timestamp,
+        account: akunKas,
+        description: `[Auto] Penjualan ${tx.paymentMethod} dari ${tx.invoiceNo}`,
+        debit: tx.totalAmount,
+        credit: 0,
+        referenceId: tx.id,
+        referenceType: 'AUTO_TRANSAKSI',
+        createdBy: tx.cashierName || 'System',
+        branchId: tx.branchId || currentUser?.branchId
+      });
+
+      const revenueGroups: Record<string, number> = {};
+      const cogsGroups: Record<string, number> = {};
+
+      tx.items.forEach(item => {
+        const prod = products.find(p => p.id === item.productId) || item as any;
+        const sCoa = prod.salesCoaCode || (prod.isPPOB 
+          ? (resolveCoa('ppob', '4105 Pendapatan Administrasi') || resolveCoa('administrasi', '4204 Pendapatan Layanan PPOB'))
+          : (resolveCoa('penjualan', '4101 Margin Murabahah') || resolveCoa('pendapatan', '4200 Pendapatan Unit Usaha'))
+        );
+        const cCoa = prod.cogsCoaCode || resolveCoa('hpp', '5-1000 Beban Pokok Penjualan (HPP)');
+
+        const rev = item.price * item.quantity;
+        const cogs = (item as any).isBox ? (prod.boxCostPrice || 0) * item.quantity : (prod.costPrice || 0) * item.quantity;
+
+        revenueGroups[sCoa] = (revenueGroups[sCoa] || 0) + rev;
+        
+        const isDukodu = prod.name?.toLowerCase().includes('dukodu') || prod.category?.toLowerCase().includes('internet');
+        const invCoa = prod.isPPOB
+          ? isDukodu ? resolveCoa('dana', '1-1054 Saldo Dana') : resolveCoa('radar', '1-1050 Saldo Radar Pulsa')
+          : resolveCoa('persediaan', '1110 Persediaan Unit Toko');
+        const key = `${cCoa}|${invCoa}`;
+        cogsGroups[key] = (cogsGroups[key] || 0) + cogs;
+      });
+
+      const discountFactor = tx.totalAmount > 0 ? tx.totalAmount / (tx.totalAmount + (tx.discountAmount || 0)) : 1;
+
+      let totalRevenueJournaled = 0;
+      Object.entries(revenueGroups).forEach(([coa, amount], index, array) => {
+        let netRev = Math.round(amount * discountFactor);
+        if (index === array.length - 1) netRev = tx.totalAmount - totalRevenueJournaled;
+        totalRevenueJournaled += netRev;
+
+        if (netRev > 0) {
+          newJournals.push({
+            id: `${jId}_rev_${index}`,
+            tenantId: currentUser?.tenantId || 'tenant_default',
+            date: tx.timestamp,
+            account: coa,
+            description: `[Auto] Pendapatan penjualan ${tx.invoiceNo}`,
+            debit: 0,
+            credit: netRev,
+            referenceId: tx.id,
+            referenceType: 'AUTO_TRANSAKSI',
+            createdBy: tx.cashierName || 'System',
+            branchId: tx.branchId || currentUser?.branchId
+          });
         }
-      }
-      return j;
+      });
+
+      Object.entries(cogsGroups).forEach(([key, amount], index) => {
+        const [cCoa, invCoa] = key.split('|');
+        if (amount > 0) {
+          newJournals.push({
+            id: `${jId}_cogs_${index}`,
+            tenantId: currentUser?.tenantId || 'tenant_default',
+            date: tx.timestamp,
+            account: cCoa,
+            description: `[Auto] HPP ${tx.invoiceNo}`,
+            debit: amount,
+            credit: 0,
+            referenceId: tx.id,
+            referenceType: 'AUTO_TRANSAKSI',
+            createdBy: tx.cashierName || 'System',
+            branchId: tx.branchId || currentUser?.branchId
+          });
+          newJournals.push({
+            id: `${jId}_inv_${index}`,
+            tenantId: currentUser?.tenantId || 'tenant_default',
+            date: tx.timestamp,
+            account: invCoa,
+            description: `[Auto] Keluar Saldo/Persediaan ${tx.invoiceNo}`,
+            debit: 0,
+            credit: amount,
+            referenceId: tx.id,
+            referenceType: 'AUTO_TRANSAKSI',
+            createdBy: tx.cashierName || 'System',
+            branchId: tx.branchId || currentUser?.branchId
+          });
+        }
+      });
+      existingRefIds.add(tx.id);
     });
 
-    if (journalsChanged) {
-      useAppStore.setState({ journalEntries: newJournals });
-      saveStorage('ksa_journal_entries', newJournals, currentUser?.tenantId);
-      console.log('Migrated legacy kas kecil journal entries COAs.');
+    if (newJournals.length > 0) {
+      console.log(`[Rebuild] Rebuilt ${newJournals.length} journal entries. Saving...`);
+      const updatedJournals = [...state.journalEntries, ...newJournals];
+      set({ journalEntries: updatedJournals });
+      saveStorage('ksa_journal_entries', updatedJournals, currentUser?.tenantId);
+      addLog('SYSTEM_REBUILD', 'SYSTEM', `Memulihkan ${newJournals.length} entri jurnal dari transaksi lama.`);
+      
+      if (typeof isSupabaseConfigured !== 'undefined' && isSupabaseConfigured) {
+        // Upload rebuilt journals in batches
+        const batchSize = 50;
+        for (let i = 0; i < newJournals.length; i += batchSize) {
+          const batch = newJournals.slice(i, i + batchSize);
+          await (supabaseService as any).saveJournalEntriesBulk(batch).catch((e: any) => console.error("Error bulk uploading rebuilt journals:", e));
+        }
+      }
+      console.log('[Rebuild] Journal rebuild complete.');
+    } else {
+      console.log('[Rebuild] No missing journal entries found.');
     }
-  }, 3000);
-}
+  }
+}));

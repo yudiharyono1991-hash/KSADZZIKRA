@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useBranchData } from '../hooks/useBranchData';
 import { useAppStore } from '../store';
-import { BookOpen, Plus, Search, Scale, Edit, Trash2, Save, X, Calendar, ArrowRight, PenLine, ChevronDown, Download, Printer } from 'lucide-react';
+import { BookOpen, Plus, Search, Scale, Edit, Trash2, Save, X, Calendar, ArrowRight, PenLine, ChevronDown, Download, Printer, Database, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useReactToPrint } from 'react-to-print';
 import { JournalSourceType, JournalEntry } from '../types';
@@ -12,6 +12,7 @@ export default function JurnalUmumPage() {
   const { journalEntries, addJournalEntry, deleteJournalEntryByRef, currentUser, coaList } = useBranchData();
   const reportRef = useRef<HTMLDivElement>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isRebuilding, setIsRebuilding] = useState(false);
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
   const currentDay = today.toLocaleDateString('en-CA');
@@ -38,6 +39,20 @@ export default function JurnalUmumPage() {
     return activeAccounts.length > 1 ? `${activeAccounts[1].code} - ${activeAccounts[1].name}` : '1101';
   });
   const [amount, setAmount] = useState(0);
+
+  const handleRebuild = async () => {
+    if (confirm('Apakah Anda yakin ingin memulihkan ulang (rebuild) Jurnal Umum dari seluruh riwayat Transaksi dan Pengeluaran? Proses ini akan mengembalikan data yang hilang di database.')) {
+      setIsRebuilding(true);
+      try {
+        await useAppStore.getState().forceRebuildJournals();
+        alert('Pemulihan Jurnal Umum berhasil diselesaikan!');
+      } catch (err: any) {
+        alert('Terjadi kesalahan saat memulihkan jurnal: ' + err.message);
+      } finally {
+        setIsRebuilding(false);
+      }
+    }
+  };
 
   const resetForm = () => {
     setIsAdding(false);
@@ -93,22 +108,17 @@ export default function JurnalUmumPage() {
 
     const tenantId = currentUser?.tenantId || 'tenant_default';
     const refId = editingRefId || `MANUAL_${Date.now()}`;
-    // Preserve current time if today, else use midnight
-    const now = new Date();
-    const isToday = date === now.toLocaleDateString('en-CA');
-    const isoDate = isToday ? now.toISOString() : new Date(`${date}T12:00:00Z`).toISOString();
-
+    
     if (editingRefId) {
       deleteJournalEntryByRef(editingRefId);
     }
 
     const { addJournalEntries } = useAppStore.getState();
-    const dateStr = new Date().toISOString();
-    const tenantIdStr = currentUser?.tenantId || 'tenant_default';
+    const dateStr = new Date(`${date}T12:00:00Z`).toISOString();
 
     addJournalEntries([
       {
-        tenantId: tenantIdStr,
+        tenantId,
         date: dateStr,
         account: actDebit,
         description,
@@ -119,7 +129,7 @@ export default function JurnalUmumPage() {
         createdBy: currentUser?.name || 'System'
       },
       {
-        tenantId: tenantIdStr,
+        tenantId,
         date: dateStr,
         account: actCredit,
         description,
@@ -174,11 +184,30 @@ export default function JurnalUmumPage() {
       groups[ref].entries.push(entry);
     });
 
-    return Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return Object.values(groups).map(g => {
+      // Pre-calculate timestamp for sorting to avoid `new Date()` inside the sort comparator
+      return { ...g, _ts: g.date ? new Date(g.date).getTime() : 0 };
+    }).sort((a, b) => b._ts - a._ts).map(({ _ts, ...g }) => g);
   }, [journalEntries, startDate, endDate]);
 
-  const totalDebit = groupedJournals.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + (e.debit || 0), 0), 0);
-  const totalCredit = groupedJournals.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + (e.credit || 0), 0), 0);
+  const { totalDebit, totalCredit, imbalanced } = useMemo(() => {
+    let tD = 0;
+    let tC = 0;
+    const imb: typeof groupedJournals = [];
+
+    groupedJournals.forEach(g => {
+      const gDebit = g.entries.reduce((s, e) => s + (e.debit || 0), 0);
+      const gCredit = g.entries.reduce((s, e) => s + (e.credit || 0), 0);
+      tD += gDebit;
+      tC += gCredit;
+
+      if (Math.abs(gDebit - gCredit) > 0.01) {
+        imb.push(g);
+      }
+    });
+
+    return { totalDebit: tD, totalCredit: tC, imbalanced: imb };
+  }, [groupedJournals]);
 
   const totalPages = Math.ceil(groupedJournals.length / itemsPerPage);
   const paginatedJournals = groupedJournals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -432,12 +461,6 @@ export default function JurnalUmumPage() {
                     <p className="text-sm font-bold text-red-600 flex items-center gap-1"><Scale className="w-4 h-4"/> TIDAK SEIMBANG</p>
                     <p className="text-xs text-red-500 font-mono">Selisih: Rp {Math.abs(totalDebit - totalCredit).toLocaleString('id-ID')} ({totalDebit > totalCredit ? 'Debit lebih besar' : 'Kredit lebih besar'})</p>
                     {(() => {
-                      // Find which referenceIds are imbalanced
-                      const imbalanced = groupedJournals.filter(g => {
-                        const gDebit = g.entries.reduce((s, e) => s + (e.debit || 0), 0);
-                        const gCredit = g.entries.reduce((s, e) => s + (e.credit || 0), 0);
-                        return Math.abs(gDebit - gCredit) > 0.01;
-                      });
                       if (imbalanced.length === 0) return null;
                       return (
                         <div className="mt-1 space-y-1">
@@ -517,6 +540,7 @@ export default function JurnalUmumPage() {
                 ) : (
                   paginatedJournals.map((group) => {
                     const isManual = group.type === 'MANUAL';
+                    const canDelete = isManual || group.type === 'AUTO_BEBAN' || group.type === 'AUTO_KOREKSI' || group.description.includes('[Auto]');
                     return (
                       <tbody key={group.refId} className="text-sm print:break-inside-avoid border-b border-slate-100 dark:border-slate-800">
                         <tr className="bg-slate-50 dark:bg-slate-800/50">
@@ -541,7 +565,7 @@ export default function JurnalUmumPage() {
                           <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].debit > 0 ? group.entries[0].debit.toLocaleString('id-ID') : '-'}</td>
                           <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].credit > 0 ? group.entries[0].credit.toLocaleString('id-ID') : '-'}</td>
                           <td className="p-3 text-center align-top print:hidden" rowSpan={group.entries.length}>
-                            {isManual && (
+                            {canDelete && (
                               <div className="flex items-center justify-center gap-2">
                                 <button onClick={() => handleEdit(group.refId)} className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors" title="Edit">
                                   <Edit className="w-4 h-4" />

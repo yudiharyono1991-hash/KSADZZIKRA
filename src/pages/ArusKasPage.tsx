@@ -116,13 +116,14 @@ export default function ArusKasPage() {
         category: 'FISIK'
       })),
       ...journalEntries
-        .filter(je => je.account === 'KAS' && je.description.includes('Pelunasan piutang'))
+        .filter(je => (je.account === 'KAS' && je.description.includes('Pelunasan piutang')) || 
+                      (je.referenceType === 'MANUAL' && (je.account?.includes('1102') || je.account?.toLowerCase().includes('kas kecil'))))
         .map(je => ({
           id: je.id,
           date: je.date,
-          description: je.description,
-          type: 'IN' as const,
-          amount: je.debit,
+          description: `[Jurnal Umum] ${je.description}`,
+          type: (Number(je.debit) > 0 ? 'IN' : 'OUT') as 'IN' | 'OUT',
+          amount: Number(je.debit) > 0 ? Number(je.debit) : Number(je.credit),
           method: 'CASH',
           category: 'FISIK'
         }))
@@ -134,15 +135,20 @@ export default function ArusKasPage() {
   const todayMonth = now.getMonth();
   const todayDate = now.getDate();
 
-  const filteredMovements = allMovements.filter(m => {
-    const d = new Date(m.date);
-    if (isNaN(d.getTime())) return false;
-    const txDate = d.toLocaleDateString('en-CA');
-    if (startDate && txDate < startDate) return false;
-    if (endDate && txDate > endDate) return false;
-    if (categoryFilter !== 'ALL' && m.category !== categoryFilter) return false;
-    return true;
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const filteredMovements = React.useMemo(() => {
+    return allMovements.filter(m => {
+      const d = new Date(m.date);
+      if (isNaN(d.getTime())) return false;
+      const txDate = d.toLocaleDateString('en-CA');
+      
+      if (startDate && txDate < startDate) return false;
+      if (endDate && txDate > endDate) return false;
+      if (categoryFilter !== 'ALL' && m.category !== categoryFilter) return false;
+      return true;
+    }).map(m => ({ ...m, _ts: m.date ? new Date(m.date).getTime() : 0 }))
+      .sort((a, b) => b._ts - a._ts)
+      .map(({ _ts, ...m }) => m);
+  }, [allMovements, startDate, endDate, categoryFilter]);
 
   const totalInTunai = filteredMovements.filter(m => m.type === 'IN' && m.method === 'CASH').reduce((sum, m) => sum + m.amount, 0);
   const totalInBank = filteredMovements.filter(m => m.type === 'IN' && m.method !== 'CASH').reduce((sum, m) => sum + m.amount, 0);
