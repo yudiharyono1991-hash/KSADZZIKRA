@@ -58,6 +58,7 @@ export default function NeracaRugiPage() {
     return `${y}-${m}-01`; // Start of current month
   });
   const [endDate, setEndDate] = useState(() => getLocalDateString());
+  const [showDetailedExpenses, setShowDetailedExpenses] = useState(false);
 
   // Pagination for Customer Receivables
   const [currentPage, setCurrentPage] = useState(1);
@@ -441,6 +442,56 @@ export default function NeracaRugiPage() {
   const displayExpenses = [...filteredExpenses, ...manualExpenseItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const displayOtherIncome = [...filteredOtherIncome, ...manualOtherIncomeItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  // Grouping expenses by CoA / Category
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, { total: number; items: any[] }> = {};
+    
+    displayExpenses.forEach(exp => {
+      let groupName = exp.description || "Beban Operasional";
+      
+      if (exp.coaId && coaList) {
+         const coa = coaList.find((c: any) => c.code === exp.coaId);
+         if (coa) groupName = coa.name;
+      } 
+      else if (exp.description) {
+         const descLower = exp.description.toLowerCase();
+         if (descLower.includes('gaji') || descLower.includes('honor')) groupName = "Beban Gaji & Honor Karyawan";
+         else if (descLower.includes('listrik') || descLower.includes('air') || descLower.includes('pdam') || descLower.includes('pln')) groupName = "Beban Listrik & Air";
+         else if (descLower.includes('internet') || descLower.includes('wifi') || descLower.includes('indihome')) groupName = "Beban Internet & Komunikasi";
+         else if (descLower.includes('kebersihan') || descLower.includes('keamanan') || descLower.includes('sampah')) groupName = "Beban Kebersihan & Keamanan";
+         else if (descLower.includes('konsumsi') || descLower.includes('makan') || descLower.includes('snack')) groupName = "Beban Konsumsi";
+         else if (descLower.includes('ongkir') || descLower.includes('kurir') || descLower.includes('transport') || descLower.includes('bensin') || descLower.includes('parkir')) groupName = "Beban Transportasi & Ongkir";
+         else if (descLower.includes('atk') || descLower.includes('tulis') || descLower.includes('kertas') || descLower.includes('fotocopy') || descLower.includes('print')) groupName = "Beban Perlengkapan (ATK)";
+         else if (descLower.includes('plastik') || descLower.includes('kresek') || descLower.includes('solasi') || descLower.includes('lakban')) groupName = "Beban Perlengkapan (Packing)";
+         else if (descLower.includes('admin') || descLower.includes('biaya bank') || descLower.includes('transfer')) groupName = "Beban Administrasi Bank";
+         else if (descLower.includes('sedekah') || descLower.includes('infaq') || descLower.includes('zakat')) groupName = "Beban Amal & Zakat";
+         else if (descLower.includes('perbaikan') || descLower.includes('service') || descLower.includes('maintenance')) groupName = "Beban Pemeliharaan & Perbaikan";
+         else if (descLower.includes('marketing') || descLower.includes('iklan') || descLower.includes('promo')) groupName = "Beban Pemasaran & Iklan";
+         else if (exp.category === 'JURNAL UMUM') {
+           const parts = exp.description.split('-');
+           if (parts.length > 1) {
+             groupName = parts.slice(1).join('-').trim();
+           } else {
+             groupName = exp.description;
+           }
+         }
+      }
+      
+      // Normalize capitalization
+      groupName = groupName.charAt(0).toUpperCase() + groupName.slice(1);
+      
+      if (!groups[groupName]) {
+        groups[groupName] = { total: 0, items: [] };
+      }
+      groups[groupName].total += Math.abs(Number(exp.amount) || 0);
+      groups[groupName].items.push(exp);
+    });
+
+    return Object.entries(groups)
+      .map(([name, data]) => ({ name, total: data.total, items: data.items }))
+      .sort((a, b) => b.total - a.total);
+  }, [displayExpenses, coaList]);
+
   const totalPhysicalRevenue = periodPhysicalRevenue + periodManualRevenue;
   let totalPhysicalHPP = periodPhysicalHPP + periodManualHPP;
 
@@ -618,6 +669,7 @@ export default function NeracaRugiPage() {
       ["Pendapatan Usaha (Omset Penjualan)", totalRevenue],
       ["Harga Pokok Penjualan (HPP)", -totalHPP],
       ["LABA KOTOR PERNIAGAAN", grossProfit],
+      ...groupedExpenses.map(g => [`  - ${g.name}`, -g.total]),
       ["Total Beban Operasional", -totalExpenses],
       ["LABA BERSIH OPERASIONAL", netProfit],
       [`Cadangan ${settings.charityTitle || 'Zakat Usaha'} (${settings.charityZakatPercentage || 2.5}%)`, zakatReserve],
@@ -902,13 +954,21 @@ export default function NeracaRugiPage() {
               <div className="pt-2">
                 <div className="flex justify-between items-center font-bold text-slate-755 border-b pb-1 mb-2">
                   <span>RINCIAN BEBAN OPERASIONAL (EXPENSES)</span>
-                  <span className="text-[10px] text-gray-400 font-medium">{displayExpenses.length} transaksi</span>
+                  <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={() => setShowDetailedExpenses(!showDetailedExpenses)}
+                      className="text-[9px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 transition-colors"
+                    >
+                      {showDetailedExpenses ? 'TAMPILKAN RINGKASAN CoA' : 'LIHAT DETAIL TRANSAKSI'}
+                    </button>
+                    <span className="text-[10px] text-gray-400 font-medium">{displayExpenses.length} transaksi</span>
+                  </div>
                 </div>
 
                 <div className="space-y-2 pl-4 max-h-96 overflow-y-auto pr-1">
                   {displayExpenses.length === 0 ? (
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
-                  ) : (
+                  ) : showDetailedExpenses ? (
                     displayExpenses.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors py-0.5">
                         <span className="pr-4 flex-1">
@@ -916,6 +976,15 @@ export default function NeracaRugiPage() {
                           • {exp.description} {exp.category ? `(${exp.category})` : ''}
                         </span>
                         <span className="text-red-700 font-mono whitespace-nowrap">- Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
+                      </div>
+                    ))
+                  ) : (
+                    groupedExpenses.map((group, idx) => (
+                      <div key={idx} className="flex justify-between text-[11px] text-slate-700 dark:text-slate-300 font-medium hover:text-slate-900 dark:text-white py-1.5 border-b border-dashed border-gray-100 dark:border-slate-800 last:border-0">
+                        <span className="pr-4 flex-1 text-[12px] font-semibold">
+                          • {group.name}
+                        </span>
+                        <span className="text-red-700 font-mono font-bold whitespace-nowrap">- Rp {group.total.toLocaleString('id-ID')}</span>
                       </div>
                     ))
                   )}
@@ -1312,10 +1381,28 @@ export default function NeracaRugiPage() {
                 <td className="p-2 border border-gray-300 dark:border-slate-600">Laba Kotor Perdagangan</td>
                 <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {grossProfit.toLocaleString('id-ID')}</td>
               </tr>
-              <tr>
-                <td className="p-2 border border-gray-300 dark:border-slate-600">Beban Operasional</td>
-                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
-              </tr>
+              {groupedExpenses.length > 0 ? (
+                <>
+                  <tr>
+                    <td colSpan={2} className="p-2 border border-gray-300 dark:border-slate-600 font-bold bg-gray-50 dark:bg-slate-800/50">Beban Operasional (Berdasarkan CoA):</td>
+                  </tr>
+                  {groupedExpenses.map((group, idx) => (
+                    <tr key={idx}>
+                      <td className="p-2 border border-gray-300 dark:border-slate-600 pl-6 text-gray-800 dark:text-gray-200 font-bold">• {group.name}</td>
+                      <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600 font-bold">(Rp {group.total.toLocaleString('id-ID')})</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-100 dark:bg-slate-800">
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 font-bold text-right text-xs uppercase">Grand Total Beban Operasional</td>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600 font-black">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
+                  </tr>
+                </>
+              ) : (
+                <tr>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Beban Operasional</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
+                </tr>
+              )}
               <tr className="bg-gray-50 dark:bg-slate-800 font-bold">
                 <td className="p-2 border border-gray-300 dark:border-slate-600 uppercase">Laba Bersih Operasional</td>
                 <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-green-800">Rp {netProfit.toLocaleString('id-ID')}</td>
