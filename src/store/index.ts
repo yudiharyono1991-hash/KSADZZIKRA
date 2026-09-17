@@ -3519,7 +3519,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             const localOnlyTxs = (get().transactions || []).filter((lt) => !remoteIds.has(lt.id));
             const merged = [...transactionsMap, ...localOnlyTxs];
             merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-            set({ transactions: merged });
+            set({ transactions: merged }); saveStorage('ksa_transactions', merged, tenantId);
             // Upload balik transaksi lokal yang belum ada di Supabase
             if (localOnlyTxs.length > 0) {
               localOnlyTxs.forEach((lt) => {
