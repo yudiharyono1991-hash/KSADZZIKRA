@@ -58,6 +58,7 @@ export default function NeracaRugiPage() {
     return `${y}-${m}-01`; // Start of current month
   });
   const [endDate, setEndDate] = useState(() => getLocalDateString());
+  const [showDetailedExpenses, setShowDetailedExpenses] = useState(false);
 
   // Pagination for Customer Receivables
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,56 +66,27 @@ export default function NeracaRugiPage() {
 
   // Calculate historical debt dynamically for audit-readiness
   const customerData = useMemo(() => {
-    // Optimization: Create maps to avoid O(N^2) complexity
-    const txMap = new Map<string, any>((transactions || []).map(t => [t.id, t]));
-    
-    // Group transactions by customer
-    const customerTxs = new Map<string, any[]>();
-    (transactions || []).forEach(tx => {
-      if (tx.customerId && tx.paymentMethod === 'KASBON') {
-        if (!customerTxs.has(tx.customerId)) customerTxs.set(tx.customerId, []);
-        customerTxs.get(tx.customerId)!.push(tx);
-      }
-    });
-
-    // Group journal entries by related customer
-    const customerJournals = new Map<string, any[]>();
-    (journalEntries || []).forEach(je => {
-      let customerId = null;
-      if (je.referenceType === 'MANUAL') {
-        customerId = je.referenceId;
-      } else if (je.referenceType === 'AUTO_TRANSAKSI') {
-        const tx = txMap.get(je.referenceId);
-        if (tx && tx.customerId) customerId = tx.customerId;
-      }
-      
-      if (customerId) {
-        if (!customerJournals.has(customerId)) customerJournals.set(customerId, []);
-        customerJournals.get(customerId)!.push(je);
-      }
-    });
-
     return (customers || []).map(c => {
       let futureDebits = 0;
       let futureCredits = 0;
       let hadActivityThisMonth = false;
       let lastActivityDate: string | null = null;
 
-      // 1. Direct check from POS Transactions for this specific customer
-      const myTxs = customerTxs.get(c.id) || [];
-      myTxs.forEach(tx => {
-        if (!lastActivityDate || tx.timestamp > lastActivityDate) {
-          lastActivityDate = tx.timestamp;
-        }
-        const txDateOnly = getDateFromTimestamp(tx.timestamp);
-        if (txDateOnly >= startDate && txDateOnly <= endDate) {
-          hadActivityThisMonth = true;
+      // 1. Direct check from POS Transactions (Most robust for Kasbon sales)
+      (transactions || []).forEach(tx => {
+        if (tx.customerId === c.id && tx.paymentMethod === 'KASBON') {
+          if (!lastActivityDate || tx.timestamp > lastActivityDate) {
+            lastActivityDate = tx.timestamp;
+          }
+          const txDateOnly = getDateFromTimestamp(tx.timestamp);
+          if (txDateOnly >= startDate && txDateOnly <= endDate) {
+            hadActivityThisMonth = true;
+          }
         }
       });
 
-      // 2. Journal Entries check for this specific customer
-      const myJournals = customerJournals.get(c.id) || [];
-      myJournals.forEach(je => {
+      // 2. Journal Entries check (For manual payments/adjustments)
+      (journalEntries || []).forEach(je => {
         // Also update date for manual payments
         if (je.referenceType === 'MANUAL' && je.referenceId === c.id) {
           if (!lastActivityDate || je.date > lastActivityDate) {
@@ -128,14 +100,24 @@ export default function NeracaRugiPage() {
 
         const isPiutang = je.account === 'PIUTANG_DAGANG' || (je.account && (je.account.toLowerCase().includes('piutang') || je.account === '1-1030'));
         if (isPiutang) {
-          const jeDateOnly = getDateFromTimestamp(je.date);
-          if (jeDateOnly > endDate) {
-            // Revert transactions that happened AFTER the endDate
-            futureDebits += (Number(je.debit) || 0);
-            futureCredits += (Number(je.credit) || 0);
-          } else if (jeDateOnly >= startDate && jeDateOnly <= endDate) {
-            // Ensure hadActivityThisMonth is set if there is related piutang activity
-            hadActivityThisMonth = true;
+          let isRelated = false;
+          if (je.referenceType === 'AUTO_TRANSAKSI') {
+            const tx = (transactions || []).find(t => t.id === je.referenceId);
+            if (tx && tx.customerId === c.id) isRelated = true;
+          } else if (je.referenceType === 'MANUAL') {
+            if (je.referenceId === c.id) isRelated = true;
+          }
+
+          if (isRelated) {
+            const jeDateOnly = getDateFromTimestamp(je.date);
+            if (jeDateOnly > endDate) {
+              // Revert transactions that happened AFTER the endDate
+              futureDebits += (Number(je.debit) || 0);
+              futureCredits += (Number(je.credit) || 0);
+            } else if (jeDateOnly >= startDate && jeDateOnly <= endDate) {
+              // Ensure hadActivityThisMonth is set if there is related piutang activity
+              hadActivityThisMonth = true;
+            }
           }
         }
       });
@@ -211,23 +193,19 @@ export default function NeracaRugiPage() {
   }, [isAutoBalanced]);
 
   // Calculations for Laba Rugi (Profit & Loss) inside the filtered timeframe
-  const filteredTransactions = useMemo(() => {
-    return (transactions || []).filter(tx => {
-      if (!tx || !tx.timestamp) return false;
-      // Exclude voided transactions from financial reports
-      if (tx.isVoided) return false;
-      const txDate = getDateFromTimestamp(tx.timestamp);
-      return txDate >= startDate && txDate <= endDate;
-    });
-  }, [transactions, startDate, endDate]);
+  const filteredTransactions = (transactions || []).filter(tx => {
+    if (!tx || !tx.timestamp) return false;
+    // Exclude voided transactions from financial reports
+    if (tx.isVoided) return false;
+    const txDate = getDateFromTimestamp(tx.timestamp);
+    return txDate >= startDate && txDate <= endDate;
+  });
 
-  const filteredAllExpenses = useMemo(() => {
-    return (expenses || []).filter(exp => {
-      if (!exp || !exp.date) return false;
-      const expDate = getDateFromTimestamp(exp.date);
-      return expDate >= startDate && expDate <= endDate;
-    });
-  }, [expenses, startDate, endDate]);
+  const filteredAllExpenses = (expenses || []).filter(exp => {
+    if (!exp || !exp.date) return false;
+    const expDate = getDateFromTimestamp(exp.date);
+    return expDate >= startDate && expDate <= endDate;
+  });
 
   // === MASTER KEYWORD MAP: sesuai arahan Pak Grandis (INPUT JURNAL KAS KECIL.pdf) ===
   // Semua kata kunci yang BUKAN beban operasional - fungsi ini mengembalikan TRUE jika bukan beban
@@ -241,7 +219,8 @@ export default function NeracaRugiPage() {
     if (desc.includes('persediaan') || desc.includes('kulakan')) return true;
     if (desc.includes('stok') && !desc.includes('stok opname')) return true;
     if ((desc.includes('belanja') || desc.includes('beli ')) && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air')) return true;
-    if (desc.includes('telur') || desc.includes('cadar') || desc.includes('roti') || desc.includes('cimory') || desc.includes('sosis') || desc.includes('basreng') || desc.includes('snack') || desc.includes('minuman') || desc.includes('aqua') || desc.includes('indomaret') || desc.includes('alfagift') || desc.includes('sales ') || desc.includes('wings') || desc.includes('pokka') || desc.includes('tango') || desc.includes('permen') || desc.includes('croisant') || desc.includes('crois') || desc.includes('donasin') || desc.includes('kontak') || desc.includes('setor roti') || desc.includes('crystal') || desc.includes('indogrosir') || desc.includes('indomart') || desc.includes('stop kontak') || desc.includes('kopi') || desc.includes('pisang') || desc.includes('plastik') || desc.includes('sabun') || desc.includes('shampo') || desc.includes('rinso') || desc.includes('sunlight') || desc.includes('mie') || desc.includes('indomie') || desc.includes('beras') || desc.includes('gula') || desc.includes('minyak') || desc.includes('teh') || desc.includes('susu') || desc.includes('rokok') || desc.includes('pampers') || desc.includes('diapers') || desc.includes('biskuit') || desc.includes('chitato') || desc.includes('taro') || desc.includes('tissue') || desc.includes('es krim') || desc.includes('ice cream') || desc.includes('minuman') || desc.includes('galon') || desc.includes('gas') || desc.includes('elpiji')) return true;
+    // Produk spesifik yang sering dibeli sebagai persediaan
+    if (desc.includes('telur') || desc.includes('cadar') || desc.includes('roti') || desc.includes('cimory') || desc.includes('sosis') || desc.includes('basreng') || desc.includes('snack') || desc.includes('minuman') || desc.includes('aqua') || desc.includes('indomaret') || desc.includes('alfagift') || desc.includes('sales ') || desc.includes('wings') || desc.includes('pokka') || desc.includes('tango') || desc.includes('permen') || desc.includes('croisant') || desc.includes('crois') || desc.includes('donasin') || desc.includes('kontak') || desc.includes('setor roti') || desc.includes('crystal') || desc.includes('indogrosir') || desc.includes('indomart') || desc.includes('stop kontak') || desc.includes('kopi') || desc.includes('pisang') || desc.includes('plastik')) return true;
 
     // 1b. Tarik Tunai / Transfer → ke Bank BSI (ASSET)
     if (desc.includes('tarik tunai') || desc.includes('tarik uang') || desc.includes('kembalian transfer') || desc.includes('nominal transfer') || desc.includes('transfer bank') || desc.includes('setor transfer')) return true;
@@ -302,7 +281,7 @@ export default function NeracaRugiPage() {
       (desc.includes('belanja') && !desc.includes('bensin') && !desc.includes('listrik') && !desc.includes('air') && !desc.includes('operasional')) ||
       desc.includes('paket cod') ||
       desc.includes('cadar') ||
-      desc.includes('telur') || desc.includes('roti') || desc.includes('cimory') || desc.includes('sosis') || desc.includes('basreng') || desc.includes('snack') || desc.includes('minuman') || desc.includes('aqua') || desc.includes('indomaret') || desc.includes('alfagift') || desc.includes('sales ') || desc.includes('wings') || desc.includes('pokka') || desc.includes('tango') || desc.includes('permen') || desc.includes('croisant') || desc.includes('crois') || desc.includes('donasin') || desc.includes('kontak') || desc.includes('setor roti') || desc.includes('crystal') || desc.includes('indogrosir') || desc.includes('indomart') || desc.includes('stop kontak') || desc.includes('kopi') || desc.includes('pisang') || desc.includes('plastik') || desc.includes('sabun') || desc.includes('shampo') || desc.includes('rinso') || desc.includes('sunlight') || desc.includes('mie') || desc.includes('indomie') || desc.includes('beras') || desc.includes('gula') || desc.includes('minyak') || desc.includes('teh') || desc.includes('susu') || desc.includes('rokok') || desc.includes('pampers') || desc.includes('diapers') || desc.includes('biskuit') || desc.includes('chitato') || desc.includes('taro') || desc.includes('tissue') || desc.includes('es krim') || desc.includes('ice cream') || desc.includes('minuman') || desc.includes('galon') || desc.includes('gas') || desc.includes('elpiji')
+      desc.includes('telur') || desc.includes('roti') || desc.includes('cimory') || desc.includes('sosis') || desc.includes('basreng') || desc.includes('snack') || desc.includes('minuman') || desc.includes('aqua') || desc.includes('indomaret') || desc.includes('alfagift') || desc.includes('sales ') || desc.includes('wings') || desc.includes('pokka') || desc.includes('tango') || desc.includes('permen') || desc.includes('croisant') || desc.includes('crois') || desc.includes('donasin') || desc.includes('kontak') || desc.includes('setor roti') || desc.includes('crystal') || desc.includes('indogrosir') || desc.includes('indomart') || desc.includes('stop kontak') || desc.includes('kopi') || desc.includes('pisang') || desc.includes('plastik')
     );
   };
 
@@ -460,23 +439,58 @@ export default function NeracaRugiPage() {
   
   periodOtherIncome += periodManualOtherIncomeAmount;
 
-  const displayExpenses = useMemo(() => {
-    return [...filteredExpenses, ...manualExpenseItems].map(e => ({
-      ...e,
-      _ts: e.date ? new Date(e.date).getTime() : 0,
-      _dateStr: e.date ? new Date(e.date).toLocaleDateString('id-ID') : '',
-      _formattedAmount: Math.abs(e.amount).toLocaleString('id-ID')
-    })).sort((a, b) => a._ts - b._ts);
-  }, [filteredExpenses, manualExpenseItems]);
+  const displayExpenses = [...filteredExpenses, ...manualExpenseItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const displayOtherIncome = [...filteredOtherIncome, ...manualOtherIncomeItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const displayOtherIncome = useMemo(() => {
-    return [...filteredOtherIncome, ...manualOtherIncomeItems].map(e => ({
-      ...e,
-      _ts: e.date ? new Date(e.date).getTime() : 0,
-      _dateStr: e.date ? new Date(e.date).toLocaleDateString('id-ID') : '',
-      _formattedAmount: Math.abs(e.amount).toLocaleString('id-ID')
-    })).sort((a, b) => a._ts - b._ts);
-  }, [filteredOtherIncome, manualOtherIncomeItems]);
+  // Grouping expenses by CoA / Category
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, { total: number; items: any[] }> = {};
+    
+    displayExpenses.forEach(exp => {
+      let groupName = exp.description || "Beban Operasional";
+      
+      if (exp.coaId && coaList) {
+         const coa = coaList.find((c: any) => c.code === exp.coaId);
+         if (coa) groupName = coa.name;
+      } 
+      else if (exp.description) {
+         const descLower = exp.description.toLowerCase();
+         if (descLower.includes('gaji') || descLower.includes('honor')) groupName = "Beban Gaji & Honor Karyawan";
+         else if (descLower.includes('listrik') || descLower.includes('air') || descLower.includes('pdam') || descLower.includes('pln')) groupName = "Beban Listrik & Air";
+         else if (descLower.includes('internet') || descLower.includes('wifi') || descLower.includes('indihome')) groupName = "Beban Internet & Komunikasi";
+         else if (descLower.includes('kebersihan') || descLower.includes('keamanan') || descLower.includes('sampah')) groupName = "Beban Kebersihan & Keamanan";
+         else if (descLower.includes('konsumsi') || descLower.includes('makan') || descLower.includes('snack')) groupName = "Beban Konsumsi";
+         else if (descLower.includes('ongkir') || descLower.includes('kurir') || descLower.includes('transport') || descLower.includes('bensin') || descLower.includes('parkir')) groupName = "Beban Transportasi & Ongkir";
+         else if (descLower.includes('atk') || descLower.includes('tulis') || descLower.includes('kertas') || descLower.includes('fotocopy') || descLower.includes('print')) groupName = "Beban Perlengkapan (ATK)";
+         else if (descLower.includes('plastik') || descLower.includes('kresek') || descLower.includes('solasi') || descLower.includes('lakban')) groupName = "Beban Perlengkapan (Packing)";
+         else if (descLower.includes('admin') || descLower.includes('biaya bank') || descLower.includes('transfer')) groupName = "Beban Administrasi Bank";
+         else if (descLower.includes('sedekah') || descLower.includes('infaq') || descLower.includes('zakat')) groupName = "Beban Amal & Zakat";
+         else if (descLower.includes('perbaikan') || descLower.includes('service') || descLower.includes('maintenance')) groupName = "Beban Pemeliharaan & Perbaikan";
+         else if (descLower.includes('marketing') || descLower.includes('iklan') || descLower.includes('promo')) groupName = "Beban Pemasaran & Iklan";
+         else if (exp.category === 'JURNAL UMUM') {
+           const parts = exp.description.split('-');
+           if (parts.length > 1) {
+             groupName = parts.slice(1).join('-').trim();
+           } else {
+             groupName = exp.description;
+           }
+         }
+      }
+      
+      // Normalize capitalization
+      groupName = groupName.charAt(0).toUpperCase() + groupName.slice(1);
+      
+      if (!groups[groupName]) {
+        groups[groupName] = { total: 0, items: [] };
+      }
+      groups[groupName].total += Math.abs(Number(exp.amount) || 0);
+      groups[groupName].items.push(exp);
+    });
+
+    return Object.entries(groups)
+      .map(([name, data]) => ({ name, total: data.total, items: data.items }))
+      .sort((a, b) => b.total - a.total);
+  }, [displayExpenses, coaList]);
 
   const totalPhysicalRevenue = periodPhysicalRevenue + periodManualRevenue;
   let totalPhysicalHPP = periodPhysicalHPP + periodManualHPP;
@@ -490,98 +504,112 @@ export default function NeracaRugiPage() {
   const zakatReserve = Math.round(Math.max(0, netProfit) * zakatRateDecimal); // Zakat Niaga berdasarkan Keuntungan Bersih, dibulatkan
 
   // Cumulative all-time balances supporting position (Balance Sheet)
-  const {
-    allTimeTransactionsRevenue,
-    allTimeTransactionsExpenses,
-    allTimeTransactionsOtherIncome,
-    allTimeTransactionsHPP,
-    allTimeManualRevenue,
-    allTimeManualHPP,
-    allTimeManualExpenses,
-    allTimeManualCash,
-    balanceKasKecil,
-    balanceKasUtamaUsang,
-    balanceBank,
-    balanceQris,
-    balanceRadar,
-    balanceDana
-  } = useMemo(() => {
-    const rev = (transactions || [])
-      .filter(tx => !tx?.isVoided && tx?.timestamp && getDateFromTimestamp(tx.timestamp) <= endDate)
-      .reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
+  const allTimeTransactionsRevenue = (transactions || [])
+    .filter(tx => {
+      if (!tx || !tx.timestamp) return false;
+      if (tx.isVoided) return false;
+      const txDate = getDateFromTimestamp(tx.timestamp);
+      return txDate <= endDate;
+    })
+    .reduce((sum, tx) => sum + (Number(tx.totalAmount) || 0), 0);
 
-    const exp = (expenses || [])
-      .filter(exp => exp?.date && getDateFromTimestamp(exp.date) <= endDate && (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp))
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const allTimeTransactionsExpenses = (expenses || [])
+    .filter(exp => {
+      if (!exp || !exp.date) return false;
+      const expDate = getDateFromTimestamp(exp.date);
+      return expDate <= endDate && (Number(exp.amount) || 0) >= 0 && !isInventoryExpense(exp);
+    })
+    .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-    const othInc = (expenses || [])
-      .filter(exp => exp?.date && getDateFromTimestamp(exp.date) <= endDate && isOtherIncome(exp))
-      .reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+  const allTimeTransactionsOtherIncome = (expenses || [])
+    .filter(exp => {
+      if (!exp || !exp.date) return false;
+      const expDate = getDateFromTimestamp(exp.date);
+      return expDate <= endDate && isOtherIncome(exp);
+    })
+    .reduce((sum, exp) => sum + Math.abs(Number(exp.amount) || 0), 0);
 
-    const hpp = (transactions || [])
-      .filter(tx => !tx?.isVoided && tx?.timestamp && getDateFromTimestamp(tx.timestamp) <= endDate)
-      .reduce((sum, tx) => sum + (tx.items || []).reduce((s, it) => s + (Number(it.costPrice || 0) * (Number(it.quantity) || 0)), 0), 0);
-
-    let mRev = 0, mHpp = 0, mExp = 0, mCash = 0;
-    manualJournals.filter(j => j.date && getDateFromTimestamp(j.date) <= endDate).forEach(j => {
-      if (!j.account || isInventoryJournal(j)) return;
-      const acc = j.account.toLowerCase();
-      if (j.account.startsWith('4-') || j.account.startsWith('4') || j.account.startsWith('7-') || j.account.startsWith('7')) mRev += (j.credit - j.debit);
-      else if (j.account.startsWith('6-') || j.account.startsWith('6') || j.account.startsWith('54') || acc.includes('beban operasional')) mExp += (j.debit - j.credit);
-      else if (j.account.startsWith('5-') || j.account.startsWith('5')) mHpp += (j.debit - j.credit);
-      else if (j.account.startsWith('1-100') || j.account.startsWith('1-101') || acc.includes('kas kecil') || acc.includes('kas utama') || j.account.startsWith('1101') || j.account.startsWith('1102') || j.account.startsWith('1112')) {
-        mCash += (j.debit - j.credit);
-      }
-    });
-
-    let bKasKecil = initialStoreCapital;
-    let bKasUtamaUsang = 0, bBank = 0, bQris = 0, bRadar = 0, bDana = 0;
-
-    (journalEntries || []).forEach(j => {
-      const jd = getDateFromTimestamp(j.date);
-      if (jd && jd <= endDate) {
-        const acc = j.account ? j.account.toLowerCase() : '';
-        const rawAcc = String(j.account || '').trim();
-        const match = rawAcc.match(/^(\d+[\d-]*)/);
-        const accCode = match ? match[1] : (rawAcc.includes(' - ') ? rawAcc.split(' - ')[0].trim() : rawAcc);
-
-        if (accCode === '1101' || acc.includes('kas utama') || acc.includes('kas tunai') || acc.startsWith('1-100') || accCode === '1100') {
-          bKasUtamaUsang += (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        } else if (accCode === '1102' || acc.includes('kas kecil')) {
-          bKasKecil += (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        } else if (acc.includes('1020') || acc.includes('1-1020') || acc.includes('qris')) {
-          bQris += (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        } else if (acc.includes('1103') || acc.includes('1104') || acc.includes('bank')) {
-          bBank += (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        } else if (acc.includes('1050') || acc.includes('1-1050') || acc.includes('radar pulsa')) {
-          bRadar += (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        } else if (acc.includes('1117') || acc.includes('1054') || acc.includes('1-1054') || acc.includes('dokuku') || acc.includes('saldo dana')) {
-          bDana += (Number(j.debit) || 0) - (Number(j.credit) || 0);
-        }
-      }
-    });
-
-    return {
-      allTimeTransactionsRevenue: rev,
-      allTimeTransactionsExpenses: exp,
-      allTimeTransactionsOtherIncome: othInc,
-      allTimeTransactionsHPP: hpp,
-      allTimeManualRevenue: mRev,
-      allTimeManualHPP: mHpp,
-      allTimeManualExpenses: mExp,
-      allTimeManualCash: mCash,
-      balanceKasKecil: bKasKecil,
-      balanceKasUtamaUsang: bKasUtamaUsang,
-      balanceBank: bBank,
-      balanceQris: bQris,
-      balanceRadar: bRadar,
-      balanceDana: bDana
-    };
-  }, [transactions, expenses, journalEntries, manualJournals, endDate, initialStoreCapital]);
+  const allTimeTransactionsHPP = (transactions || [])
+    .filter(tx => {
+      if (!tx || !tx.timestamp) return false;
+      if (tx.isVoided) return false;
+      const txDate = getDateFromTimestamp(tx.timestamp);
+      return txDate <= endDate;
+    })
+    .reduce((sum, tx) =>
+      sum + (tx.items || []).reduce((s, it) => {
+        let cp = Number(it.costPrice || 0);
+        let itemHpp = cp * (Number(it.quantity) || 0);
+        return s + itemHpp;
+      }, 0), 0
+    );
 
   // Global Auto-Koreksi untuk All-Time HPP
   // Karena transaksi diskon besar bisa membuat HPP > Revenue secara global
   let finalAllTimeTransactionsHPP = allTimeTransactionsHPP;
+
+  const cumulativeManualJournals = manualJournals.filter(j => {
+    const jd = getDateFromTimestamp(j.date);
+    return jd && jd <= endDate;
+  });
+
+  let allTimeManualRevenue = 0;
+  let allTimeManualHPP = 0;
+  let allTimeManualExpenses = 0;
+  let allTimeManualCash = 0;
+
+  cumulativeManualJournals.forEach(j => {
+    if (!j.account) return;
+    if (isInventoryJournal(j)) return; // Exclude inventory purchases from expenses!
+
+    const acc = j.account.toLowerCase();
+    if (j.account.startsWith('4-') || j.account.startsWith('4') || j.account.startsWith('7-') || j.account.startsWith('7')) allTimeManualRevenue += (j.credit - j.debit);
+    else if (j.account.startsWith('6-') || j.account.startsWith('6') || j.account.startsWith('54') || acc.includes('beban operasional')) allTimeManualExpenses += (j.debit - j.credit);
+    else if (j.account.startsWith('5-') || j.account.startsWith('5')) allTimeManualHPP += (j.debit - j.credit);
+    else if (
+      j.account.startsWith('1-100') || 
+      j.account.startsWith('1-101') || 
+      acc.includes('kas kecil') || 
+      acc.includes('kas utama') ||
+      j.account.startsWith('1101') ||
+      j.account.startsWith('1102') ||
+      j.account.startsWith('1112')
+    ) {
+      allTimeManualCash += (j.debit - j.credit);
+    }
+  });
+
+  // Calculate separate cash balances directly from ALL journals
+  let balanceKasKecil = initialStoreCapital; // modal awal dianggap masuk ke kas kecil/toko
+  let balanceKasUtamaUsang = 0; // The old 1101 balance to be written off
+  let balanceBank = 0;
+  let balanceQris = 0;
+  let balanceRadar = 0;
+  let balanceDana = 0;
+
+  (journalEntries || []).forEach(j => {
+    const jd = getDateFromTimestamp(j.date);
+    if (jd && jd <= endDate) {
+      const acc = j.account ? j.account.toLowerCase() : '';
+      const rawAcc = String(j.account || '').trim();
+      const match = rawAcc.match(/^(\d+[\d-]*)/);
+      const accCode = match ? match[1] : (rawAcc.includes(' - ') ? rawAcc.split(' - ')[0].trim() : rawAcc);
+
+      if (accCode === '1101' || acc.includes('kas utama') || acc.includes('kas tunai') || acc.startsWith('1-100') || accCode === '1100') {
+        balanceKasUtamaUsang += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      } else if (accCode === '1102' || acc.includes('kas kecil')) {
+        balanceKasKecil += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      } else if (acc.includes('1020') || acc.includes('1-1020') || acc.includes('qris')) {
+        balanceQris += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      } else if (acc.includes('1103') || acc.includes('1104') || acc.includes('bank')) {
+        balanceBank += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      } else if (acc.includes('1050') || acc.includes('1-1050') || acc.includes('radar pulsa')) {
+        balanceRadar += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      } else if (acc.includes('1117') || acc.includes('1054') || acc.includes('1-1054') || acc.includes('dokuku') || acc.includes('saldo dana')) {
+        balanceDana += (Number(j.debit) || 0) - (Number(j.credit) || 0);
+      }
+    }
+  });
 
   const allTimePhysicalRevenue = allTimeTransactionsRevenue + allTimeManualRevenue;
   let allTimePhysicalHPP = finalAllTimeTransactionsHPP + allTimeManualHPP;
@@ -597,24 +625,14 @@ export default function NeracaRugiPage() {
 
   // Unsold merchandise stock valuation (asset)
   // Exclude PPOB from physical inventory calculation to prevent balance sheet inflation
-  const physicalInventory = useMemo(() => {
-    return (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
-  }, [products]);
+  const physicalInventory = (products || []).reduce((sum, p) => p.isPPOB ? sum : sum + ((Number(p.costPrice) || 0) * (Number(p.stock) || 0)), 0);
 
-  const kasKecilInventoryEntries = useMemo(() => {
-    return (journalEntries || []).filter(j => isInventoryJournal(j))
-      .sort((a, b) => {
-        const da = a.date ? new Date(a.date).getTime() : 0;
-        const db = b.date ? new Date(b.date).getTime() : 0;
-        return db - da;
-      });
-  }, [journalEntries]);
+  const kasKecilInventoryEntries = (journalEntries || []).filter(j => isInventoryJournal(j))
+    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-  const kasKecilInventory = useMemo(() => {
-    return kasKecilInventoryEntries.reduce((sum, j) => {
-      return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
-    }, 0);
-  }, [kasKecilInventoryEntries]);
+  const kasKecilInventory = kasKecilInventoryEntries.reduce((sum, j) => {
+    return sum + (Number(j.debit) || 0) - (Number(j.credit) || 0);
+  }, 0);
 
   const valueOfInventory = physicalInventory + kasKecilInventory;
 
@@ -651,6 +669,7 @@ export default function NeracaRugiPage() {
       ["Pendapatan Usaha (Omset Penjualan)", totalRevenue],
       ["Harga Pokok Penjualan (HPP)", -totalHPP],
       ["LABA KOTOR PERNIAGAAN", grossProfit],
+      ...groupedExpenses.map(g => [`  - ${g.name}`, -g.total]),
       ["Total Beban Operasional", -totalExpenses],
       ["LABA BERSIH OPERASIONAL", netProfit],
       [`Cadangan ${settings.charityTitle || 'Zakat Usaha'} (${settings.charityZakatPercentage || 2.5}%)`, zakatReserve],
@@ -913,14 +932,14 @@ export default function NeracaRugiPage() {
                   {displayOtherIncome.length === 0 ? (
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pendapatan lainnya terjurnal.</p>
                   ) : (
-                    displayOtherIncome.map((exp: any) => (
+                    displayOtherIncome.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors py-0.5">
                         <span className="pr-4 flex-1">
-                          <span className="text-gray-400 mr-1">[{exp._dateStr}]</span>
+                          <span className="text-gray-400 mr-1">[{new Date(exp.date).toLocaleDateString('id-ID')}]</span>
                           • {exp.description} {exp.category !== 'MANUAL' && exp.category !== 'JURNAL UMUM' ? `(${exp.category})` : ''}
                         </span>
                         <span className="text-blue-700 font-mono whitespace-nowrap">
-                          {exp.amount >= 0 ? '+ Rp ' : '- Rp '}{exp._formattedAmount}
+                          {exp.amount >= 0 ? '+ Rp ' : '- Rp '}{Math.abs(exp.amount).toLocaleString('id-ID')}
                         </span>
                       </div>
                     ))
@@ -935,13 +954,21 @@ export default function NeracaRugiPage() {
               <div className="pt-2">
                 <div className="flex justify-between items-center font-bold text-slate-755 border-b pb-1 mb-2">
                   <span>RINCIAN BEBAN OPERASIONAL (EXPENSES)</span>
-                  <span className="text-[10px] text-gray-400 font-medium">{displayExpenses.length} transaksi</span>
+                  <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={() => setShowDetailedExpenses(!showDetailedExpenses)}
+                      className="text-[9px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 transition-colors"
+                    >
+                      {showDetailedExpenses ? 'TAMPILKAN RINGKASAN CoA' : 'LIHAT DETAIL TRANSAKSI'}
+                    </button>
+                    <span className="text-[10px] text-gray-400 font-medium">{displayExpenses.length} transaksi</span>
+                  </div>
                 </div>
 
                 <div className="space-y-2 pl-4 max-h-96 overflow-y-auto pr-1">
                   {displayExpenses.length === 0 ? (
                     <p className="text-gray-400 text-[11px] italic">Tidak ada pengeluaran terjurnal pada periode ini.</p>
-                  ) : (
+                  ) : showDetailedExpenses ? (
                     displayExpenses.map((exp) => (
                       <div key={exp.id} className="flex justify-between text-[11px] text-gray-600 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors py-0.5">
                         <span className="pr-4 flex-1">
@@ -949,6 +976,15 @@ export default function NeracaRugiPage() {
                           • {exp.description} {exp.category ? `(${exp.category})` : ''}
                         </span>
                         <span className="text-red-700 font-mono whitespace-nowrap">- Rp {Math.abs(exp.amount).toLocaleString('id-ID')}</span>
+                      </div>
+                    ))
+                  ) : (
+                    groupedExpenses.map((group, idx) => (
+                      <div key={idx} className="flex justify-between text-[11px] text-slate-700 dark:text-slate-300 font-medium hover:text-slate-900 dark:text-white py-1.5 border-b border-dashed border-gray-100 dark:border-slate-800 last:border-0">
+                        <span className="pr-4 flex-1 text-[12px] font-semibold">
+                          • {group.name}
+                        </span>
+                        <span className="text-red-700 font-mono font-bold whitespace-nowrap">- Rp {group.total.toLocaleString('id-ID')}</span>
                       </div>
                     ))
                   )}
@@ -1345,10 +1381,28 @@ export default function NeracaRugiPage() {
                 <td className="p-2 border border-gray-300 dark:border-slate-600">Laba Kotor Perdagangan</td>
                 <td className="p-2 border border-gray-300 dark:border-slate-600 text-right">Rp {grossProfit.toLocaleString('id-ID')}</td>
               </tr>
-              <tr>
-                <td className="p-2 border border-gray-300 dark:border-slate-600">Beban Operasional</td>
-                <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
-              </tr>
+              {groupedExpenses.length > 0 ? (
+                <>
+                  <tr>
+                    <td colSpan={2} className="p-2 border border-gray-300 dark:border-slate-600 font-bold bg-gray-50 dark:bg-slate-800/50">Beban Operasional (Berdasarkan CoA):</td>
+                  </tr>
+                  {groupedExpenses.map((group, idx) => (
+                    <tr key={idx}>
+                      <td className="p-2 border border-gray-300 dark:border-slate-600 pl-6 text-gray-800 dark:text-gray-200 font-bold">• {group.name}</td>
+                      <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600 font-bold">(Rp {group.total.toLocaleString('id-ID')})</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-100 dark:bg-slate-800">
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 font-bold text-right text-xs uppercase">Grand Total Beban Operasional</td>
+                    <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600 font-black">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
+                  </tr>
+                </>
+              ) : (
+                <tr>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600">Beban Operasional</td>
+                  <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-red-600">(Rp {totalExpenses.toLocaleString('id-ID')})</td>
+                </tr>
+              )}
               <tr className="bg-gray-50 dark:bg-slate-800 font-bold">
                 <td className="p-2 border border-gray-300 dark:border-slate-600 uppercase">Laba Bersih Operasional</td>
                 <td className="p-2 border border-gray-300 dark:border-slate-600 text-right text-green-800">Rp {netProfit.toLocaleString('id-ID')}</td>
