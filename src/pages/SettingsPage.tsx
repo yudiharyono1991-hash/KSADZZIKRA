@@ -1184,7 +1184,7 @@ export default function SettingsPage() {
                         return;
                       }
 
-                      if (!confirm(`Mesin Rekonstruksi akan memproses ${txs.length} transaksi untuk merakit ulang seluruh Jurnal Umum dan Master Pelanggan dari nol. Proses ini aman. Lanjutkan?`)) return;
+                      if (!confirm(`Mesin Rekonstruksi akan memproses ${txs.length} transaksi untuk merakit ulang seluruh Jurnal Umum. Proses ini aman. Lanjutkan?`)) return;
                       
                       const coaList = store.coaList || [];
                       const resolveCoa = (keyword: string, fallback: string) => {
@@ -1214,8 +1214,19 @@ export default function SettingsPage() {
 
                       const rebuiltJournals: any[] = [];
                       const customerMap = new Map<string, any>();
+                      
+                      // PRELOAD EXISTING CUSTOMERS SO WE DON'T DELETE THEM!
+                      const existingCustomers = store.customers || [];
+                      existingCustomers.forEach(c => {
+                        customerMap.set(c.id, {
+                          ...c,
+                          totalPointsEarned: 0,
+                          totalPointsRedeemed: 0,
+                          debtAmount: 0 // Will recalculate from transactions
+                        });
+                      });
 
-                      txs.forEach((tx) => {
+                      txs.forEach((tx: any) => {
                         // 1. Rebuild Journals
                         const jId = `je_${tx.id}_rec`;
                         
@@ -1295,7 +1306,8 @@ export default function SettingsPage() {
 
                       kasbonPayments.forEach((kp: any) => {
                         if (kp.customerId && customerMap.has(kp.customerId)) {
-                          customerMap.get(kp.customerId)!.debtAmount -= kp.amount;
+                          const amount = Number(kp.amountPaid || kp.amount || 0);
+                          customerMap.get(kp.customerId)!.debtAmount -= amount;
                         }
                       });
 
