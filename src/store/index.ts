@@ -4112,6 +4112,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncTask('zakat distributions', state.zakatDistributions, async (dist) => {
           await (supabaseService as any).saveZakatDistribution(dist);
         }),
+        syncTask('kasbon payments', state.kasbonPayments, async (payment) => {
+          await supabaseService.saveKasbonPayment(payment);
+        }),
+        syncTask('expenses', state.expenses, async (expense) => {
+          await supabaseService.saveExpense(expense);
+        }),
+        syncTask('branches', state.branches, async (branch) => {
+          await supabaseService.saveBranch(branch);
+        }),
       ]);
 
       try {
