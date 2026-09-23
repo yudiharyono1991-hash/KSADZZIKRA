@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve Supabase environment variables or use hardcoded fallbacks
-let SUPABASE_URL = 'https://stiatomaelzrptazayml.supabase.co';
-let SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aWF0b21hZWx6cnB0YXpheW1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NjUyMjQsImV4cCI6MjA5ODQ0MTIyNH0.9vkvEYp1BFcIdkt1YSx87K6zlVkZUrmd1xLPpHmILn0';
+let SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://cfhweciblqjpnhqoabvh.supabase.co';
+let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmaHdlY2libHFqcG5ocW9hYnZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDkyNzIsImV4cCI6MjEwNTY4NTI3Mn0.D_EAlpQehmG2cxWdjVxTF3RhFxUxy6Lb_aWMlbv3ur4';
 
 // Try to override with User Settings if available
 try {
@@ -478,6 +478,41 @@ export const supabaseService = {
         }
         throw error;
       }
+      return true;
+    } catch (err: any) {
+      logSync(`Failed to save transaction: ${err.message}`, true);
+      return false;
+    }
+  },
+
+  async saveTransactionsBulk(transactions: any[]): Promise<boolean> {
+    if (!supabase || transactions.length === 0) return false;
+    try {
+      const tenantId = this.getTenantId();
+      const payload = transactions.map(tx => ({
+        id: tx.id,
+        tenant_id: tenantId,
+        invoice_no: tx.invoiceNo,
+        timestamp: tx.timestamp,
+        cashier_name: tx.cashierName,
+        items: tx.items,
+        total_amount: Number(tx.totalAmount),
+        payment_method: tx.paymentMethod,
+        amount_paid: Number(tx.amountPaid || 0),
+        change_amount: Number(tx.changeAmount || 0),
+        zakat_contribution: Number(tx.zakatContribution || 0),
+        margin_contribution: Number(tx.marginContribution || 0),
+        infaq_contribution: Number(tx.infaqContribution || 0),
+        customer_id: tx.customerId || null,
+        branch_id: tx.branchId || null,
+        points_earned: Number(tx.pointsEarned || 0),
+        points_redeemed: Number(tx.pointsRedeemed || 0),
+        points_discount: Number(tx.pointsDiscount || 0)
+      }));
+
+      const { error } = await supabase.from('transactions').upsert(payload);
+      if (error) throw error;
+
       logSync(`Inserted transaction ${tx.invoiceNo} successfully.`);
       return true;
     } catch (err: any) {

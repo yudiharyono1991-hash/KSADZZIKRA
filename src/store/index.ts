@@ -4061,9 +4061,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncTask('customers', state.customers, async (customer) => {
           await supabaseService.saveCustomer(customer);
         }),
-        syncTask('transactions', state.transactions, async (transaction) => {
-          await (supabaseService as any).saveTransaction(transaction);
-        }),
+        (async () => {
+          try {
+            console.log(`[Force Sync] Bulk syncing ${state.transactions.length} transactions...`);
+            const chunkSize = 1000;
+            for (let i = 0; i < state.transactions.length; i += chunkSize) {
+              const chunk = state.transactions.slice(i, i + chunkSize);
+              await (supabaseService as any).saveTransactionsBulk(chunk);
+            }
+          } catch (err) {
+            console.warn('Failed to bulk sync transactions:', err);
+          }
+        })(),
         syncTask('online orders', state.onlineOrders, async (order) => {
           await supabaseService.saveOnlineOrder(order);
         }),
@@ -4076,9 +4085,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         syncTask('purchase orders', state.purchaseOrders, async (po) => {
           await (supabaseService as any).savePurchaseOrder(po);
         }),
-        syncTask('journal entries', state.journalEntries, async (journal) => {
-          await (supabaseService as any).saveJournalEntry(journal);
-        }),
+        // Journal Entries are synced in bulk chunks to prevent 400 timeout and NaN errors
+        (async () => {
+          try {
+            console.log(`[Force Sync] Bulk syncing ${state.journalEntries.length} journals...`);
+            const sanitized = state.journalEntries.map(j => ({
+              ...j,
+              debit: Number(j.debit) || 0,
+              credit: Number(j.credit) || 0
+            }));
+            const chunkSize = 1000;
+            for (let i = 0; i < sanitized.length; i += chunkSize) {
+              const chunk = sanitized.slice(i, i + chunkSize);
+              await (supabaseService as any).saveJournalEntriesBulk(chunk);
+            }
+          } catch (err) {
+            console.warn('Failed to bulk sync journals:', err);
+          }
+        })(),
         syncTask('ksa users', state.users, async (user) => {
           await (supabaseService as any).saveUser(user);
         }),

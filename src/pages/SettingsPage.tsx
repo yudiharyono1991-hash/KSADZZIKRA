@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import LZString from 'lz-string';
 import { useAppStore } from '../store';
-import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw, Globe, Clock, X, QrCode } from 'lucide-react';
+import { Settings, Percent, Save, CheckCircle, Lock, Building2, Wallet, Store, Copy, Database, Plus, Trash2, CreditCard, Smartphone, Download, MapPin, RefreshCw, Globe, Clock, X, QrCode, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabaseService, isSupabaseConfigured } from '../lib/supabase';
 import * as htmlToImage from 'html-to-image';
@@ -1161,6 +1162,158 @@ export default function SettingsPage() {
               >
                 <Save size={16} /> Simpan Konfigurasi
               </button>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-red-200">
+              <div className="bg-red-50 p-4 rounded-xl border border-red-200">
+                <h3 className="text-red-800 font-bold mb-2 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" /> MODE DARURAT: PENYELAMATAN JURNAL LOKAL
+                </h3>
+                <p className="text-red-700 text-xs mb-3">
+                  Gunakan ini HANYA untuk memulihkan Jurnal dan Kasbon dari memori lokal (Local Storage) ke Supabase Baru saat proses migrasi. Pastikan Supabase baru sudah terhubung dan aktif (indikator hijau di atas).
+                </p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const store = useAppStore.getState();
+                      const tenantId = store.currentUser?.tenantId || 'tenant_default';
+                      const txs = store.transactions || [];
+
+                      if (txs.length === 0) {
+                        alert("Tidak ada riwayat transaksi ditemukan untuk merekonstruksi data.");
+                        return;
+                      }
+
+                      if (!confirm(`Mesin Rekonstruksi akan memproses ${txs.length} transaksi untuk merakit ulang seluruh Jurnal Umum dan Master Pelanggan dari nol. Proses ini aman. Lanjutkan?`)) return;
+                      
+                      const coaList = store.coaList || [];
+                      const resolveCoa = (keyword: string, fallback: string) => {
+                        const exact = coaList.find(c => c.code === fallback || c.code === fallback.split(' ')[0]);
+                        if (exact) return exact.code;
+                        const fuzzyName = coaList.find(c => c.name.toLowerCase() === keyword.toLowerCase());
+                        if (fuzzyName) return fuzzyName.code;
+                        const partialName = coaList.find(c => c.name.toLowerCase().includes(keyword.toLowerCase()));
+                        return partialName ? partialName.code : fallback;
+                      };
+
+                      const kasKecilCoa = coaList.find(c => c.code === '1102') || coaList.find(c => c.name.toLowerCase().includes('kas kecil'));
+                      const getPrimaryCashCoa = () => kasKecilCoa ? kasKecilCoa.code : '1102';
+
+                      const getPaymentCoa = (method: string) => {
+                        if (method === 'CASH') return getPrimaryCashCoa();
+                        if (method === 'QRIS_SHARIAH' || method === 'QRIS') return resolveCoa('qris', '1020');
+                        if (method === 'KASBON') return resolveCoa('piutang', '1030');
+                        if (method === 'EWALLET') return resolveCoa('dana', '1117');
+                        if (method === 'BANK_LAIN') return resolveCoa('bank', '1104');
+                        return resolveCoa('bank', '1103');
+                      };
+
+                      const akunPenjualan = resolveCoa('penjualan', '4100');
+                      const akunHPP = resolveCoa('hpp', '5100');
+                      const akunPersediaan = resolveCoa('persediaan', '1104');
+
+                      const rebuiltJournals: any[] = [];
+                      const customerMap = new Map<string, any>();
+
+                      txs.forEach((tx) => {
+                        // 1. Rebuild Journals
+                        const jId = `je_${tx.id}_rec`;
+                        
+                        if (tx.splitPayments && tx.splitPayments.length > 0) {
+                          tx.splitPayments.forEach((sp: any, i: number) => {
+                            rebuiltJournals.push({
+                              id: `${jId}_d_${i}`, tenantId: tx.tenantId, date: tx.timestamp,
+                              account: getPaymentCoa(sp.method), description: `[Auto] Penjualan SPLIT (${sp.method}) dari ${tx.invoiceNo}`,
+                              debit: sp.amount - (i === 0 ? (tx.changeAmount || 0) : 0), credit: 0,
+                              referenceId: tx.id, referenceType: 'AUTO_TRANSAKSI', createdBy: tx.cashierName, branchId: tx.branchId
+                            });
+                          });
+                        } else {
+                          rebuiltJournals.push({
+                            id: `${jId}_d_1`, tenantId: tx.tenantId, date: tx.timestamp,
+                            account: getPaymentCoa(tx.paymentMethod), description: `[Auto] Penjualan ${tx.paymentMethod} dari ${tx.invoiceNo}`,
+                            debit: tx.totalAmount, credit: 0,
+                            referenceId: tx.id, referenceType: 'AUTO_TRANSAKSI', createdBy: tx.cashierName, branchId: tx.branchId
+                          });
+                        }
+
+                        let baseSales = tx.totalAmount - (tx.taxAmount || 0) - (tx.infaqContribution || 0);
+                        if (baseSales > 0) {
+                          rebuiltJournals.push({
+                            id: `${jId}_c_1`, tenantId: tx.tenantId, date: tx.timestamp,
+                            account: akunPenjualan, description: `[Auto] Pendapatan Penjualan dari ${tx.invoiceNo}`,
+                            debit: 0, credit: baseSales,
+                            referenceId: tx.id, referenceType: 'AUTO_TRANSAKSI', createdBy: tx.cashierName, branchId: tx.branchId
+                          });
+                        }
+
+                        const cogsGroups: Record<string, number> = {};
+                        if (tx.items) {
+                          tx.items.forEach((item: any) => {
+                            if (item.costPrice > 0) cogsGroups[akunHPP] = (cogsGroups[akunHPP] || 0) + (item.costPrice * item.quantity);
+                          });
+                        }
+
+                        Object.entries(cogsGroups).forEach(([coa, amt], idx) => {
+                          rebuiltJournals.push({
+                            id: `${jId}_hpp_${idx}`, tenantId: tx.tenantId, date: tx.timestamp, account: coa, description: `[Auto] HPP dari ${tx.invoiceNo}`,
+                            debit: amt, credit: 0, referenceId: tx.id, referenceType: 'AUTO_TRANSAKSI', createdBy: tx.cashierName, branchId: tx.branchId
+                          });
+                          rebuiltJournals.push({
+                            id: `${jId}_inv_${idx}`, tenantId: tx.tenantId, date: tx.timestamp, account: akunPersediaan, description: `[Auto] Pengurangan Persediaan dari ${tx.invoiceNo}`,
+                            debit: 0, credit: amt, referenceId: tx.id, referenceType: 'AUTO_TRANSAKSI', createdBy: tx.cashierName, branchId: tx.branchId
+                          });
+                        });
+
+                        // 2. Rebuild Customers
+                        if (tx.customerId && tx.customerName && tx.customerName !== 'Umum') {
+                          if (!customerMap.has(tx.customerId)) {
+                            customerMap.set(tx.customerId, {
+                              id: tx.customerId, tenantId: tx.tenantId, name: tx.customerName, phone: '', type: 'UMUM',
+                              points: 0, debtAmount: 0, totalPointsEarned: 0, totalPointsRedeemed: 0
+                            });
+                          }
+                          const cust = customerMap.get(tx.customerId)!;
+                          cust.totalPointsEarned += (tx.pointsEarned || 0);
+                          cust.totalPointsRedeemed += (tx.pointsRedeemed || 0);
+                          cust.points = cust.totalPointsEarned - cust.totalPointsRedeemed;
+                          if (tx.paymentMethod === 'KASBON') cust.debtAmount += tx.totalAmount;
+                        }
+                      });
+
+                      // Deduct payments
+                      const kasbonPayments = store.kasbonPayments || [];
+                      if (kasbonPayments.length === 0) {
+                        const rawK = localStorage.getItem(`ksa_kasbon_payments__${tenantId}`) || localStorage.getItem(`ksa_kasbon_payments_${tenantId}`);
+                        if (rawK) {
+                          try {
+                            const parsed = JSON.parse(LZString.decompressFromUTF16(rawK) || '[]');
+                            if (Array.isArray(parsed)) kasbonPayments.push(...parsed);
+                          } catch(e) {}
+                        }
+                      }
+
+                      kasbonPayments.forEach((kp: any) => {
+                        if (kp.customerId && customerMap.has(kp.customerId)) {
+                          customerMap.get(kp.customerId)!.debtAmount -= kp.amount;
+                        }
+                      });
+
+                      const rebuiltCustomers = Array.from(customerMap.values());
+                      
+                      useAppStore.setState({ journalEntries: rebuiltJournals, customers: rebuiltCustomers });
+                      if (kasbonPayments.length > 0) useAppStore.setState({ kasbonPayments: kasbonPayments });
+
+                      alert(`🎉 MESIN REKONSTRUKSI SELESAI!\n\nBerhasil merakit ulang:\n- ${rebuiltJournals.length} baris Jurnal Umum\n- ${rebuiltCustomers.length} Master Pelanggan (termasuk saldo Kasbon)\ndari ${txs.length} struk transaksi.\n\nSilakan klik OK, lalu klik tombol biru "Unggah Sekarang" untuk menyimpannya permanen ke Supabase!`);
+                    } catch (err: any) {
+                      alert("Gagal memulihkan: " + err.message);
+                    }
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white w-full py-2.5 rounded-lg text-sm font-bold flex items-center justify-center transition-colors shadow-md cursor-pointer"
+                >
+                  PULIHKAN JURNAL LOKAL (FORCE RESCUE)
+                </button>
+              </div>
             </div>
           </div>
         </div>
