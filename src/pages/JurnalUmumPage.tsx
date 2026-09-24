@@ -541,7 +541,6 @@ export default function JurnalUmumPage() {
                           <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].debit > 0 ? group.entries[0].debit.toLocaleString('id-ID') : '-'}</td>
                           <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-400 border-l-2 border-slate-100 dark:border-slate-800 print:border-none print:text-black">{group.entries[0].credit > 0 ? group.entries[0].credit.toLocaleString('id-ID') : '-'}</td>
                           <td className="p-3 text-center align-top print:hidden" rowSpan={group.entries.length}>
-                            {isManual && (
                               <div className="flex items-center justify-center gap-2">
                                 <button onClick={() => handleEdit(group.refId)} className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors" title="Edit">
                                   <Edit className="w-4 h-4" />
@@ -550,7 +549,6 @@ export default function JurnalUmumPage() {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
-                            )}
                           </td>
                         </tr>
                         {group.entries.slice(1).map((entry, idx) => (
