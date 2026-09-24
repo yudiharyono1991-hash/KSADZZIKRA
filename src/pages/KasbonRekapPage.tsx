@@ -326,10 +326,10 @@ export default function KasbonRekapPage() {
       const tgl = format(h.date, 'dd/MM/yy');
       const sign = h.type === 'PEMBELIAN' ? '+' : '-';
       const label = h.type === 'PEMBELIAN' ? (h.isPaid ? 'Kasbon (Lunas)' : 'Kasbon (Belum Lunas)') : `Pelunasan${h.paymentMethod ? ` (${h.paymentMethod})` : ''}`;
-      text += `[${tgl}] ${label}\nRp ${h.amount.toLocaleString('id-ID')} (${sign})\n`;
+      text += `[${tgl}] ${label}\nRp ${(h.amount || 0).toLocaleString('id-ID')} (${sign})\n`;
     });
     
-    text += `\n*SISA KASBON: Rp ${receiptCustomer.debtAmount.toLocaleString('id-ID')}*\n`;
+    text += `\n*SISA KASBON: Rp ${(receiptCustomer?.debtAmount || 0).toLocaleString('id-ID')}*\n`;
     if (receiptCustomer.debtAmount === 0) {
       text += `*Status: L U N A S*\n`;
     }
@@ -461,7 +461,7 @@ export default function KasbonRekapPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Piutang Berjalan</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-slate-100">Rp {totalPiutang.toLocaleString('id-ID')}</p>
+            <p className="text-xl font-bold text-slate-800 dark:text-slate-100">Rp {(totalPiutang || 0).toLocaleString('id-ID')}</p>
           </div>
         </div>
         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4">
@@ -596,7 +596,7 @@ export default function KasbonRekapPage() {
                           {customer.history.length}
                         </div>
                         <div className="col-span-2 text-right font-bold text-[11px] sm:text-base text-rose-600 dark:text-rose-400">
-                          Rp {customer.debtAmount.toLocaleString('id-ID')}
+                          Rp {(customer.debtAmount || 0).toLocaleString('id-ID')}
                         </div>
                       </div>
 
@@ -660,10 +660,10 @@ export default function KasbonRekapPage() {
                                           ? (h.isPaid ? 'text-slate-500 dark:text-slate-500' : 'text-rose-600 dark:text-rose-400') 
                                           : 'text-green-600 dark:text-green-400'
                                       }`}>
-                                        {h.type === 'PEMBELIAN' ? '+' : '-'} Rp {h.amount.toLocaleString('id-ID')}
+                                        {h.type === 'PEMBELIAN' ? '+' : '-'} Rp {(h.amount || 0).toLocaleString('id-ID')}
                                       </td>
                                       <td className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap text-[10px] sm:text-sm text-right font-bold text-slate-800 dark:text-slate-200">
-                                        Rp {h.balance.toLocaleString('id-ID')}
+                                        Rp {(h.balance || 0).toLocaleString('id-ID')}
                                       </td>
                                     </tr>
                                   ))}
@@ -693,7 +693,7 @@ export default function KasbonRekapPage() {
             <div className="hidden sm:block w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
             <div className="text-center sm:text-left">
               <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Total Sisa Kasbon</p>
-              <p className="text-sm sm:text-base font-black text-rose-600 dark:text-rose-400">Rp {totalPiutang.toLocaleString('id-ID')}</p>
+              <p className="text-sm sm:text-base font-black text-rose-600 dark:text-rose-400">Rp {(totalPiutang || 0).toLocaleString('id-ID')}</p>
             </div>
           </div>
 
@@ -805,7 +805,7 @@ export default function KasbonRekapPage() {
                         <span className="truncate max-w-[80px] mx-auto">{h.ref}</span>
                       </div>
                       <div className="flex flex-col text-right">
-                        <span>{h.type === 'PEMBELIAN' ? '+' : '-'} {h.amount.toLocaleString('id-ID')}</span>
+                        <span>{h.type === 'PEMBELIAN' ? '+' : '-'} {(h.amount || 0).toLocaleString('id-ID')}</span>
                       </div>
                     </div>
                   </div>
@@ -819,7 +819,7 @@ export default function KasbonRekapPage() {
                     {receiptCustomer.debtAmount === 0 && (
                       <span className="bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded text-[8px] font-black border border-emerald-200">LUNAS</span>
                     )}
-                    <span>Rp {receiptCustomer.debtAmount.toLocaleString('id-ID')}</span>
+                    <span>Rp {(receiptCustomer?.debtAmount || 0).toLocaleString('id-ID')}</span>
                   </div>
                 </div>
                 <p className="text-center text-[8px] text-slate-400 mt-4 leading-tight">

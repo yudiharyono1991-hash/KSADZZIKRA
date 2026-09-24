@@ -143,6 +143,7 @@ interface AppState {
   registerTenant: (tenant: Omit<import('../types').Tenant, 'id' | 'status' | 'createdAt'>) => void;
   approveTenant: (tenantId: string) => void;
   loadTenantData: (tenantId: string) => void;
+  syncFromSupabase: () => Promise<void>;
 
   products: Product[];
   cart: CartItem[];
@@ -692,6 +693,12 @@ const getSavedCategories = (tenantId?: string): string[] => {
     try {
       const parsed = saved as any[];
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Auto-fix: if the cache contains objects instead of strings, purge it
+        if (typeof parsed[0] === 'object' && parsed[0] !== null) {
+          localStorage.removeItem('ksa_product_categories');
+          return ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
+        }
+        
         const dummyList = ['Sembako', 'Fresh Food', 'Minuman', 'Kebutuhan Rumah', 'Alat Listrik', 'Perkakas', 'Bahan Bangunan', 'Alat Tulis & Kantor', 'Elektronik', 'Pakaian', 'Kesehatan', 'Mainan', 'Lainnya'];
         const filtered = parsed
           .map((item) => String(item).trim())
@@ -853,21 +860,47 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!category || typeof category !== 'string') return;
     const normalized = category.trim();
     if (!normalized) return;
-    const currentCategories = get().categories || [];
-    const nextCategories = Array.from(new Set([...currentCategories.map((c) => c.trim()), normalized]));
+    const rawCategories = get().categories;
+    const currentCategories = Array.isArray(rawCategories) ? rawCategories : [];
+    
+    // Defensively handle cases where categories might be objects due to Supabase sync
+    const nextCategories = Array.from(new Set([
+      ...currentCategories.map((c: any) => {
+        if (!c) return '';
+        if (typeof c === 'object') return (c.name || '').toString().trim();
+        return String(c).trim();
+      }).filter(c => c.length > 0),
+      normalized
+    ]));
     set({ categories: nextCategories });
     saveStorage('ksa_product_categories', nextCategories, get().currentUser?.tenantId);
   },
   removeCategory: (category: string) => {
     if (!category || typeof category !== 'string') return;
     const normalized = category.trim();
-    const currentCategories = get().categories || [];
-    const nextCategories = currentCategories.filter((c) => c !== normalized);
+    const rawCategories = get().categories;
+    const currentCategories = Array.isArray(rawCategories) ? rawCategories : [];
+    const nextCategories = currentCategories
+      .map((c: any) => {
+        if (!c) return '';
+        if (typeof c === 'object') return (c.name || '').toString().trim();
+        return String(c).trim();
+      })
+      .filter((c) => c !== normalized && c.length > 0);
     set({ categories: nextCategories });
     saveStorage('ksa_product_categories', nextCategories, get().currentUser?.tenantId);
   },
-  setCategories: (categories: string[]) => {
-    const nextCategories = Array.from(new Set(categories.map((c) => String(c).trim()).filter((c) => c.length > 0)));
+  setCategories: (categories: any[]) => {
+    const safeCategories = Array.isArray(categories) ? categories : [];
+    const nextCategories = Array.from(new Set(
+      safeCategories
+        .map((c: any) => {
+          if (!c) return '';
+          if (typeof c === 'object') return (c.name || '').toString().trim();
+          return String(c).trim();
+        })
+        .filter((c) => c.length > 0)
+    ));
     set({ categories: nextCategories });
     saveStorage('ksa_product_categories', nextCategories, get().currentUser?.tenantId);
   },
@@ -1654,6 +1687,70 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!promosSaved) saveStorage('ksa_promos', [], tenantId);
     if (!bannersSaved) saveStorage('ksa_banners', [], tenantId);
     if (!auditSaved) saveStorage('ksa_audit_logs', [], tenantId);
+  },
+
+  syncFromSupabase: async () => {
+    if (!isSupabaseConfigured) return;
+    const tenantId = get().currentUser?.tenantId || 'tenant_default';
+    get().addNotification({ title: 'Sinkronisasi Dimulai', message: 'Mengambil data terbaru dari Supabase...', type: 'INFO' });
+    try {
+      // Pull products (includes isPPOB flag)
+      const remoteProducts = await supabaseService.getProducts();
+      if (remoteProducts && remoteProducts.length > 0) {
+        const mapped = remoteProducts.map((p: any) => ({
+          id: p.id, tenantId: p.tenant_id, sku: p.sku, name: p.name,
+          category: p.category, price: Number(p.price), costPrice: Number(p.cost_price),
+          stock: Number(p.stock), minStock: Number(p.min_stock || 0),
+          unit: p.unit || 'pcs', isHalal: p.is_halal ?? true,
+          isPPOB: Boolean(p.is_ppob), image: p.image || '',
+          barcode: p.barcode || '', branchId: p.branch_id || '',
+          salesCoaCode: p.sales_coa_code || '', cogsCoaCode: p.cogs_coa_code || '',
+          wholesalePrice: p.wholesale_price || 0, wholesaleMinQty: p.wholesale_min_qty || 0,
+          hasBoxUnit: p.has_box_unit || false, boxBarcode: p.box_barcode || '',
+          pcsPerBox: p.pcs_per_box || 0, boxCostPrice: p.box_cost_price || 0,
+          isPromoActive: p.is_promo_active || false, promoPrice: p.promo_price || 0,
+          expiredDate: p.expired_date || null
+        }));
+        set({ products: mapped });
+        saveStorage('ksa_products', mapped, tenantId);
+      }
+
+      // Pull transactions
+      const remoteTx = await (supabaseService as any).getTransactions?.();
+      if (remoteTx && remoteTx.length > 0) {
+        set({ transactions: remoteTx });
+        saveStorage('ksa_transactions', remoteTx, tenantId);
+      }
+
+      // Pull journal entries
+      const remoteJournals = await supabaseService.getJournalEntries?.();
+      if (remoteJournals && remoteJournals.length > 0) {
+        set({ journalEntries: remoteJournals });
+        saveStorage('ksa_journal_entries', remoteJournals, tenantId);
+      }
+
+      // Pull expenses
+      const remoteExpenses = await supabaseService.getExpenses?.();
+      if (remoteExpenses && remoteExpenses.length > 0) {
+        set({ expenses: remoteExpenses });
+        saveStorage('ksa_expenses', remoteExpenses, tenantId);
+      }
+
+      // Pull customers (for kasbon balance)
+      const remoteCustomers = await supabaseService.getCustomers?.();
+      if (remoteCustomers && remoteCustomers.length > 0) {
+        set({ customers: remoteCustomers });
+        saveStorage('ksa_customers', remoteCustomers, tenantId);
+      }
+
+      get().addNotification({
+        title: '✅ Sinkronisasi Selesai',
+        message: `Data terbaru dari Supabase (Produk PPOB, Transaksi, Jurnal, Pengeluaran, Pelanggan) berhasil dimuat!`,
+        type: 'SUCCESS'
+      });
+    } catch (err: any) {
+      get().addNotification({ title: 'Sinkronisasi Gagal', message: err.message || 'Terjadi kesalahan saat menarik data dari Supabase.', type: 'ERROR' });
+    }
   },
 
   login: async (username, password) => {

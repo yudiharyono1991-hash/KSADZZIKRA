@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Retrieve Supabase environment variables or use hardcoded fallbacks
-let SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://cfhweciblqjpnhqoabvh.supabase.co';
-let SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmaHdlY2libHFqcG5ocW9hYnZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDkyNzIsImV4cCI6MjEwNTY4NTI3Mn0.D_EAlpQehmG2cxWdjVxTF3RhFxUxy6Lb_aWMlbv3ur4';
+let SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://cfhweciblqjpnhqoabvh.supabase.co';
+let SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmaHdlY2libHFqcG5ocW9hYnZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDkyNzIsImV4cCI6MjEwNTY4NTI3Mn0.D_EAlpQehmG2cxWdjVxTF3RhFxUxy6Lb_aWMlbv3ur4';
 
 // Try to override with User Settings if available
 try {
@@ -513,10 +513,10 @@ export const supabaseService = {
       const { error } = await supabase.from('transactions').upsert(payload);
       if (error) throw error;
 
-      logSync(`Inserted transaction ${tx.invoiceNo} successfully.`);
+      logSync(`Inserted transactions successfully.`);
       return true;
     } catch (err: any) {
-      logSync(`Failed to save transaction ${tx.invoiceNo}: ${err.message}`, true);
+      logSync(`Failed to save transactions bulk: ${err.message}`, true);
       return false;
     }
   },

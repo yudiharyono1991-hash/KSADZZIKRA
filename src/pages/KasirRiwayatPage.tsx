@@ -46,7 +46,7 @@ export default function KasirRiwayatPage() {
   const uniqueCashiers = Array.from(new Set(myTransactions.map(tx => tx.cashierName))).filter(Boolean);
 
   const filteredTx = myTransactions.filter(tx => {
-    const matchSearch = tx.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = (tx.invoiceNo || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchCashier = cashierFilter === 'ALL' || tx.cashierName === cashierFilter;
     let matchType = true;
     
@@ -94,7 +94,7 @@ export default function KasirRiwayatPage() {
   const filteredKasbonHistory = kasbonHistory.filter(h => {
     const hDate = h.date.split('T')[0];
     const isDateMatch = (!startDate || hDate >= startDate) && (!endDate || hDate <= endDate);
-    const searchMatch = h.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || h.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchMatch = (h.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) || (h.invoiceNo || '').toLowerCase().includes(searchTerm.toLowerCase());
     return isDateMatch && searchMatch;
   });
 

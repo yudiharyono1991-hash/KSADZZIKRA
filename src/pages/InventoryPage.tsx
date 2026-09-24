@@ -731,9 +731,11 @@ export default function InventoryPage() {
                 onChange={(e) => setSelectedCategory(e.target.value)}
               >
                 <option value="ALL">Semua Kategori</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {(Array.isArray(categories) ? categories : []).map((cat: any) => {
+                  const catStr = typeof cat === 'object' && cat !== null ? (cat.name || '') : String(cat || '');
+                  if (!catStr.trim()) return null;
+                  return <option key={catStr} value={catStr}>{catStr}</option>;
+                })}
               </select>
               {selectedCategory !== 'ALL' && customSavedCategories.includes(selectedCategory) && (
                 <button
@@ -776,16 +778,31 @@ export default function InventoryPage() {
                 className="border border-gray-200 dark:border-slate-700 rounded-lg py-2 px-3 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const normalized = newCategoryName.trim();
+                    if (!normalized) return;
+                    const rawCats = Array.isArray(savedCategories) ? savedCategories : [];
+                    const catStrings = rawCats.map((c: any) => typeof c === 'object' && c !== null ? String(c.name || '') : String(c));
+                    const nextCats = Array.from(new Set([...catStrings, normalized]));
+                    setCategories(nextCats);
+                    setNewCategoryName('');
+                    addNotification({ title: 'Kategori Ditambahkan', message: `Kategori "${normalized}" berhasil ditambahkan!`, type: 'SUCCESS' });
+                  }
+                }}
               />
               <button
                 type="button"
                 onClick={() => {
                   const normalized = newCategoryName.trim();
-                  if (normalized) {
-                    addCategory(normalized);
-                    setNewCategoryName('');
-                    alert(`Kategori "${normalized}" berhasil ditambahkan! Silakan cek di daftar pilihan Kategori.`);
-                  }
+                  if (!normalized) return;
+                  const rawCats = Array.isArray(savedCategories) ? savedCategories : [];
+                  const catStrings = rawCats.map((c: any) => typeof c === 'object' && c !== null ? String(c.name || '') : String(c));
+                  const nextCats = Array.from(new Set([...catStrings, normalized]));
+                  setCategories(nextCats);
+                  setNewCategoryName('');
+                  addNotification({ title: 'Kategori Ditambahkan', message: `Kategori "${normalized}" berhasil ditambahkan!`, type: 'SUCCESS' });
                 }}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center space-x-1 shadow-xs active:scale-98 transition-all"
               >

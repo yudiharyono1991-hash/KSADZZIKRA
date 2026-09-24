@@ -28,7 +28,8 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopBarProps) {
-  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser, onlineOrders, notifications, markNotificationAsRead, isDarkMode, toggleDarkMode } = useBranchData();
+  const { transactions, products, currentUser, branches, activeBranchId, setActiveBranchId, logout, users, updateUser, onlineOrders, notifications, markNotificationAsRead, isDarkMode, toggleDarkMode, syncFromSupabase } = useBranchData();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [time, setTime] = useState(new Date());
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -172,8 +173,20 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
     return true;
   }) || [];
   
-  const handleRefresh = () => {
-    window.location.reload();
+  const handleRefresh = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      if (typeof syncFromSupabase === 'function') {
+        await syncFromSupabase();
+      } else {
+        window.location.reload();
+      }
+    } catch (e) {
+      window.location.reload();
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -225,10 +238,11 @@ export default function TopBar({ onToggleSidebar, onToggleDesktopSidebar }: TopB
         {/* Refresh Button */}
         <button 
           onClick={handleRefresh}
-          className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-green-100 text-gray-500 dark:text-slate-400 hover:text-green-700 rounded-lg transition-colors cursor-pointer"
-          title="Sinkronisasi Data"
+          disabled={isSyncing}
+          className={`p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-green-100 text-gray-500 dark:text-slate-400 hover:text-green-700 rounded-lg transition-colors cursor-pointer ${isSyncing ? 'opacity-60 cursor-not-allowed' : ''}`}
+          title={isSyncing ? 'Sedang menarik data dari Supabase...' : 'Tarik Data Terbaru dari Supabase (PPOB, Transaksi, dll)'}
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-green-600' : ''}`} />
         </button>
 
         {/* Expiring Products Alert */}
