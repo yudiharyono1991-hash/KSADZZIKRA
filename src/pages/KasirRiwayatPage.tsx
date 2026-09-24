@@ -483,15 +483,15 @@ export default function KasirRiwayatPage() {
             </div>
             <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
               <p className="text-[10px] font-bold text-gray-500 uppercase">Total Omset</p>
-              <p className="text-lg font-black text-green-600">Rp {totalOmset.toLocaleString('id-ID')}</p>
+              <p className="text-lg font-black text-green-600">Rp {(totalOmset || 0).toLocaleString('id-ID')}</p>
               <div className="mt-1 pt-1 border-t border-gray-100 dark:border-slate-800 text-[10px] space-y-0.5">
-                <div className="flex justify-between"><span className="text-gray-500">Fisik:</span><span className="font-bold text-gray-700 dark:text-slate-300">Rp {totalOmsetFisik.toLocaleString('id-ID')}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">PPOB:</span><span className="font-bold text-gray-700 dark:text-slate-300">Rp {totalOmsetPPOB.toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Fisik:</span><span className="font-bold text-gray-700 dark:text-slate-300">Rp {(totalOmsetFisik || 0).toLocaleString('id-ID')}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">PPOB:</span><span className="font-bold text-gray-700 dark:text-slate-300">Rp {(totalOmsetPPOB || 0).toLocaleString('id-ID')}</span></div>
               </div>
             </div>
             <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
               <p className="text-[10px] font-bold text-gray-500 uppercase">Total Margin</p>
-              <p className="text-lg font-black text-orange-600">Rp {totalMargin.toLocaleString('id-ID')}</p>
+              <p className="text-lg font-black text-orange-600">Rp {(totalMargin || 0).toLocaleString('id-ID')}</p>
             </div>
           </div>
         )}
@@ -516,9 +516,9 @@ export default function KasirRiwayatPage() {
                        <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-200">{c.cashierName}</td>
                        <td className="px-3 py-2 text-center text-slate-600 dark:text-slate-400">{c.transaksi} Struk</td>
                        <td className="px-3 py-2 text-center text-slate-600 dark:text-slate-400">{c.barang} Item</td>
-                       <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Rp {c.fisik.toLocaleString('id-ID')}</td>
-                       <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Rp {c.ppob.toLocaleString('id-ID')}</td>
-                       <td className="px-3 py-2 text-right font-bold text-green-600 dark:text-green-500">Rp {c.total.toLocaleString('id-ID')}</td>
+                       <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Rp {(c.fisik || 0).toLocaleString('id-ID')}</td>
+                       <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">Rp {(c.ppob || 0).toLocaleString('id-ID')}</td>
+                       <td className="px-3 py-2 text-right font-bold text-green-600 dark:text-green-500">Rp {(c.total || 0).toLocaleString('id-ID')}</td>
                      </tr>
                    ))}
                  </tbody>
@@ -558,7 +558,7 @@ export default function KasirRiwayatPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-right font-bold text-green-700">
-                    Rp {tx.totalAmount.toLocaleString('id-ID')}
+                    Rp {(tx.totalAmount || 0).toLocaleString('id-ID')}
                   </td>
                   <td className="px-3 py-3 text-center space-x-2">
                     <button
@@ -627,8 +627,8 @@ export default function KasirRiwayatPage() {
                   </td>
                   <td className="px-3 py-4 text-right whitespace-nowrap">
                     <div className="flex flex-col items-end">
-                      <span className="text-green-800 text-[11px] sm:text-sm font-extrabold tracking-tight whitespace-nowrap">Rp {totalOmset.toLocaleString('id-ID')}</span>
-                      <span className="text-[9px] text-amber-600 font-normal mt-0.5 whitespace-nowrap">Margin: Rp {totalMargin.toLocaleString('id-ID')}</span>
+                      <span className="text-green-800 text-[11px] sm:text-sm font-extrabold tracking-tight whitespace-nowrap">Rp {(totalOmset || 0).toLocaleString('id-ID')}</span>
+                      <span className="text-[9px] text-amber-600 font-normal mt-0.5 whitespace-nowrap">Margin: Rp {(totalMargin || 0).toLocaleString('id-ID')}</span>
                     </div>
                   </td>
                   <td className="px-3 py-4"></td>
@@ -663,7 +663,7 @@ export default function KasirRiwayatPage() {
                       )}
                     </td>
                     <td className="px-3 py-3 text-gray-800 dark:text-slate-200 font-medium">{item.customerName}</td>
-                    <td className="px-3 py-3 text-right font-bold text-gray-700">Rp {item.amount.toLocaleString('id-ID')}</td>
+                    <td className="px-3 py-3 text-right font-bold text-gray-700">Rp {(item.amount || 0).toLocaleString('id-ID')}</td>
                     <td className="px-3 py-3 text-center space-x-2">
                       <button
                         onClick={() => {

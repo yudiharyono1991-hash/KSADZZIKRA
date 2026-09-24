@@ -8,6 +8,16 @@
 
 ---
 
+## Hotfixes (September 2026)
+
+| # | Item | Status |
+|---|------|--------|
+| HF.5 | Perbaikan error toLocaleString di Kasir Riwayat karena data PPOB kosong | 🟢 Done |
+| HF.6 | Penambahan kolom target_invoice_nos pada kasbon_payments Supabase | 🟢 Done |
+| HF.7 | Konfigurasi bucket Supabase (store-assets) untuk upload banner promo | 🟢 Done |
+
+---
+
 ## Hotfixes (Agustus 2026)
 
 | # | Item | Status |
